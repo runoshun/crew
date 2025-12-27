@@ -69,10 +69,10 @@ Bootstrap strategy: Build crew with crew.
 
 ### 1.7 Init Command
 
-- [ ] `internal/usecase/init_repo.go` - InitRepo usecase
-- [ ] `internal/cli/init.go` - init command
-- [ ] Create `.git/crew/` directory
-- [ ] Create empty `tasks.json`
+- [x] `internal/usecase/init_repo.go` - InitRepo usecase
+- [x] `internal/cli/init.go` - init command
+- [x] Create `.git/crew/` directory
+- [x] Create empty `tasks.json`
 - [ ] Integration test
 
 **Phase 1 Milestone**: `git crew init` and `git crew --version` work, CI passes.
