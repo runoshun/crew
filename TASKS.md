@@ -51,9 +51,9 @@ Bootstrap strategy: Build crew with crew.
 
 ### 1.4 Infrastructure: JSON Store
 
-- [ ] `internal/infra/jsonstore/store.go` - TaskRepository implementation
-- [ ] File locking (flock)
-- [ ] Unit tests with temp files
+- [x] `internal/infra/jsonstore/store.go` - TaskRepository implementation
+- [x] File locking (flock)
+- [x] Unit tests with temp files
 
 ### 1.5 App Container
 
