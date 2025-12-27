@@ -3,6 +3,8 @@ package domain
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
+	"strconv"
 )
 
 // BranchName returns the branch name for a task.
@@ -68,4 +70,22 @@ func TmuxConfigPath(crewDir string) string {
 // ConfigPath returns the path to the repository config file.
 func ConfigPath(crewDir string) string {
 	return filepath.Join(crewDir, "config.toml")
+}
+
+// branchPattern matches crew branch names: crew-<id> or crew-<id>-gh-<issue>
+var branchPattern = regexp.MustCompile(`^crew-(\d+)(?:-gh-\d+)?$`)
+
+// ParseBranchTaskID extracts the task ID from a branch name.
+// Returns the task ID and true if the branch follows the crew naming convention,
+// or 0 and false if not.
+func ParseBranchTaskID(branch string) (int, bool) {
+	matches := branchPattern.FindStringSubmatch(branch)
+	if matches == nil {
+		return 0, false
+	}
+	id, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return 0, false
+	}
+	return id, true
 }
