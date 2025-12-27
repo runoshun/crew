@@ -152,6 +152,21 @@ For detailed steps, use the `review-workflow` skill.
 4. Don't over-engineer
 5. Don't copy-paste code
 
+### Test Coverage Guidelines
+
+**Check is mandatory, 100% is not required**
+
+1. **Always check coverage** - Use `go tool cover -func` to identify uncovered code
+2. **Must cover**:
+   - Happy path (main scenarios)
+   - Business logic branches (validation, state transitions, etc.)
+   - User-facing errors (ErrEmptyTitle, ErrParentNotFound, etc.)
+3. **Should cover (if low cost)**:
+   - Error propagation (prevents silent swallowing, catches regressions)
+4. **No need to cover**:
+   - Unreachable code (e.g., default panic in exhaustive switch)
+   - Log-only branches
+
 ---
 
 ## Reviewer Guidelines
