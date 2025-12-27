@@ -19,7 +19,7 @@ Register ALL TODOs at once when starting Phase 1:
 
 ```
 # Phase 1: Setup
-- [ ] Read docs/README.md, core-concepts.md, architecture.md (+ spec-*.md if relevant)
+- [ ] Read docs/README.md, core-concepts.md, architecture.md, spec-cli.md, spec-tui.md
 - [ ] Check TASKS.md for current task
 - [ ] Ensure on feature branch
 # Phase 2: Implementation
@@ -51,13 +51,12 @@ Register ALL TODOs at once when starting Phase 1:
 **Goal**: Understand context and prepare workspace.
 
 1. **Read project docs** (skip if already familiar from this session)
-   - Read docs/README.md for project overview
-   - **MUST read for implementation tasks**:
+   - **MUST read ALL docs**:
+     - docs/README.md - Project overview
      - docs/core-concepts.md - Design principles
      - docs/architecture.md - Code structure
-   - Read additionally based on the task:
-     - docs/spec-cli.md - Command specs (when implementing CLI)
-     - docs/spec-tui.md - TUI specs (when implementing TUI)
+     - docs/spec-cli.md - CLI command specs
+     - docs/spec-tui.md - TUI screen specs
 
 2. **Check current task**
    - Read TASKS.md to identify the next uncompleted task
