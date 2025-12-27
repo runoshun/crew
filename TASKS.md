@@ -35,11 +35,10 @@ Bootstrap strategy: Build crew with crew.
 
 ### 1.2 CI Setup
 
-- [ ] Create `v2/.golangci.yml` with exhaustive, gosum linters
-- [x] Create `v2/mise.toml` with build, test, lint, ci tasks
-- [ ] Update `.github/workflows/ci.yml` to run v2 CI
-  - Run `mise run ci` in v2 directory
-  - Keep existing v1 CI running
+- [x] Create `.golangci.yml` with exhaustive, gochecksumtype linters
+- [x] Create `mise.toml` with build, test, lint, ci tasks
+- [x] Create `.github/workflows/ci.yml` for CI
+  - lint, test, vuln jobs
 
 ### 1.3 Domain Layer
 
