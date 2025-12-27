@@ -26,7 +26,8 @@ Register ALL TODOs at once when starting Phase 1:
 - [ ] Plan implementation and update TODOs (add specific steps here)
 # Phase 3: Wrap-up
 - [ ] Run final CI check
-- [ ] Commit changes (ask user)
+- [ ] Check test coverage for new code
+- [ ] Commit and merge (ask user - single confirmation for both)
 - [ ] Review session feedback → propose guideline updates
 - [ ] Document any docs/ friction in DESIGN_FEEDBACK.md
 - [ ] Ask user before proceeding to next task
@@ -95,11 +96,21 @@ Register ALL TODOs at once when starting Phase 1:
    - Run `mise run ci` one last time
    - Ensure all tests pass
 
-2. **Commit** (when user requests)
-   - Stage relevant files
-   - Write clear commit message following format in AGENTS.md
+2. **Check test coverage**
+   - Run `mise run test:cover`
+   - Review coverage: `go tool cover -func=coverage.out | grep -E "(total|<new-package>)"`
+   - Add tests if coverage is insufficient
 
-3. **Retrospective**
+3. **Commit and Merge**
+   - When task is complete, ask user once: "Commit and merge to main?"
+   - If yes:
+     - Stage and commit with clear message
+     - Switch to main: `git checkout main`
+     - Merge with no-ff: `git merge --no-ff feature/<branch>`
+     - Delete feature branch: `git branch -d feature/<branch>`
+   - If continuing on same branch (e.g., next task is closely related), skip merge
+
+4. **Retrospective**
    - Review feedback received during the session:
      - Instructions repeated multiple times
      - Explicit requests like "please always do X"
@@ -108,7 +119,7 @@ Register ALL TODOs at once when starting Phase 1:
      - Propose changes to the user
      - If approved, create a separate commit
 
-4. **Design Feedback** (if applicable)
+5. **Design Feedback** (if applicable)
    - If you encountered friction with specs in docs/:
      - Specs difficult to implement as written
      - Inconsistencies between docs

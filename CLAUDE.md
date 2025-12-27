@@ -103,6 +103,26 @@ For detailed steps, use the `review-workflow` skill.
 
 ---
 
+## Architecture Principles
+
+### Rules (MUST follow)
+
+1. **Respect layer responsibilities** - Place code based on "whose concern is it". Don't put code that doesn't depend on a specific external I/F in that layer
+2. **Centralize domain knowledge in domain** - Types, errors, and rules used across the app belong in the domain package
+3. **Explicit over implicit** - Environment-dependent values (cwd, etc.) should be determined by external I/F and passed explicitly as parameters
+4. **No compromises on foundations** - Don't defer design decisions on foundational code; build the correct structure from the start
+
+### Examples
+
+| Principle | Bad | Good | Reason |
+|-----------|-----|------|--------|
+| Layer responsibility | Implement git root detection in `cmd` | Implement in `infra/git` | Git operations are not CLI-specific; needed by TUI and tests too |
+| Domain centralization | Define `ErrNotGitRepository` in `app` package | Define in `domain/errors.go` | Git repository existence is domain knowledge for the whole app |
+| Explicit over implicit | `git.NewClient()` calls `os.Getwd()` internally | `git.NewClient(dir)` receives it | Allows specifying arbitrary directories in tests or other use cases |
+| No compromises | Place in `app` temporarily "to move later" | Create `infra/git` package from the start | Temporary placements become tech debt; dependencies spread and increase migration cost |
+
+---
+
 ## Developer Guidelines
 
 ### Rules (MUST follow)
@@ -171,3 +191,12 @@ mise run ci                     # Full CI check (required before commit)
 mise run test:cover             # Run with coverage
 go tool cover -func=coverage.out  # View summary
 ```
+
+---
+
+## Note: File Structure
+
+This file is the source of truth. The following are symlinks:
+
+- `AGENTS.md` → `CLAUDE.md`
+- `.opencode/skill/` → `.claude/skills/`

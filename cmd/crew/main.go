@@ -1,23 +1,62 @@
+// Package main is the entry point for the git-crew CLI.
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
+	"github.com/runoshun/git-crew/v2/internal/app"
+	"github.com/runoshun/git-crew/v2/internal/cli"
+	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
+// version is set at build time using -ldflags.
 var version = "dev"
 
 func main() {
-	rootCmd := &cobra.Command{
-		Use:     "crew",
-		Short:   "AI agent task management CLI",
-		Version: version,
-	}
-
-	if err := rootCmd.Execute(); err != nil {
+	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func run() error {
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	// Create dependency injection container
+	container, err := app.New(cwd)
+	if err != nil {
+		// Allow running without git repo for --version and --help
+		if errors.Is(err, domain.ErrNotGitRepository) {
+			return runWithoutContainer(err)
+		}
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+
+	// Create and execute root command
+	rootCmd := cli.NewRootCommand(container, version)
+	return rootCmd.Execute()
+}
+
+// runWithoutContainer handles cases where git repo is not found.
+// This allows --version and --help to work without a git repository.
+func runWithoutContainer(gitErr error) error {
+	rootCmd := cli.NewRootCommand(nil, version)
+
+	// If the command is --version or --help, execute it
+	if len(os.Args) > 1 {
+		arg := os.Args[1]
+		if arg == "--version" || arg == "-v" || arg == "version" ||
+			arg == "--help" || arg == "-h" || arg == "help" {
+			return rootCmd.Execute()
+		}
+	}
+
+	// For other commands, return the git error
+	return gitErr
 }
