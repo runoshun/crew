@@ -34,17 +34,6 @@ func newConfig(gitClient *git.Client) Config {
 	}
 }
 
-// GitClient provides git operations for CLI commands.
-// This is a subset of domain.Git interface for branch detection.
-type GitClient struct {
-	client *git.Client
-}
-
-// CurrentBranch returns the name of the current branch.
-func (g *GitClient) CurrentBranch() (string, error) {
-	return g.client.CurrentBranch()
-}
-
 // Container provides dependency injection for the application.
 // It holds all port implementations and provides factory methods for use cases.
 type Container struct {
@@ -52,7 +41,7 @@ type Container struct {
 	Tasks            domain.TaskRepository
 	StoreInitializer domain.StoreInitializer
 	Clock            domain.Clock
-	Git              *GitClient
+	Git              domain.Git
 	// Sessions  domain.SessionManager  // TODO: implement in later phase
 	// Worktrees domain.WorktreeManager // TODO: implement in later phase
 	// GitHub    domain.GitHub          // TODO: implement in later phase
@@ -88,7 +77,7 @@ func New(dir string) (*Container, error) {
 		Tasks:            store,
 		StoreInitializer: store,
 		Clock:            domain.RealClock{},
-		Git:              &GitClient{client: gitClient},
+		Git:              gitClient,
 		Logger:           logger,
 		Config:           cfg,
 	}, nil

@@ -248,7 +248,7 @@ Examples:
 }
 
 // resolveTaskID resolves the task ID from arguments or current branch.
-func resolveTaskID(args []string, git *app.GitClient) (int, error) {
+func resolveTaskID(args []string, git domain.Git) (int, error) {
 	if len(args) > 0 {
 		// Parse from argument
 		id, err := parseTaskID(args[0])

@@ -50,6 +50,39 @@ func (c *Client) CurrentBranch() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// BranchExists checks if a branch exists.
+// TODO: implement in later phase
+func (c *Client) BranchExists(_ string) (bool, error) {
+	panic("not implemented")
+}
+
+// HasUncommittedChanges checks for uncommitted changes in a directory.
+// TODO: implement in later phase
+func (c *Client) HasUncommittedChanges(_ string) (bool, error) {
+	panic("not implemented")
+}
+
+// HasMergeConflict checks if merging branch into target would conflict.
+// TODO: implement in later phase
+func (c *Client) HasMergeConflict(_, _ string) (bool, error) {
+	panic("not implemented")
+}
+
+// Merge merges a branch into the current branch.
+// TODO: implement in later phase
+func (c *Client) Merge(_ string, _ bool) error {
+	panic("not implemented")
+}
+
+// DeleteBranch deletes a branch.
+// TODO: implement in later phase
+func (c *Client) DeleteBranch(_ string) error {
+	panic("not implemented")
+}
+
+// Ensure Client implements domain.Git interface.
+var _ domain.Git = (*Client)(nil)
+
 // findGitRoot finds the git repository root and .git directory from the given directory.
 func findGitRoot(dir string) (repoRoot, gitDir string, err error) {
 	// Get the repository root
