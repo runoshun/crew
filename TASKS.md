@@ -57,9 +57,9 @@ Bootstrap strategy: Build crew with crew.
 
 ### 1.5 App Container
 
-- [ ] `internal/app/container.go` - Container struct, Config
-- [ ] Clock interface and RealClock
-- [ ] UseCase factory methods (stubs for now)
+- [x] `internal/app/container.go` - Container struct, Config
+- [x] Clock interface and RealClock
+- [x] UseCase factory methods (stubs for now)
 
 ### 1.6 CLI Skeleton
 
