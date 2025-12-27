@@ -26,8 +26,8 @@ and isolated task execution.`,
 		newInitCommand(c),
 		newNewCommand(c),
 		newListCommand(c),
+		newShowCommand(c),
 		// Commands below will be added as they are implemented:
-		// newShowCommand(c),
 		// newStartCommand(c),
 	)
 

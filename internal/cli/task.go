@@ -195,3 +195,158 @@ func formatDuration(d time.Duration) string {
 	}
 	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
+
+// newShowCommand creates the show command for displaying task details.
+func newShowCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "show [id]",
+		Short: "Display task details",
+		Long: `Display detailed information about a task.
+
+If no ID is provided, the task ID is auto-detected from the current branch name.
+The branch must follow the naming convention: crew-<id> or crew-<id>-gh-<issue>
+
+Output includes:
+  - Task ID and title
+  - Description
+  - Status, parent, branch, labels
+  - GitHub issue and PR numbers (if linked)
+  - Running agent and session info
+  - Sub-tasks (if any)
+  - Comments (if any)
+
+Examples:
+  # Show task by ID
+  git crew show 1
+
+  # Auto-detect task from current branch
+  git crew show`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve task ID
+			taskID, err := resolveTaskID(args, c.Git)
+			if err != nil {
+				return err
+			}
+
+			// Execute use case
+			uc := c.ShowTaskUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.ShowTaskInput{
+				TaskID: taskID,
+			})
+			if err != nil {
+				return err
+			}
+
+			// Print output
+			printTaskDetails(cmd.OutOrStdout(), out)
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+// resolveTaskID resolves the task ID from arguments or current branch.
+func resolveTaskID(args []string, git *app.GitClient) (int, error) {
+	if len(args) > 0 {
+		// Parse from argument
+		id, err := parseTaskID(args[0])
+		if err != nil {
+			return 0, fmt.Errorf("invalid task ID: %w", err)
+		}
+		return id, nil
+	}
+
+	// Auto-detect from branch
+	if git == nil {
+		return 0, fmt.Errorf("task ID is required (not on a crew branch)")
+	}
+
+	branch, err := git.CurrentBranch()
+	if err != nil {
+		return 0, fmt.Errorf("failed to detect current branch: %w", err)
+	}
+
+	id, ok := domain.ParseBranchTaskID(branch)
+	if !ok {
+		return 0, fmt.Errorf("task ID is required (current branch '%s' is not a crew branch)", branch)
+	}
+
+	return id, nil
+}
+
+// parseTaskID parses a task ID string to int.
+func parseTaskID(s string) (int, error) {
+	// Remove leading # if present
+	s = strings.TrimPrefix(s, "#")
+	var id int
+	_, err := fmt.Sscanf(s, "%d", &id)
+	if err != nil {
+		return 0, err
+	}
+	if id <= 0 {
+		return 0, fmt.Errorf("task ID must be positive")
+	}
+	return id, nil
+}
+
+// printTaskDetails prints task details in a formatted output.
+func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
+	task := out.Task
+
+	// Header
+	_, _ = fmt.Fprintf(w, "# Task %d: %s\n\n", task.ID, task.Title)
+
+	// Description
+	if task.Description != "" {
+		_, _ = fmt.Fprintf(w, "%s\n\n", task.Description)
+	}
+
+	// Fields
+	_, _ = fmt.Fprintf(w, "Status: %s\n", task.Status)
+
+	if task.ParentID != nil {
+		_, _ = fmt.Fprintf(w, "Parent: #%d\n", *task.ParentID)
+	} else {
+		_, _ = fmt.Fprintln(w, "Parent: none")
+	}
+
+	_, _ = fmt.Fprintf(w, "Branch: %s\n", domain.BranchName(task.ID, task.Issue))
+
+	if len(task.Labels) > 0 {
+		_, _ = fmt.Fprintf(w, "Labels: [%s]\n", strings.Join(task.Labels, ", "))
+	} else {
+		_, _ = fmt.Fprintln(w, "Labels: none")
+	}
+
+	_, _ = fmt.Fprintf(w, "Created: %s\n", task.Created.Format(time.RFC3339))
+
+	if task.Issue > 0 {
+		_, _ = fmt.Fprintf(w, "Issue: #%d\n", task.Issue)
+	}
+
+	if task.PR > 0 {
+		_, _ = fmt.Fprintf(w, "PR: #%d\n", task.PR)
+	}
+
+	if task.Agent != "" {
+		_, _ = fmt.Fprintf(w, "Agent: %s (session: %s)\n", task.Agent, task.Session)
+	}
+
+	// Sub-tasks
+	if len(out.Children) > 0 {
+		_, _ = fmt.Fprintln(w, "\nSub-tasks:")
+		for _, child := range out.Children {
+			_, _ = fmt.Fprintf(w, "  #%d [%s] %s\n", child.ID, child.Status, child.Title)
+		}
+	}
+
+	// Comments
+	if len(out.Comments) > 0 {
+		_, _ = fmt.Fprintln(w, "\nComments:")
+		for _, comment := range out.Comments {
+			_, _ = fmt.Fprintf(w, "  [%s] %s\n", comment.Time.Format(time.RFC3339), comment.Text)
+		}
+	}
+}

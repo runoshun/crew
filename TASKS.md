@@ -101,11 +101,11 @@ Bootstrap strategy: Build crew with crew.
 
 ### 2.3 Show Task
 
-- [ ] `internal/usecase/show_task.go` - ShowTask usecase
-- [ ] `internal/cli/task.go` - show command
-- [ ] Display all fields including parent and sub-tasks
-- [ ] Auto-detect task ID from branch name
-- [ ] Unit tests
+- [x] `internal/usecase/show_task.go` - ShowTask usecase
+- [x] `internal/cli/task.go` - show command
+- [x] Display all fields including parent and sub-tasks
+- [x] Auto-detect task ID from branch name
+- [x] Unit tests
 - [ ] Integration test
 
 ### 2.4 Edit Task

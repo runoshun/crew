@@ -39,6 +39,17 @@ func (c *Client) GitDir() string {
 	return c.gitDir
 }
 
+// CurrentBranch returns the name of the current branch.
+func (c *Client) CurrentBranch() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = c.repoRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current branch: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // findGitRoot finds the git repository root and .git directory from the given directory.
 func findGitRoot(dir string) (repoRoot, gitDir string, err error) {
 	// Get the repository root
