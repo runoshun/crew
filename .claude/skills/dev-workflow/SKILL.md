@@ -13,20 +13,52 @@ When this skill is loaded, IMMEDIATELY begin Phase 1. Do NOT wait for user confi
 
 ---
 
-## Phase 1: Setup
+## TODOs
+
+Register ALL TODOs at once when starting Phase 1:
+
+```
+# Phase 1: Setup
+- [ ] Read docs/README.md, core-concepts.md, architecture.md (+ spec-*.md if relevant)
+- [ ] Check TASKS.md for current task
+- [ ] Ensure on feature branch
+# Phase 2: Implementation
+- [ ] Plan implementation and update TODOs (add specific steps here)
+# Phase 3: Wrap-up
+- [ ] Run final CI check
+- [ ] Commit changes (ask user)
+- [ ] Review session feedback → propose guideline updates
+- [ ] Document any docs/ friction in DESIGN_FEEDBACK.md
+- [ ] Ask user before proceeding to next task
+```
+
+---
+
+## Rules
+
+1. **Start immediately** - Begin Phase 1 upon skill load
+2. **Register ALL TODOs at once** - Include all phases when starting Phase 1
+3. **Update TODOs in real-time** - Mark in_progress/completed as you work
+4. **One item in progress at a time** - Focus and complete before moving on
+5. **Add implementation steps** - When reaching "Plan implementation and update TODOs", add specific steps
+
+---
+
+## Reference: Phase Details
+
+### Phase 1: Setup
 
 **Goal**: Understand context and prepare workspace.
 
-### Steps
-
 1. **Read project docs** (skip if already familiar from this session)
    - Read docs/README.md for project overview
-   - Read related docs based on the task:
+   - **MUST read for implementation tasks**:
      - docs/core-concepts.md - Design principles
-     - docs/architecture.md - Code structure (always read for implementation tasks)
+     - docs/architecture.md - Code structure
+   - Read additionally based on the task:
      - docs/spec-cli.md - Command specs (when implementing CLI)
      - docs/spec-tui.md - TUI specs (when implementing TUI)
-   
+
 2. **Check current task**
    - Read TASKS.md to identify the next uncompleted task
    - If unclear, ask the user which task to work on
@@ -36,21 +68,9 @@ When this skill is loaded, IMMEDIATELY begin Phase 1. Do NOT wait for user confi
    - If on `main`: create feature branch `git checkout -b feature/<task-description>`
    - If already on `feature/*`: continue on current branch
 
-### TODOs for Phase 1
-
-```
-- [ ] Read docs/README.md and related docs (architecture.md, spec-*.md as needed)
-- [ ] Check TASKS.md for current task
-- [ ] Ensure on feature branch
-```
-
----
-
-## Phase 2: Implementation
+### Phase 2: Implementation
 
 **Goal**: Complete the task with quality.
-
-### Steps
 
 1. **Plan implementation**
    - Break down the task into specific TODOs
@@ -68,23 +88,9 @@ When this skill is loaded, IMMEDIATELY begin Phase 1. Do NOT wait for user confi
 4. **Update TASKS.md**
    - Check off completed items in TASKS.md as you go
 
-### TODOs for Phase 2 (adapt to actual task)
-
-```
-- [ ] <Implementation step 1>
-- [ ] <Implementation step 2>
-- [ ] ...
-- [ ] Run mise run ci
-- [ ] Update TASKS.md checkboxes
-```
-
----
-
-## Phase 3: Wrap-up
+### Phase 3: Wrap-up
 
 **Goal**: Finalize changes and reflect on the session.
-
-### Steps
 
 1. **Final CI check**
    - Run `mise run ci` one last time
@@ -109,22 +115,3 @@ When this skill is loaded, IMMEDIATELY begin Phase 1. Do NOT wait for user confi
      - Inconsistencies between docs
      - Missing details requiring assumptions
    - Append findings to DESIGN_FEEDBACK.md (do NOT modify docs/ directly)
-
-### TODOs for Phase 3
-
-```
-- [ ] Run final mise run ci
-- [ ] Commit changes (on user request)
-- [ ] Retrospective: review session for guideline improvements
-- [ ] Design Feedback: document any friction with docs/
-```
-
----
-
-## Rules
-
-1. **Start immediately** - Begin Phase 1 upon skill load
-2. **Register ALL steps as TODOs** - Before starting each phase
-3. **Update TODOs in real-time** - Mark in_progress/completed as you work
-4. **One item in progress at a time** - Focus and complete before moving on
-5. **Ask before proceeding to next task** - After Phase 3, confirm with user
