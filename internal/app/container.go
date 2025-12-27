@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/infra/git"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
 )
 
@@ -19,11 +20,12 @@ type Config struct {
 	StorePath  string // Path to tasks.json
 }
 
-// NewConfig creates a new Config from the given git directory.
-func NewConfig(repoRoot, gitDir string) Config {
+// newConfig creates a new Config from the git client.
+func newConfig(gitClient *git.Client) Config {
+	gitDir := gitClient.GitDir()
 	crewDir := filepath.Join(gitDir, "crew")
 	return Config{
-		RepoRoot:   repoRoot,
+		RepoRoot:   gitClient.RepoRoot(),
 		GitDir:     gitDir,
 		CrewDir:    crewDir,
 		SocketPath: filepath.Join(crewDir, "tmux.sock"),
@@ -33,10 +35,8 @@ func NewConfig(repoRoot, gitDir string) Config {
 
 // Container provides dependency injection for the application.
 // It holds all port implementations and provides factory methods for use cases.
-// Fields are ordered to minimize memory padding.
 type Container struct {
 	// Ports (interfaces bound to implementations)
-	// Interfaces are 16 bytes (2 words), so group them together.
 	Tasks domain.TaskRepository
 	Clock domain.Clock
 	// Sessions  domain.SessionManager  // TODO: implement in later phase
@@ -45,15 +45,24 @@ type Container struct {
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 	// ConfigLoader domain.ConfigLoader // TODO: implement in later phase
 
-	// Pointer fields (8 bytes each)
+	// Pointer fields
 	Logger *slog.Logger
 
-	// Configuration (value type, placed last)
+	// Configuration
 	Config Config
 }
 
-// New creates a new Container with the given configuration.
-func New(cfg Config) (*Container, error) {
+// New creates a new Container by detecting the git repository from the given directory.
+func New(dir string) (*Container, error) {
+	// Detect git repository
+	gitClient, err := git.NewClient(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create configuration from git client
+	cfg := newConfig(gitClient)
+
 	// Create task repository
 	store := jsonstore.New(cfg.StorePath)
 

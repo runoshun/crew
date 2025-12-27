@@ -63,9 +63,9 @@ Bootstrap strategy: Build crew with crew.
 
 ### 1.6 CLI Skeleton
 
-- [ ] `internal/cli/root.go` - Root command with version
-- [ ] `cmd/crew/main.go` - Entry point, find git root, create container
-- [ ] `git crew --version` working
+- [x] `internal/cli/root.go` - Root command with version
+- [x] `cmd/crew/main.go` - Entry point, find git root, create container
+- [x] `git crew --version` working
 
 ### 1.7 Init Command
 
