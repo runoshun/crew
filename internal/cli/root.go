@@ -25,8 +25,8 @@ and isolated task execution.`,
 	root.AddCommand(
 		newInitCommand(c),
 		newNewCommand(c),
+		newListCommand(c),
 		// Commands below will be added as they are implemented:
-		// newListCommand(c),
 		// newShowCommand(c),
 		// newStartCommand(c),
 	)

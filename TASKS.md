@@ -92,11 +92,11 @@ Bootstrap strategy: Build crew with crew.
 
 ### 2.2 List Tasks
 
-- [ ] `internal/usecase/list_tasks.go` - ListTasks usecase
-- [ ] `internal/cli/task.go` - list command
-- [ ] Flags: `--parent`, `--label`
-- [ ] TSV output with PARENT column
-- [ ] Unit tests
+- [x] `internal/usecase/list_tasks.go` - ListTasks usecase
+- [x] `internal/cli/task.go` - list command
+- [x] Flags: `--parent`, `--label`
+- [x] TSV output with PARENT column
+- [x] Unit tests
 - [ ] Integration test
 
 ### 2.3 Show Task
