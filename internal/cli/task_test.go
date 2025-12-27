@@ -180,21 +180,21 @@ func TestPrintTaskList_MultipleTasks(t *testing.T) {
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
 		name     string
-		expected string
 		duration time.Duration
+		expected string
 	}{
-		{"zero", "0s", 0},
-		{"seconds", "30s", 30 * time.Second},
-		{"just under minute", "59s", 59 * time.Second},
-		{"one minute", "1m", 1 * time.Minute},
-		{"minutes", "5m", 5 * time.Minute},
-		{"just under hour", "59m", 59 * time.Minute},
-		{"one hour", "1h", 1 * time.Hour},
-		{"hours", "5h", 5 * time.Hour},
-		{"just under day", "23h", 23 * time.Hour},
-		{"one day", "1d", 24 * time.Hour},
-		{"days", "3d", 3 * 24 * time.Hour},
-		{"week", "7d", 7 * 24 * time.Hour},
+		{"zero", 0, "0s"},
+		{"seconds", 30 * time.Second, "30s"},
+		{"just under minute", 59 * time.Second, "59s"},
+		{"one minute", 1 * time.Minute, "1m"},
+		{"minutes", 5 * time.Minute, "5m"},
+		{"just under hour", 59 * time.Minute, "59m"},
+		{"one hour", 1 * time.Hour, "1h"},
+		{"hours", 5 * time.Hour, "5h"},
+		{"just under day", 23 * time.Hour, "23h"},
+		{"one day", 24 * time.Hour, "1d"},
+		{"days", 3 * 24 * time.Hour, "3d"},
+		{"week", 7 * 24 * time.Hour, "7d"},
 	}
 
 	for _, tt := range tests {

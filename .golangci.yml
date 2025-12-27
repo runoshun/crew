@@ -69,6 +69,11 @@ linters:
       - path: _test\.go
         linters:
           - gosec
+      # Disable fieldalignment in tests - prioritize readability over performance
+      - path: _test\.go
+        linters:
+          - govet
+        text: fieldalignment
 
 formatters:
   enable:
