@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// StoreInitializer initializes the data store.
+type StoreInitializer interface {
+	// Initialize creates the store if it doesn't exist.
+	Initialize() error
+}
+
 // TaskRepository manages task persistence.
 type TaskRepository interface {
 	// Get retrieves a task by ID. Returns nil if not found.

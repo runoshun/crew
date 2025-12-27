@@ -21,15 +21,15 @@ and isolated task execution.`,
 		SilenceUsage: true,
 	}
 
-	// Subcommands will be added here as they are implemented
-	// root.AddCommand(
-	//     newInitCommand(c),
-	//     newNewCommand(c),
-	//     newListCommand(c),
-	//     newShowCommand(c),
-	//     newStartCommand(c),
-	//     ...
-	// )
+	// Add subcommands
+	root.AddCommand(
+		newInitCommand(c),
+		// Commands below will be added as they are implemented:
+		// newNewCommand(c),
+		// newListCommand(c),
+		// newShowCommand(c),
+		// newStartCommand(c),
+	)
 
 	return root
 }

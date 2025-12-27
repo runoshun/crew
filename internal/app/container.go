@@ -9,6 +9,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
+	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
 
 // Config holds the application configuration paths.
@@ -37,8 +38,9 @@ func newConfig(gitClient *git.Client) Config {
 // It holds all port implementations and provides factory methods for use cases.
 type Container struct {
 	// Ports (interfaces bound to implementations)
-	Tasks domain.TaskRepository
-	Clock domain.Clock
+	Tasks            domain.TaskRepository
+	StoreInitializer domain.StoreInitializer
+	Clock            domain.Clock
 	// Sessions  domain.SessionManager  // TODO: implement in later phase
 	// Worktrees domain.WorktreeManager // TODO: implement in later phase
 	// Git       domain.Git             // TODO: implement in later phase
@@ -72,25 +74,31 @@ func New(dir string) (*Container, error) {
 	}))
 
 	return &Container{
-		Tasks:  store,
-		Clock:  domain.RealClock{},
-		Logger: logger,
-		Config: cfg,
+		Tasks:            store,
+		StoreInitializer: store,
+		Clock:            domain.RealClock{},
+		Logger:           logger,
+		Config:           cfg,
 	}, nil
 }
 
 // NewWithDeps creates a new Container with custom dependencies for testing.
-func NewWithDeps(cfg Config, tasks domain.TaskRepository, clock domain.Clock, logger *slog.Logger) *Container {
+func NewWithDeps(cfg Config, tasks domain.TaskRepository, storeInit domain.StoreInitializer, clock domain.Clock, logger *slog.Logger) *Container {
 	return &Container{
-		Tasks:  tasks,
-		Clock:  clock,
-		Logger: logger,
-		Config: cfg,
+		Tasks:            tasks,
+		StoreInitializer: storeInit,
+		Clock:            clock,
+		Logger:           logger,
+		Config:           cfg,
 	}
 }
 
 // UseCase factory methods
-// These will be implemented as use cases are added.
+
+// InitRepoUseCase returns a new InitRepo use case.
+func (c *Container) InitRepoUseCase() *usecase.InitRepo {
+	return usecase.NewInitRepo(c.StoreInitializer)
+}
 
 // NewTaskUseCase returns a new NewTask use case.
 // func (c *Container) NewTaskUseCase() *usecase.NewTask {
