@@ -161,6 +161,7 @@ For detailed steps, use the `review-workflow` skill.
    - Happy path (main scenarios)
    - Business logic branches (validation, state transitions, etc.)
    - User-facing errors (ErrEmptyTitle, ErrParentNotFound, etc.)
+   - Spec-defined behavior (output formats, protocols, contracts, etc.)
 3. **Should cover (if low cost)**:
    - Error propagation (prevents silent swallowing, catches regressions)
 4. **No need to cover**:
