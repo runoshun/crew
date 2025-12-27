@@ -101,9 +101,9 @@ func (c *Container) InitRepoUseCase() *usecase.InitRepo {
 }
 
 // NewTaskUseCase returns a new NewTask use case.
-// func (c *Container) NewTaskUseCase() *usecase.NewTask {
-//     return usecase.NewNewTask(c.Tasks, c.Clock)
-// }
+func (c *Container) NewTaskUseCase() *usecase.NewTask {
+	return usecase.NewNewTask(c.Tasks, c.Clock)
+}
 
 // ListTasksUseCase returns a new ListTasks use case.
 // func (c *Container) ListTasksUseCase() *usecase.ListTasks {

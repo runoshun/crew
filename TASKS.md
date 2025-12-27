@@ -83,11 +83,11 @@ Bootstrap strategy: Build crew with crew.
 
 ### 2.1 New Task
 
-- [ ] `internal/usecase/new_task.go` - NewTask usecase
-- [ ] `internal/cli/task.go` - new command
-- [ ] Flags: `--title`, `--desc`, `--parent`, `--issue`, `--label`
-- [ ] Parent validation
-- [ ] Unit tests for usecase
+- [x] `internal/usecase/new_task.go` - NewTask usecase
+- [x] `internal/cli/task.go` - new command
+- [x] Flags: `--title`, `--desc`, `--parent`, `--issue`, `--label`
+- [x] Parent validation
+- [x] Unit tests for usecase
 - [ ] Integration test
 
 ### 2.2 List Tasks
