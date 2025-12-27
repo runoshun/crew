@@ -42,24 +42,24 @@ Bootstrap strategy: Build crew with crew.
 
 ### 1.3 Domain Layer
 
-- [ ] `internal/domain/task.go` - Task, Comment entities
-- [ ] `internal/domain/status.go` - Status enum, CanTransitionTo
-- [ ] `internal/domain/errors.go` - Domain errors
-- [ ] `internal/domain/naming.go` - BranchName, SessionName functions
-- [ ] `internal/domain/ports.go` - TaskRepository interface
-- [ ] Unit tests for Status transitions
+- [x] `internal/domain/task.go` - Task, Comment entities
+- [x] `internal/domain/status.go` - Status enum, CanTransitionTo
+- [x] `internal/domain/errors.go` - Domain errors
+- [x] `internal/domain/naming.go` - BranchName, SessionName functions
+- [x] `internal/domain/ports.go` - TaskRepository interface
+- [x] Unit tests for Status transitions
 
 ### 1.4 Infrastructure: JSON Store
 
-- [ ] `internal/infra/jsonstore/store.go` - TaskRepository implementation
-- [ ] File locking (flock)
-- [ ] Unit tests with temp files
+- [x] `internal/infra/jsonstore/store.go` - TaskRepository implementation
+- [x] File locking (flock)
+- [x] Unit tests with temp files
 
 ### 1.5 App Container
 
-- [ ] `internal/app/container.go` - Container struct, Config
-- [ ] Clock interface and RealClock
-- [ ] UseCase factory methods (stubs for now)
+- [x] `internal/app/container.go` - Container struct, Config
+- [x] Clock interface and RealClock
+- [x] UseCase factory methods (stubs for now)
 
 ### 1.6 CLI Skeleton
 

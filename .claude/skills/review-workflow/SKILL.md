@@ -5,46 +5,137 @@ description: Code review workflow with TODO tracking. Use when user says "review
 
 # Review Workflow
 
-Follow AGENTS.md Reviewer Guidelines, tracking progress with TodoWrite.
+Implements the Review Flow from AGENTS.md with detailed steps and TODO tracking.
 
 ## Auto-Start
 
-When this skill is loaded, IMMEDIATELY start the workflow:
+When this skill is loaded, IMMEDIATELY begin Phase 1. Do NOT wait for user confirmation.
 
-1. Identify review target (detect from context or ask if unclear)
-2. Register ALL review steps as TODOs
-3. Begin the review process
+---
 
-Do NOT wait for user confirmation. Start working right away.
+## TODOs
 
-## Identifying Review Target
-
-Detect or ask:
-- PR number: `gh pr view <number>`
-- Branch diff: `git diff main...<branch>`
-- Specific files: read the files directly
-
-If target is ambiguous, ask the user briefly, then proceed.
-
-## TODO Management
-
-Register these steps as TODOs:
+Register ALL TODOs at once when starting Phase 1:
 
 ```
-- [ ] Identify review target (PR, branch, or files)
-- [ ] Run code locally: mise run ci
+# Phase 1: Setup
+- [ ] Read docs/README.md, core-concepts.md, architecture.md, spec-cli.md, spec-tui.md
+- [ ] Identify review target (PR, branch, or files) - ask user if unclear
+# Phase 2: Verify
+- [ ] Run mise run ci
+# Phase 3: Review
 - [ ] Check: Correctness
-- [ ] Check: Tests exist and are meaningful
-- [ ] Check: Architecture follows project structure
+- [ ] Check: Tests
+- [ ] Check: Architecture
 - [ ] Check: Error handling
 - [ ] Check: Readability
-- [ ] Check: docs/ updated if needed
-- [ ] Provide feedback
+- [ ] Check: Documentation
+# Phase 4: Feedback
+- [ ] Provide feedback with proper format
 ```
+
+---
 
 ## Rules
 
-1. Start immediately upon skill load - no waiting
-2. Register ALL check items as TODOs before starting
-3. Update TODO status in real-time as you work
-4. Only ONE item in progress at a time
+1. **Start immediately** - Begin Phase 1 upon skill load
+2. **Register ALL TODOs at once** - Include all phases when starting Phase 1
+3. **Update TODOs in real-time** - Mark in_progress/completed as you work
+4. **One item in progress at a time** - Focus and complete before moving on
+5. **Run code locally** - Never review without running CI
+6. **Be constructive** - Goal is to improve, not criticize
+7. **Complete all checks** - Don't skip items in the checklist
+
+---
+
+## Reference: Phase Details
+
+### Phase 1: Setup
+
+**Goal**: Understand context and identify what to review.
+
+1. **Read project docs** (skip if already familiar from this session)
+   - **MUST read ALL docs**:
+     - docs/README.md - Project overview
+     - docs/core-concepts.md - Design principles
+     - docs/architecture.md - Code structure
+     - docs/spec-cli.md - CLI command specs
+     - docs/spec-tui.md - TUI screen specs
+
+2. **Identify review target**
+   - Check if user specified a target (PR number, branch, files)
+   - Check current branch - if on `feature/*`, review that branch vs main
+   - Ask user if still unclear
+
+   ```bash
+   # For PR
+   gh pr view <number>
+   gh pr diff <number>
+
+   # For branch
+   git diff main...HEAD
+   git log main..HEAD --oneline
+
+   # For uncommitted changes
+   git diff
+   git status
+   ```
+
+### Phase 2: Verify
+
+**Goal**: Verify the code works.
+
+1. **Run CI**
+   ```bash
+   mise run ci
+   ```
+
+2. **Note any failures** - These are blocking issues
+
+### Phase 3: Review
+
+**Goal**: Evaluate code against project standards.
+
+| Check | What to Look For |
+|-------|------------------|
+| **Correctness** | Does it do what it's supposed to? Edge cases handled? |
+| **Tests** | Do tests exist? Are they meaningful? Cover edge cases? |
+| **Architecture** | Follows 1 file = 1 UseCase? Proper layer separation? |
+| **Error Handling** | All errors handled? Domain errors used? |
+| **Readability** | Clear names? Appropriate comments? Not too clever? |
+| **Documentation** | docs/ updated if behavior changed? TASKS.md updated? |
+
+**How to Check**:
+- Read the diff carefully
+- Cross-reference with docs/architecture.md for patterns
+- Check that tests actually test the right things
+
+### Phase 4: Feedback
+
+**Goal**: Give actionable feedback.
+
+**Feedback Format**:
+
+```markdown
+## Summary
+<1-2 sentence overview>
+
+## Blocking Issues
+- [BLOCKING] <issue description>
+  - Why: <explanation>
+  - Suggestion: <how to fix>
+
+## Suggestions
+- [NIT] <minor issue>
+- [SUGGESTION] <improvement idea>
+
+## Positive Notes
+- <what was done well>
+```
+
+**Rules for Feedback**:
+1. **Be specific** - Point to exact lines/files
+2. **Explain why** - Not just "this is wrong"
+3. **Suggest alternatives** - Don't just criticize
+4. **Distinguish severity** - [BLOCKING] vs [NIT] vs [SUGGESTION]
+5. **Acknowledge good work** - Start with positives when possible
