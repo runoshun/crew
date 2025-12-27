@@ -42,12 +42,12 @@ Bootstrap strategy: Build crew with crew.
 
 ### 1.3 Domain Layer
 
-- [ ] `internal/domain/task.go` - Task, Comment entities
-- [ ] `internal/domain/status.go` - Status enum, CanTransitionTo
-- [ ] `internal/domain/errors.go` - Domain errors
-- [ ] `internal/domain/naming.go` - BranchName, SessionName functions
-- [ ] `internal/domain/ports.go` - TaskRepository interface
-- [ ] Unit tests for Status transitions
+- [x] `internal/domain/task.go` - Task, Comment entities
+- [x] `internal/domain/status.go` - Status enum, CanTransitionTo
+- [x] `internal/domain/errors.go` - Domain errors
+- [x] `internal/domain/naming.go` - BranchName, SessionName functions
+- [x] `internal/domain/ports.go` - TaskRepository interface
+- [x] Unit tests for Status transitions
 
 ### 1.4 Infrastructure: JSON Store
 
