@@ -1142,6 +1142,42 @@ func (c *Client) Remove(branch string) error {
 }
 ```
 
+### Incremental Interface Implementation
+
+Port interfaces (e.g., `domain.Git`) may define more methods than currently needed.
+To support incremental development while maintaining type safety:
+
+**Pattern**: Implement all interface methods, but use `panic("not implemented")` for methods not yet needed.
+
+```go
+// infra/git/client.go
+
+// Ensure Client implements domain.Git interface.
+var _ domain.Git = (*Client)(nil)
+
+// CurrentBranch is implemented and used.
+func (c *Client) CurrentBranch() (string, error) {
+    // actual implementation
+}
+
+// BranchExists is defined in the interface but not yet needed.
+// TODO: implement in later phase
+func (c *Client) BranchExists(_ string) (bool, error) {
+    panic("not implemented")
+}
+```
+
+**Benefits**:
+- Compile-time verification that the struct satisfies the interface
+- Clear visibility of what's implemented vs pending
+- No need to split interfaces into smaller pieces prematurely
+- Easy to find TODOs for future implementation
+
+**When to use**:
+- The interface is well-designed and stable
+- Only a subset of methods is needed for the current phase
+- Splitting the interface would create artificial boundaries
+
 ---
 
 ## Testing Strategy

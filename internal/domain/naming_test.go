@@ -84,3 +84,87 @@ func TestSessionName(t *testing.T) {
 		})
 	}
 }
+
+func TestPathFunctions(t *testing.T) {
+	crewDir := "/repo/.git/crew"
+
+	t.Run("ScriptPath", func(t *testing.T) {
+		got := ScriptPath(crewDir, 1)
+		want := "/repo/.git/crew/scripts/task-1.sh"
+		if got != want {
+			t.Errorf("ScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("PromptPath", func(t *testing.T) {
+		got := PromptPath(crewDir, 42)
+		want := "/repo/.git/crew/scripts/task-42-prompt.txt"
+		if got != want {
+			t.Errorf("PromptPath(%q, 42) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("ReviewScriptPath", func(t *testing.T) {
+		got := ReviewScriptPath(crewDir, 1)
+		want := "/repo/.git/crew/scripts/review-1.sh"
+		if got != want {
+			t.Errorf("ReviewScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("ReviewPromptPath", func(t *testing.T) {
+		got := ReviewPromptPath(crewDir, 1)
+		want := "/repo/.git/crew/scripts/review-1-prompt.txt"
+		if got != want {
+			t.Errorf("ReviewPromptPath(%q, 1) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("TaskLogPath", func(t *testing.T) {
+		got := TaskLogPath(crewDir, 1)
+		want := "/repo/.git/crew/logs/task-1.log"
+		if got != want {
+			t.Errorf("TaskLogPath(%q, 1) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("GlobalLogPath", func(t *testing.T) {
+		got := GlobalLogPath(crewDir)
+		want := "/repo/.git/crew/logs/crew.log"
+		if got != want {
+			t.Errorf("GlobalLogPath(%q) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("TasksStorePath", func(t *testing.T) {
+		got := TasksStorePath(crewDir)
+		want := "/repo/.git/crew/tasks.json"
+		if got != want {
+			t.Errorf("TasksStorePath(%q) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("TmuxSocketPath", func(t *testing.T) {
+		got := TmuxSocketPath(crewDir)
+		want := "/repo/.git/crew/tmux.sock"
+		if got != want {
+			t.Errorf("TmuxSocketPath(%q) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("TmuxConfigPath", func(t *testing.T) {
+		got := TmuxConfigPath(crewDir)
+		want := "/repo/.git/crew/tmux.conf"
+		if got != want {
+			t.Errorf("TmuxConfigPath(%q) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("ConfigPath", func(t *testing.T) {
+		got := ConfigPath(crewDir)
+		want := "/repo/.git/crew/config.toml"
+		if got != want {
+			t.Errorf("ConfigPath(%q) = %q, want %q", crewDir, got, want)
+		}
+	})
+}
