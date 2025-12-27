@@ -1,0 +1,52 @@
+[tools]
+go = "1.25"
+golangci-lint = "2"
+
+[tasks.build]
+description = "Build crew binary"
+run = "go build -o crew ./cmd/crew"
+
+[tasks.test]
+description = "Run tests"
+run = "go test -v ./..."
+
+[tasks.lint]
+description = "Run golangci-lint"
+run = "golangci-lint run ./..."
+
+[tasks."test:race"]
+description = "Run tests with race detector"
+run = "go test -race ./..."
+
+[tasks."test:cover"]
+description = "Run tests with coverage"
+run = "go test -race -coverprofile=coverage.out ./..."
+
+[tasks.vuln]
+description = "Check for vulnerabilities"
+run = "go run golang.org/x/vuln/cmd/govulncheck@latest ./..."
+
+[tasks.ci]
+description = "Run CI checks (lint + test with race)"
+depends = ["lint", "test:race"]
+
+[tasks."ci:full"]
+description = "Full CI with coverage and vuln check"
+depends = ["lint", "test:cover", "vuln"]
+
+[tasks.fmt]
+description = "Format code"
+run = "gofmt -s -w ."
+
+[tasks.tidy]
+description = "Tidy go.mod"
+run = "go mod tidy"
+
+[tasks.install]
+description = "Install to ~/.local/bin"
+depends = ["build"]
+run = "cp crew ~/.local/bin/"
+
+[tasks.clean]
+description = "Clean build artifacts"
+run = "rm -f crew coverage.out coverage.html"

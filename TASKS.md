@@ -1,0 +1,201 @@
+# git-crew v2 Implementation Tasks
+
+## Overview
+
+Bootstrap strategy: Build crew with crew.
+
+1. **Phase 1**: Foundation (environment, CI, project structure)
+2. **Phase 2**: Task Management (create, list, show, edit, delete)
+3. **Phase 3**: Migrate existing tasks to crew, continue development with crew
+
+---
+
+## Phase 1: Foundation
+
+### 1.1 Project Setup
+
+- [x] Create `v2/` directory structure
+  ```
+  v2/
+  ├── cmd/crew/main.go
+  ├── internal/
+  │   ├── domain/
+  │   ├── usecase/
+  │   ├── infra/
+  │   ├── app/
+  │   └── cli/
+  ├── go.mod
+  └── go.sum
+  ```
+- [x] Initialize Go module (`github.com/runoshun/git-crew/v2`)
+- [x] Add dependencies to go.mod
+  - cobra
+  - pelletier/go-toml/v2
+  - goccy/go-json
+
+### 1.2 CI Setup
+
+- [ ] Create `v2/.golangci.yml` with exhaustive, gosum linters
+- [x] Create `v2/mise.toml` with build, test, lint, ci tasks
+- [ ] Update `.github/workflows/ci.yml` to run v2 CI
+  - Run `mise run ci` in v2 directory
+  - Keep existing v1 CI running
+
+### 1.3 Domain Layer
+
+- [ ] `internal/domain/task.go` - Task, Comment entities
+- [ ] `internal/domain/status.go` - Status enum, CanTransitionTo
+- [ ] `internal/domain/errors.go` - Domain errors
+- [ ] `internal/domain/naming.go` - BranchName, SessionName functions
+- [ ] `internal/domain/ports.go` - TaskRepository interface
+- [ ] Unit tests for Status transitions
+
+### 1.4 Infrastructure: JSON Store
+
+- [ ] `internal/infra/jsonstore/store.go` - TaskRepository implementation
+- [ ] File locking (flock)
+- [ ] Unit tests with temp files
+
+### 1.5 App Container
+
+- [ ] `internal/app/container.go` - Container struct, Config
+- [ ] Clock interface and RealClock
+- [ ] UseCase factory methods (stubs for now)
+
+### 1.6 CLI Skeleton
+
+- [ ] `internal/cli/root.go` - Root command with version
+- [ ] `cmd/crew/main.go` - Entry point, find git root, create container
+- [ ] `git crew --version` working
+
+### 1.7 Init Command
+
+- [ ] `internal/usecase/init_repo.go` - InitRepo usecase
+- [ ] `internal/cli/init.go` - init command
+- [ ] Create `.git/crew/` directory
+- [ ] Create empty `tasks.json`
+- [ ] Integration test
+
+**Phase 1 Milestone**: `git crew init` and `git crew --version` work, CI passes.
+
+---
+
+## Phase 2: Task Management
+
+### 2.1 New Task
+
+- [ ] `internal/usecase/new_task.go` - NewTask usecase
+- [ ] `internal/cli/task.go` - new command
+- [ ] Flags: `--title`, `--desc`, `--parent`, `--issue`, `--label`
+- [ ] Parent validation
+- [ ] Unit tests for usecase
+- [ ] Integration test
+
+### 2.2 List Tasks
+
+- [ ] `internal/usecase/list_tasks.go` - ListTasks usecase
+- [ ] `internal/cli/task.go` - list command
+- [ ] Flags: `--parent`, `--label`
+- [ ] TSV output with PARENT column
+- [ ] Unit tests
+- [ ] Integration test
+
+### 2.3 Show Task
+
+- [ ] `internal/usecase/show_task.go` - ShowTask usecase
+- [ ] `internal/cli/task.go` - show command
+- [ ] Display all fields including parent and sub-tasks
+- [ ] Auto-detect task ID from branch name
+- [ ] Unit tests
+- [ ] Integration test
+
+### 2.4 Edit Task
+
+- [ ] `internal/usecase/edit_task.go` - EditTask usecase
+- [ ] `internal/cli/task.go` - edit command
+- [ ] Flags: `--title`, `--desc`, `--add-label`, `--rm-label`
+- [ ] Unit tests
+- [ ] Integration test
+
+### 2.5 Delete Task
+
+- [ ] `internal/usecase/delete_task.go` - DeleteTask usecase
+- [ ] `internal/cli/task.go` - rm command
+- [ ] Delete task from store (no worktree cleanup yet)
+- [ ] Unit tests
+- [ ] Integration test
+
+### 2.6 Copy Task
+
+- [ ] `internal/usecase/copy_task.go` - CopyTask usecase
+- [ ] `internal/cli/task.go` - cp command
+- [ ] Copy title (append " (copy)"), description
+- [ ] Set base branch to source branch
+- [ ] Unit tests
+- [ ] Integration test
+
+### 2.7 Comment
+
+- [ ] `internal/usecase/add_comment.go` - AddComment usecase
+- [ ] `internal/cli/task.go` - comment command
+- [ ] Display comments in show output
+- [ ] Unit tests
+- [ ] Integration test
+
+### 2.8 Help & Documentation
+
+- [ ] `internal/cli/help.go` - help command
+- [ ] Embed USAGE.md or generate from cobra
+- [ ] `--help` for all commands
+
+**Phase 2 Milestone**: Full task CRUD working. Can manage tasks with crew.
+
+---
+
+## Phase 3: Migration & Bootstrap
+
+### 3.1 Migrate to Self-Hosting
+
+- [ ] Run `git crew init` in git-crew repository
+- [ ] Create initial tasks for remaining features using `git crew new`
+- [ ] Verify task management works for real development
+
+### 3.2 Document Remaining Work
+
+- [ ] Create parent task: "Session Management"
+- [ ] Create parent task: "Workflow Commands"
+- [ ] Create parent task: "GitHub Integration"
+- [ ] Create parent task: "TUI"
+- [ ] Break down each into sub-tasks
+
+---
+
+## Task Dependencies
+
+```
+1.1 Project Setup
+ └── 1.2 CI Setup
+ └── 1.3 Domain Layer
+      └── 1.4 JSON Store
+           └── 1.5 App Container
+                └── 1.6 CLI Skeleton
+                     └── 1.7 Init Command
+                          └── 2.1 New Task
+                               └── 2.2 List Tasks
+                               └── 2.3 Show Task
+                                    └── 2.4 Edit Task
+                                    └── 2.5 Delete Task
+                                    └── 2.6 Copy Task
+                                    └── 2.7 Comment
+                                         └── 2.8 Help
+                                              └── 3.1 Migrate
+```
+
+---
+
+## Notes
+
+- Each task should have tests before moving to next
+- Run `mise run ci` after each task to ensure quality
+- Commit frequently with clear messages
+- After Phase 2, use `git crew` itself to track Phase 3+ tasks
