@@ -191,3 +191,12 @@ mise run ci                     # Full CI check (required before commit)
 mise run test:cover             # Run with coverage
 go tool cover -func=coverage.out  # View summary
 ```
+
+---
+
+## Note: File Structure
+
+This file is the source of truth. The following are symlinks:
+
+- `AGENTS.md` → `CLAUDE.md`
+- `.opencode/skill/` → `.claude/skills/`
