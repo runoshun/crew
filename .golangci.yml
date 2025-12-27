@@ -18,6 +18,8 @@ linters:
     - gochecksumtype  # sealed interface exhaustiveness
     # Hygiene
     - nolintlint
+    # Architecture
+    - depguard        # layer dependency enforcement
 
   settings:
     errcheck:
@@ -26,6 +28,50 @@ linters:
       enable-all: true
     exhaustive:
       default-signifies-exhaustive: false
+    depguard:
+      rules:
+        # Presentation layer (cli, tui) must not import infra
+        presentation-no-infra:
+          files:
+            - "**/internal/cli/*.go"
+            - "**/internal/tui/*.go"
+          deny:
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra"
+              desc: "Presentation layer must not import infra directly. Use Container factory methods."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
+              desc: "Presentation layer must not import infra directly. Use Container factory methods."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra/git"
+              desc: "Presentation layer must not import infra directly. Use Container factory methods."
+        # UseCase layer must not import infra
+        usecase-no-infra:
+          files:
+            - "**/internal/usecase/*.go"
+          deny:
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra"
+              desc: "UseCase layer must not import infra. Use domain ports."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
+              desc: "UseCase layer must not import infra. Use domain ports."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra/git"
+              desc: "UseCase layer must not import infra. Use domain ports."
+        # Domain layer must not import other internal packages
+        domain-isolation:
+          files:
+            - "**/internal/domain/*.go"
+          deny:
+            - pkg: "github.com/runoshun/git-crew/v2/internal/app"
+              desc: "Domain layer must not import app."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/usecase"
+              desc: "Domain layer must not import usecase."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra"
+              desc: "Domain layer must not import infra."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
+              desc: "Domain layer must not import infra."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/infra/git"
+              desc: "Domain layer must not import infra."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/cli"
+              desc: "Domain layer must not import cli."
+            - pkg: "github.com/runoshun/git-crew/v2/internal/tui"
+              desc: "Domain layer must not import tui."
 
   exclusions:
     presets:
