@@ -163,7 +163,7 @@ func (c *Container) CloseTaskUseCase() *usecase.CloseTask {
 
 // StartTaskUseCase returns a new StartTask use case.
 func (c *Container) StartTaskUseCase() *usecase.StartTask {
-	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Clock, c.Config.CrewDir)
+	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Clock, c.Config.CrewDir, c.Config.RepoRoot)
 }
 
 // AttachSessionUseCase returns a new AttachSession use case.
