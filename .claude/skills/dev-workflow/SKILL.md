@@ -60,9 +60,10 @@ Register ALL TODOs at once when starting Phase 1:
      - docs/spec-tui.md - TUI screen specs
 
 2. **Check current task**
-   - Run `./crew list` to see all tasks
-   - Run `./crew show <id>` to view task details
-   - If unclear, ask the user which task to work on
+   - **MUST execute** `./crew list` to see all tasks
+   - **MUST execute** `./crew show <id>` to view task details
+   - If `./crew` is not available or returns error, ask the user which task to work on
+   - Do NOT look for TASKS.md - this project uses git-crew for task management
 
 3. **Ensure feature branch**
    - Check current branch: `git branch --show-current`

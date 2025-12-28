@@ -52,7 +52,7 @@ Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`
 ### Documentation
 
 - Keep docs/ in sync with code changes
-- Update TASKS.md checkboxes when completing tasks
+- Update task status with `./crew edit <id> --status <status>` when completing tasks
 
 ---
 
@@ -63,14 +63,14 @@ Development follows three phases. For detailed steps, use the `dev-workflow` ski
 ### Phase 1: Setup
 
 - Read docs/README.md and related docs (architecture.md, spec-*.md as needed)
-- Check TASKS.md for current task
+- Check current task with `./crew list` and `./crew show <id>`
 - Ensure you're on a feature branch (create if needed)
 
 ### Phase 2: Implementation
 
 - Break down the task into TODOs
 - Implement incrementally, running CI frequently
-- Update TASKS.md checkboxes as you complete items
+- Update task status with `./crew edit <id> --status <status>` as you progress
 
 ### Phase 3: Wrap-up
 

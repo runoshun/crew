@@ -13,9 +13,9 @@ git-crew is a CLI tool for managing AI coding agent tasks. It combines git workt
 | [spec-tui.md](./spec-tui.md) | TUI screen specifications and keybindings |
 | [architecture.md](./architecture.md) | Technical architecture, code structure, and implementation details |
 
-## Implementation Plan
+## Task Management
 
-See [../TASKS.md](../TASKS.md) for the implementation task list.
+This project uses git-crew itself for task management. Run `./crew list` to see current tasks.
 
 ## Quick Overview
 
@@ -63,7 +63,7 @@ Infrastructure (JSON Store, tmux, git)
 1. **[core-concepts.md](./core-concepts.md)** - Understand the "why" and core principles
 2. **[spec-cli.md](./spec-cli.md)** - Learn what commands exist and data model
 3. **[architecture.md](./architecture.md)** - Understand how code is organized
-4. **[../TASKS.md](../TASKS.md)** - See what needs to be implemented
+4. **`./crew list`** - See what needs to be implemented
 5. **[spec-tui.md](./spec-tui.md)** - TUI details (when implementing TUI)
 
 ## Key Design Decisions
