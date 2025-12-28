@@ -88,6 +88,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Flags: `--title`, `--desc`, `--parent`, `--issue`, `--label`
 - [x] Parent validation
 - [x] Unit tests for usecase
+- [ ] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.2 List Tasks
@@ -97,6 +98,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Flags: `--parent`, `--label`
 - [x] TSV output with PARENT column
 - [x] Unit tests
+- [ ] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.3 Show Task
@@ -106,6 +108,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Display all fields including parent and sub-tasks
 - [x] Auto-detect task ID from branch name
 - [x] Unit tests
+- [ ] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.4 Edit Task
@@ -114,6 +117,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] `internal/cli/task.go` - edit command
 - [x] Flags: `--title`, `--desc`, `--add-label`, `--rm-label`
 - [x] Unit tests
+- [x] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.5 Delete Task
@@ -122,6 +126,7 @@ Bootstrap strategy: Build crew with crew.
 - [ ] `internal/cli/task.go` - rm command
 - [ ] Delete task from store (no worktree cleanup yet)
 - [ ] Unit tests
+- [ ] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.6 Copy Task
@@ -131,6 +136,7 @@ Bootstrap strategy: Build crew with crew.
 - [ ] Copy title (append " (copy)"), description
 - [ ] Set base branch to source branch
 - [ ] Unit tests
+- [ ] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.7 Comment
@@ -139,6 +145,7 @@ Bootstrap strategy: Build crew with crew.
 - [ ] `internal/cli/task.go` - comment command
 - [ ] Display comments in show output
 - [ ] Unit tests
+- [ ] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.8 Help & Documentation
