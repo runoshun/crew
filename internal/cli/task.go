@@ -366,6 +366,65 @@ Examples:
 	return cmd
 }
 
+// newCpCommand creates the cp command for copying tasks.
+func newCpCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		Title string
+	}
+
+	cmd := &cobra.Command{
+		Use:   "cp <id>",
+		Short: "Copy a task",
+		Long: `Copy a task to create a new task.
+
+The new task copies the title (with " (copy)" suffix by default),
+description, labels, and parent reference.
+
+The new task does NOT copy: issue, PR, comments.
+The base branch is set to the source task's branch name.
+
+Examples:
+  # Copy task with default title
+  git crew cp 1
+
+  # Copy task with custom title
+  git crew cp 1 --title "New feature based on #1"`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Build input
+			input := usecase.CopyTaskInput{
+				SourceID: taskID,
+			}
+
+			// Set title if provided
+			if cmd.Flags().Changed("title") {
+				input.Title = &opts.Title
+			}
+
+			// Execute use case
+			uc := c.CopyTaskUseCase()
+			out, err := uc.Execute(cmd.Context(), input)
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Copied task #%d to #%d\n", taskID, out.TaskID)
+			return nil
+		},
+	}
+
+	// Optional flags
+	cmd.Flags().StringVar(&opts.Title, "title", "", "Custom title for the new task")
+
+	return cmd
+}
+
 // newRmCommand creates the rm command for deleting tasks.
 func newRmCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
