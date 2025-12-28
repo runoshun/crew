@@ -25,6 +25,8 @@ and isolated task execution.`,
 		Version: version,
 		// SilenceUsage prevents usage from being printed on errors
 		SilenceUsage: true,
+		// SilenceErrors prevents Cobra from printing errors (we handle it in main)
+		SilenceErrors: true,
 	}
 
 	// Define command groups
