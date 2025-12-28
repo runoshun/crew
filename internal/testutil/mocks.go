@@ -199,8 +199,15 @@ func (m *MockTaskRepositoryWithAddCommentError) AddComment(_ int, _ domain.Comme
 type MockGit struct {
 	CurrentBranchErr       error
 	HasUncommittedErr      error
+	MergeErr               error
+	DeleteBranchErr        error
 	CurrentBranchName      string
+	MergeBranch            string
+	DeletedBranch          string
 	HasUncommittedChangesV bool
+	MergeNoFF              bool
+	MergeCalled            bool
+	DeleteBranchCalled     bool
 }
 
 // Ensure MockGit implements domain.Git interface.
@@ -232,14 +239,19 @@ func (m *MockGit) HasMergeConflict(_, _ string) (bool, error) {
 	panic("not implemented")
 }
 
-// Merge is not implemented yet.
-func (m *MockGit) Merge(_ string, _ bool) error {
-	panic("not implemented")
+// Merge records the call and returns configured error.
+func (m *MockGit) Merge(branch string, noFF bool) error {
+	m.MergeCalled = true
+	m.MergeBranch = branch
+	m.MergeNoFF = noFF
+	return m.MergeErr
 }
 
-// DeleteBranch is not implemented yet.
-func (m *MockGit) DeleteBranch(_ string) error {
-	panic("not implemented")
+// DeleteBranch records the call and returns configured error.
+func (m *MockGit) DeleteBranch(branch string) error {
+	m.DeleteBranchCalled = true
+	m.DeletedBranch = branch
+	return m.DeleteBranchErr
 }
 
 // MockSessionManager is a test double for domain.SessionManager.
