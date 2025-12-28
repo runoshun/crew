@@ -73,7 +73,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] `internal/cli/init.go` - init command
 - [x] Create `.git/crew/` directory
 - [x] Create empty `tasks.json`
-- [ ] Integration test
+- [x] Integration test
 
 **Phase 1 Milestone**: `git crew init` and `git crew --version` work, CI passes.
 
@@ -89,7 +89,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Parent validation
 - [x] Unit tests for usecase
 - [x] CLI tests (happy path)
-- [ ] Integration test
+- [x] Integration test
 
 ### 2.2 List Tasks
 
@@ -99,7 +99,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] TSV output with PARENT column
 - [x] Unit tests
 - [x] CLI tests (happy path)
-- [ ] Integration test
+- [x] Integration test
 
 ### 2.3 Show Task
 
@@ -109,7 +109,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Auto-detect task ID from branch name
 - [x] Unit tests
 - [x] CLI tests (happy path)
-- [ ] Integration test
+- [x] Integration test
 
 ### 2.4 Edit Task
 
@@ -118,7 +118,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Flags: `--title`, `--desc`, `--add-label`, `--rm-label`
 - [x] Unit tests
 - [x] CLI tests (happy path)
-- [ ] Integration test
+- [x] Integration test
 
 ### 2.5 Delete Task
 
@@ -127,7 +127,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Delete task from store (no worktree cleanup yet)
 - [x] Unit tests
 - [x] CLI tests (happy path)
-- [ ] Integration test
+- [x] Integration test
 
 ### 2.6 Copy Task
 
@@ -137,7 +137,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Set base branch to source branch
 - [x] Unit tests
 - [x] CLI tests (happy path)
-- [ ] Integration test
+- [x] Integration test
 
 ### 2.7 Comment
 
@@ -146,7 +146,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Display comments in show output
 - [x] Unit tests
 - [x] CLI tests (happy path)
-- [ ] Integration test
+- [x] Integration test
 
 ### 2.8 Help & Documentation
 
