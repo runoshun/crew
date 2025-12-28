@@ -45,8 +45,8 @@ func TestCopyTask_Execute_Success(t *testing.T) {
 	assert.Equal(t, domain.StatusTodo, task.Status)
 	assert.Equal(t, []string{"bug", "urgent"}, task.Labels)
 	assert.Equal(t, clock.now, task.Created)
-	// Base branch should be source task's branch name
-	assert.Equal(t, "crew-1-gh-42", task.BaseBranch)
+	// Base branch should be inherited from source
+	assert.Equal(t, "main", task.BaseBranch)
 	// Issue and PR should NOT be copied
 	assert.Equal(t, 0, task.Issue)
 	assert.Equal(t, 0, task.PR)

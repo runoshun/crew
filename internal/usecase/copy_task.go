@@ -59,8 +59,8 @@ func (uc *CopyTask) Execute(_ context.Context, in CopyTaskInput) (*CopyTaskOutpu
 		title = *in.Title
 	}
 
-	// Determine base branch (source task's branch)
-	baseBranch := domain.BranchName(source.ID, source.Issue)
+	// Inherit base branch from source (copy uses same base)
+	baseBranch := source.BaseBranch
 
 	// Copy labels (create new slice to avoid sharing)
 	var labels []string
