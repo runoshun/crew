@@ -2,6 +2,7 @@
 package testutil
 
 import (
+	"context"
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -233,5 +234,124 @@ func (m *MockGit) Merge(_ string, _ bool) error {
 
 // DeleteBranch is not implemented yet.
 func (m *MockGit) DeleteBranch(_ string) error {
+	panic("not implemented")
+}
+
+// MockSessionManager is a test double for domain.SessionManager.
+// Fields are ordered to minimize memory padding.
+type MockSessionManager struct {
+	StartErr     error
+	StopErr      error
+	AttachErr    error
+	IsRunningErr error
+	StartOpts    domain.StartSessionOptions
+	IsRunningVal bool
+	StartCalled  bool
+	StopCalled   bool
+	AttachCalled bool
+}
+
+// NewMockSessionManager creates a new MockSessionManager.
+func NewMockSessionManager() *MockSessionManager {
+	return &MockSessionManager{}
+}
+
+// Ensure MockSessionManager implements domain.SessionManager interface.
+var _ domain.SessionManager = (*MockSessionManager)(nil)
+
+// Start records the call and returns configured error.
+func (m *MockSessionManager) Start(_ context.Context, opts domain.StartSessionOptions) error {
+	m.StartCalled = true
+	m.StartOpts = opts
+	return m.StartErr
+}
+
+// Stop records the call and returns configured error.
+func (m *MockSessionManager) Stop(_ string) error {
+	m.StopCalled = true
+	return m.StopErr
+}
+
+// Attach records the call and returns configured error.
+func (m *MockSessionManager) Attach(_ string) error {
+	m.AttachCalled = true
+	return m.AttachErr
+}
+
+// Peek is not implemented yet.
+func (m *MockSessionManager) Peek(_ string, _ int) (string, error) {
+	panic("not implemented")
+}
+
+// Send is not implemented yet.
+func (m *MockSessionManager) Send(_ string, _ string) error {
+	panic("not implemented")
+}
+
+// IsRunning returns the configured value or error.
+func (m *MockSessionManager) IsRunning(_ string) (bool, error) {
+	if m.IsRunningErr != nil {
+		return false, m.IsRunningErr
+	}
+	return m.IsRunningVal, nil
+}
+
+// MockWorktreeManager is a test double for domain.WorktreeManager.
+// Fields are ordered to minimize memory padding.
+type MockWorktreeManager struct {
+	CreateErr    error
+	ResolveErr   error
+	RemoveErr    error
+	ExistsErr    error
+	CreatePath   string
+	ResolvePath  string
+	ExistsVal    bool
+	CreateCalled bool
+	RemoveCalled bool
+}
+
+// NewMockWorktreeManager creates a new MockWorktreeManager.
+func NewMockWorktreeManager() *MockWorktreeManager {
+	return &MockWorktreeManager{
+		CreatePath: "/tmp/worktree",
+	}
+}
+
+// Ensure MockWorktreeManager implements domain.WorktreeManager interface.
+var _ domain.WorktreeManager = (*MockWorktreeManager)(nil)
+
+// Create records the call and returns configured path or error.
+func (m *MockWorktreeManager) Create(_, _ string) (string, error) {
+	m.CreateCalled = true
+	if m.CreateErr != nil {
+		return "", m.CreateErr
+	}
+	return m.CreatePath, nil
+}
+
+// Resolve returns the configured path or error.
+func (m *MockWorktreeManager) Resolve(_ string) (string, error) {
+	if m.ResolveErr != nil {
+		return "", m.ResolveErr
+	}
+	return m.ResolvePath, nil
+}
+
+// Remove records the call and returns configured error.
+func (m *MockWorktreeManager) Remove(_ string) error {
+	m.RemoveCalled = true
+	return m.RemoveErr
+}
+
+// Exists returns the configured value or error.
+func (m *MockWorktreeManager) Exists(_ string) (bool, error) {
+	if m.ExistsErr != nil {
+		return false, m.ExistsErr
+	}
+	return m.ExistsVal, nil
+}
+
+// List is not implemented yet.
+func (m *MockWorktreeManager) List() ([]domain.WorktreeInfo, error) {
 	panic("not implemented")
 }

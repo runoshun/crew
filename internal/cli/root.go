@@ -8,8 +8,9 @@ import (
 
 // Command group IDs.
 const (
-	groupSetup = "setup"
-	groupTask  = "task"
+	groupSetup   = "setup"
+	groupTask    = "task"
+	groupSession = "session"
 )
 
 // NewRootCommand creates the root command for git-crew.
@@ -33,6 +34,7 @@ and isolated task execution.`,
 	root.AddGroup(
 		&cobra.Group{ID: groupSetup, Title: "Setup Commands:"},
 		&cobra.Group{ID: groupTask, Title: "Task Management:"},
+		&cobra.Group{ID: groupSession, Title: "Session Management:"},
 	)
 
 	// Setup commands
@@ -64,6 +66,16 @@ and isolated task execution.`,
 	closeCmd := newCloseCommand(c)
 	closeCmd.GroupID = groupTask
 
+	// Session management commands
+	startCmd := newStartCommand(c)
+	startCmd.GroupID = groupSession
+
+	attachCmd := newAttachCommand(c)
+	attachCmd.GroupID = groupSession
+
+	// Internal commands (hidden)
+	sessionEndedCmd := newSessionEndedCommand(c)
+
 	// Add subcommands
 	root.AddCommand(
 		initCmd,
@@ -75,8 +87,9 @@ and isolated task execution.`,
 		cpCmd,
 		commentCmd,
 		closeCmd,
-		// Commands below will be added as they are implemented:
-		// newStartCommand(c),
+		startCmd,
+		attachCmd,
+		sessionEndedCmd,
 	)
 
 	return root
