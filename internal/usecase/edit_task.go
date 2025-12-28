@@ -4,6 +4,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -111,5 +112,6 @@ func updateLabels(current, add, remove []string) []string {
 		result = append(result, label)
 	}
 
+	slices.Sort(result)
 	return result
 }
