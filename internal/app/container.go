@@ -9,16 +9,18 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
+	"github.com/runoshun/git-crew/v2/internal/infra/worktree"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
 
 // Config holds the application configuration paths.
 type Config struct {
-	RepoRoot   string // Root directory of the git repository
-	GitDir     string // Path to .git directory
-	CrewDir    string // Path to .git/crew directory
-	SocketPath string // Path to tmux socket
-	StorePath  string // Path to tasks.json
+	RepoRoot    string // Root directory of the git repository
+	GitDir      string // Path to .git directory
+	CrewDir     string // Path to .git/crew directory
+	SocketPath  string // Path to tmux socket
+	StorePath   string // Path to tasks.json
+	WorktreeDir string // Path to worktrees directory
 }
 
 // newConfig creates a new Config from the git client.
@@ -26,11 +28,12 @@ func newConfig(gitClient *git.Client) Config {
 	gitDir := gitClient.GitDir()
 	crewDir := filepath.Join(gitDir, "crew")
 	return Config{
-		RepoRoot:   gitClient.RepoRoot(),
-		GitDir:     gitDir,
-		CrewDir:    crewDir,
-		SocketPath: filepath.Join(crewDir, "tmux.sock"),
-		StorePath:  filepath.Join(crewDir, "tasks.json"),
+		RepoRoot:    gitClient.RepoRoot(),
+		GitDir:      gitDir,
+		CrewDir:     crewDir,
+		SocketPath:  filepath.Join(crewDir, "tmux.sock"),
+		StorePath:   filepath.Join(crewDir, "tasks.json"),
+		WorktreeDir: filepath.Join(crewDir, "worktrees"),
 	}
 }
 
@@ -42,8 +45,8 @@ type Container struct {
 	StoreInitializer domain.StoreInitializer
 	Clock            domain.Clock
 	Git              domain.Git
+	Worktrees        domain.WorktreeManager
 	// Sessions  domain.SessionManager  // TODO: implement in later phase
-	// Worktrees domain.WorktreeManager // TODO: implement in later phase
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 	// ConfigLoader domain.ConfigLoader // TODO: implement in later phase
 
@@ -73,11 +76,15 @@ func New(dir string) (*Container, error) {
 		Level: slog.LevelInfo,
 	}))
 
+	// Create worktree manager
+	worktreeClient := worktree.NewClient(cfg.RepoRoot, cfg.WorktreeDir)
+
 	return &Container{
 		Tasks:            store,
 		StoreInitializer: store,
 		Clock:            domain.RealClock{},
 		Git:              gitClient,
+		Worktrees:        worktreeClient,
 		Logger:           logger,
 		Config:           cfg,
 	}, nil
