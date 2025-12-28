@@ -30,7 +30,7 @@ type WorkerAgent struct {
 	Prompt          string // Prompt template for this worker
 }
 
-// CommandData holds data for rendering agent commands.
+// CommandData holds data for rendering agent commands and prompts.
 type CommandData struct {
 	// Environment
 	GitDir   string // Path to .git directory
@@ -40,50 +40,71 @@ type CommandData struct {
 	// Task information
 	Title       string
 	Description string
-	Prompt      string // Prompt to pass to the agent
+	Branch      string // Branch name (e.g., "crew-1")
+	Issue       int    // GitHub issue number (0 if not linked)
 
 	// Task ID
 	TaskID int
 }
 
-// RenderCommand renders the full command string for this agent.
-// It performs two-phase template expansion:
-// 1. Expand SystemArgs, Args, and Prompt with CommandData (for GitDir, RepoRoot, TaskID, etc.)
-// 2. Expand CommandTemplate with Command, expanded SystemArgs/Args, and expanded Prompt
-func (a *WorkerAgent) RenderCommand(data CommandData) (string, error) {
-	// Phase 1: Expand SystemArgs, Args, and Prompt
+// RenderCommandResult holds the results of RenderCommand.
+type RenderCommandResult struct {
+	Command string // The full command to execute (e.g., `claude --model opus "$PROMPT"`)
+	Prompt  string // The prompt content to be stored in PROMPT shell variable
+}
+
+// RenderCommand renders the full command string and prompt content for this agent.
+// It performs three-phase template expansion:
+// 1. Expand SystemArgs and Args with CommandData (for GitDir, RepoRoot, TaskID, etc.)
+// 2. Expand Prompt template with CommandData to generate prompt content
+// 3. Expand CommandTemplate with Command, expanded SystemArgs/Args, and shell variable reference
+//
+// The promptOverride parameter is the shell variable reference (e.g., `"$PROMPT"`) that will be
+// embedded in the command and expanded at runtime to the actual prompt content.
+// The defaultPrompt is used when WorkerAgent.Prompt is empty.
+func (a *WorkerAgent) RenderCommand(data CommandData, promptOverride, defaultPrompt string) (RenderCommandResult, error) {
+	// Phase 1: Expand SystemArgs and Args
 	systemArgs, err := expandString(a.SystemArgs, data)
 	if err != nil {
-		return "", err
+		return RenderCommandResult{}, err
 	}
 	args, err := expandString(a.Args, data)
 	if err != nil {
-		return "", err
-	}
-	prompt, err := expandString(data.Prompt, data)
-	if err != nil {
-		return "", err
+		return RenderCommandResult{}, err
 	}
 
-	// Phase 2: Expand CommandTemplate
+	// Phase 2: Expand Prompt template to generate prompt content
+	promptTemplate := a.Prompt
+	if promptTemplate == "" {
+		promptTemplate = defaultPrompt
+	}
+	promptContent, err := expandString(promptTemplate, data)
+	if err != nil {
+		return RenderCommandResult{}, err
+	}
+
+	// Phase 3: Expand CommandTemplate
 	cmdData := map[string]string{
 		"Command":    a.Command,
 		"SystemArgs": systemArgs,
 		"Args":       args,
-		"Prompt":     prompt,
+		"Prompt":     promptOverride,
 	}
 
 	tmpl, err := template.New("cmd").Parse(a.CommandTemplate)
 	if err != nil {
-		return "", err
+		return RenderCommandResult{}, err
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, cmdData); err != nil {
-		return "", err
+		return RenderCommandResult{}, err
 	}
 
-	return buf.String(), nil
+	return RenderCommandResult{
+		Command: buf.String(),
+		Prompt:  promptContent,
+	}, nil
 }
 
 // expandString expands template variables in a string.
@@ -117,10 +138,19 @@ type LogConfig struct {
 
 // Default configuration values.
 const (
-	DefaultLogLevel     = "info"
-	DefaultWorkerName   = "claude"
-	DefaultWorkerPrompt = "When the task is complete, commit your changes and run 'crew complete' to mark it for review."
+	DefaultLogLevel   = "info"
+	DefaultWorkerName = "claude"
 )
+
+// DefaultWorkerPrompt is the default prompt template for workers.
+// It uses Go template syntax with CommandData fields.
+// Task details should be viewed with 'crew show <id>' to see comments and full description.
+const DefaultWorkerPrompt = `You are working on Task #{{.TaskID}}.
+
+Run 'crew show' to see full task details including description and comments.
+
+When the task is complete, commit your changes and run 'crew complete'.
+`
 
 // BuiltinWorker defines a built-in worker configuration.
 type BuiltinWorker struct {

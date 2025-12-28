@@ -81,32 +81,40 @@ func TestNewDefaultConfig(t *testing.T) {
 
 func TestAgent_RenderCommand(t *testing.T) {
 	tests := []struct {
-		name  string
-		agent WorkerAgent
-		data  CommandData
-		want  string
+		name           string
+		agent          WorkerAgent
+		data           CommandData
+		promptOverride string
+		defaultPrompt  string
+		wantCommand    string
+		wantPrompt     string
 	}{
 		{
-			name: "claude style",
+			name: "claude style with shell variable",
 			agent: WorkerAgent{
 				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 				Command:         "claude",
 				SystemArgs:      "--permission-mode acceptEdits",
 				Args:            "--model opus",
 			},
-			data: CommandData{Prompt: "Fix the bug"},
-			want: "claude --permission-mode acceptEdits --model opus Fix the bug",
+			data:           CommandData{TaskID: 1, Title: "Fix bug"},
+			promptOverride: `"$PROMPT"`,
+			defaultPrompt:  "Task: {{.Title}}",
+			wantCommand:    `claude --permission-mode acceptEdits --model opus "$PROMPT"`,
+			wantPrompt:     "Task: Fix bug",
 		},
 		{
 			name: "opencode style with -p flag",
 			agent: WorkerAgent{
 				CommandTemplate: "{{.Command}} {{.Args}} -p {{.Prompt}}",
 				Command:         "opencode",
-				SystemArgs:      "",
 				Args:            "-m gpt-4",
 			},
-			data: CommandData{Prompt: "Implement feature"},
-			want: "opencode -m gpt-4 -p Implement feature",
+			data:           CommandData{TaskID: 2, Title: "Add feature"},
+			promptOverride: `"$PROMPT"`,
+			defaultPrompt:  "Work on: {{.Title}}",
+			wantCommand:    `opencode -m gpt-4 -p "$PROMPT"`,
+			wantPrompt:     "Work on: Add feature",
 		},
 		{
 			name: "with GitDir in SystemArgs",
@@ -118,23 +126,29 @@ func TestAgent_RenderCommand(t *testing.T) {
 			},
 			data: CommandData{
 				GitDir: "/repo/.git",
-				Prompt: "Fix bug",
+				TaskID: 3,
+				Title:  "Fix",
 			},
-			want: "claude --add-dir /repo/.git --model opus Fix bug",
+			promptOverride: `"$PROMPT"`,
+			defaultPrompt:  "Do it",
+			wantCommand:    `claude --add-dir /repo/.git --model opus "$PROMPT"`,
+			wantPrompt:     "Do it",
 		},
 		{
-			name: "with RepoRoot in Args",
+			name: "worker-specific prompt overrides default",
 			agent: WorkerAgent{
-				CommandTemplate: "{{.Command}} {{.Args}} {{.Prompt}}",
-				Command:         "myagent",
-				SystemArgs:      "",
-				Args:            "--root {{.RepoRoot}}",
+				CommandTemplate: "{{.Command}} {{.Prompt}}",
+				Command:         "agent",
+				Prompt:          "Custom: {{.Title}} (Task #{{.TaskID}})",
 			},
 			data: CommandData{
-				RepoRoot: "/home/user/project",
-				Prompt:   "Do something",
+				TaskID: 42,
+				Title:  "Fix the bug",
 			},
-			want: "myagent --root /home/user/project Do something",
+			promptOverride: `"$PROMPT"`,
+			defaultPrompt:  "This should not be used",
+			wantCommand:    `agent "$PROMPT"`,
+			wantPrompt:     "Custom: Fix the bug (Task #42)",
 		},
 		{
 			name: "with task info in Args",
@@ -146,33 +160,43 @@ func TestAgent_RenderCommand(t *testing.T) {
 			data: CommandData{
 				TaskID: 42,
 				Title:  "Fix bug",
-				Prompt: "Work on it",
 			},
-			want: "agent --task 42 Work on it",
+			promptOverride: `"$PROMPT"`,
+			defaultPrompt:  "Work on it",
+			wantCommand:    `agent --task 42 "$PROMPT"`,
+			wantPrompt:     "Work on it",
 		},
 		{
-			name: "with template in Prompt",
+			name: "prompt template with all fields",
 			agent: WorkerAgent{
 				CommandTemplate: "{{.Command}} {{.Prompt}}",
 				Command:         "agent",
+				Prompt:          "Task #{{.TaskID}}: {{.Title}}\nBranch: {{.Branch}}\nWorktree: {{.Worktree}}",
 			},
 			data: CommandData{
-				TaskID: 42,
-				Title:  "Fix the bug",
-				Prompt: "Task #{{.TaskID}}: {{.Title}}",
+				TaskID:   1,
+				Title:    "Fix bug",
+				Branch:   "crew-1",
+				Worktree: "/path/to/worktree",
 			},
-			want: "agent Task #42: Fix the bug",
+			promptOverride: `"$PROMPT"`,
+			defaultPrompt:  "",
+			wantCommand:    `agent "$PROMPT"`,
+			wantPrompt:     "Task #1: Fix bug\nBranch: crew-1\nWorktree: /path/to/worktree",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.agent.RenderCommand(tt.data)
+			result, err := tt.agent.RenderCommand(tt.data, tt.promptOverride, tt.defaultPrompt)
 			if err != nil {
 				t.Fatalf("RenderCommand() error = %v", err)
 			}
-			if got != tt.want {
-				t.Errorf("RenderCommand() = %q, want %q", got, tt.want)
+			if result.Command != tt.wantCommand {
+				t.Errorf("RenderCommand().Command = %q, want %q", result.Command, tt.wantCommand)
+			}
+			if result.Prompt != tt.wantPrompt {
+				t.Errorf("RenderCommand().Prompt = %q, want %q", result.Prompt, tt.wantPrompt)
 			}
 		})
 	}
@@ -183,7 +207,7 @@ func TestWorkerAgent_RenderCommand_InvalidTemplate(t *testing.T) {
 		CommandTemplate: "{{.Invalid",
 		Command:         "test",
 	}
-	_, err := agent.RenderCommand(CommandData{Prompt: "test"})
+	_, err := agent.RenderCommand(CommandData{}, `"$PROMPT"`, "default")
 	if err == nil {
 		t.Error("expected error for invalid template in CommandTemplate")
 	}
@@ -195,9 +219,21 @@ func TestWorkerAgent_RenderCommand_InvalidSystemArgsTemplate(t *testing.T) {
 		Command:         "test",
 		SystemArgs:      "{{.Invalid",
 	}
-	_, err := agent.RenderCommand(CommandData{Prompt: "test"})
+	_, err := agent.RenderCommand(CommandData{}, `"$PROMPT"`, "default")
 	if err == nil {
 		t.Error("expected error for invalid template in SystemArgs")
+	}
+}
+
+func TestWorkerAgent_RenderCommand_InvalidPromptTemplate(t *testing.T) {
+	agent := WorkerAgent{
+		CommandTemplate: "{{.Command}} {{.Prompt}}",
+		Command:         "test",
+		Prompt:          "{{.Invalid",
+	}
+	_, err := agent.RenderCommand(CommandData{}, `"$PROMPT"`, "default")
+	if err == nil {
+		t.Error("expected error for invalid template in Prompt")
 	}
 }
 

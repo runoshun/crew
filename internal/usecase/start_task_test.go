@@ -30,7 +30,8 @@ func TestStartTask_Execute_Success(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -70,9 +71,10 @@ func TestStartTask_Execute_Success(t *testing.T) {
 	assert.Contains(t, script, "#!/bin/bash")
 	assert.Contains(t, script, "_session-ended 1")
 	assert.Contains(t, script, "claude")
-	// Verify prompt is embedded in script
-	assert.Contains(t, script, "Test task")
-	assert.Contains(t, script, "git crew complete")
+	// Verify prompt is embedded in script (default prompt references task ID and crew commands)
+	assert.Contains(t, script, "Task #1")
+	assert.Contains(t, script, "crew show")
+	assert.Contains(t, script, "crew complete")
 }
 
 func TestStartTask_Execute_FromInReview(t *testing.T) {
@@ -90,7 +92,8 @@ func TestStartTask_Execute_FromInReview(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -121,7 +124,8 @@ func TestStartTask_Execute_FromError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -146,7 +150,8 @@ func TestStartTask_Execute_TaskNotFound(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -182,7 +187,8 @@ func TestStartTask_Execute_InvalidStatus(t *testing.T) {
 			configLoader := testutil.NewMockConfigLoader()
 			clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-			uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+			repoRoot := t.TempDir()
+			uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 			// Execute
 			_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -212,7 +218,8 @@ func TestStartTask_Execute_SessionAlreadyRunning(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -240,7 +247,8 @@ func TestStartTask_Execute_NoAgent(t *testing.T) {
 	// No default_agent in config
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute without agent
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -268,7 +276,8 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	configLoader.Config.WorkersConfig.Default = "opencode" // default from [workers] section
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute without specifying agent
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -306,7 +315,8 @@ func TestStartTask_Execute_WorktreeCreateError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -335,7 +345,8 @@ func TestStartTask_Execute_SessionStartError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -370,7 +381,8 @@ func TestStartTask_Execute_SaveError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -404,9 +416,12 @@ func TestStartTask_Execute_WithIssue(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
+	// Use custom prompt that includes issue
+	configLoader.Config.WorkersConfig.Prompt = "Task #{{.TaskID}}{{if .Issue}} (Issue #{{.Issue}}){{end}}"
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -419,10 +434,10 @@ func TestStartTask_Execute_WithIssue(t *testing.T) {
 	// Session name is still crew-1 (not crew-1-gh-123)
 	assert.Equal(t, "crew-1", out.SessionName)
 
-	// Verify prompt in script includes issue info
+	// Verify prompt template expanded with issue info
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
-	assert.Contains(t, string(scriptContent), "#123")
+	assert.Contains(t, string(scriptContent), "Issue #123")
 }
 
 func TestStartTask_Execute_WithDescription(t *testing.T) {
@@ -439,9 +454,12 @@ func TestStartTask_Execute_WithDescription(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
+	// Use custom prompt that includes description
+	configLoader.Config.WorkersConfig.Prompt = "Task: {{.Title}}\n{{.Description}}"
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -452,7 +470,7 @@ func TestStartTask_Execute_WithDescription(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 
-	// Verify prompt in script includes description
+	// Verify prompt template expanded with description
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
 	assert.Contains(t, string(scriptContent), "This is a detailed description of the task.")
@@ -474,7 +492,8 @@ func TestStartTask_ScriptGeneration(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -498,7 +517,9 @@ func TestStartTask_ScriptGeneration(t *testing.T) {
 	assert.Contains(t, script, "trap SESSION_ENDED EXIT")
 	assert.Contains(t, script, "trap 'exit 130' INT")
 	assert.Contains(t, script, "trap 'exit 143' TERM")
-	assert.Contains(t, script, "opencode \"$PROMPT\"")
+	// Verify opencode command is rendered with args from builtin config
+	assert.Contains(t, script, "opencode")
+	assert.Contains(t, script, "-p \"$PROMPT\"") // opencode uses -p for prompt
 
 	// Verify script is executable (mode 0700)
 	info, err := os.Stat(domain.ScriptPath(crewDir, 1))
@@ -516,7 +537,7 @@ func TestStartTask_CleanupScript(t *testing.T) {
 	require.NoError(t, os.WriteFile(scriptPath, []byte("test"), 0755))
 
 	// Create use case
-	uc := NewStartTask(nil, nil, nil, nil, nil, crewDir)
+	uc := NewStartTask(nil, nil, nil, nil, nil, crewDir, "")
 
 	// Cleanup
 	uc.cleanupScript(1)
@@ -541,7 +562,8 @@ func TestStartTask_Execute_ConfigLoadError(t *testing.T) {
 	configLoader.LoadErr = assert.AnError // Config load error
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 	// Execute without agent (will try to load default from config)
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -552,4 +574,125 @@ func TestStartTask_Execute_ConfigLoadError(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "load config")
+}
+
+func TestStartTask_Execute_WithCustomAgent(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute with unknown agent name (custom agent)
+	out, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "my-custom-agent",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "crew-1", out.SessionName)
+
+	// Verify task uses custom agent
+	task := repo.Tasks[1]
+	assert.Equal(t, "my-custom-agent", task.Agent)
+
+	// Verify script uses custom agent with simple command format
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	assert.Contains(t, script, "my-custom-agent")
+	assert.Contains(t, script, `"$PROMPT"`)
+}
+
+func TestStartTask_Execute_WithConfiguredAgent(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	// Configure a custom agent in config
+	configLoader.Config.Workers["my-agent"] = domain.WorkerAgent{
+		CommandTemplate: "{{.Command}} {{.Args}} {{.Prompt}}",
+		Command:         "my-agent-bin",
+		Args:            "--custom-flag",
+	}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute with configured agent
+	out, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "my-agent",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "crew-1", out.SessionName)
+
+	// Verify script uses configured agent command and args
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	assert.Contains(t, script, "my-agent-bin")
+	assert.Contains(t, script, "--custom-flag")
+}
+
+func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	// Configure worker-specific prompt
+	configLoader.Config.Workers["claude"] = domain.WorkerAgent{
+		CommandTemplate: "{{.Command}} {{.Prompt}}",
+		Command:         "claude",
+		Prompt:          "Custom worker prompt for claude",
+	}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify script contains worker-specific prompt
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	assert.Contains(t, string(scriptContent), "Custom worker prompt for claude")
 }

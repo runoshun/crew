@@ -33,6 +33,7 @@ type StartTask struct {
 	configLoader domain.ConfigLoader
 	clock        domain.Clock
 	crewDir      string // Path to .git/crew directory
+	repoRoot     string // Repository root path
 }
 
 // NewStartTask creates a new StartTask use case.
@@ -43,6 +44,7 @@ func NewStartTask(
 	configLoader domain.ConfigLoader,
 	clock domain.Clock,
 	crewDir string,
+	repoRoot string,
 ) *StartTask {
 	return &StartTask{
 		tasks:        tasks,
@@ -51,6 +53,7 @@ func NewStartTask(
 		configLoader: configLoader,
 		clock:        clock,
 		crewDir:      crewDir,
+		repoRoot:     repoRoot,
 	}
 }
 
@@ -80,19 +83,23 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, domain.ErrSessionRunning
 	}
 
+	// Load config for agent resolution and command building
+	cfg, loadErr := uc.configLoader.Load()
+	if loadErr != nil {
+		return nil, fmt.Errorf("load config: %w", loadErr)
+	}
+
 	// Resolve agent from input or config
 	agent := in.Agent
 	if agent == "" {
-		// Try to get default_agent from config
-		cfg, loadErr := uc.configLoader.Load()
-		if loadErr != nil {
-			return nil, fmt.Errorf("load config: %w", loadErr)
-		}
 		agent = cfg.WorkersConfig.Default
 	}
 	if agent == "" {
 		return nil, domain.ErrNoAgent
 	}
+
+	// Get agent configuration
+	workerAgent := uc.resolveWorkerAgent(agent, cfg)
 
 	// Create or resolve worktree
 	branch := domain.BranchName(task.ID, task.Issue)
@@ -107,7 +114,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	}
 
 	// Generate prompt and script files
-	scriptPath, err := uc.generateScript(task, agent, wtPath)
+	scriptPath, err := uc.generateScript(task, wtPath, workerAgent, cfg)
 	if err != nil {
 		_ = uc.worktrees.Remove(branch)
 		return nil, fmt.Errorf("generate script: %w", err)
@@ -147,15 +154,14 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 // generateScript creates the task script with embedded prompt.
 // Returns the path to the generated script.
-func (uc *StartTask) generateScript(task *domain.Task, agent, worktreePath string) (string, error) {
+func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config) (string, error) {
 	scriptsDir := filepath.Join(uc.crewDir, "scripts")
 	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
 		return "", fmt.Errorf("create scripts directory: %w", err)
 	}
 
-	// Build prompt and script
-	prompt := uc.buildPrompt(task, worktreePath)
-	script, err := uc.buildScript(task, agent, prompt)
+	// Build command and prompt using RenderCommand
+	script, err := uc.buildScript(task, worktreePath, workerAgent, cfg)
 	if err != nil {
 		return "", fmt.Errorf("build script: %w", err)
 	}
@@ -170,46 +176,41 @@ func (uc *StartTask) generateScript(task *domain.Task, agent, worktreePath strin
 	return scriptPath, nil
 }
 
-// buildPrompt constructs the prompt text for the agent.
-func (uc *StartTask) buildPrompt(task *domain.Task, worktreePath string) string {
-	// Build a prompt that includes task information
-	prompt := fmt.Sprintf(`# Task %d: %s
-
-`, task.ID, task.Title)
-
-	if task.Description != "" {
-		prompt += task.Description + "\n\n"
+// resolveWorkerAgent resolves the WorkerAgent configuration for the given agent name.
+func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) domain.WorkerAgent {
+	// Check if agent is configured in config
+	if workerAgent, ok := cfg.Workers[agent]; ok {
+		return workerAgent
 	}
 
-	prompt += fmt.Sprintf(`## Task Information
-- Branch: %s
-- Worktree: %s
-`, domain.BranchName(task.ID, task.Issue), worktreePath)
-
-	if task.Issue > 0 {
-		prompt += fmt.Sprintf("- Issue: #%d\n", task.Issue)
+	// Check if it's a built-in agent
+	if builtin, ok := domain.BuiltinWorkers[agent]; ok {
+		return domain.WorkerAgent{
+			CommandTemplate: builtin.CommandTemplate,
+			Command:         builtin.Command,
+			SystemArgs:      builtin.SystemArgs,
+			Args:            builtin.DefaultArgs,
+		}
 	}
 
-	// Add completion instruction
-	prompt += `
-## Instructions
-When the task is complete, run 'git crew complete' to mark it as done.
-`
-
-	return prompt
+	// Unknown agent - use the agent name as-is (custom agent)
+	return domain.WorkerAgent{
+		CommandTemplate: "{{.Command}} {{.Prompt}}",
+		Command:         agent,
+	}
 }
 
 // scriptTemplateData holds the data for script template execution.
 // Fields are ordered to minimize memory padding.
 type scriptTemplateData struct {
-	Agent   string
-	Prompt  string
-	CrewBin string
-	TaskID  int
+	AgentCommand string
+	Prompt       string
+	CrewBin      string
+	TaskID       int
 }
 
 // buildScript constructs the task script with embedded prompt and session-ended callback.
-func (uc *StartTask) buildScript(task *domain.Task, agent string, prompt string) (string, error) {
+func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config) (string, error) {
 	// Find crew binary path (for _session-ended callback)
 	crewBin, err := os.Executable()
 	if err != nil {
@@ -217,13 +218,39 @@ func (uc *StartTask) buildScript(task *domain.Task, agent string, prompt string)
 		crewBin = "crew"
 	}
 
+	// Build command data for template expansion
+	gitDir := filepath.Join(uc.repoRoot, ".git")
+	cmdData := domain.CommandData{
+		GitDir:      gitDir,
+		RepoRoot:    uc.repoRoot,
+		Worktree:    worktreePath,
+		Title:       task.Title,
+		Description: task.Description,
+		Branch:      domain.BranchName(task.ID, task.Issue),
+		Issue:       task.Issue,
+		TaskID:      task.ID,
+	}
+
+	// Determine default prompt: use config's WorkersConfig.Prompt or fall back to DefaultWorkerPrompt
+	defaultPrompt := cfg.WorkersConfig.Prompt
+	if defaultPrompt == "" {
+		defaultPrompt = domain.DefaultWorkerPrompt
+	}
+
+	// Render command and prompt using WorkerAgent.RenderCommand
+	// Pass shell variable reference as promptOverride - will be expanded at runtime
+	result, err := workerAgent.RenderCommand(cmdData, `"$PROMPT"`, defaultPrompt)
+	if err != nil {
+		return "", fmt.Errorf("render agent command: %w", err)
+	}
+
 	tmpl := template.Must(template.New("script").Parse(scriptTemplate))
 
 	data := scriptTemplateData{
-		TaskID:  task.ID,
-		Agent:   agent,
-		Prompt:  prompt,
-		CrewBin: crewBin,
+		TaskID:       task.ID,
+		AgentCommand: result.Command,
+		Prompt:       result.Prompt,
+		CrewBin:      crewBin,
 	}
 
 	var script strings.Builder
@@ -263,5 +290,5 @@ trap 'exit 143' TERM       # kill -> exit code 143
 trap 'exit 129' HUP        # hangup -> exit code 129
 
 # Run agent
-{{.Agent}} "$PROMPT"
+{{.AgentCommand}}
 `
