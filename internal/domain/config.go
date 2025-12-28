@@ -37,6 +37,13 @@ const (
 	DefaultLogLevel = "info"
 )
 
+// Configuration file paths.
+const (
+	GlobalConfigDirName = "crew"        // Directory name under XDG_CONFIG_HOME or ~/.config
+	RepoConfigDirName   = "crew"        // Directory name under .git
+	ConfigFileName      = "config.toml" // Config file name (used for both global and repo)
+)
+
 // NewDefaultConfig returns a Config with default values.
 func NewDefaultConfig() *Config {
 	return &Config{

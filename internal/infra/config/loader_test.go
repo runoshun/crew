@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,7 +31,7 @@ command = "mise run ci"
 [log]
 level = "debug"
 `
-	err := os.WriteFile(filepath.Join(crewDir, "config.toml"), []byte(repoConfig), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
 	require.NoError(t, err)
 
 	// Load config
@@ -58,7 +59,7 @@ default_agent = "opencode"
 [agents.opencode]
 args = "-m gpt-4"
 `
-	err := os.WriteFile(filepath.Join(globalDir, "config.toml"), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
 	require.NoError(t, err)
 
 	// Load config
@@ -95,7 +96,7 @@ command = "go test ./..."
 [log]
 level = "info"
 `
-	err := os.WriteFile(filepath.Join(globalDir, "config.toml"), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
 	require.NoError(t, err)
 
 	// Write repo config (overrides some values)
@@ -108,7 +109,7 @@ args = "--model repo-model"
 [complete]
 command = "mise run ci"
 `
-	err = os.WriteFile(filepath.Join(crewDir, "config.toml"), []byte(repoConfig), 0644)
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
 	require.NoError(t, err)
 
 	// Load config
@@ -150,7 +151,7 @@ func TestLoader_LoadGlobal(t *testing.T) {
 	globalConfig := `
 default_agent = "opencode"
 `
-	err := os.WriteFile(filepath.Join(globalDir, "config.toml"), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
 	require.NoError(t, err)
 
 	// Load global config
@@ -185,7 +186,7 @@ func TestLoader_Load_InvalidTOML(t *testing.T) {
 	invalidConfig := `
 this is not valid toml [[[
 `
-	err := os.WriteFile(filepath.Join(crewDir, "config.toml"), []byte(invalidConfig), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(invalidConfig), 0644)
 	require.NoError(t, err)
 
 	// Load config
@@ -207,7 +208,7 @@ func TestLoader_Load_CustomAgentCommand(t *testing.T) {
 [agents.my-agent]
 command = 'my-custom-agent --task "{{.Title}}"'
 `
-	err := os.WriteFile(filepath.Join(crewDir, "config.toml"), []byte(config), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0644)
 	require.NoError(t, err)
 
 	// Load config

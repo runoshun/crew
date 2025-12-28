@@ -39,13 +39,13 @@ func NewLoaderWithGlobalDir(crewDir, globalConfDir string) *Loader {
 // defaultGlobalConfigDir returns the default global config directory.
 func defaultGlobalConfigDir() string {
 	if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
-		return filepath.Join(xdgConfigHome, "git-crew")
+		return filepath.Join(xdgConfigHome, domain.GlobalConfigDirName)
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(home, ".config", "git-crew")
+	return filepath.Join(home, ".config", domain.GlobalConfigDirName)
 }
 
 // configFile represents the structure of config.toml.
@@ -85,7 +85,7 @@ func (l *Loader) Load() (*domain.Config, error) {
 	}
 
 	// Load repo config
-	repoPath := filepath.Join(l.crewDir, "config.toml")
+	repoPath := filepath.Join(l.crewDir, domain.ConfigFileName)
 	repo, err := l.loadFile(repoPath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -115,7 +115,7 @@ func (l *Loader) LoadGlobal() (*domain.Config, error) {
 	if l.globalConfDir == "" {
 		return nil, os.ErrNotExist
 	}
-	globalPath := filepath.Join(l.globalConfDir, "config.toml")
+	globalPath := filepath.Join(l.globalConfDir, domain.ConfigFileName)
 	return l.loadFile(globalPath)
 }
 

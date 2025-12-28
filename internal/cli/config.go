@@ -64,7 +64,7 @@ func newConfigInitCommand(c *app.Container) *cobra.Command {
 		Long: `Generate a configuration file template.
 
 By default, creates the repository configuration file at .git/crew/config.toml.
-With --global, creates the global configuration file at ~/.config/git-crew/config.toml.
+With --global, creates the global configuration file at ~/.config/crew/config.toml.
 
 Error conditions:
 - Target file already exists: error`,

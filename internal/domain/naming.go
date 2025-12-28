@@ -74,7 +74,7 @@ func WorktreePath(crewDir string, taskID int) string {
 
 // ConfigPath returns the path to the repository config file.
 func ConfigPath(crewDir string) string {
-	return filepath.Join(crewDir, "config.toml")
+	return filepath.Join(crewDir, ConfigFileName)
 }
 
 // branchPattern matches crew branch names: crew-<id> or crew-<id>-gh-<issue>

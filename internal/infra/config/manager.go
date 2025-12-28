@@ -37,7 +37,7 @@ func NewManagerWithGlobalDir(crewDir, globalConfDir string) *Manager {
 
 // GetRepoConfigInfo returns information about the repository config file.
 func (m *Manager) GetRepoConfigInfo() domain.ConfigInfo {
-	path := filepath.Join(m.crewDir, "config.toml")
+	path := filepath.Join(m.crewDir, domain.ConfigFileName)
 	return m.getConfigInfo(path)
 }
 
@@ -49,7 +49,7 @@ func (m *Manager) GetGlobalConfigInfo() domain.ConfigInfo {
 			Exists: false,
 		}
 	}
-	path := filepath.Join(m.globalConfDir, "config.toml")
+	path := filepath.Join(m.globalConfDir, domain.ConfigFileName)
 	return m.getConfigInfo(path)
 }
 
@@ -71,7 +71,7 @@ func (m *Manager) getConfigInfo(path string) domain.ConfigInfo {
 
 // InitRepoConfig creates a repository config file with default template.
 func (m *Manager) InitRepoConfig() error {
-	path := filepath.Join(m.crewDir, "config.toml")
+	path := filepath.Join(m.crewDir, domain.ConfigFileName)
 	return m.initConfig(path)
 }
 
@@ -80,7 +80,7 @@ func (m *Manager) InitGlobalConfig() error {
 	if m.globalConfDir == "" {
 		return errors.New("global config directory not available")
 	}
-	path := filepath.Join(m.globalConfDir, "config.toml")
+	path := filepath.Join(m.globalConfDir, domain.ConfigFileName)
 
 	// Create parent directory if it doesn't exist
 	if err := os.MkdirAll(m.globalConfDir, 0700); err != nil {

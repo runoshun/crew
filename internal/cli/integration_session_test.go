@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +92,7 @@ func TestIntegration_Start_WithDefaultAgent(t *testing.T) {
 
 	// Create config with default_agent
 	crewDir := filepath.Join(dir, ".git", "crew")
-	configPath := filepath.Join(crewDir, "config.toml")
+	configPath := filepath.Join(crewDir, domain.ConfigFileName)
 	configContent := `default_agent = "echo"
 `
 	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
@@ -173,7 +174,7 @@ func TestIntegration_SessionWorkflow(t *testing.T) {
 
 	// Create config with default agent
 	crewDir := filepath.Join(dir, ".git", "crew")
-	configPath := filepath.Join(crewDir, "config.toml")
+	configPath := filepath.Join(crewDir, domain.ConfigFileName)
 	configContent := `default_agent = "true"
 `
 	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
