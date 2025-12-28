@@ -141,11 +141,11 @@ Bootstrap strategy: Build crew with crew.
 
 ### 2.7 Comment
 
-- [ ] `internal/usecase/add_comment.go` - AddComment usecase
-- [ ] `internal/cli/task.go` - comment command
-- [ ] Display comments in show output
-- [ ] Unit tests
-- [ ] CLI tests (happy path)
+- [x] `internal/usecase/add_comment.go` - AddComment usecase
+- [x] `internal/cli/task.go` - comment command
+- [x] Display comments in show output
+- [x] Unit tests
+- [x] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.8 Help & Documentation

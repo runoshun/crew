@@ -466,6 +466,52 @@ Examples:
 	return cmd
 }
 
+// newCommentCommand creates the comment command for adding comments to tasks.
+func newCommentCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "comment <id> <message>",
+		Short: "Add a comment to a task",
+		Long: `Add a comment to a task.
+
+Comments are timestamped and displayed in the task details output.
+They can be used to track progress, notes, or any relevant information.
+
+Examples:
+  # Add a comment to task #1
+  git crew comment 1 "Started working on authentication"
+
+  # Add a comment with spaces
+  git crew comment 1 "Fixed the login bug, needs testing"
+
+  # Use with task ID prefix
+  git crew comment "#1" "Completed initial implementation"`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Execute use case
+			uc := c.AddCommentUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.AddCommentInput{
+				TaskID:  taskID,
+				Message: args[1],
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added comment to task #%d at %s\n",
+				taskID, out.Comment.Time.Format(time.RFC3339))
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // printTaskDetails prints task details in a formatted output.
 func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
 	task := out.Task
