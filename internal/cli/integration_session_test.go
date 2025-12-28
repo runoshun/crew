@@ -195,3 +195,145 @@ func TestIntegration_SessionWorkflow(t *testing.T) {
 	assert.Contains(t, out, "Status: in_progress")
 	assert.Contains(t, out, "Agent: true")
 }
+
+// =============================================================================
+// Complete Command Integration Tests
+// =============================================================================
+
+func TestIntegration_Complete_Success(t *testing.T) {
+	dir := testRepo(t)
+	t.Cleanup(func() { cleanupTmuxSocket(t, dir) })
+
+	crewMust(t, dir, "init")
+
+	// Create config with default agent
+	crewDir := filepath.Join(dir, ".git", "crew")
+	configPath := filepath.Join(crewDir, domain.ConfigFileName)
+	configContent := `default_agent = "true"
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
+
+	crewMust(t, dir, "new", "--title", "Task to complete")
+
+	// Start the task
+	crewMust(t, dir, "start", "1")
+
+	// Verify status is in_progress
+	out := crewMust(t, dir, "show", "1")
+	assert.Contains(t, out, "Status: in_progress")
+
+	// Complete the task
+	out = crewMust(t, dir, "complete", "1")
+	assert.Contains(t, out, "Completed task #1")
+
+	// Verify status changed to in_review
+	out = crewMust(t, dir, "show", "1")
+	assert.Contains(t, out, "Status: in_review")
+}
+
+func TestIntegration_Complete_NotInProgress(t *testing.T) {
+	dir := testRepo(t)
+	crewMust(t, dir, "init")
+
+	crewMust(t, dir, "new", "--title", "Task in todo")
+
+	// Complete a task that is in 'todo' status should fail
+	_, err := crew(t, dir, "complete", "1")
+	assert.Error(t, err)
+}
+
+func TestIntegration_Complete_TaskNotFound(t *testing.T) {
+	dir := testRepo(t)
+	crewMust(t, dir, "init")
+
+	_, err := crew(t, dir, "complete", "999")
+	assert.Error(t, err)
+}
+
+func TestIntegration_Complete_UncommittedChanges(t *testing.T) {
+	dir := testRepo(t)
+	t.Cleanup(func() { cleanupTmuxSocket(t, dir) })
+
+	crewMust(t, dir, "init")
+
+	// Create config with default agent
+	crewDir := filepath.Join(dir, ".git", "crew")
+	configPath := filepath.Join(crewDir, domain.ConfigFileName)
+	configContent := `default_agent = "true"
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
+
+	crewMust(t, dir, "new", "--title", "Task with changes")
+
+	// Start the task
+	crewMust(t, dir, "start", "1")
+
+	// Get the worktree path and create an uncommitted file
+	worktreeDir := filepath.Join(crewDir, "worktrees", "1")
+	testFile := filepath.Join(worktreeDir, "uncommitted.txt")
+	require.NoError(t, os.WriteFile(testFile, []byte("uncommitted content"), 0o644))
+
+	// Complete should fail due to uncommitted changes
+	_, err := crew(t, dir, "complete", "1")
+	assert.Error(t, err)
+}
+
+func TestIntegration_Complete_WithCompleteCommand(t *testing.T) {
+	dir := testRepo(t)
+	t.Cleanup(func() { cleanupTmuxSocket(t, dir) })
+
+	crewMust(t, dir, "init")
+
+	// Create config with default agent and complete command
+	crewDir := filepath.Join(dir, ".git", "crew")
+	configPath := filepath.Join(crewDir, domain.ConfigFileName)
+	configContent := `default_agent = "true"
+
+[complete]
+command = "echo 'CI passed'"
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
+
+	crewMust(t, dir, "new", "--title", "Task with CI")
+
+	// Start the task
+	crewMust(t, dir, "start", "1")
+
+	// Complete should succeed (complete.command succeeds)
+	out := crewMust(t, dir, "complete", "1")
+	assert.Contains(t, out, "Completed task #1")
+
+	// Verify status changed to in_review
+	out = crewMust(t, dir, "show", "1")
+	assert.Contains(t, out, "Status: in_review")
+}
+
+func TestIntegration_Complete_FailingCompleteCommand(t *testing.T) {
+	dir := testRepo(t)
+	t.Cleanup(func() { cleanupTmuxSocket(t, dir) })
+
+	crewMust(t, dir, "init")
+
+	// Create config with default agent and failing complete command
+	crewDir := filepath.Join(dir, ".git", "crew")
+	configPath := filepath.Join(crewDir, domain.ConfigFileName)
+	configContent := `default_agent = "true"
+
+[complete]
+command = "exit 1"
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
+
+	crewMust(t, dir, "new", "--title", "Task with failing CI")
+
+	// Start the task
+	crewMust(t, dir, "start", "1")
+
+	// Complete should fail (complete.command fails)
+	_, err := crew(t, dir, "complete", "1")
+	assert.Error(t, err)
+
+	// Verify status is still in_progress
+	out := crewMust(t, dir, "show", "1")
+	assert.Contains(t, out, "Status: in_progress")
+}

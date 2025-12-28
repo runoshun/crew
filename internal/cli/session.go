@@ -104,6 +104,53 @@ Examples:
 	return cmd
 }
 
+// newCompleteCommand creates the complete command for marking a task as complete.
+func newCompleteCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "complete [id]",
+		Short: "Mark task as complete",
+		Long: `Mark a task as complete (in_progress → in_review).
+
+If no ID is provided, the task ID is auto-detected from the current branch name.
+
+Preconditions:
+  - Task status must be 'in_progress'
+  - No uncommitted changes in the worktree
+
+If [complete].command is configured, it will be executed before transitioning
+the status. If the command fails, the completion is aborted.
+
+Examples:
+  # Complete task by ID
+  git crew complete 1
+
+  # Auto-detect task from current branch (when working in a worktree)
+  git crew complete`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve task ID
+			taskID, err := resolveTaskID(args, c.Git)
+			if err != nil {
+				return err
+			}
+
+			// Execute use case
+			uc := c.CompleteTaskUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.CompleteTaskInput{
+				TaskID: taskID,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // newSessionEndedCommand creates the _session-ended internal command.
 // This is called by the task script's EXIT trap to handle session termination.
 func newSessionEndedCommand(c *app.Container) *cobra.Command {

@@ -117,7 +117,8 @@ For detailed steps, use the `review-workflow` skill.
 | Principle | Bad | Good | Reason |
 |-----------|-----|------|--------|
 | Layer responsibility | Implement git root detection in `cmd` | Implement in `infra/git` | Git operations are not CLI-specific; needed by TUI and tests too |
-| Layer responsibility | CLI/TUI で infra パッケージを import | Container 経由で UseCase を取得 | Presentation は Infrastructure を直接参照すべきでない |
+| Layer responsibility | CLI/TUI imports infra packages directly | Get UseCase via Container | Presentation layer should not directly reference Infrastructure |
+| Layer responsibility | CLI calls UseCase A, then uses result to call UseCase B | UseCase B fetches required data internally | CLI should not orchestrate; gathering necessary information is the UseCase's responsibility |
 | Domain centralization | Define `ErrNotGitRepository` in `app` package | Define in `domain/errors.go` | Git repository existence is domain knowledge for the whole app |
 | Explicit over implicit | `git.NewClient()` calls `os.Getwd()` internally | `git.NewClient(dir)` receives it | Allows specifying arbitrary directories in tests or other use cases |
 | No compromises | Place in `app` temporarily "to move later" | Create `infra/git` package from the start | Temporary placements become tech debt; dependencies spread and increase migration cost |
