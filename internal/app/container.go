@@ -120,3 +120,8 @@ func (c *Container) ShowTaskUseCase() *usecase.ShowTask {
 func (c *Container) EditTaskUseCase() *usecase.EditTask {
 	return usecase.NewEditTask(c.Tasks)
 }
+
+// DeleteTaskUseCase returns a new DeleteTask use case.
+func (c *Container) DeleteTaskUseCase() *usecase.DeleteTask {
+	return usecase.NewDeleteTask(c.Tasks)
+}

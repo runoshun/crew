@@ -733,6 +733,122 @@ func TestNewEditCommand_MultipleUpdates(t *testing.T) {
 	assert.NotContains(t, task.Labels, "old")
 }
 
+// =============================================================================
+// Rm Command Tests
+// =============================================================================
+
+func TestNewRmCommand_Success(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task to delete",
+		Status: domain.StatusTodo,
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newRmCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Deleted task #1")
+
+	// Verify task was deleted
+	_, exists := repo.tasks[1]
+	assert.False(t, exists, "task should be deleted from repository")
+}
+
+func TestNewRmCommand_WithHashPrefix(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task to delete",
+		Status: domain.StatusTodo,
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newRmCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"#1"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Deleted task #1")
+
+	// Verify task was deleted
+	_, exists := repo.tasks[1]
+	assert.False(t, exists, "task should be deleted from repository")
+}
+
+func TestNewRmCommand_NotFound(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newRmCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"999"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
+}
+
+func TestNewRmCommand_InvalidID(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newRmCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"invalid"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid task ID")
+}
+
+func TestNewRmCommand_NoArgs(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newRmCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert - should fail due to missing argument
+	assert.Error(t, err)
+}
+
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
 		name     string

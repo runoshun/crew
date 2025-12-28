@@ -366,6 +366,47 @@ Examples:
 	return cmd
 }
 
+// newRmCommand creates the rm command for deleting tasks.
+func newRmCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "rm <id>",
+		Short: "Delete a task",
+		Long: `Delete a task from git-crew.
+
+This removes the task from the store. In Phase 2, this does not
+clean up worktrees or sessions - that will be added in later phases.
+
+Examples:
+  # Delete task by ID
+  git crew rm 1
+
+  # Delete task using # prefix
+  git crew rm "#1"`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Execute use case
+			uc := c.DeleteTaskUseCase()
+			_, err = uc.Execute(cmd.Context(), usecase.DeleteTaskInput{
+				TaskID: taskID,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted task #%d\n", taskID)
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // printTaskDetails prints task details in a formatted output.
 func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
 	task := out.Task
