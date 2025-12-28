@@ -243,12 +243,7 @@ func (s *Store) read() (*storeData, error) {
 	content, err := os.ReadFile(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Return empty store if file doesn't exist
-			return &storeData{
-				Meta:     meta{NextTaskID: 1},
-				Tasks:    make(map[string]*taskData),
-				Comments: make(map[string][]comment),
-			}, nil
+			return nil, domain.ErrNotInitialized
 		}
 		return nil, fmt.Errorf("read store file: %w", err)
 	}

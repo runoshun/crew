@@ -497,18 +497,15 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 func TestIntegration_NotInitialized(t *testing.T) {
 	dir := testRepo(t)
 
-	// NOTE: Current implementation auto-creates tasks.json on first write,
-	// so commands work without explicit init. This test documents current behavior.
-	// TODO: Consider requiring explicit init in future versions.
+	// Commands should fail without init
+	_, err := crew(t, dir, "new", "--title", "Test")
+	assert.Error(t, err)
 
-	// Commands work without init (auto-creates store)
-	out, err := crew(t, dir, "new", "--title", "Test")
-	assert.NoError(t, err)
-	assert.Contains(t, out, "Created task #1")
+	_, err = crew(t, dir, "list")
+	assert.Error(t, err)
 
-	out, err = crew(t, dir, "list")
-	assert.NoError(t, err)
-	assert.Contains(t, out, "Test")
+	_, err = crew(t, dir, "show", "1")
+	assert.Error(t, err)
 }
 
 func TestIntegration_NotGitRepo(t *testing.T) {
