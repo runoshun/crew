@@ -19,4 +19,5 @@ var (
 	ErrEmptyMessage       = errors.New("message cannot be empty")
 	ErrNotOnMainBranch    = errors.New("not on main branch")
 	ErrNotGitRepository   = errors.New("not a git repository (or any of the parent directories)")
+	ErrNoFieldsToUpdate   = errors.New("no fields to update")
 )

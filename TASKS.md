@@ -110,10 +110,10 @@ Bootstrap strategy: Build crew with crew.
 
 ### 2.4 Edit Task
 
-- [ ] `internal/usecase/edit_task.go` - EditTask usecase
-- [ ] `internal/cli/task.go` - edit command
-- [ ] Flags: `--title`, `--desc`, `--add-label`, `--rm-label`
-- [ ] Unit tests
+- [x] `internal/usecase/edit_task.go` - EditTask usecase
+- [x] `internal/cli/task.go` - edit command
+- [x] Flags: `--title`, `--desc`, `--add-label`, `--rm-label`
+- [x] Unit tests
 - [ ] Integration test
 
 ### 2.5 Delete Task
