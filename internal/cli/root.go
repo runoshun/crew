@@ -29,6 +29,7 @@ and isolated task execution.`,
 		newShowCommand(c),
 		newEditCommand(c),
 		newRmCommand(c),
+		newCpCommand(c),
 		// Commands below will be added as they are implemented:
 		// newStartCommand(c),
 	)

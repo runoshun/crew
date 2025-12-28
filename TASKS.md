@@ -131,12 +131,12 @@ Bootstrap strategy: Build crew with crew.
 
 ### 2.6 Copy Task
 
-- [ ] `internal/usecase/copy_task.go` - CopyTask usecase
-- [ ] `internal/cli/task.go` - cp command
-- [ ] Copy title (append " (copy)"), description
-- [ ] Set base branch to source branch
-- [ ] Unit tests
-- [ ] CLI tests (happy path)
+- [x] `internal/usecase/copy_task.go` - CopyTask usecase
+- [x] `internal/cli/task.go` - cp command
+- [x] Copy title (append " (copy)"), description
+- [x] Set base branch to source branch
+- [x] Unit tests
+- [x] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.7 Comment

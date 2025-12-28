@@ -849,6 +849,130 @@ func TestNewRmCommand_NoArgs(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// =============================================================================
+// Cp Command Tests
+// =============================================================================
+
+func TestNewCpCommand_Success(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Original task",
+		Description: "Task description",
+		Status:      domain.StatusTodo,
+		Labels:      []string{"bug"},
+		BaseBranch:  "main",
+	}
+	repo.nextID = 2
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCpCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Copied task #1 to #2")
+
+	// Verify new task was created
+	task := repo.tasks[2]
+	assert.NotNil(t, task)
+	assert.Equal(t, "Original task (copy)", task.Title)
+	assert.Equal(t, "Task description", task.Description)
+	assert.Equal(t, domain.StatusTodo, task.Status)
+}
+
+func TestNewCpCommand_WithCustomTitle(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Original task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	repo.nextID = 2
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCpCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1", "--title", "Custom new title"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Copied task #1 to #2")
+
+	task := repo.tasks[2]
+	assert.Equal(t, "Custom new title", task.Title)
+}
+
+func TestNewCpCommand_SourceNotFound(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCpCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"999"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
+}
+
+func TestNewCpCommand_InvalidID(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCpCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"invalid"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid task ID")
+}
+
+func TestNewCpCommand_NoArgs(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCpCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert - should fail due to missing argument
+	assert.Error(t, err)
+}
+
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -125,3 +125,8 @@ func (c *Container) EditTaskUseCase() *usecase.EditTask {
 func (c *Container) DeleteTaskUseCase() *usecase.DeleteTask {
 	return usecase.NewDeleteTask(c.Tasks)
 }
+
+// CopyTaskUseCase returns a new CopyTask use case.
+func (c *Container) CopyTaskUseCase() *usecase.CopyTask {
+	return usecase.NewCopyTask(c.Tasks, c.Clock)
+}
