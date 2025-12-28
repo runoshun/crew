@@ -55,6 +55,12 @@ func crew(t *testing.T, dir string, args ...string) (string, error) {
 
 	cmd := exec.Command(binPath, args...)
 	cmd.Dir = dir
+
+	// Set GOCOVERDIR if coverage mode is enabled
+	if coverDir != "" {
+		cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverDir)
+	}
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -78,11 +84,13 @@ func crewMust(t *testing.T, dir string, args ...string) string {
 
 var (
 	crewBinPath string
+	coverDir    string
 	buildOnce   sync.Once
 	buildErr    error
 )
 
 // buildCrew builds the crew binary once and caches the path.
+// If GOCOVERDIR_OUT is set, builds with -cover flag for coverage collection.
 func buildCrew(t *testing.T) string {
 	t.Helper()
 
@@ -111,7 +119,23 @@ func buildCrew(t *testing.T) string {
 		// Build to a fixed temp directory (not per-test)
 		tmpDir := os.TempDir()
 		binPath := filepath.Join(tmpDir, "crew-integration-test")
-		cmd := exec.Command("go", "build", "-o", binPath, "./cmd/crew")
+
+		// Check if coverage mode is requested
+		coverDir = os.Getenv("GOCOVERDIR_OUT")
+		var buildArgs []string
+		if coverDir != "" {
+			// Build with coverage instrumentation
+			buildArgs = []string{"build", "-cover", "-o", binPath, "./cmd/crew"}
+			// Create coverage directory if it doesn't exist
+			if err := os.MkdirAll(coverDir, 0o755); err != nil {
+				buildErr = err
+				return
+			}
+		} else {
+			buildArgs = []string{"build", "-o", binPath, "./cmd/crew"}
+		}
+
+		cmd := exec.Command("go", buildArgs...)
 		cmd.Dir = moduleRoot
 		out, err := cmd.CombinedOutput()
 		if err != nil {
