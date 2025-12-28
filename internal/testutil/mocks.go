@@ -192,3 +192,46 @@ func (m *MockTaskRepositoryWithAddCommentError) AddComment(_ int, _ domain.Comme
 	}
 	return nil
 }
+
+// MockGit is a test double for domain.Git.
+// Fields are ordered to minimize memory padding.
+type MockGit struct {
+	CurrentBranchErr  error
+	CurrentBranchName string
+}
+
+// Ensure MockGit implements domain.Git interface.
+var _ domain.Git = (*MockGit)(nil)
+
+// CurrentBranch returns the configured branch name or error.
+func (m *MockGit) CurrentBranch() (string, error) {
+	if m.CurrentBranchErr != nil {
+		return "", m.CurrentBranchErr
+	}
+	return m.CurrentBranchName, nil
+}
+
+// BranchExists is not implemented yet.
+func (m *MockGit) BranchExists(_ string) (bool, error) {
+	panic("not implemented")
+}
+
+// HasUncommittedChanges is not implemented yet.
+func (m *MockGit) HasUncommittedChanges(_ string) (bool, error) {
+	panic("not implemented")
+}
+
+// HasMergeConflict is not implemented yet.
+func (m *MockGit) HasMergeConflict(_, _ string) (bool, error) {
+	panic("not implemented")
+}
+
+// Merge is not implemented yet.
+func (m *MockGit) Merge(_ string, _ bool) error {
+	panic("not implemented")
+}
+
+// DeleteBranch is not implemented yet.
+func (m *MockGit) DeleteBranch(_ string) error {
+	panic("not implemented")
+}
