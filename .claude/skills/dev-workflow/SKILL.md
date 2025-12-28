@@ -20,7 +20,7 @@ Register ALL TODOs at once when starting Phase 1:
 ```
 # Phase 1: Setup
 - [ ] Read docs/README.md, core-concepts.md, architecture.md, spec-cli.md, spec-tui.md
-- [ ] Check TASKS.md for current task
+- [ ] Check current task with `./crew list` and `./crew show <id>`
 - [ ] Ensure on feature branch
 # Phase 2: Implementation
 - [ ] Plan implementation and update TODOs (add specific steps here)
@@ -60,7 +60,8 @@ Register ALL TODOs at once when starting Phase 1:
      - docs/spec-tui.md - TUI screen specs
 
 2. **Check current task**
-   - Read TASKS.md to identify the next uncompleted task
+   - Run `./crew list` to see all tasks
+   - Run `./crew show <id>` to view task details
    - If unclear, ask the user which task to work on
 
 3. **Ensure feature branch**
@@ -85,8 +86,8 @@ Register ALL TODOs at once when starting Phase 1:
    - Run `mise run ci` after significant changes
    - Fix any issues before proceeding
 
-4. **Update TASKS.md**
-   - Check off completed items in TASKS.md as you go
+4. **Update task status**
+   - Use `./crew edit <id> --status <status>` to update task status as you progress
 
 ### Phase 3: Wrap-up
 
