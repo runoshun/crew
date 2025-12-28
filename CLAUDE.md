@@ -143,6 +143,46 @@ For detailed steps, use the `review-workflow` skill.
 4. Comment the "why", not the "what"
 5. Fail fast - return errors early
 6. Use ADT/sumtypes with `exhaustive` linter
+7. Inject functions that are hard to test (e.g., `syscall.Exec`) - see example below
+
+#### Testing Hard-to-Test Functions
+
+When a function calls something that terminates or replaces the process (like `syscall.Exec`), inject it as a field:
+
+```go
+// Define the function type
+type ExecFunc func(argv0 string, argv []string, envv []string) error
+
+type Client struct {
+    execFunc ExecFunc // default: syscall.Exec
+}
+
+func NewClient() *Client {
+    return &Client{execFunc: syscall.Exec}
+}
+
+// Setter for testing
+func (c *Client) SetExecFunc(fn ExecFunc) {
+    c.execFunc = fn
+}
+
+// Use c.execFunc instead of syscall.Exec directly
+func (c *Client) Attach(name string) error {
+    return c.execFunc(path, args, env)
+}
+```
+
+In tests, inject a mock to verify arguments without actually exec'ing:
+
+```go
+var capturedArgs []string
+client.SetExecFunc(func(argv0 string, argv []string, envv []string) error {
+    capturedArgs = argv
+    return nil
+})
+client.Attach("session-1")
+assert.Equal(t, expectedArgs, capturedArgs)
+```
 
 ### Things to Avoid
 
