@@ -512,6 +512,50 @@ Examples:
 	return cmd
 }
 
+// newCloseCommand creates the close command for closing tasks.
+func newCloseCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "close <id>",
+		Short: "Close task without merging",
+		Long: `Close a task without merging it.
+
+This transitions the task status to 'closed'. The task will remain
+in the task list but will not be merged.
+
+In future versions, this command will also stop any running session
+and delete the worktree. Currently, it only updates the status.
+
+Examples:
+  # Close task by ID
+  git crew close 1
+
+  # Close task using # prefix
+  git crew close "#1"`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Execute use case
+			uc := c.CloseTaskUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.CloseTaskInput{
+				TaskID: taskID,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Closed task #%d: %s\n", out.Task.ID, out.Task.Title)
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // printTaskDetails prints task details in a formatted output.
 func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
 	task := out.Task

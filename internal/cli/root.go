@@ -61,6 +61,9 @@ and isolated task execution.`,
 	commentCmd := newCommentCommand(c)
 	commentCmd.GroupID = groupTask
 
+	closeCmd := newCloseCommand(c)
+	closeCmd.GroupID = groupTask
+
 	// Add subcommands
 	root.AddCommand(
 		initCmd,
@@ -71,6 +74,7 @@ and isolated task execution.`,
 		rmCmd,
 		cpCmd,
 		commentCmd,
+		closeCmd,
 		// Commands below will be added as they are implemented:
 		// newStartCommand(c),
 	)
