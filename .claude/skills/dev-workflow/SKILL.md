@@ -27,9 +27,9 @@ Register ALL TODOs at once when starting Phase 1:
 # Phase 3: Wrap-up
 - [ ] Run final CI check
 - [ ] Check test coverage for new code
+- [ ] Share technical findings before commit (if any)
 - [ ] Commit and merge (ask user - single confirmation for both)
-- [ ] Review session feedback → propose guideline updates
-- [ ] Document any docs/ friction in DESIGN_FEEDBACK.md
+- [ ] Retrospective → propose guideline updates (if any)
 - [ ] Ask user before proceeding to next task
 ```
 
@@ -101,7 +101,15 @@ Register ALL TODOs at once when starting Phase 1:
    - Review coverage: `go tool cover -func=coverage.out | grep -E "(total|<new-package>)"`
    - Add tests if coverage is insufficient
 
-3. **Commit and Merge**
+3. **Share technical findings** (before commit)
+   - Share any concerns, ambiguities, or potential issues discovered during implementation
+   - Examples:
+     - Spec interpretation questions
+     - Edge cases not covered by specs
+     - Design decisions that might need confirmation
+   - This allows fixes to be included in the same commit
+
+4. **Commit and Merge**
    - When task is complete, ask user once: "Commit and merge to main?"
    - If yes:
      - Stage and commit with clear message
@@ -110,7 +118,7 @@ Register ALL TODOs at once when starting Phase 1:
      - Delete feature branch: `git branch -d feature/<branch>`
    - If continuing on same branch (e.g., next task is closely related), skip merge
 
-4. **Retrospective**
+5. **Retrospective** (after commit)
    - Review feedback received during the session:
      - Instructions repeated multiple times
      - Explicit requests like "please always do X"
@@ -118,8 +126,6 @@ Register ALL TODOs at once when starting Phase 1:
    - If patterns suggest AGENTS.md or docs/ improvements:
      - Propose changes to the user
      - If approved, create a separate commit
-
-5. **Design Feedback** (if applicable)
    - If you encountered friction with specs in docs/:
      - Specs difficult to implement as written
      - Inconsistencies between docs
