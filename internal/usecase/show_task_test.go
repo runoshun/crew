@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestShowTask_Execute_Success(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Test task",
 		Description: "Test description",
@@ -42,20 +43,20 @@ func TestShowTask_Execute_Success(t *testing.T) {
 
 func TestShowTask_Execute_WithChildren(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	parentID := 1
-	repo.tasks[1] = &domain.Task{
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Parent task",
 		Status: domain.StatusInProgress,
 	}
-	repo.tasks[2] = &domain.Task{
+	repo.Tasks[2] = &domain.Task{
 		ID:       2,
 		ParentID: &parentID,
 		Title:    "Child task 1",
 		Status:   domain.StatusTodo,
 	}
-	repo.tasks[3] = &domain.Task{
+	repo.Tasks[3] = &domain.Task{
 		ID:       3,
 		ParentID: &parentID,
 		Title:    "Child task 2",
@@ -75,13 +76,13 @@ func TestShowTask_Execute_WithChildren(t *testing.T) {
 
 func TestShowTask_Execute_WithComments(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	repo.comments[1] = []domain.Comment{
+	repo.Comments[1] = []domain.Comment{
 		{Text: "First comment", Time: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
 		{Text: "Second comment", Time: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 	}
@@ -101,9 +102,9 @@ func TestShowTask_Execute_WithComments(t *testing.T) {
 
 func TestShowTask_Execute_FullDetails(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	parentID := 10
-	repo.tasks[1] = &domain.Task{
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		ParentID:    &parentID,
 		Title:       "OAuth implementation",
@@ -142,7 +143,7 @@ func TestShowTask_Execute_FullDetails(t *testing.T) {
 
 func TestShowTask_Execute_TaskNotFound(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	uc := NewShowTask(repo)
 
 	// Execute
@@ -156,8 +157,8 @@ func TestShowTask_Execute_TaskNotFound(t *testing.T) {
 
 func TestShowTask_Execute_GetError(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.getErr = errors.New("database error")
+	repo := testutil.NewMockTaskRepository()
+	repo.GetErr = errors.New("database error")
 	uc := NewShowTask(repo)
 
 	// Execute
@@ -172,11 +173,11 @@ func TestShowTask_Execute_GetError(t *testing.T) {
 
 func TestShowTask_Execute_GetChildrenError(t *testing.T) {
 	// Setup
-	repo := &mockTaskRepositoryWithChildrenError{
-		mockTaskRepository: newMockTaskRepository(),
-		childrenErr:        errors.New("children error"),
+	repo := &testutil.MockTaskRepositoryWithChildrenError{
+		MockTaskRepository: testutil.NewMockTaskRepository(),
+		ChildrenErr:        errors.New("children error"),
 	}
-	repo.tasks[1] = &domain.Task{
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
@@ -195,11 +196,11 @@ func TestShowTask_Execute_GetChildrenError(t *testing.T) {
 
 func TestShowTask_Execute_GetCommentsError(t *testing.T) {
 	// Setup
-	repo := &mockTaskRepositoryWithCommentsError{
-		mockTaskRepository: newMockTaskRepository(),
-		commentsErr:        errors.New("comments error"),
+	repo := &testutil.MockTaskRepositoryWithCommentsError{
+		MockTaskRepository: testutil.NewMockTaskRepository(),
+		CommentsErr:        errors.New("comments error"),
 	}
-	repo.tasks[1] = &domain.Task{
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
@@ -214,30 +215,4 @@ func TestShowTask_Execute_GetCommentsError(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get comments")
-}
-
-// mockTaskRepositoryWithChildrenError extends mockTaskRepository to return error on GetChildren.
-type mockTaskRepositoryWithChildrenError struct {
-	*mockTaskRepository
-	childrenErr error
-}
-
-func (m *mockTaskRepositoryWithChildrenError) GetChildren(_ int) ([]*domain.Task, error) {
-	if m.childrenErr != nil {
-		return nil, m.childrenErr
-	}
-	return m.mockTaskRepository.GetChildren(0)
-}
-
-// mockTaskRepositoryWithCommentsError extends mockTaskRepository to return error on GetComments.
-type mockTaskRepositoryWithCommentsError struct {
-	*mockTaskRepository
-	commentsErr error
-}
-
-func (m *mockTaskRepositoryWithCommentsError) GetComments(_ int) ([]domain.Comment, error) {
-	if m.commentsErr != nil {
-		return nil, m.commentsErr
-	}
-	return m.mockTaskRepository.GetComments(0)
 }

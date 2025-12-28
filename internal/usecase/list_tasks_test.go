@@ -7,24 +7,25 @@ import (
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestListTasks_Execute_AllTasks(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
 		Status: domain.StatusTodo,
 	}
-	repo.tasks[2] = &domain.Task{
+	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Task 2",
 		Status: domain.StatusInProgress,
 	}
-	repo.tasks[3] = &domain.Task{
+	repo.Tasks[3] = &domain.Task{
 		ID:     3,
 		Title:  "Task 3",
 		Status: domain.StatusDone,
@@ -42,7 +43,7 @@ func TestListTasks_Execute_AllTasks(t *testing.T) {
 
 func TestListTasks_Execute_Empty(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	uc := NewListTasks(repo)
 
 	// Execute
@@ -55,26 +56,26 @@ func TestListTasks_Execute_Empty(t *testing.T) {
 
 func TestListTasks_Execute_WithParentFilter(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	parentID := 1
-	repo.tasks[1] = &domain.Task{
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Parent Task",
 		Status: domain.StatusTodo,
 	}
-	repo.tasks[2] = &domain.Task{
+	repo.Tasks[2] = &domain.Task{
 		ID:       2,
 		Title:    "Child Task 1",
 		ParentID: &parentID,
 		Status:   domain.StatusTodo,
 	}
-	repo.tasks[3] = &domain.Task{
+	repo.Tasks[3] = &domain.Task{
 		ID:       3,
 		Title:    "Child Task 2",
 		ParentID: &parentID,
 		Status:   domain.StatusTodo,
 	}
-	repo.tasks[4] = &domain.Task{
+	repo.Tasks[4] = &domain.Task{
 		ID:     4,
 		Title:  "Orphan Task",
 		Status: domain.StatusTodo,
@@ -96,20 +97,20 @@ func TestListTasks_Execute_WithParentFilter(t *testing.T) {
 
 func TestListTasks_Execute_WithLabelFilter(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task with bug label",
 		Status: domain.StatusTodo,
 		Labels: []string{"bug"},
 	}
-	repo.tasks[2] = &domain.Task{
+	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Task with feature label",
 		Status: domain.StatusTodo,
 		Labels: []string{"feature"},
 	}
-	repo.tasks[3] = &domain.Task{
+	repo.Tasks[3] = &domain.Task{
 		ID:     3,
 		Title:  "Task with both labels",
 		Status: domain.StatusTodo,
@@ -130,9 +131,9 @@ func TestListTasks_Execute_WithLabelFilter(t *testing.T) {
 
 func TestListTasks_Execute_RepositoryError(t *testing.T) {
 	// Setup
-	repo := &mockTaskRepositoryWithListError{
-		mockTaskRepository: newMockTaskRepository(),
-		listErr:            errors.New("database error"),
+	repo := &testutil.MockTaskRepositoryWithListError{
+		MockTaskRepository: testutil.NewMockTaskRepository(),
+		ListErr:            errors.New("database error"),
 	}
 	uc := NewListTasks(repo)
 
@@ -146,10 +147,10 @@ func TestListTasks_Execute_RepositoryError(t *testing.T) {
 
 func TestListTasks_Execute_PreservesTaskData(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	now := time.Now()
 	parentID := 1
-	repo.tasks[1] = &domain.Task{
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Parent Task",
 		Description: "A parent task",
@@ -163,7 +164,7 @@ func TestListTasks_Execute_PreservesTaskData(t *testing.T) {
 		BaseBranch:  "main",
 		Labels:      []string{"feature", "urgent"},
 	}
-	repo.tasks[2] = &domain.Task{
+	repo.Tasks[2] = &domain.Task{
 		ID:         2,
 		Title:      "Child Task",
 		ParentID:   &parentID,
@@ -210,17 +211,4 @@ func TestListTasks_Execute_PreservesTaskData(t *testing.T) {
 	assert.Equal(t, "Child Task", childTask.Title)
 	require.NotNil(t, childTask.ParentID)
 	assert.Equal(t, 1, *childTask.ParentID)
-}
-
-// mockTaskRepositoryWithListError extends mockTaskRepository to return error on List.
-type mockTaskRepositoryWithListError struct {
-	*mockTaskRepository
-	listErr error
-}
-
-func (m *mockTaskRepositoryWithListError) List(_ domain.TaskFilter) ([]*domain.Task, error) {
-	if m.listErr != nil {
-		return nil, m.listErr
-	}
-	return m.mockTaskRepository.List(domain.TaskFilter{})
 }
