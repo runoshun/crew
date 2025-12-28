@@ -27,11 +27,12 @@ type StartTaskOutput struct {
 
 // StartTask is the use case for starting a task.
 type StartTask struct {
-	tasks     domain.TaskRepository
-	sessions  domain.SessionManager
-	worktrees domain.WorktreeManager
-	clock     domain.Clock
-	crewDir   string // Path to .git/crew directory
+	tasks        domain.TaskRepository
+	sessions     domain.SessionManager
+	worktrees    domain.WorktreeManager
+	configLoader domain.ConfigLoader
+	clock        domain.Clock
+	crewDir      string // Path to .git/crew directory
 }
 
 // NewStartTask creates a new StartTask use case.
@@ -39,15 +40,17 @@ func NewStartTask(
 	tasks domain.TaskRepository,
 	sessions domain.SessionManager,
 	worktrees domain.WorktreeManager,
+	configLoader domain.ConfigLoader,
 	clock domain.Clock,
 	crewDir string,
 ) *StartTask {
 	return &StartTask{
-		tasks:     tasks,
-		sessions:  sessions,
-		worktrees: worktrees,
-		clock:     clock,
-		crewDir:   crewDir,
+		tasks:        tasks,
+		sessions:     sessions,
+		worktrees:    worktrees,
+		configLoader: configLoader,
+		clock:        clock,
+		crewDir:      crewDir,
 	}
 }
 
@@ -77,8 +80,16 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, domain.ErrSessionRunning
 	}
 
-	// Resolve agent (MVP: require agent to be specified)
+	// Resolve agent from input or config
 	agent := in.Agent
+	if agent == "" {
+		// Try to get default_agent from config
+		cfg, loadErr := uc.configLoader.Load()
+		if loadErr != nil {
+			return nil, fmt.Errorf("load config: %w", loadErr)
+		}
+		agent = cfg.DefaultAgent
+	}
 	if agent == "" {
 		return nil, domain.ErrNoAgent
 	}

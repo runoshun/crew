@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/infra/config"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
@@ -48,8 +49,8 @@ type Container struct {
 	Git              domain.Git
 	Worktrees        domain.WorktreeManager
 	Sessions         domain.SessionManager
+	ConfigLoader     domain.ConfigLoader
 	// GitHub    domain.GitHub          // TODO: implement in later phase
-	// ConfigLoader domain.ConfigLoader // TODO: implement in later phase
 
 	// Pointer fields
 	Logger *slog.Logger
@@ -83,6 +84,9 @@ func New(dir string) (*Container, error) {
 	// Create session manager
 	sessionClient := tmux.NewClient(cfg.SocketPath, cfg.CrewDir)
 
+	// Create config loader
+	configLoader := config.NewLoader(cfg.CrewDir)
+
 	return &Container{
 		Tasks:            store,
 		StoreInitializer: store,
@@ -90,6 +94,7 @@ func New(dir string) (*Container, error) {
 		Git:              gitClient,
 		Worktrees:        worktreeClient,
 		Sessions:         sessionClient,
+		ConfigLoader:     configLoader,
 		Logger:           logger,
 		Config:           cfg,
 	}, nil
@@ -155,7 +160,7 @@ func (c *Container) CloseTaskUseCase() *usecase.CloseTask {
 
 // StartTaskUseCase returns a new StartTask use case.
 func (c *Container) StartTaskUseCase() *usecase.StartTask {
-	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.Clock, c.Config.CrewDir)
+	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Clock, c.Config.CrewDir)
 }
 
 // AttachSessionUseCase returns a new AttachSession use case.

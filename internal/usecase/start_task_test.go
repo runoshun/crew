@@ -27,9 +27,10 @@ func TestStartTask_Execute_Success(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = "/path/to/worktree"
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -86,9 +87,10 @@ func TestStartTask_Execute_FromInReview(t *testing.T) {
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -116,9 +118,10 @@ func TestStartTask_Execute_FromError(t *testing.T) {
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -140,9 +143,10 @@ func TestStartTask_Execute_TaskNotFound(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -175,9 +179,10 @@ func TestStartTask_Execute_InvalidStatus(t *testing.T) {
 			}
 			sessions := testutil.NewMockSessionManager()
 			worktrees := testutil.NewMockWorktreeManager()
+			configLoader := testutil.NewMockConfigLoader()
 			clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-			uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+			uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 			// Execute
 			_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -204,9 +209,10 @@ func TestStartTask_Execute_SessionAlreadyRunning(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true // Session already running
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -230,9 +236,11 @@ func TestStartTask_Execute_NoAgent(t *testing.T) {
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	// No default_agent in config
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute without agent
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -242,6 +250,44 @@ func TestStartTask_Execute_NoAgent(t *testing.T) {
 
 	// Assert
 	assert.ErrorIs(t, err, domain.ErrNoAgent)
+}
+
+func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.DefaultAgent = "opencode" // default_agent from config
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+
+	// Execute without specifying agent
+	out, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "", // No agent specified
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "crew-1", out.SessionName)
+
+	// Verify task uses default agent
+	task := repo.Tasks[1]
+	assert.Equal(t, "opencode", task.Agent)
+
+	// Verify script uses default agent
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	assert.Contains(t, string(scriptContent), "opencode")
 }
 
 func TestStartTask_Execute_WorktreeCreateError(t *testing.T) {
@@ -257,9 +303,10 @@ func TestStartTask_Execute_WorktreeCreateError(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreateErr = assert.AnError
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -285,9 +332,10 @@ func TestStartTask_Execute_SessionStartError(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	sessions.StartErr = assert.AnError
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -319,9 +367,10 @@ func TestStartTask_Execute_SaveError(t *testing.T) {
 	repo.SaveErr = assert.AnError
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -354,9 +403,10 @@ func TestStartTask_Execute_WithIssue(t *testing.T) {
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -388,9 +438,10 @@ func TestStartTask_Execute_WithDescription(t *testing.T) {
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -420,9 +471,10 @@ func TestStartTask_ScriptGeneration(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = "/path/to/worktree"
+	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, clock, crewDir)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -464,11 +516,40 @@ func TestStartTask_CleanupScript(t *testing.T) {
 	require.NoError(t, os.WriteFile(scriptPath, []byte("test"), 0755))
 
 	// Create use case
-	uc := NewStartTask(nil, nil, nil, nil, crewDir)
+	uc := NewStartTask(nil, nil, nil, nil, nil, crewDir)
 
 	// Cleanup
 	uc.cleanupScript(1)
 
 	// Verify file is removed
 	assert.NoFileExists(t, scriptPath)
+}
+
+func TestStartTask_Execute_ConfigLoadError(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.LoadErr = assert.AnError // Config load error
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)
+
+	// Execute without agent (will try to load default from config)
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "", // No agent specified, will try to load from config
+	})
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "load config")
 }
