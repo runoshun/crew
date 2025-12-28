@@ -122,11 +122,11 @@ Bootstrap strategy: Build crew with crew.
 
 ### 2.5 Delete Task
 
-- [ ] `internal/usecase/delete_task.go` - DeleteTask usecase
-- [ ] `internal/cli/task.go` - rm command
-- [ ] Delete task from store (no worktree cleanup yet)
-- [ ] Unit tests
-- [ ] CLI tests (happy path)
+- [x] `internal/usecase/delete_task.go` - DeleteTask usecase
+- [x] `internal/cli/task.go` - rm command
+- [x] Delete task from store (no worktree cleanup yet)
+- [x] Unit tests
+- [x] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.6 Copy Task
