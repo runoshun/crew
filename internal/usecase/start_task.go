@@ -160,9 +160,8 @@ func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, work
 		return "", fmt.Errorf("create scripts directory: %w", err)
 	}
 
-	// Build prompt and script
-	prompt := uc.buildPrompt(task, worktreePath, workerAgent, cfg)
-	script, err := uc.buildScript(task, worktreePath, workerAgent, prompt)
+	// Build command and prompt using RenderCommand
+	script, err := uc.buildScript(task, worktreePath, workerAgent, cfg)
 	if err != nil {
 		return "", fmt.Errorf("build script: %w", err)
 	}
@@ -201,40 +200,6 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) domain
 	}
 }
 
-// buildPrompt constructs the prompt text for the agent.
-func (uc *StartTask) buildPrompt(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config) string {
-	// Build a prompt that includes task information
-	prompt := fmt.Sprintf(`# Task %d: %s
-
-`, task.ID, task.Title)
-
-	if task.Description != "" {
-		prompt += task.Description + "\n\n"
-	}
-
-	prompt += fmt.Sprintf(`## Task Information
-- Branch: %s
-- Worktree: %s
-`, domain.BranchName(task.ID, task.Issue), worktreePath)
-
-	if task.Issue > 0 {
-		prompt += fmt.Sprintf("- Issue: #%d\n", task.Issue)
-	}
-
-	// Add completion instruction from config or worker-specific prompt
-	instructionPrompt := workerAgent.Prompt
-	if instructionPrompt == "" {
-		instructionPrompt = cfg.WorkersConfig.Prompt
-	}
-	if instructionPrompt == "" {
-		instructionPrompt = domain.DefaultWorkerPrompt
-	}
-
-	prompt += "\n## Instructions\n" + instructionPrompt + "\n"
-
-	return prompt
-}
-
 // scriptTemplateData holds the data for script template execution.
 // Fields are ordered to minimize memory padding.
 type scriptTemplateData struct {
@@ -245,7 +210,7 @@ type scriptTemplateData struct {
 }
 
 // buildScript constructs the task script with embedded prompt and session-ended callback.
-func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, prompt string) (string, error) {
+func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config) (string, error) {
 	// Find crew binary path (for _session-ended callback)
 	crewBin, err := os.Executable()
 	if err != nil {
@@ -253,7 +218,7 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerA
 		crewBin = "crew"
 	}
 
-	// Build agent command using WorkerAgent.RenderCommand
+	// Build command data for template expansion
 	gitDir := filepath.Join(uc.repoRoot, ".git")
 	cmdData := domain.CommandData{
 		GitDir:      gitDir,
@@ -261,11 +226,20 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerA
 		Worktree:    worktreePath,
 		Title:       task.Title,
 		Description: task.Description,
-		Prompt:      `"$PROMPT"`, // Use shell variable reference
+		Branch:      domain.BranchName(task.ID, task.Issue),
+		Issue:       task.Issue,
 		TaskID:      task.ID,
 	}
 
-	agentCommand, err := workerAgent.RenderCommand(cmdData)
+	// Determine default prompt: use config's WorkersConfig.Prompt or fall back to DefaultWorkerPrompt
+	defaultPrompt := cfg.WorkersConfig.Prompt
+	if defaultPrompt == "" {
+		defaultPrompt = domain.DefaultWorkerPrompt
+	}
+
+	// Render command and prompt using WorkerAgent.RenderCommand
+	// Pass shell variable reference as promptOverride - will be expanded at runtime
+	result, err := workerAgent.RenderCommand(cmdData, `"$PROMPT"`, defaultPrompt)
 	if err != nil {
 		return "", fmt.Errorf("render agent command: %w", err)
 	}
@@ -274,8 +248,8 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerA
 
 	data := scriptTemplateData{
 		TaskID:       task.ID,
-		AgentCommand: agentCommand,
-		Prompt:       prompt,
+		AgentCommand: result.Command,
+		Prompt:       result.Prompt,
 		CrewBin:      crewBin,
 	}
 

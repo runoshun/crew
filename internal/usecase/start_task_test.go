@@ -71,9 +71,10 @@ func TestStartTask_Execute_Success(t *testing.T) {
 	assert.Contains(t, script, "#!/bin/bash")
 	assert.Contains(t, script, "_session-ended 1")
 	assert.Contains(t, script, "claude")
-	// Verify prompt is embedded in script
-	assert.Contains(t, script, "Test task")
-	assert.Contains(t, script, "crew complete") // Uses config default prompt
+	// Verify prompt is embedded in script (default prompt references task ID and crew commands)
+	assert.Contains(t, script, "Task #1")
+	assert.Contains(t, script, "crew show")
+	assert.Contains(t, script, "crew complete")
 }
 
 func TestStartTask_Execute_FromInReview(t *testing.T) {
@@ -415,6 +416,8 @@ func TestStartTask_Execute_WithIssue(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
+	// Use custom prompt that includes issue
+	configLoader.Config.WorkersConfig.Prompt = "Task #{{.TaskID}}{{if .Issue}} (Issue #{{.Issue}}){{end}}"
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
@@ -431,10 +434,10 @@ func TestStartTask_Execute_WithIssue(t *testing.T) {
 	// Session name is still crew-1 (not crew-1-gh-123)
 	assert.Equal(t, "crew-1", out.SessionName)
 
-	// Verify prompt in script includes issue info
+	// Verify prompt template expanded with issue info
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
-	assert.Contains(t, string(scriptContent), "#123")
+	assert.Contains(t, string(scriptContent), "Issue #123")
 }
 
 func TestStartTask_Execute_WithDescription(t *testing.T) {
@@ -451,6 +454,8 @@ func TestStartTask_Execute_WithDescription(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
+	// Use custom prompt that includes description
+	configLoader.Config.WorkersConfig.Prompt = "Task: {{.Title}}\n{{.Description}}"
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
@@ -465,7 +470,7 @@ func TestStartTask_Execute_WithDescription(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 
-	// Verify prompt in script includes description
+	// Verify prompt template expanded with description
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
 	assert.Contains(t, string(scriptContent), "This is a detailed description of the task.")
