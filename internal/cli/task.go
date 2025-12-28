@@ -291,6 +291,81 @@ func parseTaskID(s string) (int, error) {
 	return id, nil
 }
 
+// newEditCommand creates the edit command for editing task information.
+func newEditCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		Title        string
+		Description  string
+		AddLabels    []string
+		RemoveLabels []string
+	}
+
+	cmd := &cobra.Command{
+		Use:   "edit <id>",
+		Short: "Edit task information",
+		Long: `Edit an existing task's title, description, or labels.
+
+At least one of --title, --desc, --add-label, or --rm-label must be specified.
+
+Examples:
+  # Change task title
+  git crew edit 1 --title "New task title"
+
+  # Update description
+  git crew edit 1 --desc "Updated description text"
+
+  # Add labels
+  git crew edit 1 --add-label bug --add-label urgent
+
+  # Remove labels
+  git crew edit 1 --rm-label old-label
+
+  # Multiple changes at once
+  git crew edit 1 --title "New title" --add-label feature --rm-label draft`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Build input
+			input := usecase.EditTaskInput{
+				TaskID:       taskID,
+				AddLabels:    opts.AddLabels,
+				RemoveLabels: opts.RemoveLabels,
+			}
+
+			// Set optional fields only if provided
+			if cmd.Flags().Changed("title") {
+				input.Title = &opts.Title
+			}
+			if cmd.Flags().Changed("desc") {
+				input.Description = &opts.Description
+			}
+
+			// Execute use case
+			uc := c.EditTaskUseCase()
+			out, err := uc.Execute(cmd.Context(), input)
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated task #%d: %s\n", out.Task.ID, out.Task.Title)
+			return nil
+		},
+	}
+
+	// Optional flags
+	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
+	cmd.Flags().StringVar(&opts.Description, "desc", "", "New task description")
+	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")
+	cmd.Flags().StringArrayVar(&opts.RemoveLabels, "rm-label", nil, "Labels to remove (can specify multiple)")
+
+	return cmd
+}
+
 // printTaskDetails prints task details in a formatted output.
 func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
 	task := out.Task
