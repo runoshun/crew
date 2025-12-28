@@ -150,9 +150,10 @@ Bootstrap strategy: Build crew with crew.
 
 ### 2.8 Help & Documentation
 
-- [ ] `internal/cli/help.go` - help command
-- [ ] Embed USAGE.md or generate from cobra
-- [ ] `--help` for all commands
+- [x] `internal/cli/help.go` - help command (using Cobra's built-in)
+- [x] Embed USAGE.md or generate from cobra (Cobra auto-generates from Long/Examples)
+- [x] `--help` for all commands
+- [x] Command grouping in help output
 
 **Phase 2 Milestone**: Full task CRUD working. Can manage tasks with crew.
 
