@@ -114,6 +114,305 @@ func (m *mockClock) Now() time.Time {
 	return m.now
 }
 
+// =============================================================================
+// New Command Tests
+// =============================================================================
+
+func TestNewNewCommand_CreateTask(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newNewCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--title", "Test task"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Created task #1")
+
+	// Verify task was created
+	task := repo.tasks[1]
+	assert.NotNil(t, task)
+	assert.Equal(t, "Test task", task.Title)
+	assert.Equal(t, domain.StatusTodo, task.Status)
+}
+
+func TestNewNewCommand_WithDescription(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newNewCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--title", "Test task", "--desc", "Task description"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	task := repo.tasks[1]
+	assert.Equal(t, "Task description", task.Description)
+}
+
+func TestNewNewCommand_WithParent(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Parent task",
+		Status: domain.StatusTodo,
+	}
+	repo.nextID = 2
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newNewCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--title", "Child task", "--parent", "1"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Created task #2")
+
+	task := repo.tasks[2]
+	assert.NotNil(t, task.ParentID)
+	assert.Equal(t, 1, *task.ParentID)
+}
+
+func TestNewNewCommand_WithLabels(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newNewCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--title", "Test task", "--label", "bug", "--label", "urgent"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	task := repo.tasks[1]
+	assert.Contains(t, task.Labels, "bug")
+	assert.Contains(t, task.Labels, "urgent")
+}
+
+func TestNewNewCommand_WithIssue(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newNewCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--title", "Fix bug", "--issue", "42"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	task := repo.tasks[1]
+	assert.Equal(t, 42, task.Issue)
+}
+
+// =============================================================================
+// List Command Tests
+// =============================================================================
+
+func TestNewListCommand_Empty(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newListCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "ID")
+	assert.Contains(t, output, "TITLE")
+}
+
+func TestNewListCommand_WithTasks(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "First task",
+		Status: domain.StatusTodo,
+	}
+	repo.tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Second task",
+		Status: domain.StatusInProgress,
+		Agent:  "claude",
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newListCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "First task")
+	assert.Contains(t, output, "Second task")
+	assert.Contains(t, output, "todo")
+	assert.Contains(t, output, "in_progress")
+	assert.Contains(t, output, "claude")
+}
+
+// =============================================================================
+// Show Command Tests
+// =============================================================================
+
+func TestNewShowCommand_ByID(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Test task",
+		Description: "Task description",
+		Status:      domain.StatusTodo,
+		Created:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		BaseBranch:  "main",
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newShowCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "Task 1")
+	assert.Contains(t, output, "Test task")
+	assert.Contains(t, output, "Task description")
+	assert.Contains(t, output, "todo")
+}
+
+func TestNewShowCommand_WithSubtasks(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	parentID := 1
+	repo.tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Parent task",
+		Status:     domain.StatusInProgress,
+		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		BaseBranch: "main",
+	}
+	repo.tasks[2] = &domain.Task{
+		ID:         2,
+		ParentID:   &parentID,
+		Title:      "Child task 1",
+		Status:     domain.StatusTodo,
+		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		BaseBranch: "main",
+	}
+	repo.tasks[3] = &domain.Task{
+		ID:         3,
+		ParentID:   &parentID,
+		Title:      "Child task 2",
+		Status:     domain.StatusDone,
+		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		BaseBranch: "main",
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newShowCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "Parent task")
+	assert.Contains(t, output, "Sub-tasks:")
+	assert.Contains(t, output, "Child task 1")
+	assert.Contains(t, output, "Child task 2")
+}
+
+func TestNewShowCommand_WithComments(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		BaseBranch: "main",
+	}
+	repo.comments[1] = []domain.Comment{
+		{
+			Text: "First comment",
+			Time: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
+		},
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newShowCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "Comments:")
+	assert.Contains(t, output, "First comment")
+}
+
+// =============================================================================
+// Print Functions Tests
+// =============================================================================
+
 func TestPrintTaskList_Empty(t *testing.T) {
 	var buf bytes.Buffer
 	clock := &mockClock{now: time.Now()}

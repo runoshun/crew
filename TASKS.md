@@ -88,7 +88,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Flags: `--title`, `--desc`, `--parent`, `--issue`, `--label`
 - [x] Parent validation
 - [x] Unit tests for usecase
-- [ ] CLI tests (happy path)
+- [x] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.2 List Tasks
@@ -98,7 +98,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Flags: `--parent`, `--label`
 - [x] TSV output with PARENT column
 - [x] Unit tests
-- [ ] CLI tests (happy path)
+- [x] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.3 Show Task
@@ -108,7 +108,7 @@ Bootstrap strategy: Build crew with crew.
 - [x] Display all fields including parent and sub-tasks
 - [x] Auto-detect task ID from branch name
 - [x] Unit tests
-- [ ] CLI tests (happy path)
+- [x] CLI tests (happy path)
 - [ ] Integration test
 
 ### 2.4 Edit Task
