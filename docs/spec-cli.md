@@ -488,10 +488,11 @@ Merge task into main and complete.
    - Without `--force` → error
    - With `--force` → stop session
 2. Display confirmation prompt (skip with `--yes`)
-3. Delete worktree
-4. Execute `git merge --no-ff`
-5. Update status to `done`
-6. Clear agent info
+3. Execute `git merge --no-ff`
+4. Delete worktree
+5. Delete branch
+6. Update status to `done`
+7. Clear agent info
 
 **Error Conditions**:
 - Task does not exist → error

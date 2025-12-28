@@ -190,3 +190,8 @@ func (c *Container) InitConfigUseCase() *usecase.InitConfig {
 func (c *Container) CompleteTaskUseCase() *usecase.CompleteTask {
 	return usecase.NewCompleteTask(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader)
 }
+
+// MergeTaskUseCase returns a new MergeTask use case.
+func (c *Container) MergeTaskUseCase() *usecase.MergeTask {
+	return usecase.NewMergeTask(c.Tasks, c.Sessions, c.Worktrees, c.Git)
+}

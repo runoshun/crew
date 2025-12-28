@@ -1,10 +1,14 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/app"
+	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -185,6 +189,94 @@ func newSessionEndedCommand(c *app.Container) *cobra.Command {
 			return nil
 		},
 	}
+
+	return cmd
+}
+
+// newMergeCommand creates the merge command for merging a task branch into main.
+func newMergeCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		force bool
+		yes   bool
+	}
+
+	cmd := &cobra.Command{
+		Use:   "merge <id>",
+		Short: "Merge task branch into main",
+		Long: `Merge a task branch into main and mark the task as done.
+
+Preconditions:
+  - Current branch must be 'main'
+  - Main's working tree must be clean
+  - No merge conflict
+
+Processing:
+  1. If session is running and --force is specified, stop it
+  2. Delete the worktree
+  3. Execute git merge --no-ff
+  4. Update task status to 'done'
+
+Examples:
+  # Merge task #1 into main
+  git crew merge 1
+
+  # Force stop session and merge
+  git crew merge 1 --force
+
+  # Skip confirmation prompt
+  git crew merge 1 --yes`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Get task info for confirmation
+			showUC := c.ShowTaskUseCase()
+			showOut, err := showUC.Execute(cmd.Context(), usecase.ShowTaskInput{
+				TaskID: taskID,
+			})
+			if err != nil {
+				return err
+			}
+
+			// Get branch name for confirmation message
+			branch := domain.BranchName(showOut.Task.ID, showOut.Task.Issue)
+
+			// Confirmation prompt (skip with --yes)
+			if !opts.yes {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Merge task #%d (%s) to main? [y/N] ", taskID, branch)
+				reader := bufio.NewReader(os.Stdin)
+				response, readErr := reader.ReadString('\n')
+				if readErr != nil {
+					return fmt.Errorf("read response: %w", readErr)
+				}
+				response = strings.TrimSpace(strings.ToLower(response))
+				if response != "y" && response != "yes" {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+					return nil
+				}
+			}
+
+			// Execute use case
+			uc := c.MergeTaskUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.MergeTaskInput{
+				TaskID: taskID,
+				Force:  opts.force,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Merged task #%d: %s\n", out.Task.ID, out.Task.Title)
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVarP(&opts.force, "force", "f", false, "Force stop session if running")
+	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "Skip confirmation prompt")
 
 	return cmd
 }

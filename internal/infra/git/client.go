@@ -78,15 +78,31 @@ func (c *Client) HasMergeConflict(_, _ string) (bool, error) {
 }
 
 // Merge merges a branch into the current branch.
-// TODO: implement in later phase
-func (c *Client) Merge(_ string, _ bool) error {
-	panic("not implemented")
+// If noFF is true, a merge commit is always created (--no-ff).
+func (c *Client) Merge(branch string, noFF bool) error {
+	args := []string{"merge"}
+	if noFF {
+		args = append(args, "--no-ff")
+	}
+	args = append(args, branch)
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = c.repoRoot
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to merge branch %s: %w: %s", branch, err, string(out))
+	}
+	return nil
 }
 
 // DeleteBranch deletes a branch.
-// TODO: implement in later phase
-func (c *Client) DeleteBranch(_ string) error {
-	panic("not implemented")
+// Uses -d flag (safe delete, only if fully merged).
+func (c *Client) DeleteBranch(branch string) error {
+	cmd := exec.Command("git", "branch", "-d", branch)
+	cmd.Dir = c.repoRoot
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to delete branch %s: %w: %s", branch, err, string(out))
+	}
+	return nil
 }
 
 // Ensure Client implements domain.Git interface.
