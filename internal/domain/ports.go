@@ -137,15 +137,6 @@ type GitHub interface {
 	Push(branch string) error
 }
 
-// Issue represents a GitHub issue.
-// Fields are ordered to minimize memory padding.
-type Issue struct {
-	Title  string
-	Body   string
-	Labels []string
-	Number int
-}
-
 // CreatePROptions configures PR creation.
 type CreatePROptions struct {
 	Title  string
@@ -169,34 +160,28 @@ type ConfigLoader interface {
 	LoadGlobal() (*Config, error)
 }
 
-// Config represents the application configuration.
-type Config struct {
-	DefaultAgent string           // Top-level default_agent
-	Agent        AgentConfig      // Common [agent] settings
-	Agents       map[string]Agent // Per-agent settings [agents.<name>]
-	Complete     CompleteConfig   // [complete] settings
-	Log          LogConfig        // [log] settings
+// ConfigInfo holds information about a config file.
+type ConfigInfo struct {
+	Path    string // Path to the config file
+	Content string // Raw content (empty if not found)
+	Exists  bool   // Whether the file exists
 }
 
-// AgentConfig holds common agent settings from [agent] section.
-type AgentConfig struct {
-	Prompt string // Common prompt appended to all agents
-}
+// ConfigManager manages configuration files.
+type ConfigManager interface {
+	// GetRepoConfigInfo returns information about the repository config file.
+	GetRepoConfigInfo() ConfigInfo
 
-// Agent holds per-agent configuration from [agents.<name>] sections.
-type Agent struct {
-	Args    string // Additional arguments to pass to the agent
-	Command string // Custom command (overrides built-in agent command)
-}
+	// GetGlobalConfigInfo returns information about the global config file.
+	GetGlobalConfigInfo() ConfigInfo
 
-// CompleteConfig holds completion gate settings from [complete] section.
-type CompleteConfig struct {
-	Command string // Command to run as CI gate on complete
-}
+	// InitRepoConfig creates a repository config file with default template.
+	// Returns error if file already exists.
+	InitRepoConfig() error
 
-// LogConfig holds logging settings from [log] section.
-type LogConfig struct {
-	Level string // Log level: debug, info, warn, error
+	// InitGlobalConfig creates a global config file with default template.
+	// Returns error if file already exists.
+	InitGlobalConfig() error
 }
 
 // Clock provides time operations for testability.

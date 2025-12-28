@@ -134,6 +134,7 @@ For detailed steps, use the `review-workflow` skill.
 4. **Never commit directly to main**
 5. **Handle all errors explicitly**
 6. **Use domain errors, not raw errors**
+7. **Don't set default config values at read site** - Defaults are set in `domain.NewDefaultConfig()`. Never check `if cfg.Field == "" { field = "default" }`
 
 ### Best Practices (SHOULD follow)
 
