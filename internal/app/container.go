@@ -9,6 +9,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
+	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
 	"github.com/runoshun/git-crew/v2/internal/infra/worktree"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
@@ -46,7 +47,7 @@ type Container struct {
 	Clock            domain.Clock
 	Git              domain.Git
 	Worktrees        domain.WorktreeManager
-	// Sessions  domain.SessionManager  // TODO: implement in later phase
+	Sessions         domain.SessionManager
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 	// ConfigLoader domain.ConfigLoader // TODO: implement in later phase
 
@@ -79,12 +80,16 @@ func New(dir string) (*Container, error) {
 	// Create worktree manager
 	worktreeClient := worktree.NewClient(cfg.RepoRoot, cfg.WorktreeDir)
 
+	// Create session manager
+	sessionClient := tmux.NewClient(cfg.SocketPath, cfg.CrewDir)
+
 	return &Container{
 		Tasks:            store,
 		StoreInitializer: store,
 		Clock:            domain.RealClock{},
 		Git:              gitClient,
 		Worktrees:        worktreeClient,
+		Sessions:         sessionClient,
 		Logger:           logger,
 		Config:           cfg,
 	}, nil
