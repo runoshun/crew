@@ -22,6 +22,21 @@ run = "go test -race ./..."
 description = "Run tests with coverage"
 run = "go test -race -coverprofile=coverage.out ./..."
 
+[tasks."test:integration"]
+description = "Run integration tests"
+run = "go test -tags=integration ./internal/cli/... -run TestIntegration"
+
+[tasks."test:integration:cover"]
+description = "Run integration tests with coverage"
+run = """
+rm -rf /tmp/crew-covdata && mkdir -p /tmp/crew-covdata
+GOCOVERDIR_OUT=/tmp/crew-covdata go test -tags=integration ./internal/cli/... -run TestIntegration
+go tool covdata textfmt -i=/tmp/crew-covdata -o=coverage-integration.out
+echo "Coverage report: coverage-integration.out"
+echo ""
+go tool cover -func=coverage-integration.out | tail -5
+"""
+
 [tasks.vuln]
 description = "Check for vulnerabilities"
 run = "go run golang.org/x/vuln/cmd/govulncheck@latest ./..."
