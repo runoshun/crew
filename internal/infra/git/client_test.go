@@ -70,10 +70,12 @@ func TestNewClient_FromWorktree(t *testing.T) {
 	worktreeDir := filepath.Join(t.TempDir(), "worktree")
 	runGit(t, mainRepo, "worktree", "add", "-b", "feature", worktreeDir)
 
-	// NewClient from worktree should find the common .git directory
+	// NewClient from worktree should find the main repository
 	client, err := NewClient(worktreeDir)
 	require.NoError(t, err)
-	assert.Equal(t, worktreeDir, client.RepoRoot())
+	// RepoRoot should be the main repo (parent of .git), not the worktree
+	// This allows crew commands to work from within worktrees
+	assert.Equal(t, mainRepo, client.RepoRoot())
 	// GitDir should point to the main repo's .git directory
 	assert.Equal(t, filepath.Join(mainRepo, ".git"), client.GitDir())
 }

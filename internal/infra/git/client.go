@@ -84,32 +84,35 @@ func (c *Client) DeleteBranch(_ string) error {
 var _ domain.Git = (*Client)(nil)
 
 // findGitRoot finds the git repository root and .git directory from the given directory.
+// This works correctly both in the main repository and inside worktrees.
 func findGitRoot(dir string) (repoRoot, gitDir string, err error) {
-	// Get the repository root
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	// First check if we're in a git repository at all
+	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
 		return "", "", domain.ErrNotGitRepository
 	}
-	repoRoot = strings.TrimSpace(string(out))
-
-	// Get the .git directory (handles both regular repos and worktrees)
-	cmd = exec.Command("git", "rev-parse", "--git-common-dir")
-	cmd.Dir = dir
-	out, err = cmd.Output()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to find .git directory: %w", err)
-	}
 	gitDir = strings.TrimSpace(string(out))
 
 	// Make gitDir absolute if it's relative
 	if !filepath.IsAbs(gitDir) {
-		gitDir = filepath.Join(repoRoot, gitDir)
+		// Get the toplevel to resolve relative path
+		cmd = exec.Command("git", "rev-parse", "--show-toplevel")
+		cmd.Dir = dir
+		toplevel, err := cmd.Output()
+		if err != nil {
+			return "", "", fmt.Errorf("failed to find toplevel: %w", err)
+		}
+		gitDir = filepath.Join(strings.TrimSpace(string(toplevel)), gitDir)
 	}
 
 	// Clean the path
 	gitDir = filepath.Clean(gitDir)
+
+	// repoRoot is the parent of .git directory
+	// This works for both main repo and worktrees
+	repoRoot = filepath.Dir(gitDir)
 
 	return repoRoot, gitDir, nil
 }
