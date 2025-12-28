@@ -29,6 +29,7 @@ Register ALL TODOs at once when starting Phase 1:
 - [ ] Check test coverage for new code
 - [ ] Share technical findings before commit (if any)
 - [ ] Commit and merge (ask user - single confirmation for both)
+- [ ] Close completed tasks with `./crew close <id>`
 - [ ] Retrospective → propose guideline updates (if any)
 - [ ] Ask user before proceeding to next task
 ```
@@ -120,7 +121,12 @@ Register ALL TODOs at once when starting Phase 1:
      - Delete feature branch: `git branch -d feature/<branch>`
    - If continuing on same branch (e.g., next task is closely related), skip merge
 
-5. **Retrospective** (after commit)
+5. **Close completed tasks**
+   - Close the task(s) you worked on with `./crew close <id>`
+   - Only close tasks that are fully implemented
+   - Tasks with remaining work (e.g., waiting for dependencies) should stay open with a comment
+
+6. **Retrospective** (after commit)
    - Review feedback received during the session:
      - Instructions repeated multiple times
      - Explicit requests like "please always do X"
