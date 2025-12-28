@@ -152,3 +152,18 @@ func (c *Container) AddCommentUseCase() *usecase.AddComment {
 func (c *Container) CloseTaskUseCase() *usecase.CloseTask {
 	return usecase.NewCloseTask(c.Tasks)
 }
+
+// StartTaskUseCase returns a new StartTask use case.
+func (c *Container) StartTaskUseCase() *usecase.StartTask {
+	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.Clock, c.Config.CrewDir)
+}
+
+// AttachSessionUseCase returns a new AttachSession use case.
+func (c *Container) AttachSessionUseCase() *usecase.AttachSession {
+	return usecase.NewAttachSession(c.Tasks, c.Sessions)
+}
+
+// SessionEndedUseCase returns a new SessionEnded use case.
+func (c *Container) SessionEndedUseCase() *usecase.SessionEnded {
+	return usecase.NewSessionEnded(c.Tasks, c.Config.CrewDir)
+}
