@@ -973,6 +973,166 @@ func TestNewCpCommand_NoArgs(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// =============================================================================
+// Comment Command Tests
+// =============================================================================
+
+func TestNewCommentCommand_Success(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1", "This is a test comment"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Added comment to task #1")
+
+	// Verify comment was added
+	comments := repo.comments[1]
+	assert.Len(t, comments, 1)
+	assert.Equal(t, "This is a test comment", comments[0].Text)
+}
+
+func TestNewCommentCommand_WithHashPrefix(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"#1", "Comment with hash prefix"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Added comment to task #1")
+
+	// Verify comment was added
+	comments := repo.comments[1]
+	assert.Len(t, comments, 1)
+	assert.Equal(t, "Comment with hash prefix", comments[0].Text)
+}
+
+func TestNewCommentCommand_TaskNotFound(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"999", "Comment on missing task"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
+}
+
+func TestNewCommentCommand_EmptyMessage(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	repo.tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1", ""})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrEmptyMessage)
+}
+
+func TestNewCommentCommand_InvalidID(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"invalid", "Some message"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid task ID")
+}
+
+func TestNewCommentCommand_NoArgs(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert - should fail due to missing arguments
+	assert.Error(t, err)
+}
+
+func TestNewCommentCommand_OnlyID(t *testing.T) {
+	// Setup
+	repo := newMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert - should fail due to missing message argument
+	assert.Error(t, err)
+}
+
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
 		name     string

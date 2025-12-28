@@ -130,3 +130,8 @@ func (c *Container) DeleteTaskUseCase() *usecase.DeleteTask {
 func (c *Container) CopyTaskUseCase() *usecase.CopyTask {
 	return usecase.NewCopyTask(c.Tasks, c.Clock)
 }
+
+// AddCommentUseCase returns a new AddComment use case.
+func (c *Container) AddCommentUseCase() *usecase.AddComment {
+	return usecase.NewAddComment(c.Tasks, c.Clock)
+}
