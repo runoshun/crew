@@ -355,3 +355,38 @@ func (m *MockWorktreeManager) Exists(_ string) (bool, error) {
 func (m *MockWorktreeManager) List() ([]domain.WorktreeInfo, error) {
 	panic("not implemented")
 }
+
+// MockConfigLoader is a test double for domain.ConfigLoader.
+type MockConfigLoader struct {
+	Config    *domain.Config
+	LoadErr   error
+	GlobalErr error
+}
+
+// NewMockConfigLoader creates a new MockConfigLoader with default empty config.
+func NewMockConfigLoader() *MockConfigLoader {
+	return &MockConfigLoader{
+		Config: &domain.Config{
+			Agents: make(map[string]domain.Agent),
+		},
+	}
+}
+
+// Ensure MockConfigLoader implements domain.ConfigLoader interface.
+var _ domain.ConfigLoader = (*MockConfigLoader)(nil)
+
+// Load returns the configured config or error.
+func (m *MockConfigLoader) Load() (*domain.Config, error) {
+	if m.LoadErr != nil {
+		return nil, m.LoadErr
+	}
+	return m.Config, nil
+}
+
+// LoadGlobal returns the configured config or error.
+func (m *MockConfigLoader) LoadGlobal() (*domain.Config, error) {
+	if m.GlobalErr != nil {
+		return nil, m.GlobalErr
+	}
+	return m.Config, nil
+}
