@@ -163,17 +163,19 @@ Bootstrap strategy: Build crew with crew.
 
 ### 3.1 Migrate to Self-Hosting
 
-- [ ] Run `git crew init` in git-crew repository
-- [ ] Create initial tasks for remaining features using `git crew new`
-- [ ] Verify task management works for real development
+- [x] Run `git crew init` in git-crew repository
+- [x] Create initial tasks for remaining features using `git crew new`
+- [x] Verify task management works for real development
 
 ### 3.2 Document Remaining Work
 
-- [ ] Create parent task: "Session Management"
-- [ ] Create parent task: "Workflow Commands"
-- [ ] Create parent task: "GitHub Integration"
-- [ ] Create parent task: "TUI"
-- [ ] Break down each into sub-tasks
+- [x] Create parent task: "Session Management"
+- [x] Create parent task: "Workflow Commands"
+- [x] Create parent task: "GitHub Integration"
+- [x] Create parent task: "TUI"
+- [x] Break down each into sub-tasks
+
+**Phase 3 Milestone**: git-crew is now self-hosted. Use `./crew list` to see all remaining tasks.
 
 ---
 
