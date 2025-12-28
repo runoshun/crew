@@ -72,11 +72,6 @@ func WorktreePath(crewDir string, taskID int) string {
 	return filepath.Join(crewDir, "worktrees", fmt.Sprintf("%d", taskID))
 }
 
-// ConfigPath returns the path to the repository config file.
-func ConfigPath(crewDir string) string {
-	return filepath.Join(crewDir, ConfigFileName)
-}
-
 // branchPattern matches crew branch names: crew-<id> or crew-<id>-gh-<issue>
 var branchPattern = regexp.MustCompile(`^crew-(\d+)(?:-gh-\d+)?$`)
 

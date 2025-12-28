@@ -27,11 +27,11 @@ type Config struct {
 
 // newConfig creates a new Config from the git client.
 func newConfig(gitClient *git.Client) Config {
-	gitDir := gitClient.GitDir()
-	crewDir := filepath.Join(gitDir, "crew")
+	repoRoot := gitClient.RepoRoot()
+	crewDir := domain.RepoCrewDir(repoRoot)
 	return Config{
-		RepoRoot:    gitClient.RepoRoot(),
-		GitDir:      gitDir,
+		RepoRoot:    repoRoot,
+		GitDir:      gitClient.GitDir(),
 		CrewDir:     crewDir,
 		SocketPath:  filepath.Join(crewDir, "tmux.sock"),
 		StorePath:   filepath.Join(crewDir, "tasks.json"),

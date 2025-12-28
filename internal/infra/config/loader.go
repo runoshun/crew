@@ -38,14 +38,15 @@ func NewLoaderWithGlobalDir(crewDir, globalConfDir string) *Loader {
 
 // defaultGlobalConfigDir returns the default global config directory.
 func defaultGlobalConfigDir() string {
-	if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
-		return filepath.Join(xdgConfigHome, domain.GlobalConfigDirName)
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		configHome = filepath.Join(home, ".config")
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".config", domain.GlobalConfigDirName)
+	return domain.GlobalCrewDir(configHome)
 }
 
 // configFile represents the structure of config.toml.

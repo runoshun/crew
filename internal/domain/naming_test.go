@@ -159,12 +159,4 @@ func TestPathFunctions(t *testing.T) {
 			t.Errorf("TmuxConfigPath(%q) = %q, want %q", crewDir, got, want)
 		}
 	})
-
-	t.Run("ConfigPath", func(t *testing.T) {
-		got := ConfigPath(crewDir)
-		want := "/repo/.git/crew/config.toml"
-		if got != want {
-			t.Errorf("ConfigPath(%q) = %q, want %q", crewDir, got, want)
-		}
-	})
 }
