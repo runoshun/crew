@@ -6,14 +6,15 @@ import (
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestEditTask_Execute_UpdateTitle(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Original title",
 		Status: domain.StatusTodo,
@@ -35,8 +36,8 @@ func TestEditTask_Execute_UpdateTitle(t *testing.T) {
 
 func TestEditTask_Execute_UpdateDescription(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Test task",
 		Description: "Original description",
@@ -59,8 +60,8 @@ func TestEditTask_Execute_UpdateDescription(t *testing.T) {
 
 func TestEditTask_Execute_AddLabels(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Labels: []string{"existing"},
@@ -84,8 +85,8 @@ func TestEditTask_Execute_AddLabels(t *testing.T) {
 
 func TestEditTask_Execute_RemoveLabels(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Labels: []string{"keep", "remove-me", "also-keep"},
@@ -109,8 +110,8 @@ func TestEditTask_Execute_RemoveLabels(t *testing.T) {
 
 func TestEditTask_Execute_AddAndRemoveLabels(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Labels: []string{"old"},
@@ -134,8 +135,8 @@ func TestEditTask_Execute_AddAndRemoveLabels(t *testing.T) {
 
 func TestEditTask_Execute_MultipleUpdates(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Original",
 		Description: "Old desc",
@@ -166,8 +167,8 @@ func TestEditTask_Execute_MultipleUpdates(t *testing.T) {
 
 func TestEditTask_Execute_NoFieldsToUpdate(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
@@ -185,8 +186,8 @@ func TestEditTask_Execute_NoFieldsToUpdate(t *testing.T) {
 
 func TestEditTask_Execute_EmptyTitle(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
@@ -206,7 +207,7 @@ func TestEditTask_Execute_EmptyTitle(t *testing.T) {
 
 func TestEditTask_Execute_TaskNotFound(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	uc := NewEditTask(repo)
 
 	// Execute for non-existent task
@@ -222,13 +223,13 @@ func TestEditTask_Execute_TaskNotFound(t *testing.T) {
 
 func TestEditTask_Execute_SaveError(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	repo.saveErr = assert.AnError
+	repo.SaveErr = assert.AnError
 	uc := NewEditTask(repo)
 
 	// Execute
@@ -245,8 +246,8 @@ func TestEditTask_Execute_SaveError(t *testing.T) {
 
 func TestEditTask_Execute_GetError(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.getErr = assert.AnError
+	repo := testutil.NewMockTaskRepository()
+	repo.GetErr = assert.AnError
 	uc := NewEditTask(repo)
 
 	// Execute
@@ -263,8 +264,8 @@ func TestEditTask_Execute_GetError(t *testing.T) {
 
 func TestEditTask_Execute_ClearDescription(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Test task",
 		Description: "Has description",
@@ -286,8 +287,8 @@ func TestEditTask_Execute_ClearDescription(t *testing.T) {
 
 func TestEditTask_Execute_RemoveAllLabels(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Labels: []string{"a", "b", "c"},
@@ -308,8 +309,8 @@ func TestEditTask_Execute_RemoveAllLabels(t *testing.T) {
 
 func TestEditTask_Execute_AddDuplicateLabel(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Labels: []string{"existing"},

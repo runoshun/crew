@@ -6,19 +6,20 @@ import (
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAddComment_Execute_Success(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	clock := &mockClock{now: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
 	uc := NewAddComment(repo, clock)
 
 	// Execute
@@ -30,24 +31,24 @@ func TestAddComment_Execute_Success(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, "This is a test comment", out.Comment.Text)
-	assert.Equal(t, clock.now, out.Comment.Time)
+	assert.Equal(t, clock.NowTime, out.Comment.Time)
 
 	// Verify comment saved
-	comments := repo.comments[1]
+	comments := repo.Comments[1]
 	require.Len(t, comments, 1)
 	assert.Equal(t, "This is a test comment", comments[0].Text)
-	assert.Equal(t, clock.now, comments[0].Time)
+	assert.Equal(t, clock.NowTime, comments[0].Time)
 }
 
 func TestAddComment_Execute_TrimsWhitespace(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	clock := &mockClock{now: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
 	uc := NewAddComment(repo, clock)
 
 	// Execute with whitespace
@@ -63,13 +64,13 @@ func TestAddComment_Execute_TrimsWhitespace(t *testing.T) {
 
 func TestAddComment_Execute_EmptyMessage(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 	uc := NewAddComment(repo, clock)
 
 	// Execute with empty message
@@ -84,13 +85,13 @@ func TestAddComment_Execute_EmptyMessage(t *testing.T) {
 
 func TestAddComment_Execute_WhitespaceOnlyMessage(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 	uc := NewAddComment(repo, clock)
 
 	// Execute with whitespace-only message
@@ -105,8 +106,8 @@ func TestAddComment_Execute_WhitespaceOnlyMessage(t *testing.T) {
 
 func TestAddComment_Execute_TaskNotFound(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	clock := &mockClock{now: time.Now()}
+	repo := testutil.NewMockTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Now()}
 	uc := NewAddComment(repo, clock)
 
 	// Execute with non-existent task
@@ -121,9 +122,9 @@ func TestAddComment_Execute_TaskNotFound(t *testing.T) {
 
 func TestAddComment_Execute_GetTaskError(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.getErr = assert.AnError
-	clock := &mockClock{now: time.Now()}
+	repo := testutil.NewMockTaskRepository()
+	repo.GetErr = assert.AnError
+	clock := &testutil.MockClock{NowTime: time.Now()}
 	uc := NewAddComment(repo, clock)
 
 	// Execute
@@ -139,16 +140,16 @@ func TestAddComment_Execute_GetTaskError(t *testing.T) {
 
 func TestAddComment_Execute_AddCommentError(t *testing.T) {
 	// Setup
-	repo := &mockTaskRepositoryWithAddCommentError{
-		mockTaskRepository: newMockTaskRepository(),
-		addCommentErr:      assert.AnError,
+	repo := &testutil.MockTaskRepositoryWithAddCommentError{
+		MockTaskRepository: testutil.NewMockTaskRepository(),
+		AddCommentErr:      assert.AnError,
 	}
-	repo.tasks[1] = &domain.Task{
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 	uc := NewAddComment(repo, clock)
 
 	// Execute
@@ -164,14 +165,14 @@ func TestAddComment_Execute_AddCommentError(t *testing.T) {
 
 func TestAddComment_Execute_MultipleComments(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
 	baseTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-	clock := &mockClock{now: baseTime}
+	clock := &testutil.MockClock{NowTime: baseTime}
 	uc := NewAddComment(repo, clock)
 
 	// Add first comment
@@ -182,7 +183,7 @@ func TestAddComment_Execute_MultipleComments(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add second comment (with different time)
-	clock.now = baseTime.Add(time.Hour)
+	clock.NowTime = baseTime.Add(time.Hour)
 	_, err = uc.Execute(context.Background(), AddCommentInput{
 		TaskID:  1,
 		Message: "Second comment",
@@ -190,23 +191,10 @@ func TestAddComment_Execute_MultipleComments(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify both comments saved
-	comments := repo.comments[1]
+	comments := repo.Comments[1]
 	require.Len(t, comments, 2)
 	assert.Equal(t, "First comment", comments[0].Text)
 	assert.Equal(t, baseTime, comments[0].Time)
 	assert.Equal(t, "Second comment", comments[1].Text)
 	assert.Equal(t, baseTime.Add(time.Hour), comments[1].Time)
-}
-
-// mockTaskRepositoryWithAddCommentError extends mockTaskRepository to return error on AddComment.
-type mockTaskRepositoryWithAddCommentError struct {
-	*mockTaskRepository
-	addCommentErr error
-}
-
-func (m *mockTaskRepositoryWithAddCommentError) AddComment(_ int, _ domain.Comment) error {
-	if m.addCommentErr != nil {
-		return m.addCommentErr
-	}
-	return nil
 }

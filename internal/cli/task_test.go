@@ -9,109 +9,20 @@ import (
 
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
-// mockTaskRepository is a test double for domain.TaskRepository.
-type mockTaskRepository struct {
-	tasks    map[int]*domain.Task
-	comments map[int][]domain.Comment
-	saveErr  error
-	getErr   error
-	nextID   int
-}
-
-func newMockTaskRepository() *mockTaskRepository {
-	return &mockTaskRepository{
-		tasks:    make(map[int]*domain.Task),
-		nextID:   1,
-		comments: make(map[int][]domain.Comment),
-	}
-}
-
-func (m *mockTaskRepository) Get(id int) (*domain.Task, error) {
-	if m.getErr != nil {
-		return nil, m.getErr
-	}
-	task, ok := m.tasks[id]
-	if !ok {
-		return nil, nil
-	}
-	return task, nil
-}
-
-func (m *mockTaskRepository) List(_ domain.TaskFilter) ([]*domain.Task, error) {
-	tasks := make([]*domain.Task, 0, len(m.tasks))
-	for _, t := range m.tasks {
-		tasks = append(tasks, t)
-	}
-	return tasks, nil
-}
-
-func (m *mockTaskRepository) GetChildren(parentID int) ([]*domain.Task, error) {
-	var tasks []*domain.Task
-	for _, t := range m.tasks {
-		if t.ParentID != nil && *t.ParentID == parentID {
-			tasks = append(tasks, t)
-		}
-	}
-	return tasks, nil
-}
-
-func (m *mockTaskRepository) Save(task *domain.Task) error {
-	if m.saveErr != nil {
-		return m.saveErr
-	}
-	m.tasks[task.ID] = task
-	return nil
-}
-
-func (m *mockTaskRepository) Delete(id int) error {
-	delete(m.tasks, id)
-	return nil
-}
-
-func (m *mockTaskRepository) NextID() (int, error) {
-	id := m.nextID
-	m.nextID++
-	return id, nil
-}
-
-func (m *mockTaskRepository) GetComments(taskID int) ([]domain.Comment, error) {
-	return m.comments[taskID], nil
-}
-
-func (m *mockTaskRepository) AddComment(taskID int, comment domain.Comment) error {
-	m.comments[taskID] = append(m.comments[taskID], comment)
-	return nil
-}
-
-// mockStoreInitializer is a test double for domain.StoreInitializer.
-type mockStoreInitializer struct{}
-
-func (m *mockStoreInitializer) Initialize() error {
-	return nil
-}
-
 // newTestContainer creates an app.Container with mock dependencies.
-func newTestContainer(repo *mockTaskRepository) *app.Container {
+func newTestContainer(repo *testutil.MockTaskRepository) *app.Container {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	return app.NewWithDeps(
 		app.Config{},
 		repo,
-		&mockStoreInitializer{},
-		&mockClock{now: time.Now()},
+		&testutil.MockStoreInitializer{},
+		&testutil.MockClock{NowTime: time.Now()},
 		logger,
 	)
-}
-
-// mockClock is a test double for domain.Clock.
-type mockClock struct {
-	now time.Time
-}
-
-func (m *mockClock) Now() time.Time {
-	return m.now
 }
 
 // =============================================================================
@@ -120,7 +31,7 @@ func (m *mockClock) Now() time.Time {
 
 func TestNewNewCommand_CreateTask(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -137,7 +48,7 @@ func TestNewNewCommand_CreateTask(t *testing.T) {
 	assert.Contains(t, buf.String(), "Created task #1")
 
 	// Verify task was created
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.NotNil(t, task)
 	assert.Equal(t, "Test task", task.Title)
 	assert.Equal(t, domain.StatusTodo, task.Status)
@@ -145,7 +56,7 @@ func TestNewNewCommand_CreateTask(t *testing.T) {
 
 func TestNewNewCommand_WithDescription(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -159,19 +70,19 @@ func TestNewNewCommand_WithDescription(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.Equal(t, "Task description", task.Description)
 }
 
 func TestNewNewCommand_WithParent(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Parent task",
 		Status: domain.StatusTodo,
 	}
-	repo.nextID = 2
+	repo.NextIDN = 2
 	container := newTestContainer(repo)
 
 	// Create command
@@ -187,14 +98,14 @@ func TestNewNewCommand_WithParent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Created task #2")
 
-	task := repo.tasks[2]
+	task := repo.Tasks[2]
 	assert.NotNil(t, task.ParentID)
 	assert.Equal(t, 1, *task.ParentID)
 }
 
 func TestNewNewCommand_WithLabels(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -208,14 +119,14 @@ func TestNewNewCommand_WithLabels(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.Contains(t, task.Labels, "bug")
 	assert.Contains(t, task.Labels, "urgent")
 }
 
 func TestNewNewCommand_WithIssue(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -229,7 +140,7 @@ func TestNewNewCommand_WithIssue(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.Equal(t, 42, task.Issue)
 }
 
@@ -239,7 +150,7 @@ func TestNewNewCommand_WithIssue(t *testing.T) {
 
 func TestNewListCommand_Empty(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -260,13 +171,13 @@ func TestNewListCommand_Empty(t *testing.T) {
 
 func TestNewListCommand_WithTasks(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "First task",
 		Status: domain.StatusTodo,
 	}
-	repo.tasks[2] = &domain.Task{
+	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Second task",
 		Status: domain.StatusInProgress,
@@ -299,8 +210,8 @@ func TestNewListCommand_WithTasks(t *testing.T) {
 
 func TestNewShowCommand_ByID(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Test task",
 		Description: "Task description",
@@ -330,16 +241,16 @@ func TestNewShowCommand_ByID(t *testing.T) {
 
 func TestNewShowCommand_WithSubtasks(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	parentID := 1
-	repo.tasks[1] = &domain.Task{
+	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Parent task",
 		Status:     domain.StatusInProgress,
 		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		BaseBranch: "main",
 	}
-	repo.tasks[2] = &domain.Task{
+	repo.Tasks[2] = &domain.Task{
 		ID:         2,
 		ParentID:   &parentID,
 		Title:      "Child task 1",
@@ -347,7 +258,7 @@ func TestNewShowCommand_WithSubtasks(t *testing.T) {
 		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		BaseBranch: "main",
 	}
-	repo.tasks[3] = &domain.Task{
+	repo.Tasks[3] = &domain.Task{
 		ID:         3,
 		ParentID:   &parentID,
 		Title:      "Child task 2",
@@ -377,15 +288,15 @@ func TestNewShowCommand_WithSubtasks(t *testing.T) {
 
 func TestNewShowCommand_WithComments(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Test task",
 		Status:     domain.StatusTodo,
 		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		BaseBranch: "main",
 	}
-	repo.comments[1] = []domain.Comment{
+	repo.Comments[1] = []domain.Comment{
 		{
 			Text: "First comment",
 			Time: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC),
@@ -415,7 +326,7 @@ func TestNewShowCommand_WithComments(t *testing.T) {
 
 func TestPrintTaskList_Empty(t *testing.T) {
 	var buf bytes.Buffer
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 
 	printTaskList(&buf, []*domain.Task{}, clock)
 
@@ -426,7 +337,7 @@ func TestPrintTaskList_Empty(t *testing.T) {
 
 func TestPrintTaskList_SingleTask(t *testing.T) {
 	var buf bytes.Buffer
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 
 	tasks := []*domain.Task{
 		{
@@ -453,7 +364,7 @@ func TestPrintTaskList_SingleTask(t *testing.T) {
 
 func TestPrintTaskList_WithParent(t *testing.T) {
 	var buf bytes.Buffer
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 
 	parentID := 1
 	tasks := []*domain.Task{
@@ -475,7 +386,7 @@ func TestPrintTaskList_WithParent(t *testing.T) {
 
 func TestPrintTaskList_WithAgent(t *testing.T) {
 	var buf bytes.Buffer
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 
 	tasks := []*domain.Task{
 		{
@@ -494,7 +405,7 @@ func TestPrintTaskList_WithAgent(t *testing.T) {
 
 func TestPrintTaskList_WithLabels(t *testing.T) {
 	var buf bytes.Buffer
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 
 	tasks := []*domain.Task{
 		{
@@ -516,7 +427,7 @@ func TestPrintTaskList_InProgressWithElapsed(t *testing.T) {
 	started := time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC) // 1 hour ago
 
 	var buf bytes.Buffer
-	clock := &mockClock{now: now}
+	clock := &testutil.MockClock{NowTime: now}
 
 	tasks := []*domain.Task{
 		{
@@ -535,7 +446,7 @@ func TestPrintTaskList_InProgressWithElapsed(t *testing.T) {
 
 func TestPrintTaskList_MultipleTasks(t *testing.T) {
 	var buf bytes.Buffer
-	clock := &mockClock{now: time.Now()}
+	clock := &testutil.MockClock{NowTime: time.Now()}
 
 	parentID := 1
 	tasks := []*domain.Task{
@@ -574,8 +485,8 @@ func TestPrintTaskList_MultipleTasks(t *testing.T) {
 
 func TestNewEditCommand_UpdateTitle(t *testing.T) {
 	// Setup mock repository
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Original title",
 		Status: domain.StatusTodo,
@@ -599,14 +510,14 @@ func TestNewEditCommand_UpdateTitle(t *testing.T) {
 	assert.Contains(t, buf.String(), "Updated title")
 
 	// Verify task was updated
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.Equal(t, "Updated title", task.Title)
 }
 
 func TestNewEditCommand_UpdateDescription(t *testing.T) {
 	// Setup mock repository
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Test task",
 		Description: "Old description",
@@ -630,14 +541,14 @@ func TestNewEditCommand_UpdateDescription(t *testing.T) {
 	assert.Contains(t, buf.String(), "Updated task #1")
 
 	// Verify description was updated
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.Equal(t, "New description", task.Description)
 }
 
 func TestNewEditCommand_AddLabels(t *testing.T) {
 	// Setup mock repository
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Labels: []string{"existing"},
@@ -661,7 +572,7 @@ func TestNewEditCommand_AddLabels(t *testing.T) {
 	assert.Contains(t, buf.String(), "Updated task #1")
 
 	// Verify labels were added
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.Contains(t, task.Labels, "existing")
 	assert.Contains(t, task.Labels, "new")
 	assert.Contains(t, task.Labels, "urgent")
@@ -669,8 +580,8 @@ func TestNewEditCommand_AddLabels(t *testing.T) {
 
 func TestNewEditCommand_RemoveLabels(t *testing.T) {
 	// Setup mock repository
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Labels: []string{"keep", "remove-me"},
@@ -694,15 +605,15 @@ func TestNewEditCommand_RemoveLabels(t *testing.T) {
 	assert.Contains(t, buf.String(), "Updated task #1")
 
 	// Verify label was removed
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.Contains(t, task.Labels, "keep")
 	assert.NotContains(t, task.Labels, "remove-me")
 }
 
 func TestNewEditCommand_MultipleUpdates(t *testing.T) {
 	// Setup mock repository
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Original",
 		Description: "Old desc",
@@ -726,7 +637,7 @@ func TestNewEditCommand_MultipleUpdates(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify all fields were updated
-	task := repo.tasks[1]
+	task := repo.Tasks[1]
 	assert.Equal(t, "New Title", task.Title)
 	assert.Equal(t, "New desc", task.Description)
 	assert.Contains(t, task.Labels, "new")
@@ -739,8 +650,8 @@ func TestNewEditCommand_MultipleUpdates(t *testing.T) {
 
 func TestNewRmCommand_Success(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task to delete",
 		Status: domain.StatusTodo,
@@ -761,14 +672,14 @@ func TestNewRmCommand_Success(t *testing.T) {
 	assert.Contains(t, buf.String(), "Deleted task #1")
 
 	// Verify task was deleted
-	_, exists := repo.tasks[1]
+	_, exists := repo.Tasks[1]
 	assert.False(t, exists, "task should be deleted from repository")
 }
 
 func TestNewRmCommand_WithHashPrefix(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task to delete",
 		Status: domain.StatusTodo,
@@ -789,13 +700,13 @@ func TestNewRmCommand_WithHashPrefix(t *testing.T) {
 	assert.Contains(t, buf.String(), "Deleted task #1")
 
 	// Verify task was deleted
-	_, exists := repo.tasks[1]
+	_, exists := repo.Tasks[1]
 	assert.False(t, exists, "task should be deleted from repository")
 }
 
 func TestNewRmCommand_NotFound(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -814,7 +725,7 @@ func TestNewRmCommand_NotFound(t *testing.T) {
 
 func TestNewRmCommand_InvalidID(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -833,7 +744,7 @@ func TestNewRmCommand_InvalidID(t *testing.T) {
 
 func TestNewRmCommand_NoArgs(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -855,8 +766,8 @@ func TestNewRmCommand_NoArgs(t *testing.T) {
 
 func TestNewCpCommand_Success(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
 		Title:       "Original task",
 		Description: "Task description",
@@ -864,7 +775,7 @@ func TestNewCpCommand_Success(t *testing.T) {
 		Labels:      []string{"bug"},
 		BaseBranch:  "main",
 	}
-	repo.nextID = 2
+	repo.NextIDN = 2
 	container := newTestContainer(repo)
 
 	// Create command
@@ -881,7 +792,7 @@ func TestNewCpCommand_Success(t *testing.T) {
 	assert.Contains(t, buf.String(), "Copied task #1 to #2")
 
 	// Verify new task was created
-	task := repo.tasks[2]
+	task := repo.Tasks[2]
 	assert.NotNil(t, task)
 	assert.Equal(t, "Original task (copy)", task.Title)
 	assert.Equal(t, "Task description", task.Description)
@@ -890,14 +801,14 @@ func TestNewCpCommand_Success(t *testing.T) {
 
 func TestNewCpCommand_WithCustomTitle(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Original task",
 		Status:     domain.StatusTodo,
 		BaseBranch: "main",
 	}
-	repo.nextID = 2
+	repo.NextIDN = 2
 	container := newTestContainer(repo)
 
 	// Create command
@@ -913,13 +824,13 @@ func TestNewCpCommand_WithCustomTitle(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, buf.String(), "Copied task #1 to #2")
 
-	task := repo.tasks[2]
+	task := repo.Tasks[2]
 	assert.Equal(t, "Custom new title", task.Title)
 }
 
 func TestNewCpCommand_SourceNotFound(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -938,7 +849,7 @@ func TestNewCpCommand_SourceNotFound(t *testing.T) {
 
 func TestNewCpCommand_InvalidID(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -957,7 +868,7 @@ func TestNewCpCommand_InvalidID(t *testing.T) {
 
 func TestNewCpCommand_NoArgs(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -979,8 +890,8 @@ func TestNewCpCommand_NoArgs(t *testing.T) {
 
 func TestNewCommentCommand_Success(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
@@ -1001,15 +912,15 @@ func TestNewCommentCommand_Success(t *testing.T) {
 	assert.Contains(t, buf.String(), "Added comment to task #1")
 
 	// Verify comment was added
-	comments := repo.comments[1]
+	comments := repo.Comments[1]
 	assert.Len(t, comments, 1)
 	assert.Equal(t, "This is a test comment", comments[0].Text)
 }
 
 func TestNewCommentCommand_WithHashPrefix(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
@@ -1030,14 +941,14 @@ func TestNewCommentCommand_WithHashPrefix(t *testing.T) {
 	assert.Contains(t, buf.String(), "Added comment to task #1")
 
 	// Verify comment was added
-	comments := repo.comments[1]
+	comments := repo.Comments[1]
 	assert.Len(t, comments, 1)
 	assert.Equal(t, "Comment with hash prefix", comments[0].Text)
 }
 
 func TestNewCommentCommand_TaskNotFound(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -1056,8 +967,8 @@ func TestNewCommentCommand_TaskNotFound(t *testing.T) {
 
 func TestNewCommentCommand_EmptyMessage(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
-	repo.tasks[1] = &domain.Task{
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusTodo,
@@ -1080,7 +991,7 @@ func TestNewCommentCommand_EmptyMessage(t *testing.T) {
 
 func TestNewCommentCommand_InvalidID(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -1099,7 +1010,7 @@ func TestNewCommentCommand_InvalidID(t *testing.T) {
 
 func TestNewCommentCommand_NoArgs(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
@@ -1117,7 +1028,7 @@ func TestNewCommentCommand_NoArgs(t *testing.T) {
 
 func TestNewCommentCommand_OnlyID(t *testing.T) {
 	// Setup
-	repo := newMockTaskRepository()
+	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 
 	// Create command
