@@ -1071,3 +1071,94 @@ func TestFormatDuration(t *testing.T) {
 		})
 	}
 }
+
+// =============================================================================
+// resolveTaskID Tests
+// =============================================================================
+
+func TestResolveTaskID_FromArgs(t *testing.T) {
+	// When args are provided, git is not used
+	id, err := resolveTaskID([]string{"42"}, nil)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 42, id)
+}
+
+func TestResolveTaskID_FromArgsWithHash(t *testing.T) {
+	// With # prefix
+	id, err := resolveTaskID([]string{"#123"}, nil)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 123, id)
+}
+
+func TestResolveTaskID_InvalidArg(t *testing.T) {
+	_, err := resolveTaskID([]string{"invalid"}, nil)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid task ID")
+}
+
+func TestResolveTaskID_NegativeArg(t *testing.T) {
+	_, err := resolveTaskID([]string{"-5"}, nil)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid task ID")
+}
+
+func TestResolveTaskID_ZeroArg(t *testing.T) {
+	_, err := resolveTaskID([]string{"0"}, nil)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid task ID")
+}
+
+func TestResolveTaskID_NoArgsNoGit(t *testing.T) {
+	// No args and no git client
+	_, err := resolveTaskID([]string{}, nil)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "task ID is required")
+}
+
+func TestResolveTaskID_FromCrewBranch(t *testing.T) {
+	// Auto-detect from crew branch
+	git := &testutil.MockGit{CurrentBranchName: "crew-42"}
+
+	id, err := resolveTaskID([]string{}, git)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 42, id)
+}
+
+func TestResolveTaskID_FromCrewBranchWithIssue(t *testing.T) {
+	// Auto-detect from crew branch with issue suffix
+	git := &testutil.MockGit{CurrentBranchName: "crew-7-gh-123"}
+
+	id, err := resolveTaskID([]string{}, git)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 7, id)
+}
+
+func TestResolveTaskID_NonCrewBranch(t *testing.T) {
+	// On a non-crew branch (e.g., main)
+	git := &testutil.MockGit{CurrentBranchName: "main"}
+
+	_, err := resolveTaskID([]string{}, git)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "task ID is required")
+	assert.Contains(t, err.Error(), "main")
+	assert.Contains(t, err.Error(), "not a crew branch")
+}
+
+func TestResolveTaskID_GitError(t *testing.T) {
+	// Git returns an error
+	git := &testutil.MockGit{CurrentBranchErr: assert.AnError}
+
+	_, err := resolveTaskID([]string{}, git)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to detect current branch")
+}
