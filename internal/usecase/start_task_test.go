@@ -265,7 +265,7 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.DefaultAgent = "opencode" // default_agent from config
+	configLoader.Config.WorkersConfig.Default = "opencode" // default from [workers] section
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir)

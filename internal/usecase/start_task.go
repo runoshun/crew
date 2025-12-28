@@ -88,7 +88,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		if loadErr != nil {
 			return nil, fmt.Errorf("load config: %w", loadErr)
 		}
-		agent = cfg.DefaultAgent
+		agent = cfg.WorkersConfig.Default
 	}
 	if agent == "" {
 		return nil, domain.ErrNoAgent

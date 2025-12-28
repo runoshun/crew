@@ -51,21 +51,70 @@ func defaultGlobalConfigDir() string {
 
 // configFile represents the structure of config.toml.
 // Using separate struct to handle TOML tag mapping.
+// Note: Workers is map[string]any because it contains both top-level fields (default, prompt)
+// and subtables (per-worker definitions). We parse it manually after unmarshaling.
 type configFile struct {
-	DefaultAgent string              `toml:"default_agent"`
-	Agent        agentSection        `toml:"agent"`
-	Agents       map[string]agentDef `toml:"agents"`
-	Complete     completeSection     `toml:"complete"`
-	Log          logSection          `toml:"log"`
+	Workers  map[string]any  `toml:"workers"`
+	Complete completeSection `toml:"complete"`
+	Log      logSection      `toml:"log"`
 }
 
-type agentSection struct {
-	Prompt string `toml:"prompt"`
+// workersConfig holds the parsed [workers] section.
+type workersConfig struct {
+	Defs    map[string]workerDef // Per-worker definitions from [workers.<name>]
+	Default string               // Default worker name from [workers].default
+	Prompt  string               // Common prompt from [workers].prompt
 }
 
-type agentDef struct {
-	Args    string `toml:"args"`
-	Command string `toml:"command"`
+// parseWorkersSection parses the raw workers map into structured workersConfig.
+func parseWorkersSection(raw map[string]any) workersConfig {
+	result := workersConfig{
+		Defs: make(map[string]workerDef),
+	}
+
+	for key, value := range raw {
+		switch key {
+		case "default":
+			if s, ok := value.(string); ok {
+				result.Default = s
+			}
+		case "prompt":
+			if s, ok := value.(string); ok {
+				result.Prompt = s
+			}
+		default:
+			// Treat as worker definition
+			if subMap, ok := value.(map[string]any); ok {
+				def := workerDef{}
+				if v, ok := subMap["command_template"].(string); ok {
+					def.CommandTemplate = v
+				}
+				if v, ok := subMap["command"].(string); ok {
+					def.Command = v
+				}
+				if v, ok := subMap["system_args"].(string); ok {
+					def.SystemArgs = v
+				}
+				if v, ok := subMap["args"].(string); ok {
+					def.Args = v
+				}
+				if v, ok := subMap["prompt"].(string); ok {
+					def.Prompt = v
+				}
+				result.Defs[key] = def
+			}
+		}
+	}
+
+	return result
+}
+
+type workerDef struct {
+	CommandTemplate string
+	Command         string
+	SystemArgs      string
+	Args            string
+	Prompt          string
 }
 
 type completeSection struct {
@@ -137,20 +186,26 @@ func (l *Loader) loadFile(path string) (*domain.Config, error) {
 
 // convertToDomainConfig converts the file config to domain config.
 func convertToDomainConfig(cf *configFile) *domain.Config {
-	agents := make(map[string]domain.Agent)
-	for name, def := range cf.Agents {
-		agents[name] = domain.Agent{
-			Args:    def.Args,
-			Command: def.Command,
+	// Parse the workers section
+	wc := parseWorkersSection(cf.Workers)
+
+	workers := make(map[string]domain.WorkerAgent)
+	for name, def := range wc.Defs {
+		workers[name] = domain.WorkerAgent{
+			CommandTemplate: def.CommandTemplate,
+			Command:         def.Command,
+			SystemArgs:      def.SystemArgs,
+			Args:            def.Args,
+			Prompt:          def.Prompt,
 		}
 	}
 
 	return &domain.Config{
-		DefaultAgent: cf.DefaultAgent,
-		Agent: domain.AgentConfig{
-			Prompt: cf.Agent.Prompt,
+		WorkersConfig: domain.WorkersConfig{
+			Default: wc.Default,
+			Prompt:  wc.Prompt,
 		},
-		Agents: agents,
+		Workers: workers,
 		Complete: domain.CompleteConfig{
 			Command: cf.Complete.Command,
 		},
@@ -163,24 +218,23 @@ func convertToDomainConfig(cf *configFile) *domain.Config {
 // mergeConfigs merges two configs, with override taking precedence.
 func mergeConfigs(base, override *domain.Config) *domain.Config {
 	result := &domain.Config{
-		DefaultAgent: base.DefaultAgent,
-		Agent:        base.Agent,
-		Complete:     base.Complete,
-		Log:          base.Log,
-		Agents:       make(map[string]domain.Agent),
+		WorkersConfig: base.WorkersConfig,
+		Complete:      base.Complete,
+		Log:           base.Log,
+		Workers:       make(map[string]domain.WorkerAgent),
 	}
 
-	// Copy base agents
-	for name, agent := range base.Agents {
-		result.Agents[name] = agent
+	// Copy base workers
+	for name, worker := range base.Workers {
+		result.Workers[name] = worker
 	}
 
 	// Override with override config
-	if override.DefaultAgent != "" {
-		result.DefaultAgent = override.DefaultAgent
+	if override.WorkersConfig.Default != "" {
+		result.WorkersConfig.Default = override.WorkersConfig.Default
 	}
-	if override.Agent.Prompt != "" {
-		result.Agent.Prompt = override.Agent.Prompt
+	if override.WorkersConfig.Prompt != "" {
+		result.WorkersConfig.Prompt = override.WorkersConfig.Prompt
 	}
 	if override.Complete.Command != "" {
 		result.Complete.Command = override.Complete.Command
@@ -189,9 +243,25 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		result.Log.Level = override.Log.Level
 	}
 
-	// Merge agents: override takes precedence
-	for name, agent := range override.Agents {
-		result.Agents[name] = agent
+	// Merge workers: override individual fields, not entire worker
+	for name, overrideWorker := range override.Workers {
+		baseWorker := result.Workers[name]
+		if overrideWorker.CommandTemplate != "" {
+			baseWorker.CommandTemplate = overrideWorker.CommandTemplate
+		}
+		if overrideWorker.Command != "" {
+			baseWorker.Command = overrideWorker.Command
+		}
+		if overrideWorker.SystemArgs != "" {
+			baseWorker.SystemArgs = overrideWorker.SystemArgs
+		}
+		if overrideWorker.Args != "" {
+			baseWorker.Args = overrideWorker.Args
+		}
+		if overrideWorker.Prompt != "" {
+			baseWorker.Prompt = overrideWorker.Prompt
+		}
+		result.Workers[name] = baseWorker
 	}
 
 	return result

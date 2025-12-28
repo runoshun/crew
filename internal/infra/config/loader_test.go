@@ -17,13 +17,12 @@ func TestLoader_Load_RepoConfigOnly(t *testing.T) {
 
 	// Write repo config
 	repoConfig := `
-default_agent = "claude"
+[workers]
+default = "claude"
 
-[agent]
-prompt = "When done, run 'git crew complete'."
-
-[agents.claude]
+[workers.claude]
 args = "--model claude-sonnet-4-20250514"
+prompt = "When done, run 'crew complete'."
 
 [complete]
 command = "mise run ci"
@@ -40,9 +39,9 @@ level = "debug"
 	require.NoError(t, err)
 
 	// Verify
-	assert.Equal(t, "claude", cfg.DefaultAgent)
-	assert.Equal(t, "When done, run 'git crew complete'.", cfg.Agent.Prompt)
-	assert.Equal(t, "--model claude-sonnet-4-20250514", cfg.Agents["claude"].Args)
+	assert.Equal(t, "claude", cfg.WorkersConfig.Default)
+	assert.Equal(t, "--model claude-sonnet-4-20250514", cfg.Workers["claude"].Args)
+	assert.Equal(t, "When done, run 'crew complete'.", cfg.Workers["claude"].Prompt)
 	assert.Equal(t, "mise run ci", cfg.Complete.Command)
 	assert.Equal(t, "debug", cfg.Log.Level)
 }
@@ -54,9 +53,10 @@ func TestLoader_Load_GlobalConfigOnly(t *testing.T) {
 
 	// Write global config only
 	globalConfig := `
-default_agent = "opencode"
+[workers]
+default = "opencode"
 
-[agents.opencode]
+[workers.opencode]
 args = "-m gpt-4"
 `
 	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
@@ -68,8 +68,8 @@ args = "-m gpt-4"
 	require.NoError(t, err)
 
 	// Verify
-	assert.Equal(t, "opencode", cfg.DefaultAgent)
-	assert.Equal(t, "-m gpt-4", cfg.Agents["opencode"].Args)
+	assert.Equal(t, "opencode", cfg.WorkersConfig.Default)
+	assert.Equal(t, "-m gpt-4", cfg.Workers["opencode"].Args)
 }
 
 func TestLoader_Load_MergeRepoOverridesGlobal(t *testing.T) {
@@ -79,15 +79,14 @@ func TestLoader_Load_MergeRepoOverridesGlobal(t *testing.T) {
 
 	// Write global config
 	globalConfig := `
-default_agent = "opencode"
+[workers]
+default = "opencode"
 
-[agent]
+[workers.opencode]
+args = "-m gpt-4"
 prompt = "Global prompt"
 
-[agents.opencode]
-args = "-m gpt-4"
-
-[agents.claude]
+[workers.claude]
 args = "--model global-model"
 
 [complete]
@@ -101,9 +100,10 @@ level = "info"
 
 	// Write repo config (overrides some values)
 	repoConfig := `
-default_agent = "claude"
+[workers]
+default = "claude"
 
-[agents.claude]
+[workers.claude]
 args = "--model repo-model"
 
 [complete]
@@ -118,12 +118,12 @@ command = "mise run ci"
 	require.NoError(t, err)
 
 	// Verify: repo overrides global
-	assert.Equal(t, "claude", cfg.DefaultAgent)                      // Overridden by repo
-	assert.Equal(t, "Global prompt", cfg.Agent.Prompt)               // From global (not overridden)
-	assert.Equal(t, "--model repo-model", cfg.Agents["claude"].Args) // Overridden by repo
-	assert.Equal(t, "-m gpt-4", cfg.Agents["opencode"].Args)         // From global
-	assert.Equal(t, "mise run ci", cfg.Complete.Command)             // Overridden by repo
-	assert.Equal(t, "info", cfg.Log.Level)                           // From global (not overridden)
+	assert.Equal(t, "claude", cfg.WorkersConfig.Default)              // Overridden by repo
+	assert.Equal(t, "Global prompt", cfg.Workers["opencode"].Prompt)  // From global (not overridden)
+	assert.Equal(t, "--model repo-model", cfg.Workers["claude"].Args) // Overridden by repo
+	assert.Equal(t, "-m gpt-4", cfg.Workers["opencode"].Args)         // From global
+	assert.Equal(t, "mise run ci", cfg.Complete.Command)              // Overridden by repo
+	assert.Equal(t, "info", cfg.Log.Level)                            // From global (not overridden)
 }
 
 func TestLoader_Load_NoConfigFiles(t *testing.T) {
@@ -136,10 +136,21 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
-	// Verify: default config is returned
-	assert.Equal(t, "", cfg.DefaultAgent)
-	assert.Empty(t, cfg.Agents)
-	assert.Equal(t, "info", cfg.Log.Level) // Default log level
+	// Verify: default config is returned (values from domain constants)
+	assert.Equal(t, domain.DefaultWorkerName, cfg.WorkersConfig.Default)
+	assert.Equal(t, domain.DefaultLogLevel, cfg.Log.Level)
+	// Default prompt comes from WorkersConfig, not individual workers
+	assert.Equal(t, domain.DefaultWorkerPrompt, cfg.WorkersConfig.Prompt)
+	// Builtin workers should have values from BuiltinWorkers
+	for name, builtin := range domain.BuiltinWorkers {
+		worker := cfg.Workers[name]
+		assert.Equal(t, builtin.CommandTemplate, worker.CommandTemplate)
+		assert.Equal(t, builtin.Command, worker.Command)
+		assert.Equal(t, builtin.SystemArgs, worker.SystemArgs)
+		assert.Equal(t, builtin.DefaultArgs, worker.Args)
+		// Worker.Prompt is empty; falls back to WorkersConfig.Prompt
+		assert.Empty(t, worker.Prompt)
+	}
 }
 
 func TestLoader_LoadGlobal(t *testing.T) {
@@ -149,7 +160,8 @@ func TestLoader_LoadGlobal(t *testing.T) {
 
 	// Write global config
 	globalConfig := `
-default_agent = "opencode"
+[workers]
+default = "opencode"
 `
 	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
 	require.NoError(t, err)
@@ -160,7 +172,7 @@ default_agent = "opencode"
 	require.NoError(t, err)
 
 	// Verify
-	assert.Equal(t, "opencode", cfg.DefaultAgent)
+	assert.Equal(t, "opencode", cfg.WorkersConfig.Default)
 }
 
 func TestLoader_LoadGlobal_NotFound(t *testing.T) {
@@ -198,14 +210,14 @@ this is not valid toml [[[
 	assert.Nil(t, cfg)
 }
 
-func TestLoader_Load_CustomAgentCommand(t *testing.T) {
+func TestLoader_Load_CustomWorkerCommand(t *testing.T) {
 	// Setup
 	crewDir := t.TempDir()
 	globalDir := t.TempDir()
 
-	// Write config with custom agent
+	// Write config with custom worker
 	config := `
-[agents.my-agent]
+[workers.my-worker]
 command = 'my-custom-agent --task "{{.Title}}"'
 `
 	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0644)
@@ -217,5 +229,5 @@ command = 'my-custom-agent --task "{{.Title}}"'
 	require.NoError(t, err)
 
 	// Verify
-	assert.Equal(t, `my-custom-agent --task "{{.Title}}"`, cfg.Agents["my-agent"].Command)
+	assert.Equal(t, `my-custom-agent --task "{{.Title}}"`, cfg.Workers["my-worker"].Command)
 }

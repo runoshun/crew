@@ -86,7 +86,8 @@ func TestManager_InitRepoConfig(t *testing.T) {
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "git-crew configuration")
-		assert.Contains(t, string(content), "default_agent")
+		assert.Contains(t, string(content), "[workers]")
+		assert.Contains(t, string(content), "default = ")
 	})
 
 	t.Run("returns error if file already exists", func(t *testing.T) {

@@ -97,6 +97,11 @@ func (m *Manager) initConfig(path string) error {
 		return domain.ErrConfigExists
 	}
 
-	// Write default template from domain
-	return os.WriteFile(path, []byte(domain.DefaultConfigTemplate), 0600)
+	// Render template with default values
+	content, err := domain.RenderConfigTemplate()
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, []byte(content), 0600)
 }

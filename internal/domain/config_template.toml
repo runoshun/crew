@@ -1,27 +1,38 @@
 # git-crew configuration
 
-## Default agent to use when starting tasks
-# default_agent = "claude"
+## Workers configuration
+# [workers]
+# default = "<<.DefaultWorker>>"  # Default worker to use when starting tasks
+# prompt = "<<.WorkersPrompt>>"
 
-## Common agent settings
-# [agent]
-# prompt = "When the task is complete, run 'git crew complete'."
+## Built-in worker customization
+## - args: user-customizable arguments (e.g., model selection)
+## - prompt: override the common prompt for this worker
+## - system_args: auto-applied for crew operation (rarely need to change)
+## - command: base command to run
+## - command_template: how to assemble the full command
+##   Available: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
 
-## Log settings
-# [log]
-# level = "info"  # debug, info, warn, error
+# [workers.claude]
+# args = "<<.ClaudeArgs>>"
 
-## Built-in agent argument extensions
-# [agents.claude]
-# args = "--model opus"
+# [workers.opencode]
+# args = "<<.OpencodeArgs>>"
 
-# [agents.opencode]
-# args = "-m anthropic/claude-opus-4-5"
+# [workers.codex]
+# args = "<<.CodexArgs>>"
 
-## Custom agent example
-# [agents.my-agent]
-# command = 'my-custom-agent --task "{{.Title}}"'
+## Custom worker example
+# [workers.my-worker]
+# command_template = "{{.Command}} {{.Args}} {{.Prompt}}"
+# command = "my-custom-agent"
+# args = "--task"
+# prompt = "Complete the task and run 'crew complete'"
 
 ## CI gate on completion
 # [complete]
 # command = "mise run ci"
+
+## Log settings
+# [log]
+# level = "<<.LogLevel>>"  # debug, info, warn, error
