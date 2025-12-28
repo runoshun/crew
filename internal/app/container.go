@@ -50,6 +50,7 @@ type Container struct {
 	Worktrees        domain.WorktreeManager
 	Sessions         domain.SessionManager
 	ConfigLoader     domain.ConfigLoader
+	ConfigManager    domain.ConfigManager
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 
 	// Pointer fields
@@ -84,8 +85,9 @@ func New(dir string) (*Container, error) {
 	// Create session manager
 	sessionClient := tmux.NewClient(cfg.SocketPath, cfg.CrewDir)
 
-	// Create config loader
+	// Create config loader and manager
 	configLoader := config.NewLoader(cfg.CrewDir)
+	configManager := config.NewManager(cfg.CrewDir)
 
 	return &Container{
 		Tasks:            store,
@@ -95,6 +97,7 @@ func New(dir string) (*Container, error) {
 		Worktrees:        worktreeClient,
 		Sessions:         sessionClient,
 		ConfigLoader:     configLoader,
+		ConfigManager:    configManager,
 		Logger:           logger,
 		Config:           cfg,
 	}, nil
@@ -171,4 +174,14 @@ func (c *Container) AttachSessionUseCase() *usecase.AttachSession {
 // SessionEndedUseCase returns a new SessionEnded use case.
 func (c *Container) SessionEndedUseCase() *usecase.SessionEnded {
 	return usecase.NewSessionEnded(c.Tasks, c.Config.CrewDir)
+}
+
+// ShowConfigUseCase returns a new ShowConfig use case.
+func (c *Container) ShowConfigUseCase() *usecase.ShowConfig {
+	return usecase.NewShowConfig(c.ConfigManager)
+}
+
+// InitConfigUseCase returns a new InitConfig use case.
+func (c *Container) InitConfigUseCase() *usecase.InitConfig {
+	return usecase.NewInitConfig(c.ConfigManager)
 }

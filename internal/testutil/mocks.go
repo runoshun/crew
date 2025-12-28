@@ -390,3 +390,53 @@ func (m *MockConfigLoader) LoadGlobal() (*domain.Config, error) {
 	}
 	return m.Config, nil
 }
+
+// MockConfigManager is a test double for domain.ConfigManager.
+// Fields are ordered to minimize memory padding.
+type MockConfigManager struct {
+	InitRepoErr      error
+	InitGlobalErr    error
+	RepoConfigInfo   domain.ConfigInfo
+	GlobalConfigInfo domain.ConfigInfo
+	InitRepoCalled   bool
+	InitGlobalCalled bool
+}
+
+// NewMockConfigManager creates a new MockConfigManager.
+func NewMockConfigManager() *MockConfigManager {
+	return &MockConfigManager{
+		RepoConfigInfo: domain.ConfigInfo{
+			Path:   "/test/.git/crew/config.toml",
+			Exists: false,
+		},
+		GlobalConfigInfo: domain.ConfigInfo{
+			Path:   "/home/test/.config/git-crew/config.toml",
+			Exists: false,
+		},
+	}
+}
+
+// Ensure MockConfigManager implements domain.ConfigManager interface.
+var _ domain.ConfigManager = (*MockConfigManager)(nil)
+
+// GetRepoConfigInfo returns the configured repo config info.
+func (m *MockConfigManager) GetRepoConfigInfo() domain.ConfigInfo {
+	return m.RepoConfigInfo
+}
+
+// GetGlobalConfigInfo returns the configured global config info.
+func (m *MockConfigManager) GetGlobalConfigInfo() domain.ConfigInfo {
+	return m.GlobalConfigInfo
+}
+
+// InitRepoConfig records the call and returns configured error.
+func (m *MockConfigManager) InitRepoConfig() error {
+	m.InitRepoCalled = true
+	return m.InitRepoErr
+}
+
+// InitGlobalConfig records the call and returns configured error.
+func (m *MockConfigManager) InitGlobalConfig() error {
+	m.InitGlobalCalled = true
+	return m.InitGlobalErr
+}

@@ -1,0 +1,27 @@
+# git-crew configuration
+
+## Default agent to use when starting tasks
+# default_agent = "claude"
+
+## Common agent settings
+# [agent]
+# prompt = "When the task is complete, run 'git crew complete'."
+
+## Log settings
+# [log]
+# level = "info"  # debug, info, warn, error
+
+## Built-in agent argument extensions
+# [agents.claude]
+# args = "--model opus"
+
+# [agents.opencode]
+# args = "-m anthropic/claude-opus-4-5"
+
+## Custom agent example
+# [agents.my-agent]
+# command = 'my-custom-agent --task "{{.Title}}"'
+
+## CI gate on completion
+# [complete]
+# command = "mise run ci"

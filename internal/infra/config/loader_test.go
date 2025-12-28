@@ -135,9 +135,10 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
-	// Verify: empty config
+	// Verify: default config is returned
 	assert.Equal(t, "", cfg.DefaultAgent)
 	assert.Empty(t, cfg.Agents)
+	assert.Equal(t, "info", cfg.Log.Level) // Default log level
 }
 
 func TestLoader_LoadGlobal(t *testing.T) {

@@ -91,23 +91,23 @@ func (l *Loader) Load() (*domain.Config, error) {
 		return nil, err
 	}
 
-	// If both don't exist, return empty config
+	// Start with default config
+	base := domain.NewDefaultConfig()
+
+	// If both don't exist, return default config
 	if global == nil && repo == nil {
-		return &domain.Config{
-			Agents: make(map[string]domain.Agent),
-		}, nil
+		return base, nil
 	}
 
-	// If only one exists, return it
-	if global == nil {
-		return repo, nil
+	// Merge: default <- global <- repo (later takes precedence)
+	if global != nil {
+		base = mergeConfigs(base, global)
 	}
-	if repo == nil {
-		return global, nil
+	if repo != nil {
+		base = mergeConfigs(base, repo)
 	}
 
-	// Merge: repo overrides global
-	return mergeConfigs(global, repo), nil
+	return base, nil
 }
 
 // LoadGlobal returns only the global configuration.
