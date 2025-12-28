@@ -67,6 +67,11 @@ func TmuxConfigPath(crewDir string) string {
 	return filepath.Join(crewDir, "tmux.conf")
 }
 
+// WorktreePath returns the path to a worktree for a task.
+func WorktreePath(crewDir string, taskID int) string {
+	return filepath.Join(crewDir, "worktrees", fmt.Sprintf("%d", taskID))
+}
+
 // ConfigPath returns the path to the repository config file.
 func ConfigPath(crewDir string) string {
 	return filepath.Join(crewDir, "config.toml")
