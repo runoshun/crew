@@ -57,9 +57,18 @@ func (c *Client) BranchExists(_ string) (bool, error) {
 }
 
 // HasUncommittedChanges checks for uncommitted changes in a directory.
-// TODO: implement in later phase
-func (c *Client) HasUncommittedChanges(_ string) (bool, error) {
-	panic("not implemented")
+// Returns true if there are uncommitted changes (staged or unstaged).
+func (c *Client) HasUncommittedChanges(dir string) (bool, error) {
+	// Use git status --porcelain to check for any uncommitted changes
+	// This returns empty output if the working tree is clean
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to check uncommitted changes: %w", err)
+	}
+	// If output is non-empty, there are uncommitted changes
+	return len(out) > 0, nil
 }
 
 // HasMergeConflict checks if merging branch into target would conflict.

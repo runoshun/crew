@@ -76,6 +76,9 @@ and isolated task execution.`,
 	attachCmd := newAttachCommand(c)
 	attachCmd.GroupID = groupSession
 
+	completeCmd := newCompleteCommand(c)
+	completeCmd.GroupID = groupSession
+
 	// Internal commands (hidden)
 	sessionEndedCmd := newSessionEndedCommand(c)
 
@@ -93,6 +96,7 @@ and isolated task execution.`,
 		closeCmd,
 		startCmd,
 		attachCmd,
+		completeCmd,
 		sessionEndedCmd,
 	)
 

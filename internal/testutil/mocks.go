@@ -197,8 +197,10 @@ func (m *MockTaskRepositoryWithAddCommentError) AddComment(_ int, _ domain.Comme
 // MockGit is a test double for domain.Git.
 // Fields are ordered to minimize memory padding.
 type MockGit struct {
-	CurrentBranchErr  error
-	CurrentBranchName string
+	CurrentBranchErr       error
+	HasUncommittedErr      error
+	CurrentBranchName      string
+	HasUncommittedChangesV bool
 }
 
 // Ensure MockGit implements domain.Git interface.
@@ -217,9 +219,12 @@ func (m *MockGit) BranchExists(_ string) (bool, error) {
 	panic("not implemented")
 }
 
-// HasUncommittedChanges is not implemented yet.
+// HasUncommittedChanges returns the configured value or error.
 func (m *MockGit) HasUncommittedChanges(_ string) (bool, error) {
-	panic("not implemented")
+	if m.HasUncommittedErr != nil {
+		return false, m.HasUncommittedErr
+	}
+	return m.HasUncommittedChangesV, nil
 }
 
 // HasMergeConflict is not implemented yet.
