@@ -33,6 +33,16 @@
 # [complete]
 # command = "mise run ci"
 
+## Diff display settings
+## - command: Shell command to display diff. Supports template variables:
+##   - {{.BaseBranch}}: Task's base branch (e.g., "main")
+##   - {{.Args}}: Additional arguments passed to the diff command
+##   The command runs from the worktree directory.
+## - tui_command: Command for TUI diff display (optional)
+# [diff]
+# command = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}}{{end}}"
+# tui_command = "git diff --color {{.BaseBranch}}...HEAD | less -R"
+
 ## Log settings
 # [log]
 # level = "<<.LogLevel>>"  # debug, info, warn, error

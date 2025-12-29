@@ -56,6 +56,7 @@ func defaultGlobalConfigDir() string {
 type configFile struct {
 	Workers  map[string]any  `toml:"workers"`
 	Complete completeSection `toml:"complete"`
+	Diff     diffSection     `toml:"diff"`
 	Log      logSection      `toml:"log"`
 }
 
@@ -119,6 +120,11 @@ type workerDef struct {
 
 type completeSection struct {
 	Command string `toml:"command"`
+}
+
+type diffSection struct {
+	Command    string `toml:"command"`
+	TUICommand string `toml:"tui_command"`
 }
 
 type logSection struct {
@@ -209,6 +215,10 @@ func convertToDomainConfig(cf *configFile) *domain.Config {
 		Complete: domain.CompleteConfig{
 			Command: cf.Complete.Command,
 		},
+		Diff: domain.DiffConfig{
+			Command:    cf.Diff.Command,
+			TUICommand: cf.Diff.TUICommand,
+		},
 		Log: domain.LogConfig{
 			Level: cf.Log.Level,
 		},
@@ -220,6 +230,7 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	result := &domain.Config{
 		WorkersConfig: base.WorkersConfig,
 		Complete:      base.Complete,
+		Diff:          base.Diff,
 		Log:           base.Log,
 		Workers:       make(map[string]domain.WorkerAgent),
 	}
@@ -238,6 +249,12 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.Complete.Command != "" {
 		result.Complete.Command = override.Complete.Command
+	}
+	if override.Diff.Command != "" {
+		result.Diff.Command = override.Diff.Command
+	}
+	if override.Diff.TUICommand != "" {
+		result.Diff.TUICommand = override.Diff.TUICommand
 	}
 	if override.Log.Level != "" {
 		result.Log.Level = override.Log.Level
