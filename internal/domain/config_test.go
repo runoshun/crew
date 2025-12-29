@@ -250,7 +250,8 @@ func TestRenderConfigTemplate(t *testing.T) {
 	if !strings.Contains(content, DefaultWorkerName) {
 		t.Errorf("expected default_worker %q to be embedded in template", DefaultWorkerName)
 	}
-	if !strings.Contains(content, DefaultWorkerPrompt) {
+	formattedPrompt := formatPromptForTemplate(DefaultWorkerPrompt)
+	if !strings.Contains(content, "# prompt = "+formattedPrompt) {
 		t.Errorf("expected worker prompt to be embedded in template")
 	}
 	for name, builtin := range BuiltinWorkers {

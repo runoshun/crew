@@ -3,7 +3,7 @@
 ## Workers configuration
 # [workers]
 # default = "<<.DefaultWorker>>"  # Default worker to use when starting tasks
-# prompt = "<<.WorkersPrompt>>"
+# prompt = <<.WorkersPrompt>>
 
 ## Built-in worker customization
 ## - args: user-customizable arguments (e.g., model selection)

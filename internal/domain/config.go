@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"path/filepath"
+	"strings"
 	"text/template"
 )
 
@@ -256,7 +257,7 @@ func RenderConfigTemplate() (string, error) {
 
 	data := map[string]any{
 		"DefaultWorker": cfg.WorkersConfig.Default,
-		"WorkersPrompt": cfg.WorkersConfig.Prompt,
+		"WorkersPrompt": formatPromptForTemplate(cfg.WorkersConfig.Prompt),
 		"LogLevel":      cfg.Log.Level,
 		"ClaudeArgs":    cfg.Workers["claude"].Args,
 		"OpencodeArgs":  cfg.Workers["opencode"].Args,
@@ -274,4 +275,23 @@ func RenderConfigTemplate() (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func formatPromptForTemplate(prompt string) string {
+	if prompt == "" {
+		return ""
+	}
+
+	trimmed := strings.TrimRight(prompt, "\n")
+	lines := strings.Split(trimmed, "\n")
+
+	var buf strings.Builder
+	buf.WriteString(`"""`)
+	for _, line := range lines {
+		buf.WriteString("\n# ")
+		buf.WriteString(line)
+	}
+	buf.WriteString("\n# \"\"\"")
+
+	return buf.String()
 }
