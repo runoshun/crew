@@ -172,6 +172,11 @@ func (c *Container) AttachSessionUseCase() *usecase.AttachSession {
 	return usecase.NewAttachSession(c.Tasks, c.Sessions)
 }
 
+// SendKeysUseCase returns a new SendKeys use case.
+func (c *Container) SendKeysUseCase() *usecase.SendKeys {
+	return usecase.NewSendKeys(c.Tasks, c.Sessions)
+}
+
 // PeekSessionUseCase returns a new PeekSession use case.
 func (c *Container) PeekSessionUseCase() *usecase.PeekSession {
 	return usecase.NewPeekSession(c.Tasks, c.Sessions)

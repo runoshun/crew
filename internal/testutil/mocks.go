@@ -261,14 +261,17 @@ type MockSessionManager struct {
 	StartErr     error
 	StopErr      error
 	AttachErr    error
+	SendErr      error
 	PeekErr      error
 	PeekOutput   string
+	SentKeys     string
 	StartOpts    domain.StartSessionOptions
 	PeekLines    int
 	IsRunningVal bool
 	StartCalled  bool
 	StopCalled   bool
 	AttachCalled bool
+	SendCalled   bool
 	PeekCalled   bool
 }
 
@@ -309,9 +312,11 @@ func (m *MockSessionManager) Peek(_ string, lines int) (string, error) {
 	return m.PeekOutput, nil
 }
 
-// Send is not implemented yet.
-func (m *MockSessionManager) Send(_ string, _ string) error {
-	panic("not implemented")
+// Send records the call and returns configured error.
+func (m *MockSessionManager) Send(_ string, keys string) error {
+	m.SendCalled = true
+	m.SentKeys = keys
+	return m.SendErr
 }
 
 // IsRunning returns the configured value or error.
