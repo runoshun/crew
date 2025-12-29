@@ -172,6 +172,11 @@ func (c *Container) AttachSessionUseCase() *usecase.AttachSession {
 	return usecase.NewAttachSession(c.Tasks, c.Sessions)
 }
 
+// PeekSessionUseCase returns a new PeekSession use case.
+func (c *Container) PeekSessionUseCase() *usecase.PeekSession {
+	return usecase.NewPeekSession(c.Tasks, c.Sessions)
+}
+
 // SessionEndedUseCase returns a new SessionEnded use case.
 func (c *Container) SessionEndedUseCase() *usecase.SessionEnded {
 	return usecase.NewSessionEnded(c.Tasks, c.Config.CrewDir)
