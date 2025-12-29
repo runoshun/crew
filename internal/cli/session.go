@@ -356,6 +356,46 @@ Examples:
 	return cmd
 }
 
+// newStopCommand creates the stop command for stopping a task session.
+func newStopCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "stop <id>",
+		Short: "Stop a session",
+		Long: `Stop a running session for a task.
+
+This terminates the tmux session, deletes the task script,
+clears agent info, and updates the status to 'in_review'.
+
+The worktree is NOT deleted (use 'close' to also delete the worktree).
+
+Examples:
+  # Stop session for task #1
+  git crew stop 1`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Execute use case
+			uc := c.StopTaskUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.StopTaskInput{
+				TaskID: taskID,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Stopped task #%d: %s\n", out.Task.ID, out.Task.Title)
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // newMergeCommand creates the merge command for merging a task branch into main.
 func newMergeCommand(c *app.Container) *cobra.Command {
 	var opts struct {

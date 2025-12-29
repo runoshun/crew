@@ -212,3 +212,8 @@ func (c *Container) MergeTaskUseCase() *usecase.MergeTask {
 func (c *Container) ShowDiffUseCase(stdout, stderr io.Writer) *usecase.ShowDiff {
 	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.ConfigLoader, stdout, stderr)
 }
+
+// StopTaskUseCase returns a new StopTask use case.
+func (c *Container) StopTaskUseCase() *usecase.StopTask {
+	return usecase.NewStopTask(c.Tasks, c.Sessions, c.Config.CrewDir)
+}
