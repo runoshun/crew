@@ -12,6 +12,7 @@ type Config struct {
 	WorkersConfig WorkersConfig          // Common [workers] settings (including default)
 	Workers       map[string]WorkerAgent // Per-worker settings [workers.<name>]
 	Complete      CompleteConfig         // [complete] settings
+	Diff          DiffConfig             // [diff] settings
 	Log           LogConfig              // [log] settings
 }
 
@@ -129,6 +130,12 @@ func expandString(s string, data CommandData) (string, error) {
 // CompleteConfig holds completion gate settings from [complete] section.
 type CompleteConfig struct {
 	Command string // Command to run as CI gate on complete
+}
+
+// DiffConfig holds diff display settings from [diff] section.
+type DiffConfig struct {
+	Command    string // Command to display diff (with {{.Args}} template support)
+	TUICommand string // Command for TUI diff display
 }
 
 // LogConfig holds logging settings from [log] section.

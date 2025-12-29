@@ -2,6 +2,7 @@
 package app
 
 import (
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -194,4 +195,10 @@ func (c *Container) CompleteTaskUseCase() *usecase.CompleteTask {
 // MergeTaskUseCase returns a new MergeTask use case.
 func (c *Container) MergeTaskUseCase() *usecase.MergeTask {
 	return usecase.NewMergeTask(c.Tasks, c.Sessions, c.Worktrees, c.Git)
+}
+
+// ShowDiffUseCase returns a new ShowDiff use case.
+// stdout and stderr are the writers for command output.
+func (c *Container) ShowDiffUseCase(stdout, stderr io.Writer) *usecase.ShowDiff {
+	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.ConfigLoader, stdout, stderr)
 }

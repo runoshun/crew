@@ -13,6 +13,59 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// newDiffCommand creates the diff command for showing task changes.
+func newDiffCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "diff <id> [args...]",
+		Short: "Display task change diff",
+		Long: `Display the diff for a task's changes.
+
+The diff command executes the configured diff.command (or a default git diff)
+from the task's worktree directory.
+
+Any additional arguments after the task ID are passed to the diff command
+through the {{.Args}} template variable.
+
+Examples:
+  # Show diff for task #1
+  git crew diff 1
+
+  # Show diff with --stat
+  git crew diff 1 --stat
+
+  # Show diff for specific file
+  git crew diff 1 -- path/to/file.go`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Get additional args (everything after the task ID)
+			var diffArgs []string
+			if len(args) > 1 {
+				diffArgs = args[1:]
+			}
+
+			// Execute use case
+			uc := c.ShowDiffUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
+			_, err = uc.Execute(cmd.Context(), usecase.ShowDiffInput{
+				TaskID: taskID,
+				Args:   diffArgs,
+			})
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // newStartCommand creates the start command for starting a task.
 func newStartCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{

@@ -76,6 +76,9 @@ and isolated task execution.`,
 	attachCmd := newAttachCommand(c)
 	attachCmd.GroupID = groupSession
 
+	diffCmd := newDiffCommand(c)
+	diffCmd.GroupID = groupSession
+
 	completeCmd := newCompleteCommand(c)
 	completeCmd.GroupID = groupSession
 
@@ -99,6 +102,7 @@ and isolated task execution.`,
 		closeCmd,
 		startCmd,
 		attachCmd,
+		diffCmd,
 		completeCmd,
 		mergeCmd,
 		sessionEndedCmd,
