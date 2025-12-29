@@ -27,11 +27,9 @@ Register ALL TODOs at once when starting Phase 1:
 # Phase 3: Wrap-up
 - [ ] Run final CI check
 - [ ] Check test coverage for new code
-- [ ] Share technical findings before commit (if any)
-- [ ] Commit and merge (ask user - single confirmation for both)
-- [ ] Close completed tasks with `./crew close <id>`
-- [ ] Retrospective → propose guideline updates (if any)
-- [ ] Ask user before proceeding to next task
+- [ ] Commit changes (no user confirmation needed)
+- [ ] Run `crew complete <id>` to merge and close task
+- [ ] Summary report (findings, retrospective)
 ```
 
 ---
@@ -104,38 +102,29 @@ Register ALL TODOs at once when starting Phase 1:
    - Review coverage: `go tool cover -func=coverage.out | grep -E "(total|<new-package>)"`
    - Add tests if coverage is insufficient
 
-3. **Share technical findings** (before commit)
-   - Share any concerns, ambiguities, or potential issues discovered during implementation
-   - Examples:
-     - Spec interpretation questions
-     - Edge cases not covered by specs
-     - Design decisions that might need confirmation
-   - This allows fixes to be included in the same commit
+3. **Commit changes** (no user confirmation needed)
+   - Stage and commit with clear message
+   - Follow commit message format from AGENTS.md
 
-4. **Commit and Merge**
-   - When task is complete, ask user once: "Commit and merge to main?"
-   - If yes:
-     - Stage and commit with clear message
-     - Switch to main: `git checkout main`
-     - Merge with no-ff: `git merge --no-ff feature/<branch>`
-     - Delete feature branch: `git branch -d feature/<branch>`
-   - If continuing on same branch (e.g., next task is closely related), skip merge
+4. **Complete task**
+   - Run `./crew complete <id>` to merge to main and close task
 
-5. **Close completed tasks**
-   - Close the task(s) you worked on with `./crew close <id>`
-   - Only close tasks that are fully implemented
-   - Tasks with remaining work (e.g., waiting for dependencies) should stay open with a comment
+5. **Summary report**
+   - Output a consolidated report with the following sections:
 
-6. **Retrospective** (after commit)
-   - Review feedback received during the session:
-     - Instructions repeated multiple times
-     - Explicit requests like "please always do X"
-     - Corrections from the user
-   - If patterns suggest AGENTS.md or docs/ improvements:
-     - Propose changes to the user
-     - If approved, create a separate commit
-   - If you encountered friction with specs in docs/:
-     - Specs difficult to implement as written
-     - Inconsistencies between docs
-     - Missing details requiring assumptions
-   - Append findings to DESIGN_FEEDBACK.md (do NOT modify docs/ directly)
+   ```
+   ## Summary
+
+   ### What was done
+   - Brief description of implemented changes
+
+   ### Technical findings (if any)
+   - Concerns, ambiguities, or potential issues discovered
+   - Spec interpretation questions
+   - Edge cases not covered by specs
+   - Design decisions that might need confirmation
+
+   ### Retrospective (if any)
+   - Patterns suggesting AGENTS.md or docs/ improvements
+   - Friction with specs in docs/ → append to DESIGN_FEEDBACK.md
+   ```
