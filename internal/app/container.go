@@ -159,7 +159,7 @@ func (c *Container) AddCommentUseCase() *usecase.AddComment {
 
 // CloseTaskUseCase returns a new CloseTask use case.
 func (c *Container) CloseTaskUseCase() *usecase.CloseTask {
-	return usecase.NewCloseTask(c.Tasks)
+	return usecase.NewCloseTask(c.Tasks, c.Sessions, c.Worktrees)
 }
 
 // StartTaskUseCase returns a new StartTask use case.

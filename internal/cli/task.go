@@ -519,11 +519,12 @@ func newCloseCommand(c *app.Container) *cobra.Command {
 		Short: "Close task without merging",
 		Long: `Close a task without merging it.
 
-This transitions the task status to 'closed'. The task will remain
-in the task list but will not be merged.
+This command will:
+1. Stop any running session for the task
+2. Delete the task's worktree if it exists
+3. Transition the task status to 'closed'
 
-In future versions, this command will also stop any running session
-and delete the worktree. Currently, it only updates the status.
+The task will remain in the task list but will not be merged.
 
 Examples:
   # Close task by ID
