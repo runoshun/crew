@@ -79,6 +79,9 @@ and isolated task execution.`,
 	sendCmd := newSendCommand(c)
 	sendCmd.GroupID = groupSession
 
+	peekCmd := newPeekCommand(c)
+	peekCmd.GroupID = groupSession
+
 	diffCmd := newDiffCommand(c)
 	diffCmd.GroupID = groupSession
 
@@ -106,6 +109,7 @@ and isolated task execution.`,
 		startCmd,
 		attachCmd,
 		sendCmd,
+		peekCmd,
 		diffCmd,
 		completeCmd,
 		mergeCmd,

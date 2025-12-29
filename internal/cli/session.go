@@ -161,6 +161,60 @@ Examples:
 	return cmd
 }
 
+// newPeekCommand creates the peek command for viewing session output.
+func newPeekCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		lines int
+	}
+
+	cmd := &cobra.Command{
+		Use:   "peek <id>",
+		Short: "View session output non-interactively",
+		Long: `View session output non-interactively using tmux capture-pane.
+
+This captures and displays the last N lines from a running session
+without attaching to it.
+
+Preconditions:
+  - Task must exist
+  - Session must be running
+
+Examples:
+  # View last 30 lines (default) of task #1 session
+  git crew peek 1
+
+  # View last 50 lines
+  git crew peek 1 --lines 50
+  git crew peek 1 -n 50`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Execute use case
+			uc := c.PeekSessionUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.PeekSessionInput{
+				TaskID: taskID,
+				Lines:  opts.lines,
+			})
+			if err != nil {
+				return err
+			}
+
+			// Print output
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.Output)
+			return nil
+		},
+	}
+
+	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 0, "Number of lines to display (default: 30)")
+
+	return cmd
+}
+
 // newCompleteCommand creates the complete command for marking a task as complete.
 func newCompleteCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{

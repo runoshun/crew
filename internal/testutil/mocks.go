@@ -257,19 +257,23 @@ func (m *MockGit) DeleteBranch(branch string) error {
 // MockSessionManager is a test double for domain.SessionManager.
 // Fields are ordered to minimize memory padding.
 type MockSessionManager struct {
+	IsRunningErr error
 	StartErr     error
 	StopErr      error
 	AttachErr    error
 	SendErr      error
-	IsRunningErr error
+	PeekErr      error
+	PeekOutput   string
 	SentKeys     string
 	StartOpts    domain.StartSessionOptions
+	PeekLines    int
 	IsRunningVal bool
 	StartCalled  bool
 	StopCalled   bool
 	AttachCalled bool
 	SendCalled   bool
-} // Matches domain.SessionManager interface; field order follows domain.StartSessionOptions
+	PeekCalled   bool
+}
 
 // NewMockSessionManager creates a new MockSessionManager.
 func NewMockSessionManager() *MockSessionManager {
@@ -298,9 +302,14 @@ func (m *MockSessionManager) Attach(_ string) error {
 	return m.AttachErr
 }
 
-// Peek is not implemented yet.
-func (m *MockSessionManager) Peek(_ string, _ int) (string, error) {
-	panic("not implemented")
+// Peek records the call and returns configured output or error.
+func (m *MockSessionManager) Peek(_ string, lines int) (string, error) {
+	m.PeekCalled = true
+	m.PeekLines = lines
+	if m.PeekErr != nil {
+		return "", m.PeekErr
+	}
+	return m.PeekOutput, nil
 }
 
 // Send records the call and returns configured error.
