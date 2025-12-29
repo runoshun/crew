@@ -260,13 +260,16 @@ type MockSessionManager struct {
 	StartErr     error
 	StopErr      error
 	AttachErr    error
+	SendErr      error
 	IsRunningErr error
+	SentKeys     string
 	StartOpts    domain.StartSessionOptions
 	IsRunningVal bool
 	StartCalled  bool
 	StopCalled   bool
 	AttachCalled bool
-}
+	SendCalled   bool
+} // Matches domain.SessionManager interface; field order follows domain.StartSessionOptions
 
 // NewMockSessionManager creates a new MockSessionManager.
 func NewMockSessionManager() *MockSessionManager {
@@ -300,9 +303,11 @@ func (m *MockSessionManager) Peek(_ string, _ int) (string, error) {
 	panic("not implemented")
 }
 
-// Send is not implemented yet.
-func (m *MockSessionManager) Send(_ string, _ string) error {
-	panic("not implemented")
+// Send records the call and returns configured error.
+func (m *MockSessionManager) Send(_ string, keys string) error {
+	m.SendCalled = true
+	m.SentKeys = keys
+	return m.SendErr
 }
 
 // IsRunning returns the configured value or error.

@@ -246,6 +246,62 @@ func newSessionEndedCommand(c *app.Container) *cobra.Command {
 	return cmd
 }
 
+// newSendCommand creates the send command for sending keys to a session.
+func newSendCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "send <id> <keys>",
+		Short: "Send key input to a session",
+		Long: `Send key input to a running tmux session for a task.
+
+The keys argument can be:
+  - Special keys: Tab, Escape, Enter
+  - Any text to be typed into the session
+
+Preconditions:
+  - Task must exist
+  - Session must be running
+
+Examples:
+  # Send Enter key to task #1
+  git crew send 1 Enter
+
+  # Send Tab key for completion
+  git crew send 1 Tab
+
+  # Send Escape key
+  git crew send 1 Escape
+
+  # Send text
+  git crew send 1 "hello world"`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Get keys from args
+			keys := args[1]
+
+			// Execute use case
+			uc := c.SendKeysUseCase()
+			_, err = uc.Execute(cmd.Context(), usecase.SendKeysInput{
+				TaskID: taskID,
+				Keys:   keys,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Sent keys to task #%d\n", taskID)
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // newMergeCommand creates the merge command for merging a task branch into main.
 func newMergeCommand(c *app.Container) *cobra.Command {
 	var opts struct {

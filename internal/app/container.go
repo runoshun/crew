@@ -172,6 +172,11 @@ func (c *Container) AttachSessionUseCase() *usecase.AttachSession {
 	return usecase.NewAttachSession(c.Tasks, c.Sessions)
 }
 
+// SendKeysUseCase returns a new SendKeys use case.
+func (c *Container) SendKeysUseCase() *usecase.SendKeys {
+	return usecase.NewSendKeys(c.Tasks, c.Sessions)
+}
+
 // SessionEndedUseCase returns a new SessionEnded use case.
 func (c *Container) SessionEndedUseCase() *usecase.SessionEnded {
 	return usecase.NewSessionEnded(c.Tasks, c.Config.CrewDir)
