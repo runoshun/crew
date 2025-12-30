@@ -181,7 +181,7 @@ var BuiltinWorkers = map[string]BuiltinWorker{
 		DefaultArgs:     "--model opus",
 	},
 	"opencode": {
-		CommandTemplate: "{{.Command}} {{.Args}} -p {{.Prompt}}",
+		CommandTemplate: "{{.Command}} {{.Args}} --prompt {{.Prompt}}",
 		Command:         "opencode",
 		SystemArgs:      "",
 		DefaultArgs:     "-m anthropic/claude-opus-4-5",

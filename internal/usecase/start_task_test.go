@@ -519,7 +519,8 @@ func TestStartTask_ScriptGeneration(t *testing.T) {
 	assert.Contains(t, script, "trap 'exit 143' TERM")
 	// Verify opencode command is rendered with args from builtin config
 	assert.Contains(t, script, "opencode")
-	assert.Contains(t, script, "-p \"$PROMPT\"") // opencode uses -p for prompt
+	assert.Contains(t, script, "--prompt")
+	assert.Contains(t, script, "\"$PROMPT\"")
 
 	// Verify script is executable (mode 0700)
 	info, err := os.Stat(domain.ScriptPath(crewDir, 1))
