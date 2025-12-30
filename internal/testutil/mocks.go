@@ -221,9 +221,16 @@ func (m *MockGit) CurrentBranch() (string, error) {
 	return m.CurrentBranchName, nil
 }
 
-// BranchExists is not implemented yet.
-func (m *MockGit) BranchExists(_ string) (bool, error) {
-	panic("not implemented")
+// BranchExists returns the configured value or error.
+func (m *MockGit) BranchExists(branch string) (bool, error) {
+	// Simple mock: assume true unless configured otherwise
+	return true, nil
+}
+
+// ListBranches returns the configured branches or error.
+func (m *MockGit) ListBranches() ([]string, error) {
+	// Return a default list or configured list
+	return []string{"main", "crew-1", "crew-2"}, nil
 }
 
 // HasUncommittedChanges returns the configured value or error.
@@ -248,9 +255,10 @@ func (m *MockGit) Merge(branch string, noFF bool) error {
 }
 
 // DeleteBranch records the call and returns configured error.
-func (m *MockGit) DeleteBranch(branch string) error {
+func (m *MockGit) DeleteBranch(branch string, force bool) error {
 	m.DeleteBranchCalled = true
 	m.DeletedBranch = branch
+	// force is ignored in mock for now, or we could add a field to verify it
 	return m.DeleteBranchErr
 }
 
@@ -382,9 +390,9 @@ func (m *MockWorktreeManager) Exists(_ string) (bool, error) {
 	return m.ExistsVal, nil
 }
 
-// List is not implemented yet.
+// List returns the configured worktrees or error.
 func (m *MockWorktreeManager) List() ([]domain.WorktreeInfo, error) {
-	panic("not implemented")
+	return []domain.WorktreeInfo{}, nil
 }
 
 // MockConfigLoader is a test double for domain.ConfigLoader.

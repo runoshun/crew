@@ -119,7 +119,7 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	}
 
 	// Delete the branch after merge
-	if err := uc.git.DeleteBranch(branch); err != nil {
+	if err := uc.git.DeleteBranch(branch, false); err != nil {
 		return nil, fmt.Errorf("delete branch: %w", err)
 	}
 

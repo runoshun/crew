@@ -54,9 +54,19 @@ func (c *Client) CurrentBranch() (string, error) {
 }
 
 // BranchExists checks if a branch exists.
-// TODO: implement in later phase
-func (c *Client) BranchExists(_ string) (bool, error) {
-	panic("not implemented")
+func (c *Client) BranchExists(branch string) (bool, error) {
+	//nolint:gosec // branch name is used as argument, not shell command
+	cmd := exec.Command("git", "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+	cmd.Dir = c.repoRoot
+	err := cmd.Run()
+	if err == nil {
+		return true, nil
+	}
+	// Exit code 1 means ref not found
+	if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, fmt.Errorf("failed to check branch existence: %w", err)
 }
 
 // HasUncommittedChanges checks for uncommitted changes in a directory.
@@ -98,14 +108,37 @@ func (c *Client) Merge(branch string, noFF bool) error {
 }
 
 // DeleteBranch deletes a branch.
-// Uses -d flag (safe delete, only if fully merged).
-func (c *Client) DeleteBranch(branch string) error {
-	cmd := exec.Command("git", "branch", "-d", branch)
+// If force is true, it uses -D (force delete), otherwise -d.
+func (c *Client) DeleteBranch(branch string, force bool) error {
+	flag := "-d"
+	if force {
+		flag = "-D"
+	}
+	cmd := exec.Command("git", "branch", flag, branch)
 	cmd.Dir = c.repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to delete branch %s: %w: %s", branch, err, string(out))
 	}
 	return nil
+}
+
+// ListBranches returns a list of all local branches.
+func (c *Client) ListBranches() ([]string, error) {
+	cmd := exec.Command("git", "branch", "--format=%(refname:short)")
+	cmd.Dir = c.repoRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list branches: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	var branches []string
+	for _, line := range lines {
+		if line != "" {
+			branches = append(branches, strings.TrimSpace(line))
+		}
+	}
+	return branches, nil
 }
 
 // Ensure Client implements domain.Git interface.

@@ -94,6 +94,9 @@ and isolated task execution.`,
 	mergeCmd := newMergeCommand(c)
 	mergeCmd.GroupID = groupSession
 
+	pruneCmd := newPruneCommand(c)
+	pruneCmd.GroupID = groupTask
+
 	// TUI command
 	tuiCmd := newTUICommand(c)
 	tuiCmd.GroupID = groupTask
@@ -121,6 +124,7 @@ and isolated task execution.`,
 		diffCmd,
 		completeCmd,
 		mergeCmd,
+		pruneCmd,
 		tuiCmd,
 		sessionEndedCmd,
 	)

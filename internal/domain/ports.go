@@ -116,7 +116,11 @@ type Git interface {
 	Merge(branch string, noFF bool) error
 
 	// DeleteBranch deletes a branch.
-	DeleteBranch(branch string) error
+	// If force is true, it uses -D (force delete), otherwise -d.
+	DeleteBranch(branch string, force bool) error
+
+	// ListBranches returns a list of all local branches.
+	ListBranches() ([]string, error)
 }
 
 // GitHub provides GitHub integration via gh CLI.

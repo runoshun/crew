@@ -217,3 +217,8 @@ func (c *Container) ShowDiffUseCase(stdout, stderr io.Writer) *usecase.ShowDiff 
 func (c *Container) StopTaskUseCase() *usecase.StopTask {
 	return usecase.NewStopTask(c.Tasks, c.Sessions, c.Config.CrewDir)
 }
+
+// PruneTasksUseCase returns a new PruneTasks use case.
+func (c *Container) PruneTasksUseCase() *usecase.PruneTasks {
+	return usecase.NewPruneTasks(c.Tasks, c.Worktrees, c.Git)
+}
