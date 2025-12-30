@@ -370,9 +370,35 @@ func (m *Model) handleInputDescMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleStartMode handles keys in agent picker mode.
 func (m *Model) handleStartMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle Tab to switch focus between list and custom input
+	if msg.Type == tea.KeyTab {
+		m.startFocusCustom = !m.startFocusCustom
+		if m.startFocusCustom {
+			m.customInput.Focus()
+		} else {
+			m.customInput.Blur()
+		}
+		return m, nil
+	}
+
+	// If custom input is focused, handle text input
+	if m.startFocusCustom {
+		return m.handleStartModeCustomInput(msg)
+	}
+
+	// Handle agent list navigation
+	return m.handleStartModeList(msg)
+}
+
+// handleStartModeList handles keys when agent list is focused.
+func (m *Model) handleStartModeList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	allAgents := m.allAgents()
+
 	switch {
 	case key.Matches(msg, m.keys.Escape):
 		m.mode = ModeNormal
+		m.customInput.Reset()
+		m.startFocusCustom = false
 		return m, nil
 
 	case key.Matches(msg, m.keys.Up):
@@ -382,7 +408,7 @@ func (m *Model) handleStartMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Down):
-		if m.agentCursor < len(m.agents)-1 {
+		if m.agentCursor < len(allAgents)-1 {
 			m.agentCursor++
 		}
 		return m, nil
@@ -393,12 +419,49 @@ func (m *Model) handleStartMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.mode = ModeNormal
 			return m, nil
 		}
-		agent := m.agents[m.agentCursor]
+		if len(allAgents) == 0 {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		agent := allAgents[m.agentCursor]
 		m.mode = ModeNormal
+		m.customInput.Reset()
+		m.startFocusCustom = false
 		return m, m.startTask(task.ID, agent)
 	}
 
 	return m, nil
+}
+
+// handleStartModeCustomInput handles keys when custom input is focused.
+func (m *Model) handleStartModeCustomInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		m.customInput.Reset()
+		m.startFocusCustom = false
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		task := m.SelectedTask()
+		if task == nil {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		customCmd := m.customInput.Value()
+		if customCmd == "" {
+			return m, nil
+		}
+		m.mode = ModeNormal
+		m.customInput.Reset()
+		m.startFocusCustom = false
+		return m, m.startTask(task.ID, customCmd)
+	}
+
+	// Forward to text input
+	var cmd tea.Cmd
+	m.customInput, cmd = m.customInput.Update(msg)
+	return m, cmd
 }
 
 // handleHelpMode handles keys in help mode.
