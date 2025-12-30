@@ -73,6 +73,9 @@ and isolated task execution.`,
 	startCmd := newStartCommand(c)
 	startCmd.GroupID = groupSession
 
+	stopCmd := newStopCommand(c)
+	stopCmd.GroupID = groupSession
+
 	attachCmd := newAttachCommand(c)
 	attachCmd.GroupID = groupSession
 
@@ -107,6 +110,7 @@ and isolated task execution.`,
 		commentCmd,
 		closeCmd,
 		startCmd,
+		stopCmd,
 		attachCmd,
 		sendCmd,
 		peekCmd,
