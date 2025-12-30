@@ -11,6 +11,32 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
 
+// statusOrder defines the display order of statuses (v1-style).
+var statusOrder = []domain.Status{
+	domain.StatusInProgress,
+	domain.StatusInReview,
+	domain.StatusError,
+	domain.StatusTodo,
+	domain.StatusDone,
+	domain.StatusClosed,
+}
+
+// listItem represents an item in the task list (task or group header).
+type listItem struct {
+	task     *domain.Task  // nil for group header
+	status   domain.Status // status for group header
+	count    int           // task count for group header
+	isHeader bool
+}
+
+// FilterValue implements list.Item interface.
+func (i listItem) FilterValue() string {
+	if i.isHeader {
+		return ""
+	}
+	return i.task.Title
+}
+
 // Model is the main bubbletea model for the TUI.
 type Model struct {
 	// Dependencies (pointers first for alignment)
@@ -21,6 +47,7 @@ type Model struct {
 	// State (slices - contain pointers)
 	tasks         []*domain.Task
 	filteredTasks []*domain.Task
+	groupedItems  []listItem        // Cached grouped items for display
 	builtinAgents []string          // Built-in agent names (claude, opencode, codex)
 	customAgents  []string          // Custom agent names from config
 	agentCommands map[string]string // Agent name -> command preview
@@ -39,7 +66,7 @@ type Model struct {
 	// Numeric state (smaller types last)
 	mode             Mode
 	confirmAction    ConfirmAction
-	cursor           int
+	cursor           int // Index into groupedItems (task items only)
 	width            int
 	height           int
 	confirmTaskID    int
@@ -119,11 +146,74 @@ func (m *Model) loadConfig() tea.Cmd {
 
 // SelectedTask returns the currently selected task, or nil if none.
 func (m *Model) SelectedTask() *domain.Task {
-	tasks := m.visibleTasks()
-	if len(tasks) == 0 || m.cursor < 0 || m.cursor >= len(tasks) {
+	// cursor is the index into task items (excluding headers) in groupedItems
+	items := m.groupedItems
+	if len(items) == 0 {
 		return nil
 	}
-	return tasks[m.cursor]
+
+	taskIdx := 0
+	for _, item := range items {
+		if item.isHeader {
+			continue
+		}
+		if taskIdx == m.cursor {
+			return item.task
+		}
+		taskIdx++
+	}
+	return nil
+}
+
+// taskCount returns the number of task items in groupedItems.
+func (m *Model) taskCount() int {
+	count := 0
+	for _, item := range m.groupedItems {
+		if !item.isHeader {
+			count++
+		}
+	}
+	return count
+}
+
+// rebuildGroupedItems rebuilds the cached grouped items.
+func (m *Model) rebuildGroupedItems() {
+	tasks := m.visibleTasks()
+	if len(tasks) == 0 {
+		m.groupedItems = nil
+		return
+	}
+
+	// Group tasks by status
+	grouped := make(map[domain.Status][]*domain.Task)
+	for _, task := range tasks {
+		grouped[task.Status] = append(grouped[task.Status], task)
+	}
+
+	// Build items in status order
+	items := make([]listItem, 0, len(statusOrder)+len(tasks))
+	for _, status := range statusOrder {
+		tasksForStatus := grouped[status]
+		if len(tasksForStatus) == 0 {
+			continue
+		}
+
+		// Add group header
+		items = append(items, listItem{
+			isHeader: true,
+			status:   status,
+			count:    len(tasksForStatus),
+		})
+
+		// Add tasks
+		for _, task := range tasksForStatus {
+			items = append(items, listItem{
+				task: task,
+			})
+		}
+	}
+
+	m.groupedItems = items
 }
 
 // visibleTasks returns the tasks that should be displayed.

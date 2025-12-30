@@ -5,14 +5,22 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
-// Colors defines the color palette for the TUI.
+// Colors defines the color palette for the TUI (v1-style Hex colors).
 var Colors = struct {
-	Primary   lipgloss.Color
-	Secondary lipgloss.Color
-	Muted     lipgloss.Color
-	Error     lipgloss.Color
-	Success   lipgloss.Color
-	Warning   lipgloss.Color
+	// Base colors
+	Primary    lipgloss.Color
+	Secondary  lipgloss.Color
+	Muted      lipgloss.Color
+	Error      lipgloss.Color
+	Success    lipgloss.Color
+	Warning    lipgloss.Color
+	Background lipgloss.Color
+
+	// Title/text colors
+	TitleNormal   lipgloss.Color
+	TitleSelected lipgloss.Color
+	DescNormal    lipgloss.Color
+	DescSelected  lipgloss.Color
 
 	// Status colors
 	Todo        lipgloss.Color
@@ -21,21 +29,35 @@ var Colors = struct {
 	StatusError lipgloss.Color
 	Done        lipgloss.Color
 	Closed      lipgloss.Color
-}{
-	Primary:   lipgloss.Color("12"), // Blue
-	Secondary: lipgloss.Color("5"),  // Purple
-	Muted:     lipgloss.Color("8"),  // Gray
-	Error:     lipgloss.Color("9"),  // Red
-	Success:   lipgloss.Color("10"), // Green
-	Warning:   lipgloss.Color("11"), // Yellow
 
-	// Status colors matching spec
-	Todo:        lipgloss.Color("12"), // Blue
-	InProgress:  lipgloss.Color("11"), // Yellow
-	InReview:    lipgloss.Color("5"),  // Purple
-	StatusError: lipgloss.Color("9"),  // Red
-	Done:        lipgloss.Color("10"), // Green
-	Closed:      lipgloss.Color("8"),  // Gray
+	// Group header
+	GroupLine lipgloss.Color
+}{
+	// v1-style Hex color palette
+	Primary:    lipgloss.Color("#6C5CE7"), // Purple
+	Secondary:  lipgloss.Color("#A29BFE"), // Lavender
+	Muted:      lipgloss.Color("#636E72"), // Gray
+	Error:      lipgloss.Color("#D63031"), // Red
+	Success:    lipgloss.Color("#00B894"), // Green
+	Warning:    lipgloss.Color("#FDCB6E"), // Yellow
+	Background: lipgloss.Color("#2D3436"), // Dark gray
+
+	// v1-style title colors
+	TitleNormal:   lipgloss.Color("#DFE6E9"), // Light gray
+	TitleSelected: lipgloss.Color("#FFEAA7"), // Yellow (selected)
+	DescNormal:    lipgloss.Color("#636E72"), // Gray
+	DescSelected:  lipgloss.Color("#B2BEC3"), // Light gray
+
+	// v1-style status colors
+	Todo:        lipgloss.Color("#74B9FF"), // Light blue
+	InProgress:  lipgloss.Color("#FDCB6E"), // Yellow
+	InReview:    lipgloss.Color("#A29BFE"), // Lavender
+	StatusError: lipgloss.Color("#D63031"), // Red
+	Done:        lipgloss.Color("#00B894"), // Green
+	Closed:      lipgloss.Color("#636E72"), // Gray
+
+	// Group header line color
+	GroupLine: lipgloss.Color("#636E72"),
 }
 
 // Styles contains all the lipgloss styles for the TUI.
@@ -50,15 +72,22 @@ type Styles struct {
 	// Task list
 	TaskList          lipgloss.Style
 	TaskItem          lipgloss.Style
+	TaskNormal        lipgloss.Style
 	TaskSelected      lipgloss.Style
 	TaskID            lipgloss.Style
 	TaskIDSelected    lipgloss.Style
 	TaskTitle         lipgloss.Style
 	TaskTitleSelected lipgloss.Style
+	TaskDesc          lipgloss.Style
+	TaskDescSelected  lipgloss.Style
 	TaskAgent         lipgloss.Style
 	TaskAgentSelected lipgloss.Style
 	CursorNormal      lipgloss.Style
 	CursorSelected    lipgloss.Style
+
+	// Group header
+	GroupHeaderLine  lipgloss.Style
+	GroupHeaderLabel lipgloss.Style
 
 	// Status badges (normal)
 	StatusTodo       lipgloss.Style
@@ -84,6 +113,10 @@ type Styles struct {
 	// Footer
 	Footer    lipgloss.Style
 	FooterKey lipgloss.Style
+
+	// Pagination
+	PaginationDot       lipgloss.Style
+	PaginationDotActive lipgloss.Style
 
 	// Dialog
 	Dialog       lipgloss.Style
@@ -124,94 +157,99 @@ func DefaultStyles() Styles {
 		TaskItem: lipgloss.NewStyle().
 			PaddingLeft(2),
 
+		TaskNormal: lipgloss.NewStyle().
+			Foreground(Colors.TitleNormal),
+
 		TaskSelected: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.Primary),
+			Foreground(Colors.TitleSelected),
 
 		TaskID: lipgloss.NewStyle().
 			Foreground(Colors.Muted).
 			Width(5),
 
 		TaskIDSelected: lipgloss.NewStyle().
-			Foreground(Colors.Primary).
+			Foreground(Colors.TitleSelected).
 			Bold(true).
 			Width(5),
 
-		TaskTitle: lipgloss.NewStyle(),
+		TaskTitle: lipgloss.NewStyle().
+			Foreground(Colors.TitleNormal),
 
 		TaskTitleSelected: lipgloss.NewStyle().
-			Foreground(Colors.Primary).
+			Foreground(Colors.TitleSelected).
 			Bold(true),
+
+		TaskDesc: lipgloss.NewStyle().
+			Foreground(Colors.DescNormal),
+
+		TaskDescSelected: lipgloss.NewStyle().
+			Foreground(Colors.DescSelected),
 
 		TaskAgent: lipgloss.NewStyle().
 			Foreground(Colors.Secondary).
 			Italic(true),
 
 		TaskAgentSelected: lipgloss.NewStyle().
-			Foreground(Colors.Primary).
+			Foreground(Colors.TitleSelected).
 			Italic(true),
 
 		CursorNormal: lipgloss.NewStyle().
 			Foreground(Colors.Muted),
 
 		CursorSelected: lipgloss.NewStyle().
-			Foreground(Colors.Primary).
+			Foreground(Colors.TitleSelected).
 			Bold(true),
 
+		// Group header styles (v1-style)
+		GroupHeaderLine: lipgloss.NewStyle().
+			Foreground(Colors.GroupLine),
+
+		GroupHeaderLabel: lipgloss.NewStyle().
+			Foreground(Colors.Muted),
+
 		StatusTodo: lipgloss.NewStyle().
-			Foreground(Colors.Todo).
-			Width(12),
+			Foreground(Colors.Todo),
 
 		StatusInProgress: lipgloss.NewStyle().
-			Foreground(Colors.InProgress).
-			Width(12),
+			Foreground(Colors.InProgress),
 
 		StatusInReview: lipgloss.NewStyle().
-			Foreground(Colors.InReview).
-			Width(12),
+			Foreground(Colors.InReview),
 
 		StatusError: lipgloss.NewStyle().
-			Foreground(Colors.StatusError).
-			Width(12),
+			Foreground(Colors.StatusError),
 
 		StatusDone: lipgloss.NewStyle().
-			Foreground(Colors.Done).
-			Width(12),
+			Foreground(Colors.Done),
 
 		StatusClosed: lipgloss.NewStyle().
-			Foreground(Colors.Closed).
-			Width(12),
+			Foreground(Colors.Closed),
 
 		// Selected status badges (brighter/bold)
 		StatusTodoSelected: lipgloss.NewStyle().
 			Foreground(Colors.Todo).
-			Bold(true).
-			Width(12),
+			Bold(true),
 
 		StatusInProgressSelected: lipgloss.NewStyle().
 			Foreground(Colors.InProgress).
-			Bold(true).
-			Width(12),
+			Bold(true),
 
 		StatusInReviewSelected: lipgloss.NewStyle().
 			Foreground(Colors.InReview).
-			Bold(true).
-			Width(12),
+			Bold(true),
 
 		StatusErrorSelected: lipgloss.NewStyle().
 			Foreground(Colors.StatusError).
-			Bold(true).
-			Width(12),
+			Bold(true),
 
 		StatusDoneSelected: lipgloss.NewStyle().
 			Foreground(Colors.Done).
-			Bold(true).
-			Width(12),
+			Bold(true),
 
 		StatusClosedSelected: lipgloss.NewStyle().
 			Foreground(Colors.Closed).
-			Bold(true).
-			Width(12),
+			Bold(true),
 
 		Help: lipgloss.NewStyle().
 			Padding(1, 2).
@@ -232,14 +270,22 @@ func DefaultStyles() Styles {
 			Foreground(Colors.Primary).
 			Bold(true),
 
+		// Pagination dots (v1-style)
+		PaginationDot: lipgloss.NewStyle().
+			Foreground(Colors.Muted),
+
+		PaginationDotActive: lipgloss.NewStyle().
+			Foreground(Colors.TitleSelected).
+			Bold(true),
+
 		Dialog: lipgloss.NewStyle().
 			Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(Colors.Warning),
+			BorderForeground(Colors.Primary),
 
 		DialogTitle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.Warning),
+			Foreground(Colors.Primary),
 
 		DialogPrompt: lipgloss.NewStyle(),
 

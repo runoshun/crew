@@ -49,8 +49,14 @@ func (m *Model) viewMain() string {
 		b.WriteString(m.styles.Footer.Render("Filtered: "+m.filterInput.Value()) + "\n\n")
 	}
 
-	// Task list
+	// Task list (v1-style grouped)
 	b.WriteString(m.viewTaskList())
+
+	// Pagination info
+	if paginationInfo := m.viewPagination(); paginationInfo != "" {
+		b.WriteString("\n")
+		b.WriteString(paginationInfo)
+	}
 
 	// Dialogs/overlays
 	switch m.mode {
@@ -84,68 +90,232 @@ func (m *Model) viewHeader() string {
 	return m.styles.Header.Render(title + m.styles.Footer.Render(taskCount))
 }
 
-// viewTaskList renders the task list.
+// viewTaskList renders the grouped task list (v1-style).
 func (m *Model) viewTaskList() string {
-	tasks := m.visibleTasks()
-	if len(tasks) == 0 {
+	if len(m.groupedItems) == 0 {
 		return m.styles.Footer.Render("No tasks. Press 'n' to create one.")
 	}
 
+	// Calculate visible range for pagination
+	listHeight := m.listHeight()
+	startIdx, endIdx := m.visibleRange(m.groupedItems, listHeight)
+
+	// Count task index before startIdx
+	taskIdxOffset := 0
+	for i := 0; i < startIdx; i++ {
+		if !m.groupedItems[i].isHeader {
+			taskIdxOffset++
+		}
+	}
+
 	var b strings.Builder
-	for i, task := range tasks {
-		b.WriteString(m.renderTaskItem(task, i == m.cursor))
-		b.WriteString("\n")
+	taskIdx := taskIdxOffset // Track task index for selection
+	for i := startIdx; i < endIdx; i++ {
+		item := m.groupedItems[i]
+
+		if item.isHeader {
+			// Add blank line before header (except at the very start)
+			if b.Len() > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString(m.renderGroupHeader(item.status, item.count))
+			b.WriteString("\n\n") // blank lines after header
+		} else {
+			selected := taskIdx == m.cursor
+			// Render cursor + task item with proper indentation
+			line := m.renderTaskItem(item.task, selected)
+			cursor := "    "
+			if selected {
+				cursor = "  > "
+			}
+			b.WriteString(fmt.Sprintf("%s%s\n\n", cursor, line))
+			taskIdx++
+		}
 	}
 
 	return m.styles.TaskList.Render(b.String())
 }
 
-// renderTaskItem renders a single task item.
+// listHeight returns the available height for the list.
+func (m *Model) listHeight() int {
+	// Reserve space for header, footer, padding, etc.
+	reserved := 8 // header + footer + margins
+	if m.err != nil {
+		reserved += 2
+	}
+	if m.mode == ModeFilter || m.filterInput.Value() != "" {
+		reserved += 2
+	}
+
+	height := m.height - reserved
+	if height < 5 {
+		height = 5
+	}
+	return height
+}
+
+// visibleRange calculates the start and end indices for visible items.
+func (m *Model) visibleRange(items []listItem, listHeight int) (int, int) {
+	if len(items) == 0 {
+		return 0, 0
+	}
+
+	// Find the current cursor position in items
+	cursorItemIdx := m.findCursorItemIndex(items)
+
+	// Calculate actual line count (headers take 3 lines: blank + header + blank, tasks take 2: task + blank)
+	calcLines := func(start, end int) int {
+		lines := 0
+		for i := start; i < end && i < len(items); i++ {
+			if items[i].isHeader {
+				lines += 3 // blank before + header + blank after
+			} else {
+				lines += 2 // task + blank after
+			}
+		}
+		return lines
+	}
+
+	// Check if all items fit
+	totalLines := calcLines(0, len(items))
+	if totalLines <= listHeight {
+		return 0, len(items)
+	}
+
+	// Need to scroll - center the cursor in the visible window
+	// Start from the beginning and find a window that includes the cursor
+	startIdx := 0
+	endIdx := 0
+
+	// Find the starting position that includes the cursor
+	// We want the cursor to be visible, preferably with some context before it
+	for endIdx < len(items) {
+		linesUsed := calcLines(startIdx, endIdx+1)
+		if linesUsed <= listHeight {
+			endIdx++
+		} else {
+			// Can't fit more, check if cursor is visible
+			if endIdx > cursorItemIdx {
+				break // cursor is visible
+			}
+			// Need to scroll - move start forward
+			startIdx++
+			endIdx++
+		}
+	}
+
+	// Ensure cursor is in the visible range
+	if cursorItemIdx < startIdx {
+		startIdx = cursorItemIdx
+		// Recalculate endIdx
+		endIdx = startIdx
+		for endIdx < len(items) && calcLines(startIdx, endIdx+1) <= listHeight {
+			endIdx++
+		}
+	} else if cursorItemIdx >= endIdx {
+		endIdx = cursorItemIdx + 1
+		// Recalculate startIdx
+		for startIdx < cursorItemIdx && calcLines(startIdx, endIdx) > listHeight {
+			startIdx++
+		}
+	}
+
+	return startIdx, endIdx
+}
+
+// findCursorItemIndex finds the index in items that corresponds to the current cursor.
+func (m *Model) findCursorItemIndex(items []listItem) int {
+	taskIdx := 0
+	for i, item := range items {
+		if item.isHeader {
+			continue
+		}
+		if taskIdx == m.cursor {
+			return i
+		}
+		taskIdx++
+	}
+	return 0
+}
+
+// renderGroupHeader renders a group header (v1-style).
+func (m *Model) renderGroupHeader(status domain.Status, count int) string {
+	// Format: "──────── in_progress (3) ────────"
+	label := fmt.Sprintf(" %s %s (%d) ", StatusIcon(status), status, count)
+
+	// Calculate line widths
+	contentWidth := m.width - 4 // padding
+	if contentWidth < 40 {
+		contentWidth = 40
+	}
+
+	labelLen := len(label)
+	lineLen := (contentWidth - labelLen) / 2
+	if lineLen < 2 {
+		lineLen = 2
+	}
+
+	leftLine := strings.Repeat("─", lineLen)
+	rightLine := strings.Repeat("─", lineLen)
+
+	// Apply status color to the label
+	statusStyle := m.styles.StatusStyle(status)
+	styledLabel := statusStyle.Render(label)
+
+	return m.styles.GroupHeaderLine.Render(leftLine) + styledLabel + m.styles.GroupHeaderLine.Render(rightLine)
+}
+
+// viewPagination renders pagination info if needed.
+func (m *Model) viewPagination() string {
+	items := m.groupedItems
+	if len(items) == 0 {
+		return ""
+	}
+
+	listHeight := m.listHeight()
+	startIdx, endIdx := m.visibleRange(items, listHeight)
+
+	// Count total tasks (not headers)
+	totalTasks := 0
+	for _, item := range items {
+		if !item.isHeader {
+			totalTasks++
+		}
+	}
+
+	// Count visible tasks
+	visibleTasks := 0
+	for i := startIdx; i < endIdx; i++ {
+		if !items[i].isHeader {
+			visibleTasks++
+		}
+	}
+
+	if visibleTasks >= totalTasks {
+		return "" // All visible, no pagination needed
+	}
+
+	// Show pagination hint
+	return m.styles.Footer.Render(fmt.Sprintf("Showing %d of %d tasks (↑↓ to scroll)", visibleTasks, totalTasks))
+}
+
+// renderTaskItem renders a single task item (v1-style single line).
+// Format: "#1 [status] - title" (cursor is added separately in viewNormalList)
 func (m *Model) renderTaskItem(task *domain.Task, selected bool) string {
-	// Cursor indicator (always same width, different style when selected)
-	var cursor string
+	// Format: "#1 [status] - title" with colored status
+	var idPart, statusPart, titlePart string
+
 	if selected {
-		cursor = m.styles.CursorSelected.Render(">")
+		idPart = m.styles.TaskSelected.Render(fmt.Sprintf("#%d", task.ID))
+		statusPart = m.styles.StatusStyleSelected(task.Status).Render(fmt.Sprintf("[%s]", task.Status))
+		titlePart = m.styles.TaskSelected.Render(fmt.Sprintf("- %s", task.Title))
 	} else {
-		cursor = m.styles.CursorNormal.Render(" ")
+		idPart = m.styles.TaskNormal.Render(fmt.Sprintf("#%d", task.ID))
+		statusPart = m.styles.StatusStyle(task.Status).Render(fmt.Sprintf("[%s]", task.Status))
+		titlePart = m.styles.TaskNormal.Render(fmt.Sprintf("- %s", task.Title))
 	}
 
-	// Task ID
-	id := fmt.Sprintf("#%-3d", task.ID)
-
-	// Status with icon
-	statusText := fmt.Sprintf("[%s %s]", StatusIcon(task.Status), task.Status)
-
-	// Agent (if running)
-	agent := ""
-	if task.Agent != "" {
-		agent = " @" + task.Agent
-	}
-
-	// Title
-	title := task.Title
-
-	// Apply styles based on selection
-	if selected {
-		id = m.styles.TaskIDSelected.Render(id)
-		statusStyle := m.styles.StatusStyleSelected(task.Status)
-		statusText = statusStyle.Render(statusText)
-		title = m.styles.TaskTitleSelected.Render(title)
-		if agent != "" {
-			agent = m.styles.TaskAgentSelected.Render(agent)
-		}
-	} else {
-		id = m.styles.TaskID.Render(id)
-		statusStyle := m.styles.StatusStyle(task.Status)
-		statusText = statusStyle.Render(statusText)
-		title = m.styles.TaskTitle.Render(title)
-		if agent != "" {
-			agent = m.styles.TaskAgent.Render(agent)
-		}
-	}
-
-	// Assemble (no indentation shift)
-	return fmt.Sprintf("%s %s %s %s%s", cursor, id, statusText, title, agent)
+	return fmt.Sprintf("%s %s %s", idPart, statusPart, titlePart)
 }
 
 // viewConfirmDialog renders the confirmation dialog.

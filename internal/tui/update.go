@@ -23,8 +23,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgTasksLoaded:
 		m.tasks = msg.Tasks
 		m.applyFilter()
-		if m.cursor >= len(m.visibleTasks()) {
-			m.cursor = max(0, len(m.visibleTasks())-1)
+		m.rebuildGroupedItems()
+		if m.cursor >= m.taskCount() {
+			m.cursor = max(0, m.taskCount()-1)
 		}
 		return m, nil
 
@@ -124,8 +125,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Down):
-		tasks := m.visibleTasks()
-		if m.cursor < len(tasks)-1 {
+		if m.cursor < m.taskCount()-1 {
 			m.cursor++
 		}
 		return m, nil
@@ -276,6 +276,7 @@ func (m *Model) handleFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.filterInput, cmd = m.filterInput.Update(msg)
 	m.applyFilter()
+	m.rebuildGroupedItems()
 	m.cursor = 0
 	return m, cmd
 }
