@@ -1,0 +1,96 @@
+package tui
+
+import "github.com/runoshun/git-crew/v2/internal/domain"
+
+// Msg is the sealed interface for all TUI messages.
+// All message types must implement the sealed() method.
+//
+// go-sumtype:decl Msg
+type Msg interface {
+	sealed()
+}
+
+// MsgTasksLoaded is sent when tasks are loaded from the repository.
+type MsgTasksLoaded struct {
+	Tasks []*domain.Task
+}
+
+func (MsgTasksLoaded) sealed() {}
+
+// MsgTaskStarted is sent when a task session is started.
+type MsgTaskStarted struct {
+	SessionName string
+	TaskID      int
+}
+
+func (MsgTaskStarted) sealed() {}
+
+// MsgTaskStopped is sent when a task session is stopped.
+type MsgTaskStopped struct {
+	TaskID int
+}
+
+func (MsgTaskStopped) sealed() {}
+
+// MsgTaskCreated is sent when a new task is created.
+type MsgTaskCreated struct {
+	TaskID int
+}
+
+func (MsgTaskCreated) sealed() {}
+
+// MsgTaskDeleted is sent when a task is deleted.
+type MsgTaskDeleted struct {
+	TaskID int
+}
+
+func (MsgTaskDeleted) sealed() {}
+
+// MsgTaskClosed is sent when a task is closed.
+type MsgTaskClosed struct {
+	TaskID int
+}
+
+func (MsgTaskClosed) sealed() {}
+
+// MsgTaskMerged is sent when a task is merged.
+type MsgTaskMerged struct {
+	TaskID int
+}
+
+func (MsgTaskMerged) sealed() {}
+
+// MsgTaskCopied is sent when a task is copied.
+type MsgTaskCopied struct {
+	OriginalID int
+	NewID      int
+}
+
+func (MsgTaskCopied) sealed() {}
+
+// MsgError is sent when an error occurs.
+type MsgError struct {
+	Err error
+}
+
+func (MsgError) sealed() {}
+
+// MsgClearError is sent to clear the current error message.
+type MsgClearError struct{}
+
+func (MsgClearError) sealed() {}
+
+// MsgConfigLoaded is sent when configuration is loaded.
+type MsgConfigLoaded struct {
+	Config *domain.Config
+}
+
+func (MsgConfigLoaded) sealed() {}
+
+// MsgAttachSession is sent to trigger session attachment.
+// This is handled specially to suspend the TUI.
+type MsgAttachSession struct {
+	TaskID int
+}
+
+func (MsgAttachSession) sealed() {}
