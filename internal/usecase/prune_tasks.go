@@ -103,12 +103,6 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 
 		// Otherwise, it's a target
 		out.DeletedBranches = append(out.DeletedBranches, branch)
-		if !in.DryRun {
-			// Force delete branch
-			if deleteErr := uc.git.DeleteBranch(branch, true); deleteErr != nil {
-				return nil, fmt.Errorf("delete branch %s: %w", branch, deleteErr)
-			}
-		}
 	}
 
 	// 3. Identify orphan worktrees
@@ -126,16 +120,6 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 		// Check if this worktree is associated with a crew branch we are deleting
 		if uc.contains(out.DeletedBranches, wt.Branch) {
 			out.DeletedWorktrees = append(out.DeletedWorktrees, wt.Path)
-			if !in.DryRun {
-				if err := uc.worktrees.Remove(wt.Branch); err != nil {
-					// Ignore "not found" errors for worktrees as they might have been cleaned up with the branch
-					// But usually worktree remove cleans up the branch reference too?
-					// git worktree remove <path>
-					// Our interface takes branch... let's check implementation
-					// Implementation resolves path from branch.
-					return nil, fmt.Errorf("remove worktree for %s: %w", wt.Branch, err)
-				}
-			}
 			continue
 		}
 
@@ -166,13 +150,46 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 			// Let's safe-guard: if we didn't mark branch for deletion but task is gone/deleted, prune worktree.
 			if !uc.contains(out.DeletedBranches, wt.Branch) {
 				out.DeletedWorktrees = append(out.DeletedWorktrees, wt.Path)
-				if !in.DryRun {
-					if err := uc.worktrees.Remove(wt.Branch); err != nil {
-						return nil, fmt.Errorf("remove worktree for %s: %w", wt.Branch, err)
-					}
+			}
+		}
+	}
+
+	// 4. Perform deletions (if not dry run)
+	// Order is important: Worktrees -> Branches -> Tasks
+	if !in.DryRun {
+		// 4.1 Delete Worktrees first (to free up branches)
+		for _, path := range out.DeletedWorktrees {
+			// Find the branch for this path to call Remove(branch)
+			var branchToRemove string
+			for _, wt := range worktrees {
+				if wt.Path == path {
+					branchToRemove = wt.Branch
+					break
+				}
+			}
+
+			if branchToRemove != "" {
+				if err := uc.worktrees.Remove(branchToRemove); err != nil {
+					// Log error but continue? Or return partial error?
+					// For CLI tools, usually failing fast or logging is good.
+					// Let's return error for now to be safe.
+					return nil, fmt.Errorf("remove worktree %s: %w", path, err)
 				}
 			}
 		}
+
+		// 4.2 Delete Branches
+		for _, branch := range out.DeletedBranches {
+			if err := uc.git.DeleteBranch(branch, true); err != nil {
+				return nil, fmt.Errorf("delete branch %s: %w", branch, err)
+			}
+		}
+
+		// 4.3 Delete Tasks (from DB)
+		// We already did this in the loop above (step 1), which is fine as it doesn't block git operations.
+		// Wait, looking at step 1 in original code:
+		// if !in.DryRun { uc.tasks.Delete(...) }
+		// This is fine. Task DB deletion is independent of Git.
 	}
 
 	return out, nil
