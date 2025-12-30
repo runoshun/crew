@@ -2,9 +2,11 @@ package tmux
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -148,6 +150,60 @@ func TestClient_Stop_NotRunning(t *testing.T) {
 	// Stop non-existent session - should not error
 	err := client.Stop("non-existent")
 	assert.NoError(t, err)
+}
+
+func TestClient_Stop_KillsChildProcesses(t *testing.T) {
+	socketPath, crewDir, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	client := NewClient(socketPath, crewDir)
+	sessionName := "test-session"
+
+	// Create a PID file that the child process will write to
+	pidFile := filepath.Join(crewDir, "child.pid")
+
+	// Start session with a command that spawns a child process
+	// The child process writes its PID to a file and then sleeps
+	command := fmt.Sprintf(`bash -c 'echo $$ > %s; sleep 60'`, pidFile)
+
+	err := client.Start(context.Background(), domain.StartSessionOptions{
+		Name:    sessionName,
+		Dir:     crewDir,
+		Command: command,
+		TaskID:  1,
+	})
+	require.NoError(t, err)
+
+	// Wait for the child process to start and write its PID
+	var childPID string
+	require.Eventually(t, func() bool {
+		data, readErr := os.ReadFile(pidFile)
+		if readErr != nil {
+			return false
+		}
+		childPID = strings.TrimSpace(string(data))
+		return childPID != ""
+	}, 2*time.Second, 50*time.Millisecond, "child process should write its PID")
+
+	// Verify the child process is running
+	checkCmd := exec.Command("kill", "-0", childPID)
+	require.NoError(t, checkCmd.Run(), "child process should be running before stop")
+
+	// Stop session - this should kill child processes first
+	err = client.Stop(sessionName)
+	require.NoError(t, err)
+
+	// Verify session is stopped
+	running, err := client.IsRunning(sessionName)
+	require.NoError(t, err)
+	assert.False(t, running)
+
+	// Verify the child process is no longer running
+	// kill -0 returns error if process doesn't exist
+	assert.Eventually(t, func() bool {
+		checkCmd := exec.Command("kill", "-0", childPID)
+		return checkCmd.Run() != nil
+	}, 2*time.Second, 50*time.Millisecond, "child process should be terminated after stop")
 }
 
 func TestClient_Peek(t *testing.T) {

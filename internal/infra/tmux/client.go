@@ -86,6 +86,9 @@ func (c *Client) Start(ctx context.Context, opts domain.StartSessionOptions) err
 }
 
 // Stop terminates a tmux session.
+// It first kills all processes running in the session's panes, then kills the session itself.
+// This ensures that child processes (like AI agents) are properly terminated
+// and don't become orphaned when the session is closed.
 func (c *Client) Stop(sessionName string) error {
 	// Check if session exists
 	running, err := c.IsRunning(sessionName)
@@ -96,11 +99,46 @@ func (c *Client) Stop(sessionName string) error {
 		return nil // Session already stopped, nothing to do
 	}
 
+	// Get all pane PIDs in the session
+	// tmux -S <socket> list-panes -t <name> -F '#{pane_pid}'
+	// Session names follow our naming convention (crew-N) and are safe to pass to tmux.
+	listCmd := exec.Command("tmux", //nolint:gosec // sessionName follows crew-N naming convention
+		"-S", c.socketPath,
+		"list-panes",
+		"-t", sessionName,
+		"-F", "#{pane_pid}",
+	)
+	out, err := listCmd.Output()
+	if err == nil && len(out) > 0 {
+		// Kill child processes of each pane
+		// We use SIGTERM to allow graceful shutdown
+		pids := strings.Split(strings.TrimSpace(string(out)), "\n")
+		for _, pid := range pids {
+			if pid == "" {
+				continue
+			}
+			// pkill -TERM -P <pid> sends SIGTERM to all child processes
+			// We ignore errors here because:
+			// - The process might have already exited
+			// - There might be no child processes
+			killCmd := exec.Command("pkill", "-TERM", "-P", pid)
+			_ = killCmd.Run()
+		}
+	}
+	// If list-panes fails, we still try to kill the session
+
 	// tmux -S <socket> kill-session -t <name>
 	// Session names follow our naming convention (crew-N) and are safe to pass to tmux.
 	cmd := exec.Command("tmux", "-S", c.socketPath, "kill-session", "-t", sessionName) //nolint:gosec // sessionName follows crew-N naming convention
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("stop session: %w: %s", err, string(out))
+		// Check if the session still exists - if it's already gone, that's fine
+		// (child process termination may have caused the session to exit)
+		stillRunning, checkErr := c.IsRunning(sessionName)
+		if checkErr != nil || stillRunning {
+			// Session still running or check failed - report the original error
+			return fmt.Errorf("stop session: %w: %s", err, string(out))
+		}
+		// Session no longer exists, which is what we wanted
 	}
 
 	return nil
