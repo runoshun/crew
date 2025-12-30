@@ -208,25 +208,84 @@ func (m *Model) viewAgentPicker() string {
 	}
 
 	title := m.styles.DialogTitle.Render(fmt.Sprintf("Start Task #%d", task.ID))
+	selectLabel := m.styles.InputPrompt.Render("Select agent:")
 
 	var agentList strings.Builder
-	for i, agent := range m.agents {
-		cursor := "  "
-		if i == m.agentCursor {
-			cursor = "> "
-		}
+	allAgents := m.allAgents()
+	cursor := 0
 
-		line := fmt.Sprintf("%s%s", cursor, agent)
-		if i == m.agentCursor {
-			line = m.styles.TaskSelected.Render(line)
-		}
-		agentList.WriteString(line + "\n")
+	// Render built-in agents
+	for i, agent := range m.builtinAgents {
+		agentList.WriteString(m.renderAgentRow(agent, cursor == m.agentCursor && !m.startFocusCustom))
+		agentList.WriteString("\n")
+		cursor++
+		_ = i // suppress unused variable warning
 	}
 
-	hint := m.styles.Footer.Render("[↑/↓] select  [enter] start  [esc] cancel")
+	// Separator between built-in and custom agents
+	if len(m.customAgents) > 0 {
+		separator := m.styles.Footer.Render("────────────────────────")
+		agentList.WriteString(separator + "\n")
 
-	content := lipgloss.JoinVertical(lipgloss.Left, title, "", agentList.String(), hint)
+		// Render custom agents
+		for _, agent := range m.customAgents {
+			agentList.WriteString(m.renderAgentRow(agent, cursor == m.agentCursor && !m.startFocusCustom))
+			agentList.WriteString("\n")
+			cursor++
+		}
+	}
+
+	// Custom command input
+	customLabel := m.styles.Footer.Render("Or type custom command:")
+	customInputView := m.customInput.View()
+	if m.startFocusCustom {
+		customLabel = m.styles.InputPrompt.Render("Or type custom command:")
+	}
+
+	// Hint based on focus
+	var hint string
+	if m.startFocusCustom {
+		hint = m.styles.Footer.Render("[tab] agent list  [enter] start  [esc] cancel")
+	} else {
+		hint = m.styles.Footer.Render("[↑/↓] select  [tab] custom  [enter] start  [esc] cancel")
+	}
+
+	_ = allAgents // suppress unused variable warning
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		"",
+		selectLabel,
+		agentList.String(),
+		customLabel,
+		customInputView,
+		"",
+		hint,
+	)
 	return m.styles.Dialog.Render(content)
+}
+
+// renderAgentRow renders a single agent row with cursor and command preview.
+func (m *Model) renderAgentRow(agent string, selected bool) string {
+	cursorStr := "  "
+	if selected {
+		cursorStr = "> "
+	}
+
+	// Get command preview
+	cmdPreview := m.agentCommands[agent]
+	if cmdPreview == "" {
+		cmdPreview = agent
+	}
+
+	// Format: "  agent_name    command_preview"
+	name := fmt.Sprintf("%-12s", agent)
+	preview := m.styles.Footer.Render(cmdPreview)
+
+	if selected {
+		return m.styles.TaskSelected.Render(cursorStr+name) + "  " + preview
+	}
+	return cursorStr + name + "  " + preview
 }
 
 // viewFooter renders the footer with key hints.

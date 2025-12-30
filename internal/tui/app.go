@@ -21,7 +21,9 @@ type Model struct {
 	// State (slices - contain pointers)
 	tasks         []*domain.Task
 	filteredTasks []*domain.Task
-	agents        []string
+	builtinAgents []string          // Built-in agent names (claude, opencode, codex)
+	customAgents  []string          // Custom agent names from config
+	agentCommands map[string]string // Agent name -> command preview
 
 	// Components (structs with pointers)
 	keys   KeyMap
@@ -32,15 +34,17 @@ type Model struct {
 	titleInput  textinput.Model
 	descInput   textinput.Model
 	filterInput textinput.Model
+	customInput textinput.Model // Custom agent command input
 
 	// Numeric state (smaller types last)
-	mode          Mode
-	confirmAction ConfirmAction
-	cursor        int
-	width         int
-	height        int
-	confirmTaskID int
-	agentCursor   int
+	mode             Mode
+	confirmAction    ConfirmAction
+	cursor           int
+	width            int
+	height           int
+	confirmTaskID    int
+	agentCursor      int
+	startFocusCustom bool // true = focus on custom input, false = focus on agent list
 }
 
 // New creates a new TUI Model with the given container.
@@ -57,20 +61,28 @@ func New(c *app.Container) *Model {
 	fi.Placeholder = "Filter tasks..."
 	fi.CharLimit = 100
 
+	ci := textinput.New()
+	ci.Placeholder = "Enter custom command..."
+	ci.CharLimit = 500
+
 	return &Model{
-		container:     c,
-		mode:          ModeNormal,
-		tasks:         nil,
-		filteredTasks: nil,
-		cursor:        0,
-		keys:          DefaultKeyMap(),
-		styles:        DefaultStyles(),
-		help:          help.New(),
-		titleInput:    ti,
-		descInput:     di,
-		filterInput:   fi,
-		agents:        []string{"claude", "opencode", "codex"},
-		agentCursor:   0,
+		container:        c,
+		mode:             ModeNormal,
+		tasks:            nil,
+		filteredTasks:    nil,
+		cursor:           0,
+		keys:             DefaultKeyMap(),
+		styles:           DefaultStyles(),
+		help:             help.New(),
+		titleInput:       ti,
+		descInput:        di,
+		filterInput:      fi,
+		customInput:      ci,
+		builtinAgents:    []string{"claude", "opencode", "codex"},
+		customAgents:     nil,
+		agentCommands:    make(map[string]string),
+		agentCursor:      0,
+		startFocusCustom: false,
 	}
 }
 
@@ -220,42 +232,47 @@ func (m *Model) copyTask(taskID int) tea.Cmd {
 	}
 }
 
-// updateAgents updates the agent list from config.
+// updateAgents updates the agent lists from config.
 func (m *Model) updateAgents() {
 	if m.config == nil {
 		return
 	}
 
-	// Start with built-in agents
-	agents := []string{}
-	for name := range domain.BuiltinWorkers {
-		agents = append(agents, name)
+	// Build agent command previews
+	m.agentCommands = make(map[string]string)
+
+	// Built-in agents with their commands
+	m.builtinAgents = []string{}
+	for name, builtin := range domain.BuiltinWorkers {
+		m.builtinAgents = append(m.builtinAgents, name)
+		m.agentCommands[name] = builtin.Command
 	}
 
-	// Add custom agents from config
-	for name := range m.config.Workers {
-		// Skip if already in built-in list
-		found := false
-		for _, a := range agents {
-			if a == name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			agents = append(agents, name)
+	// Custom agents from config (exclude built-ins)
+	m.customAgents = []string{}
+	for name, worker := range m.config.Workers {
+		if _, isBuiltin := domain.BuiltinWorkers[name]; !isBuiltin {
+			m.customAgents = append(m.customAgents, name)
+			m.agentCommands[name] = worker.Command
 		}
 	}
-
-	m.agents = agents
 
 	// Set cursor to default agent
 	if m.config.WorkersConfig.Default != "" {
-		for i, a := range m.agents {
+		allAgents := m.allAgents()
+		for i, a := range allAgents {
 			if a == m.config.WorkersConfig.Default {
 				m.agentCursor = i
 				break
 			}
 		}
 	}
+}
+
+// allAgents returns all agents (built-in + custom).
+func (m *Model) allAgents() []string {
+	result := make([]string, 0, len(m.builtinAgents)+len(m.customAgents))
+	result = append(result, m.builtinAgents...)
+	result = append(result, m.customAgents...)
+	return result
 }
