@@ -100,13 +100,27 @@ func newSnapshotListCmd(container *app.Container) *cobra.Command {
 }
 
 func newSnapshotRestoreCmd(container *app.Container) *cobra.Command {
+	var noSave bool
+
 	cmd := &cobra.Command{
 		Use:   "restore <ref>",
 		Short: "Restore tasks from a snapshot",
-		Long:  "Restore the task state from a previously saved snapshot.",
+		Long:  "Restore the task state from a previously saved snapshot.\nAutomatically saves current state before restoring unless --no-save is specified.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			snapshotRef := args[0]
+
+			// Save current state before restoring (unless --no-save)
+			if !noSave {
+				head, err := getGitHEAD()
+				if err != nil {
+					return fmt.Errorf("get HEAD: %w", err)
+				}
+				if err := container.Tasks.SaveSnapshot(head); err != nil {
+					return fmt.Errorf("save current state: %w", err)
+				}
+				fmt.Fprintf(cmd.OutOrStdout(), "Saved current state for %s\n", head[:7])
+			}
 
 			if err := container.Tasks.RestoreSnapshot(snapshotRef); err != nil {
 				return fmt.Errorf("restore snapshot: %w", err)
@@ -116,6 +130,8 @@ func newSnapshotRestoreCmd(container *app.Container) *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&noSave, "no-save", false, "Don't save current state before restoring")
 
 	return cmd
 }
