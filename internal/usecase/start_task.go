@@ -16,6 +16,7 @@ import (
 // Fields are ordered to minimize memory padding.
 type StartTaskInput struct {
 	Agent  string // Agent name (required in MVP)
+	Model  string // Model name override (optional, uses agent's default if empty)
 	TaskID int    // Task ID to start
 }
 
@@ -99,7 +100,13 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	}
 
 	// Get agent configuration
-	workerAgent := uc.resolveWorkerAgent(agent, cfg)
+	workerAgent, defaultModel := uc.resolveWorkerAgent(agent, cfg)
+
+	// Resolve model: use input model, fall back to agent's default
+	model := in.Model
+	if model == "" {
+		model = defaultModel
+	}
 
 	// Create or resolve worktree
 	branch := domain.BranchName(task.ID, task.Issue)
@@ -114,7 +121,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	}
 
 	// Generate prompt and script files
-	scriptPath, err := uc.generateScript(task, wtPath, workerAgent, cfg)
+	scriptPath, err := uc.generateScript(task, wtPath, workerAgent, cfg, model)
 	if err != nil {
 		_ = uc.worktrees.Remove(branch)
 		return nil, fmt.Errorf("generate script: %w", err)
@@ -154,14 +161,14 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 // generateScript creates the task script with embedded prompt.
 // Returns the path to the generated script.
-func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config) (string, error) {
+func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config, model string) (string, error) {
 	scriptsDir := filepath.Join(uc.crewDir, "scripts")
 	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
 		return "", fmt.Errorf("create scripts directory: %w", err)
 	}
 
 	// Build command and prompt using RenderCommand
-	script, err := uc.buildScript(task, worktreePath, workerAgent, cfg)
+	script, err := uc.buildScript(task, worktreePath, workerAgent, cfg, model)
 	if err != nil {
 		return "", fmt.Errorf("build script: %w", err)
 	}
@@ -177,10 +184,16 @@ func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, work
 }
 
 // resolveWorkerAgent resolves the WorkerAgent configuration for the given agent name.
-func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) domain.WorkerAgent {
+// Returns the WorkerAgent and the default model for that agent.
+func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) (domain.WorkerAgent, string) {
 	// Check if agent is configured in config
 	if workerAgent, ok := cfg.Workers[agent]; ok {
-		return workerAgent
+		// For user-configured agents, check if there's a built-in default model
+		defaultModel := ""
+		if builtin, ok := domain.BuiltinWorkers[agent]; ok {
+			defaultModel = builtin.DefaultModel
+		}
+		return workerAgent, defaultModel
 	}
 
 	// Check if it's a built-in agent
@@ -190,14 +203,14 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) domain
 			Command:         builtin.Command,
 			SystemArgs:      builtin.SystemArgs,
 			Args:            builtin.DefaultArgs,
-		}
+		}, builtin.DefaultModel
 	}
 
 	// Unknown agent - use the agent name as-is (custom agent)
 	return domain.WorkerAgent{
 		CommandTemplate: "{{.Command}} {{.Prompt}}",
 		Command:         agent,
-	}
+	}, ""
 }
 
 // scriptTemplateData holds the data for script template execution.
@@ -210,7 +223,7 @@ type scriptTemplateData struct {
 }
 
 // buildScript constructs the task script with embedded prompt and session-ended callback.
-func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config) (string, error) {
+func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config, model string) (string, error) {
 	// Find crew binary path (for _session-ended callback)
 	crewBin, err := os.Executable()
 	if err != nil {
@@ -229,6 +242,7 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerA
 		Branch:      domain.BranchName(task.ID, task.Issue),
 		Issue:       task.Issue,
 		TaskID:      task.ID,
+		Model:       model,
 	}
 
 	// Determine default prompt: use config's WorkersConfig.Prompt or fall back to DefaultWorkerPrompt

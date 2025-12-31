@@ -33,6 +33,7 @@ type WorkerAgent struct {
 }
 
 // CommandData holds data for rendering agent commands and prompts.
+// Fields are ordered to minimize memory padding.
 type CommandData struct {
 	// Environment
 	GitDir   string // Path to .git directory
@@ -43,9 +44,12 @@ type CommandData struct {
 	Title       string
 	Description string
 	Branch      string // Branch name (e.g., "crew-1")
-	Issue       int    // GitHub issue number (0 if not linked)
 
-	// Task ID
+	// Runtime options
+	Model string // Model name override (e.g., "sonnet", "gpt-4o")
+
+	// Integer fields grouped together for alignment
+	Issue  int // GitHub issue number (0 if not linked)
 	TaskID int
 }
 
@@ -164,8 +168,9 @@ When the task is complete, commit your changes and run 'crew complete'.
 type BuiltinWorker struct {
 	CommandTemplate string // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
 	Command         string // Base command (e.g., "claude")
-	SystemArgs      string // System arguments for crew operation
-	DefaultArgs     string // Default user-customizable arguments
+	SystemArgs      string // System arguments (model, permissions) - NOT overridable by user config
+	DefaultArgs     string // Default user-customizable arguments (overridable in config.toml)
+	DefaultModel    string // Default model name for this worker
 }
 
 const claudeAllowedTools = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show)'`
@@ -173,24 +178,29 @@ const claudeAllowedTools = `--allowedTools='Bash(git add:*) Bash(git commit:*) B
 // BuiltinWorkers contains preset configurations for known workers.
 // Note: Use --option=value format for options that take variadic arguments (like --allowedTools)
 // to prevent them from consuming the prompt argument.
+// The {{.Model}} template variable in SystemArgs is replaced with the runtime model selection.
+// SystemArgs cannot be overridden by user config; Args can be customized in config.toml.
 var BuiltinWorkers = map[string]BuiltinWorker{
 	"claude": {
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 		Command:         "claude",
-		SystemArgs:      "--permission-mode acceptEdits " + claudeAllowedTools,
-		DefaultArgs:     "--model opus",
+		SystemArgs:      "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,
+		DefaultArgs:     "",
+		DefaultModel:    "opus",
 	},
 	"opencode": {
-		CommandTemplate: "{{.Command}} {{.Args}} --prompt {{.Prompt}}",
+		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
 		Command:         "opencode",
-		SystemArgs:      "",
-		DefaultArgs:     "-m anthropic/claude-opus-4-5",
+		SystemArgs:      "-m {{.Model}}",
+		DefaultArgs:     "",
+		DefaultModel:    "anthropic/claude-opus-4-5",
 	},
 	"codex": {
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 		Command:         "codex",
-		SystemArgs:      "--full-auto",
-		DefaultArgs:     "--model gpt-5.2-codex",
+		SystemArgs:      "--model {{.Model}} --full-auto",
+		DefaultArgs:     "",
+		DefaultModel:    "gpt-5.2-codex",
 	},
 }
 

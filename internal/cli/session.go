@@ -68,6 +68,10 @@ Examples:
 
 // newStartCommand creates the start command for starting a task.
 func newStartCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		model string
+	}
+
 	cmd := &cobra.Command{
 		Use:   "start <id> [agent]",
 		Short: "Start an AI agent session",
@@ -85,7 +89,11 @@ Examples:
   git crew start 1 claude
 
   # Start task with a different agent
-  git crew start 1 bash`,
+  git crew start 1 bash
+
+  # Start task with a specific model
+  git crew start 1 claude --model sonnet
+  git crew start 1 opencode -m gpt-4o`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -105,6 +113,7 @@ Examples:
 			out, err := uc.Execute(cmd.Context(), usecase.StartTaskInput{
 				TaskID: taskID,
 				Agent:  agent,
+				Model:  opts.model,
 			})
 			if err != nil {
 				return err
@@ -115,6 +124,8 @@ Examples:
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
 
 	return cmd
 }
