@@ -75,9 +75,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case MsgAttachSession:
-		// This message triggers session attachment
-		// The CLI layer handles the actual attachment
-		return m, tea.Quit
+		// Use tea.Exec to attach to tmux session, returning to TUI after detach
+		return m, m.attachToSession(msg.TaskID)
+
+	case MsgReloadTasks:
+		// Reload tasks after returning from external commands
+		return m, m.loadTasks()
 	}
 
 	return m, nil
@@ -153,7 +156,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Attach):
 		task := m.SelectedTask()
-		if task == nil || task.Status != domain.StatusInProgress {
+		if task == nil || !task.IsRunning() {
 			return m, nil
 		}
 		return m, func() tea.Msg {
@@ -244,7 +247,12 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 		}
 
 	case domain.StatusInReview:
-		// Show detail view
+		// Attach if session exists, otherwise show detail view
+		if task.IsRunning() {
+			return m, func() tea.Msg {
+				return MsgAttachSession{TaskID: task.ID}
+			}
+		}
 		m.mode = ModeDetail
 		return m, nil
 

@@ -2,6 +2,8 @@ package tui
 
 import (
 	"context"
+	"io"
+	"os/exec"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -365,4 +367,41 @@ func (m *Model) allAgents() []string {
 	result = append(result, m.builtinAgents...)
 	result = append(result, m.customAgents...)
 	return result
+}
+
+// tmuxAttachCmd implements tea.ExecCommand for attaching to a tmux session.
+type tmuxAttachCmd struct {
+	stdin       io.Reader
+	stdout      io.Writer
+	stderr      io.Writer
+	socketPath  string
+	sessionName string
+}
+
+func (c *tmuxAttachCmd) Run() error {
+	// #nosec G204 - socketPath and sessionName are trusted internal values
+	cmd := exec.Command("tmux", "-S", c.socketPath, "attach", "-t", c.sessionName)
+	cmd.Stdin = c.stdin
+	cmd.Stdout = c.stdout
+	cmd.Stderr = c.stderr
+	return cmd.Run()
+}
+
+func (c *tmuxAttachCmd) SetStdin(r io.Reader)  { c.stdin = r }
+func (c *tmuxAttachCmd) SetStdout(w io.Writer) { c.stdout = w }
+func (c *tmuxAttachCmd) SetStderr(w io.Writer) { c.stderr = w }
+
+// attachToSession returns a tea.Cmd that attaches to a tmux session.
+// After the attach completes (user detaches), it triggers a task reload.
+func (m *Model) attachToSession(taskID int) tea.Cmd {
+	socketPath := m.container.Config.SocketPath
+	sessionName := domain.SessionName(taskID)
+
+	return tea.Exec(&tmuxAttachCmd{
+		socketPath:  socketPath,
+		sessionName: sessionName,
+	}, func(err error) tea.Msg {
+		// Reload tasks after detaching from the session
+		return MsgReloadTasks{}
+	})
 }

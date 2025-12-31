@@ -94,3 +94,8 @@ type MsgAttachSession struct {
 }
 
 func (MsgAttachSession) sealed() {}
+
+// MsgReloadTasks is sent after external commands complete to reload the task list.
+type MsgReloadTasks struct{}
+
+func (MsgReloadTasks) sealed() {}
