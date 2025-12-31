@@ -51,13 +51,13 @@ var Colors = struct {
 	DescNormal:    lipgloss.Color("#6C7086"), // Overlay0
 	DescSelected:  lipgloss.Color("#9399B2"), // Overlay2
 
-	// Status colors
-	Todo:        lipgloss.Color("#89B4FA"), // Blue
-	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow
-	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
+	// Status colors (from spec-tui.md)
+	Todo:        lipgloss.Color("#74B9FF"), // Blue
+	InProgress:  lipgloss.Color("#FDCB6E"), // Yellow
+	InReview:    lipgloss.Color("#A29BFE"), // Purple
 	StatusError: lipgloss.Color("#F38BA8"), // Red
-	Done:        lipgloss.Color("#A6E3A1"), // Green
-	Closed:      lipgloss.Color("#585B70"), // Surface2
+	Done:        lipgloss.Color("#00B894"), // Green
+	Closed:      lipgloss.Color("#636E72"), // Gray
 
 	// Group header
 	GroupLine: lipgloss.Color("#45475A"), // Surface1
@@ -149,11 +149,8 @@ func DefaultStyles() Styles {
 		Header: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(Colors.Primary).
-			BorderStyle(lipgloss.NormalBorder()).
-			BorderBottom(true).
-			BorderForeground(Colors.GroupLine).
-			MarginBottom(1).
-			PaddingBottom(1),
+			// Border removed for cleaner look
+			MarginBottom(1),
 
 		HeaderText: lipgloss.NewStyle().
 			Bold(true).
@@ -171,8 +168,7 @@ func DefaultStyles() Styles {
 
 		TaskSelected: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.TitleSelected).
-			Background(Colors.SelectionBg), // Highlight background
+			Foreground(Colors.TitleNormal), // Keep same color, just bold
 
 		TaskID: lipgloss.NewStyle().
 			Foreground(Colors.Muted).
@@ -180,7 +176,7 @@ func DefaultStyles() Styles {
 			MarginRight(1),
 
 		TaskIDSelected: lipgloss.NewStyle().
-			Foreground(Colors.TitleSelected).
+			Foreground(Colors.TitleNormal).
 			Bold(true).
 			Width(4).
 			MarginRight(1),
@@ -189,7 +185,7 @@ func DefaultStyles() Styles {
 			Foreground(Colors.TitleNormal),
 
 		TaskTitleSelected: lipgloss.NewStyle().
-			Foreground(Colors.TitleSelected).
+			Foreground(Colors.TitleNormal).
 			Bold(true),
 
 		TaskDesc: lipgloss.NewStyle().
@@ -285,8 +281,8 @@ func DefaultStyles() Styles {
 			MarginTop(1),
 
 		FooterKey: lipgloss.NewStyle().
-			Foreground(Colors.Primary).
-			Bold(true),
+			Foreground(Colors.Muted), // Less intrusive
+		// Bold removed
 
 		// Pagination dots
 		PaginationDot: lipgloss.NewStyle().

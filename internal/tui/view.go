@@ -530,16 +530,10 @@ func (m *Model) renderAgentRow(agent string, selected bool) string {
 func (m *Model) viewFooter() string {
 	switch m.mode {
 	case ModeNormal:
-		// Main mode hints - organized by importance
-		return m.styles.FooterKey.Render("↑↓") + m.styles.Footer.Render(" navigate  ") +
-			m.styles.FooterKey.Render("enter") + m.styles.Footer.Render(" action  ") +
-			m.styles.FooterKey.Render("s") + m.styles.Footer.Render(" start  ") +
-			m.styles.FooterKey.Render("n") + m.styles.Footer.Render(" new  ") +
-			m.styles.FooterKey.Render("?") + m.styles.Footer.Render(" help  ") +
-			m.styles.FooterKey.Render("q") + m.styles.Footer.Render(" quit")
+		// Minimal hint - only show help key (spec: hide help line in Normal mode)
+		return m.styles.Footer.Render("? help")
 	case ModeFilter:
-		return m.styles.FooterKey.Render("enter") + m.styles.Footer.Render(" apply  ") +
-			m.styles.FooterKey.Render("esc") + m.styles.Footer.Render(" cancel")
+		return m.styles.Footer.Render("enter apply · esc cancel")
 	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeStart, ModeHelp, ModeDetail:
 		// Hints are shown in the dialogs/views themselves
 		return ""
