@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TUI Design Mocks</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .container {
+            border: 1px solid #333;
+            padding: 10px;
+            background-color: #000;
+            position: relative;
+        }
+
+        .title {
+            position: absolute;
+            top: -10px;
+            left: 10px;
+            background-color: #1a1a1a;
+            padding: 0 5px;
+            font-weight: bold;
+            color: #888;
+        }
+
+        /* Common Elements */
+        .header { margin-bottom: 10px; }
+        .list-item { padding: 2px 5px; display: flex; justify-content: space-between; }
+        .list-item.selected { font-weight: bold; }
+        .status { margin-right: 10px; width: 80px; }
+        .desc { color: #666; font-size: 0.9em; margin-left: 20px; display: block;}
+        .footer { margin-top: 10px; border-top: 1px solid #333; padding-top: 5px; font-size: 0.8em; }
+        .key { color: #888; }
+
+        /* Variant 1: Classic Dark */
+        #classic .header { color: #00ff00; border-bottom: 1px dashed #00ff00; }
+        #classic .list-item.selected { color: #000; background-color: #00ff00; }
+        #classic .status.todo { color: #ffff00; }
+        #classic .status.done { color: #00ff00; }
+        #classic .key { color: #00ff00; }
+
+        /* Variant 2: Modern Soft */
+        #modern .container { background-color: #1e1e2e; border: none; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        #modern .header { color: #89b4fa; font-size: 1.1em; border-bottom: 1px solid #313244; padding-bottom: 5px; }
+        #modern .list-item { padding: 5px 10px; border-radius: 4px; margin-bottom: 2px; }
+        #modern .list-item.selected { background-color: #313244; color: #cdd6f4; border-left: 3px solid #89b4fa; }
+        #modern .status.todo { color: #f9e2af; }
+        #modern .status.done { color: #a6e3a1; }
+        #modern .desc { color: #a6adc8; }
+        #modern .footer { border-top: 1px solid #313244; color: #6c7086; }
+        #modern .key { color: #b4befe; background: #313244; padding: 0 4px; border-radius: 2px; }
+
+        /* Variant 3: Monochrome Pro */
+        #mono .container { background-color: #000; border: 1px solid #fff; }
+        #mono .header { color: #fff; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px double #fff; }
+        #mono .list-item.selected { color: #000; background-color: #fff; }
+        #mono .status { font-weight: bold; }
+        #mono .status.todo::before { content: "[ ] "; }
+        #mono .status.done::before { content: "[x] "; }
+        #mono .footer { border-top: 1px solid #fff; }
+        #mono .key { border: 1px solid #666; padding: 0 2px; }
+
+        /* Variant 4: Solarized Light (for TUI usually Dark, but trying something different) - actually stick to Dark for TUI */
+        /* Variant 4: Neon Cyber */
+        #neon .container { background-color: #050510; border: 1px solid #0ff; box-shadow: 0 0 5px #0ff; }
+        #neon .header { color: #f0f; text-shadow: 0 0 2px #f0f; border-bottom: 1px solid #0ff; }
+        #neon .list-item.selected { color: #0ff; text-shadow: 0 0 2px #0ff; border: 1px solid #f0f; }
+        #neon .status.todo { color: #f0f; }
+        #neon .status.done { color: #0ff; }
+        #neon .footer { border-top: 1px solid #0ff; color: #0ff; }
+        #neon .key { color: #ff0; }
+
+        /* Variant 5: Minimalist Code */
+        #code .container { background-color: #282c34; border-left: 2px solid #61afef; padding-left: 15px; }
+        #code .header { color: #61afef; font-family: 'Fira Code', monospace; }
+        #code .list-item.selected { color: #98c379; }
+        #code .list-item::before { content: "  "; }
+        #code .list-item.selected::before { content: "> "; color: #61afef; }
+        #code .status.todo { color: #e06c75; }
+        #code .status.done { color: #98c379; }
+        #code .footer { color: #abb2bf; font-size: 0.75em; margin-top: 15px; }
+        #code .key { color: #d19a66; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Variant 1 -->
+    <div class="container" id="classic">
+        <span class="title">1. Classic Dark</span>
+        <div class="header">Tasks [Feature/TUI-Refine]</div>
+        <div class="list">
+            <div class="list-item">
+                <span><span class="status todo">TODO</span>1. Setup environment</span>
+            </div>
+            <div class="list-item selected">
+                <span><span class="status todo">IN_PRG</span>2. Create HTML Mocks</span>
+            </div>
+            <div class="desc">Creating 5 variants of design...</div>
+            <div class="list-item">
+                <span><span class="status done">DONE</span>3. Initial Planning</span>
+            </div>
+        </div>
+        <div class="footer">
+            <span class="key">q</span>:quit <span class="key">j/k</span>:nav <span class="key">enter</span>:open
+        </div>
+    </div>
+
+    <!-- Variant 2 -->
+    <div class="container" id="modern">
+        <span class="title">2. Modern Soft</span>
+        <div class="header">Tasks <span style="color: #6c7086;">/</span> Feature/TUI-Refine</div>
+        <div class="list">
+            <div class="list-item">
+                <span><span class="status todo">● Pending</span>1. Setup environment</span>
+            </div>
+            <div class="list-item selected">
+                <span><span class="status todo">➜ In Prog</span>2. Create HTML Mocks</span>
+            </div>
+            <div class="desc">Creating 5 variants of design...</div>
+            <div class="list-item">
+                <span><span class="status done">✔ Done</span>3. Initial Planning</span>
+            </div>
+        </div>
+        <div class="footer">
+            <span class="key">q</span> quit <span class="key">j/k</span> nav <span class="key">enter</span> open
+        </div>
+    </div>
+
+    <!-- Variant 3 -->
+    <div class="container" id="mono">
+        <span class="title">3. Monochrome Pro</span>
+        <div class="header">TASKS :: Feature/TUI-Refine</div>
+        <div class="list">
+            <div class="list-item">
+                <span><span class="status todo">TODO</span>1. Setup environment</span>
+            </div>
+            <div class="list-item selected">
+                <span><span class="status todo">WIP </span>2. Create HTML Mocks</span>
+            </div>
+            <div class="desc">Creating 5 variants of design...</div>
+            <div class="list-item">
+                <span><span class="status done">DONE</span>3. Initial Planning</span>
+            </div>
+        </div>
+        <div class="footer">
+            [Q]UIT [J/K]NAV [ENTER]OPEN
+        </div>
+    </div>
+
+    <!-- Variant 4 -->
+    <div class="container" id="neon">
+        <span class="title">4. Neon Cyber</span>
+        <div class="header">>> TASKS // SYSTEM_READY</div>
+        <div class="list">
+            <div class="list-item">
+                <span><span class="status todo">[ ]</span>1. Setup environment</span>
+            </div>
+            <div class="list-item selected">
+                <span><span class="status todo">[*]</span>2. Create HTML Mocks</span>
+            </div>
+            <div class="desc">>> Creating 5 variants of design...</div>
+            <div class="list-item">
+                <span><span class="status done">[X]</span>3. Initial Planning</span>
+            </div>
+        </div>
+        <div class="footer">
+            <span class="key">Q</span>:ABORT <span class="key">ENT</span>:EXECUTE
+        </div>
+    </div>
+
+    <!-- Variant 5 -->
+    <div class="container" id="code">
+        <span class="title">5. Minimalist Code</span>
+        <div class="header">func main() { // Feature/TUI-Refine</div>
+        <div class="list">
+            <div class="list-item">
+                <span><span class="status todo">todo</span> var setupEnvironment</span>
+            </div>
+            <div class="list-item selected">
+                <span><span class="status todo">wip </span> var createHtmlMocks</span>
+            </div>
+            <div class="desc">// Creating 5 variants of design...</div>
+            <div class="list-item">
+                <span><span class="status done">done</span> var initialPlanning</span>
+            </div>
+        </div>
+        <div class="footer">
+            <span class="key">q</span>.Quit() <span class="key">enter</span>.Open()
+        </div>
+    </div>
+
+</body>
+</html>

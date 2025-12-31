@@ -35,11 +35,11 @@ var Colors = struct {
 	// Group header
 	GroupLine lipgloss.Color
 }{
-	// Modern Dark Palette (Catppuccin-inspired)
-	Primary:    lipgloss.Color("#89B4FA"), // Blue (Main action/highlight)
-	Secondary:  lipgloss.Color("#CBA6F7"), // Mauve (Secondary accents)
-	Muted:      lipgloss.Color("#A6ADC8"), // Subtext1 (Readable but distinct)
-	Subtle:     lipgloss.Color("#585B70"), // Surface2 (Very subtle)
+	// Modern Dark Palette (Catppuccin-inspired - Modern Soft Variant)
+	Primary:    lipgloss.Color("#89B4FA"), // Blue
+	Secondary:  lipgloss.Color("#CBA6F7"), // Mauve
+	Muted:      lipgloss.Color("#A6ADC8"), // Subtext1
+	Subtle:     lipgloss.Color("#585B70"), // Surface2
 	Error:      lipgloss.Color("#F38BA8"), // Red
 	Success:    lipgloss.Color("#A6E3A1"), // Green
 	Warning:    lipgloss.Color("#F9E2AF"), // Yellow
@@ -47,11 +47,11 @@ var Colors = struct {
 
 	// Text colors
 	TitleNormal:   lipgloss.Color("#CDD6F4"), // Text
-	TitleSelected: lipgloss.Color("#89B4FA"), // Blue (Matches Primary)
+	TitleSelected: lipgloss.Color("#CDD6F4"), // Text (keep white on selection for contrast)
 	DescNormal:    lipgloss.Color("#6C7086"), // Overlay0
-	DescSelected:  lipgloss.Color("#9399B2"), // Overlay2
+	DescSelected:  lipgloss.Color("#A6ADC8"), // Subtext1 (brighter than normal)
 
-	// Status colors (slightly muted for better harmony)
+	// Status colors
 	Todo:        lipgloss.Color("#89DCEB"), // Sky
 	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow
 	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
@@ -59,8 +59,8 @@ var Colors = struct {
 	Done:        lipgloss.Color("#A6E3A1"), // Green
 	Closed:      lipgloss.Color("#6C7086"), // Overlay0
 
-	// Group header
-	GroupLine: lipgloss.Color("#313244"), // Surface0
+	// Group header / UI Elements
+	GroupLine: lipgloss.Color("#313244"), // Surface0 (Used for separators and selection bg)
 }
 
 // Styles contains all the lipgloss styles for the TUI.
@@ -168,17 +168,20 @@ func DefaultStyles() Styles {
 
 		TaskSelected: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.TitleSelected),
+			Background(Colors.GroupLine).
+			Foreground(Colors.TitleSelected).
+			PaddingLeft(1).
+			PaddingRight(1),
 
 		TaskID: lipgloss.NewStyle().
 			Foreground(Colors.Subtle).
-			Width(4).
+			Width(3).
 			MarginRight(1),
 
 		TaskIDSelected: lipgloss.NewStyle().
 			Foreground(Colors.Primary).
 			Bold(true).
-			Width(4).
+			Width(3).
 			MarginRight(1),
 
 		TaskTitle: lipgloss.NewStyle().
@@ -205,13 +208,13 @@ func DefaultStyles() Styles {
 			MarginLeft(1),
 
 		CursorNormal: lipgloss.NewStyle().
-			Foreground(Colors.Muted).
-			MarginRight(1),
+			Foreground(Colors.Background). // Hide cursor in normal mode (matches bg)
+			MarginRight(0),
 
 		CursorSelected: lipgloss.NewStyle().
 			Foreground(Colors.Primary).
 			Bold(true).
-			MarginRight(1),
+			MarginRight(0),
 
 		// Group header styles
 		GroupHeaderLine: lipgloss.NewStyle().
