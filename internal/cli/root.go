@@ -130,6 +130,7 @@ and isolated task execution.`,
 		pruneCmd,
 		tuiCmd,
 		snapshotCmd,
+		newSyncCmd(c),
 		sessionEndedCmd,
 	)
 

@@ -59,6 +59,17 @@ type TaskRepository interface {
 
 	// PruneSnapshots removes old snapshots, keeping the most recent keepCount per mainSHA.
 	PruneSnapshots(keepCount int) error
+
+	// === Remote sync operations ===
+
+	// Push pushes task refs to remote.
+	Push() error
+
+	// Fetch fetches task refs from remote for a given namespace.
+	Fetch(namespace string) error
+
+	// ListNamespaces returns available namespaces on remote.
+	ListNamespaces() ([]string, error)
 }
 
 // SnapshotInfo contains information about a snapshot.

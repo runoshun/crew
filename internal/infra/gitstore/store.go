@@ -3,8 +3,10 @@ package gitstore
 
 import (
 	"fmt"
+	"os/exec"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/go-git/go-git/v5"
@@ -31,6 +33,7 @@ import (
 //	    <main-sha>_<seq> → tree
 type Store struct {
 	repo      *git.Repository
+	repoPath  string // path to the repository
 	namespace string // e.g., "crew-shun"
 	mu        sync.RWMutex
 }
@@ -54,6 +57,7 @@ func New(repoPath, namespace string) (*Store, error) {
 
 	return &Store{
 		repo:      repo,
+		repoPath:  repoPath,
 		namespace: namespace,
 	}, nil
 }
@@ -849,4 +853,81 @@ func (s *Store) PruneSnapshots(keepCount int) error {
 	}
 
 	return nil
+}
+
+// === Remote sync operations ===
+
+// Push pushes task refs to remote.
+func (s *Store) Push() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Use git command for push (go-git push requires auth config)
+	refspec := fmt.Sprintf("refs/%s/*:refs/%s/*", s.namespace, s.namespace)
+	cmd := exec.Command("git", "-C", s.repoPath, "push", "origin", refspec)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("push failed: %s: %w", string(output), err)
+	}
+	return nil
+}
+
+// Fetch fetches task refs from remote for a given namespace.
+func (s *Store) Fetch(namespace string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if namespace == "" {
+		namespace = s.namespace
+	}
+
+	refspec := fmt.Sprintf("refs/%s/*:refs/%s/*", namespace, namespace)
+	cmd := exec.Command("git", "-C", s.repoPath, "fetch", "origin", refspec)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("fetch failed: %s: %w", string(output), err)
+	}
+	return nil
+}
+
+// ListNamespaces returns available namespaces on remote.
+func (s *Store) ListNamespaces() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	cmd := exec.Command("git", "-C", s.repoPath, "ls-remote", "--refs", "origin", "refs/crew-*")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("ls-remote failed: %w", err)
+	}
+
+	namespaces := make(map[string]bool)
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		// Format: <sha>\trefs/crew-xxx/...
+		parts := strings.Split(line, "\t")
+		if len(parts) != 2 {
+			continue
+		}
+		ref := parts[1]
+		// Extract namespace from refs/crew-xxx/...
+		if strings.HasPrefix(ref, "refs/") {
+			ref = ref[5:] // Remove "refs/"
+		}
+		idx := strings.Index(ref, "/")
+		if idx > 0 {
+			ns := ref[:idx]
+			namespaces[ns] = true
+		}
+	}
+
+	result := make([]string, 0, len(namespaces))
+	for ns := range namespaces {
+		result = append(result, ns)
+	}
+	slices.Sort(result)
+	return result, nil
 }

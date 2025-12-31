@@ -336,3 +336,20 @@ func (s *Store) SyncSnapshot() error {
 func (s *Store) PruneSnapshots(keepCount int) error {
 	return nil
 }
+
+// === Remote sync operations (no-op for JSON store) ===
+
+// Push is a no-op for JSON store.
+func (s *Store) Push() error {
+	return nil
+}
+
+// Fetch is a no-op for JSON store.
+func (s *Store) Fetch(namespace string) error {
+	return nil
+}
+
+// ListNamespaces returns empty for JSON store.
+func (s *Store) ListNamespaces() ([]string, error) {
+	return nil, nil
+}
