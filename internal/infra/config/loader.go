@@ -64,6 +64,7 @@ type configFile struct {
 type tasksSection struct {
 	Store     string `toml:"store"`
 	Namespace string `toml:"namespace"`
+	Encrypt   bool   `toml:"encrypt"`
 }
 
 // workersConfig holds the parsed [workers] section.
@@ -277,6 +278,7 @@ func convertToDomainConfig(cf *configFile) *domain.Config {
 		Tasks: domain.TasksConfig{
 			Store:     cf.Tasks.Store,
 			Namespace: cf.Tasks.Namespace,
+			Encrypt:   cf.Tasks.Encrypt,
 		},
 	}
 }
@@ -321,6 +323,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.Tasks.Namespace != "" {
 		result.Tasks.Namespace = override.Tasks.Namespace
+	}
+	if override.Tasks.Encrypt {
+		result.Tasks.Encrypt = override.Tasks.Encrypt
 	}
 
 	// Merge workers: override individual fields, not entire worker

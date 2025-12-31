@@ -16,6 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/infra/crypto"
 )
 
 // Store implements domain.TaskRepository using Git plumbing (refs and blobs).
@@ -33,6 +34,7 @@ import (
 //	    <main-sha>_<seq> → tree
 type Store struct {
 	repo      *git.Repository
+	encryptor *crypto.Encryptor
 	repoPath  string // path to the repository
 	namespace string // e.g., "crew-shun"
 	mu        sync.RWMutex
@@ -50,23 +52,45 @@ type commentsData struct {
 
 // New creates a new Store for the given repository.
 func New(repoPath, namespace string) (*Store, error) {
+	return NewWithEncryption(repoPath, namespace, "", "")
+}
+
+// NewWithEncryption creates a new Store with optional encryption.
+// If encryptionKey is empty, encryption is disabled.
+// encryptionKey must be 64 hex characters (32 bytes) for AES-256.
+func NewWithEncryption(repoPath, namespace, encryptionKey, cachePath string) (*Store, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("open git repository: %w", err)
+	}
+
+	var encryptor *crypto.Encryptor
+	if encryptionKey != "" {
+		encryptor, err = crypto.NewEncryptor(encryptionKey, cachePath)
+		if err != nil {
+			return nil, fmt.Errorf("create encryptor: %w", err)
+		}
 	}
 
 	return &Store{
 		repo:      repo,
 		repoPath:  repoPath,
 		namespace: namespace,
+		encryptor: encryptor,
 	}, nil
 }
 
 // NewWithRepo creates a new Store with an existing repository instance.
 func NewWithRepo(repo *git.Repository, namespace string) *Store {
+	return NewWithRepoAndEncryptor(repo, namespace, nil)
+}
+
+// NewWithRepoAndEncryptor creates a new Store with an existing repository and encryptor.
+func NewWithRepoAndEncryptor(repo *git.Repository, namespace string, encryptor *crypto.Encryptor) *Store {
 	return &Store{
 		repo:      repo,
 		namespace: namespace,
+		encryptor: encryptor,
 	}
 }
 
@@ -108,19 +132,13 @@ func (s *Store) Get(id int) (*domain.Task, error) {
 		return nil, fmt.Errorf("get task ref: %w", err)
 	}
 
-	blob, err := s.repo.BlobObject(ref.Hash())
+	data, err := s.readBlob(ref.Hash())
 	if err != nil {
-		return nil, fmt.Errorf("get task blob: %w", err)
+		return nil, fmt.Errorf("read task: %w", err)
 	}
-
-	reader, err := blob.Reader()
-	if err != nil {
-		return nil, fmt.Errorf("read task blob: %w", err)
-	}
-	defer func() { _ = reader.Close() }()
 
 	var task domain.Task
-	if err := yaml.NewDecoder(reader).Decode(&task); err != nil {
+	if err := yaml.Unmarshal(data, &task); err != nil {
 		return nil, fmt.Errorf("decode task: %w", err)
 	}
 	task.ID = id
@@ -153,19 +171,13 @@ func (s *Store) List(filter domain.TaskFilter) ([]*domain.Task, error) {
 			return nil // Skip invalid refs
 		}
 
-		blob, blobErr := s.repo.BlobObject(ref.Hash())
-		if blobErr != nil {
-			return fmt.Errorf("get task blob: %w", blobErr)
+		data, readErr := s.readBlob(ref.Hash())
+		if readErr != nil {
+			return fmt.Errorf("read task: %w", readErr)
 		}
-
-		reader, readerErr := blob.Reader()
-		if readerErr != nil {
-			return fmt.Errorf("read task blob: %w", readerErr)
-		}
-		defer func() { _ = reader.Close() }()
 
 		var task domain.Task
-		if decodeErr := yaml.NewDecoder(reader).Decode(&task); decodeErr != nil {
+		if decodeErr := yaml.Unmarshal(data, &task); decodeErr != nil {
 			return fmt.Errorf("decode task: %w", decodeErr)
 		}
 		task.ID = taskID
@@ -324,19 +336,13 @@ func (s *Store) getCommentsLocked(taskID int) ([]domain.Comment, error) {
 		return nil, fmt.Errorf("get comments ref: %w", err)
 	}
 
-	blob, err := s.repo.BlobObject(ref.Hash())
+	rawData, err := s.readBlob(ref.Hash())
 	if err != nil {
-		return nil, fmt.Errorf("get comments blob: %w", err)
+		return nil, fmt.Errorf("read comments: %w", err)
 	}
-
-	reader, err := blob.Reader()
-	if err != nil {
-		return nil, fmt.Errorf("read comments blob: %w", err)
-	}
-	defer func() { _ = reader.Close() }()
 
 	var data commentsData
-	if err := yaml.NewDecoder(reader).Decode(&data); err != nil {
+	if err := yaml.Unmarshal(rawData, &data); err != nil {
 		return nil, fmt.Errorf("decode comments: %w", err)
 	}
 
@@ -353,19 +359,13 @@ func (s *Store) loadMeta() (*meta, error) {
 		return nil, fmt.Errorf("get meta ref: %w", err)
 	}
 
-	blob, err := s.repo.BlobObject(ref.Hash())
+	data, err := s.readBlob(ref.Hash())
 	if err != nil {
-		return nil, fmt.Errorf("get meta blob: %w", err)
+		return nil, fmt.Errorf("read meta: %w", err)
 	}
-
-	reader, err := blob.Reader()
-	if err != nil {
-		return nil, fmt.Errorf("read meta blob: %w", err)
-	}
-	defer func() { _ = reader.Close() }()
 
 	var m meta
-	if err := yaml.NewDecoder(reader).Decode(&m); err != nil {
+	if err := yaml.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("decode meta: %w", err)
 	}
 
@@ -393,17 +393,28 @@ func (s *Store) saveMeta(m *meta) error {
 }
 
 // writeBlob writes data to a blob and returns the hash.
+// If encryption is enabled, the data is encrypted before writing.
 func (s *Store) writeBlob(data []byte) (plumbing.Hash, error) {
+	// Encrypt if encryptor is configured
+	blobData := data
+	if s.encryptor != nil {
+		encrypted, err := s.encryptor.Encrypt(data)
+		if err != nil {
+			return plumbing.ZeroHash, fmt.Errorf("encrypt data: %w", err)
+		}
+		blobData = encrypted
+	}
+
 	obj := s.repo.Storer.NewEncodedObject()
 	obj.SetType(plumbing.BlobObject)
-	obj.SetSize(int64(len(data)))
+	obj.SetSize(int64(len(blobData)))
 
 	writer, err := obj.Writer()
 	if err != nil {
 		return plumbing.ZeroHash, fmt.Errorf("create blob writer: %w", err)
 	}
 
-	if _, writeErr := writer.Write(data); writeErr != nil {
+	if _, writeErr := writer.Write(blobData); writeErr != nil {
 		_ = writer.Close()
 		return plumbing.ZeroHash, fmt.Errorf("write blob: %w", writeErr)
 	}
@@ -415,6 +426,36 @@ func (s *Store) writeBlob(data []byte) (plumbing.Hash, error) {
 	}
 
 	return hash, nil
+}
+
+// readBlob reads and optionally decrypts data from a blob.
+func (s *Store) readBlob(hash plumbing.Hash) ([]byte, error) {
+	blob, err := s.repo.BlobObject(hash)
+	if err != nil {
+		return nil, fmt.Errorf("get blob: %w", err)
+	}
+
+	reader, err := blob.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("read blob: %w", err)
+	}
+	defer func() { _ = reader.Close() }()
+
+	data := make([]byte, blob.Size)
+	if _, err := reader.Read(data); err != nil {
+		return nil, fmt.Errorf("read blob data: %w", err)
+	}
+
+	// Decrypt if encryptor is configured
+	if s.encryptor != nil {
+		decrypted, err := s.encryptor.Decrypt(data)
+		if err != nil {
+			return nil, fmt.Errorf("decrypt data: %w", err)
+		}
+		return decrypted, nil
+	}
+
+	return data, nil
 }
 
 // Initialize creates initial metadata if it doesn't exist.
