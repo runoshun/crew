@@ -5,16 +5,18 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
-// Colors defines the color palette for the TUI (v1-style Hex colors).
+// Colors defines the color palette for the TUI.
+// Designed with a "Modern Dark" aesthetic for a commercial-grade look.
 var Colors = struct {
 	// Base colors
-	Primary    lipgloss.Color
-	Secondary  lipgloss.Color
-	Muted      lipgloss.Color
-	Error      lipgloss.Color
-	Success    lipgloss.Color
-	Warning    lipgloss.Color
-	Background lipgloss.Color
+	Primary     lipgloss.Color
+	Secondary   lipgloss.Color
+	Muted       lipgloss.Color
+	Error       lipgloss.Color
+	Success     lipgloss.Color
+	Warning     lipgloss.Color
+	Background  lipgloss.Color
+	SelectionBg lipgloss.Color // New: Background for selected items
 
 	// Title/text colors
 	TitleNormal   lipgloss.Color
@@ -33,31 +35,32 @@ var Colors = struct {
 	// Group header
 	GroupLine lipgloss.Color
 }{
-	// v1-style Hex color palette
-	Primary:    lipgloss.Color("#6C5CE7"), // Purple
-	Secondary:  lipgloss.Color("#A29BFE"), // Lavender
-	Muted:      lipgloss.Color("#636E72"), // Gray
-	Error:      lipgloss.Color("#D63031"), // Red
-	Success:    lipgloss.Color("#00B894"), // Green
-	Warning:    lipgloss.Color("#FDCB6E"), // Yellow
-	Background: lipgloss.Color("#2D3436"), // Dark gray
+	// Modern Dark Palette (Catppuccin-inspired)
+	Primary:     lipgloss.Color("#CBA6F7"), // Mauve (Accent)
+	Secondary:   lipgloss.Color("#89B4FA"), // Blue
+	Muted:       lipgloss.Color("#6C7086"), // Overlay0
+	Error:       lipgloss.Color("#F38BA8"), // Red
+	Success:     lipgloss.Color("#A6E3A1"), // Green
+	Warning:     lipgloss.Color("#F9E2AF"), // Yellow
+	Background:  lipgloss.Color("#1E1E2E"), // Base
+	SelectionBg: lipgloss.Color("#313244"), // Surface0
 
-	// v1-style title colors
-	TitleNormal:   lipgloss.Color("#DFE6E9"), // Light gray
-	TitleSelected: lipgloss.Color("#FFEAA7"), // Yellow (selected)
-	DescNormal:    lipgloss.Color("#636E72"), // Gray
-	DescSelected:  lipgloss.Color("#B2BEC3"), // Light gray
+	// Text colors
+	TitleNormal:   lipgloss.Color("#CDD6F4"), // Text
+	TitleSelected: lipgloss.Color("#CBA6F7"), // Mauve
+	DescNormal:    lipgloss.Color("#6C7086"), // Overlay0
+	DescSelected:  lipgloss.Color("#9399B2"), // Overlay2
 
-	// v1-style status colors
-	Todo:        lipgloss.Color("#74B9FF"), // Light blue
-	InProgress:  lipgloss.Color("#FDCB6E"), // Yellow
-	InReview:    lipgloss.Color("#A29BFE"), // Lavender
-	StatusError: lipgloss.Color("#D63031"), // Red
-	Done:        lipgloss.Color("#00B894"), // Green
-	Closed:      lipgloss.Color("#636E72"), // Gray
+	// Status colors
+	Todo:        lipgloss.Color("#89B4FA"), // Blue
+	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow
+	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
+	StatusError: lipgloss.Color("#F38BA8"), // Red
+	Done:        lipgloss.Color("#A6E3A1"), // Green
+	Closed:      lipgloss.Color("#585B70"), // Surface2
 
-	// Group header line color
-	GroupLine: lipgloss.Color("#636E72"),
+	// Group header
+	GroupLine: lipgloss.Color("#45475A"), // Surface1
 }
 
 // Styles contains all the lipgloss styles for the TUI.
@@ -146,32 +149,41 @@ func DefaultStyles() Styles {
 		Header: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(Colors.Primary).
-			MarginBottom(1),
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderBottom(true).
+			BorderForeground(Colors.GroupLine).
+			MarginBottom(1).
+			PaddingBottom(1),
 
 		HeaderText: lipgloss.NewStyle().
-			Bold(true),
+			Bold(true).
+			Foreground(Colors.Primary),
 
 		TaskList: lipgloss.NewStyle().
 			MarginBottom(1),
 
 		TaskItem: lipgloss.NewStyle().
-			PaddingLeft(2),
+			PaddingLeft(1).
+			PaddingRight(1),
 
 		TaskNormal: lipgloss.NewStyle().
 			Foreground(Colors.TitleNormal),
 
 		TaskSelected: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.TitleSelected),
+			Foreground(Colors.TitleSelected).
+			Background(Colors.SelectionBg), // Highlight background
 
 		TaskID: lipgloss.NewStyle().
 			Foreground(Colors.Muted).
-			Width(5),
+			Width(4).
+			MarginRight(1),
 
 		TaskIDSelected: lipgloss.NewStyle().
 			Foreground(Colors.TitleSelected).
 			Bold(true).
-			Width(5),
+			Width(4).
+			MarginRight(1),
 
 		TaskTitle: lipgloss.NewStyle().
 			Foreground(Colors.TitleNormal),
@@ -188,25 +200,30 @@ func DefaultStyles() Styles {
 
 		TaskAgent: lipgloss.NewStyle().
 			Foreground(Colors.Secondary).
-			Italic(true),
+			Italic(true).
+			MarginLeft(1),
 
 		TaskAgentSelected: lipgloss.NewStyle().
-			Foreground(Colors.TitleSelected).
-			Italic(true),
+			Foreground(Colors.Secondary).
+			Italic(true).
+			MarginLeft(1),
 
 		CursorNormal: lipgloss.NewStyle().
-			Foreground(Colors.Muted),
+			Foreground(Colors.Muted).
+			MarginRight(1),
 
 		CursorSelected: lipgloss.NewStyle().
-			Foreground(Colors.TitleSelected).
-			Bold(true),
+			Foreground(Colors.Primary).
+			Bold(true).
+			MarginRight(1),
 
-		// Group header styles (v1-style)
+		// Group header styles
 		GroupHeaderLine: lipgloss.NewStyle().
 			Foreground(Colors.GroupLine),
 
 		GroupHeaderLabel: lipgloss.NewStyle().
-			Foreground(Colors.Muted),
+			Foreground(Colors.Muted).
+			Bold(true),
 
 		StatusTodo: lipgloss.NewStyle().
 			Foreground(Colors.Todo),
@@ -264,24 +281,26 @@ func DefaultStyles() Styles {
 			Foreground(Colors.Muted),
 
 		Footer: lipgloss.NewStyle().
-			Foreground(Colors.Muted),
+			Foreground(Colors.Muted).
+			MarginTop(1),
 
 		FooterKey: lipgloss.NewStyle().
 			Foreground(Colors.Primary).
 			Bold(true),
 
-		// Pagination dots (v1-style)
+		// Pagination dots
 		PaginationDot: lipgloss.NewStyle().
-			Foreground(Colors.Muted),
+			Foreground(Colors.GroupLine),
 
 		PaginationDotActive: lipgloss.NewStyle().
-			Foreground(Colors.TitleSelected).
+			Foreground(Colors.Primary).
 			Bold(true),
 
 		Dialog: lipgloss.NewStyle().
 			Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(Colors.Primary),
+			BorderForeground(Colors.Primary).
+			MarginTop(1),
 
 		DialogTitle: lipgloss.NewStyle().
 			Bold(true).
@@ -367,11 +386,11 @@ func StatusIcon(status domain.Status) string {
 	case domain.StatusInProgress:
 		return "●"
 	case domain.StatusInReview:
-		return "◉"
+		return "◎"
 	case domain.StatusError:
-		return "✗"
+		return "✕"
 	case domain.StatusDone:
-		return "✓"
+		return "✔"
 	case domain.StatusClosed:
 		return "−"
 	default:
