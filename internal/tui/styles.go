@@ -9,14 +9,14 @@ import (
 // Designed with a "Modern Dark" aesthetic for a commercial-grade look.
 var Colors = struct {
 	// Base colors
-	Primary     lipgloss.Color
-	Secondary   lipgloss.Color
-	Muted       lipgloss.Color
-	Error       lipgloss.Color
-	Success     lipgloss.Color
-	Warning     lipgloss.Color
-	Background  lipgloss.Color
-	SelectionBg lipgloss.Color // New: Background for selected items
+	Primary    lipgloss.Color
+	Secondary  lipgloss.Color
+	Muted      lipgloss.Color
+	Subtle     lipgloss.Color // New: Even more muted for unobtrusive elements
+	Error      lipgloss.Color
+	Success    lipgloss.Color
+	Warning    lipgloss.Color
+	Background lipgloss.Color
 
 	// Title/text colors
 	TitleNormal   lipgloss.Color
@@ -36,31 +36,31 @@ var Colors = struct {
 	GroupLine lipgloss.Color
 }{
 	// Modern Dark Palette (Catppuccin-inspired)
-	Primary:     lipgloss.Color("#CBA6F7"), // Mauve (Accent)
-	Secondary:   lipgloss.Color("#89B4FA"), // Blue
-	Muted:       lipgloss.Color("#6C7086"), // Overlay0
-	Error:       lipgloss.Color("#F38BA8"), // Red
-	Success:     lipgloss.Color("#A6E3A1"), // Green
-	Warning:     lipgloss.Color("#F9E2AF"), // Yellow
-	Background:  lipgloss.Color("#1E1E2E"), // Base
-	SelectionBg: lipgloss.Color("#313244"), // Surface0
+	Primary:    lipgloss.Color("#89B4FA"), // Blue (Main action/highlight)
+	Secondary:  lipgloss.Color("#CBA6F7"), // Mauve (Secondary accents)
+	Muted:      lipgloss.Color("#A6ADC8"), // Subtext1 (Readable but distinct)
+	Subtle:     lipgloss.Color("#585B70"), // Surface2 (Very subtle)
+	Error:      lipgloss.Color("#F38BA8"), // Red
+	Success:    lipgloss.Color("#A6E3A1"), // Green
+	Warning:    lipgloss.Color("#F9E2AF"), // Yellow
+	Background: lipgloss.Color("#1E1E2E"), // Base
 
 	// Text colors
 	TitleNormal:   lipgloss.Color("#CDD6F4"), // Text
-	TitleSelected: lipgloss.Color("#CBA6F7"), // Mauve
+	TitleSelected: lipgloss.Color("#89B4FA"), // Blue (Matches Primary)
 	DescNormal:    lipgloss.Color("#6C7086"), // Overlay0
 	DescSelected:  lipgloss.Color("#9399B2"), // Overlay2
 
-	// Status colors (from spec-tui.md)
-	Todo:        lipgloss.Color("#74B9FF"), // Blue
-	InProgress:  lipgloss.Color("#FDCB6E"), // Yellow
-	InReview:    lipgloss.Color("#A29BFE"), // Purple
+	// Status colors (slightly muted for better harmony)
+	Todo:        lipgloss.Color("#89DCEB"), // Sky
+	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow
+	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
 	StatusError: lipgloss.Color("#F38BA8"), // Red
-	Done:        lipgloss.Color("#00B894"), // Green
-	Closed:      lipgloss.Color("#636E72"), // Gray
+	Done:        lipgloss.Color("#A6E3A1"), // Green
+	Closed:      lipgloss.Color("#6C7086"), // Overlay0
 
 	// Group header
-	GroupLine: lipgloss.Color("#45475A"), // Surface1
+	GroupLine: lipgloss.Color("#313244"), // Surface0
 }
 
 // Styles contains all the lipgloss styles for the TUI.
@@ -168,15 +168,15 @@ func DefaultStyles() Styles {
 
 		TaskSelected: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.TitleNormal), // Keep same color, just bold
+			Foreground(Colors.TitleSelected),
 
 		TaskID: lipgloss.NewStyle().
-			Foreground(Colors.Muted).
+			Foreground(Colors.Subtle).
 			Width(4).
 			MarginRight(1),
 
 		TaskIDSelected: lipgloss.NewStyle().
-			Foreground(Colors.TitleNormal).
+			Foreground(Colors.Primary).
 			Bold(true).
 			Width(4).
 			MarginRight(1),
@@ -185,7 +185,7 @@ func DefaultStyles() Styles {
 			Foreground(Colors.TitleNormal),
 
 		TaskTitleSelected: lipgloss.NewStyle().
-			Foreground(Colors.TitleNormal).
+			Foreground(Colors.TitleSelected).
 			Bold(true),
 
 		TaskDesc: lipgloss.NewStyle().
@@ -270,19 +270,18 @@ func DefaultStyles() Styles {
 			BorderForeground(Colors.Muted),
 
 		HelpKey: lipgloss.NewStyle().
-			Foreground(Colors.Primary).
+			Foreground(Colors.Muted).
 			Bold(true),
 
 		HelpDesc: lipgloss.NewStyle().
-			Foreground(Colors.Muted),
+			Foreground(Colors.Subtle),
 
 		Footer: lipgloss.NewStyle().
-			Foreground(Colors.Muted).
+			Foreground(Colors.Subtle).
 			MarginTop(1),
 
 		FooterKey: lipgloss.NewStyle().
-			Foreground(Colors.Muted), // Less intrusive
-		// Bold removed
+			Foreground(Colors.Muted),
 
 		// Pagination dots
 		PaginationDot: lipgloss.NewStyle().
@@ -295,7 +294,7 @@ func DefaultStyles() Styles {
 		Dialog: lipgloss.NewStyle().
 			Padding(1, 2).
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(Colors.Primary).
+			BorderForeground(Colors.Muted).
 			MarginTop(1),
 
 		DialogTitle: lipgloss.NewStyle().
