@@ -19,6 +19,8 @@ func newSnapshotCmd(container *app.Container) *cobra.Command {
 	cmd.AddCommand(newSnapshotSaveCmd(container))
 	cmd.AddCommand(newSnapshotListCmd(container))
 	cmd.AddCommand(newSnapshotRestoreCmd(container))
+	cmd.AddCommand(newSnapshotSyncCmd(container))
+	cmd.AddCommand(newSnapshotPruneCmd(container))
 
 	return cmd
 }
@@ -132,6 +134,46 @@ func newSnapshotRestoreCmd(container *app.Container) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&noSave, "no-save", false, "Don't save current state before restoring")
+
+	return cmd
+}
+
+func newSnapshotSyncCmd(container *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "sync",
+		Short: "Sync task state with current git HEAD",
+		Long:  "If a snapshot exists for the current git HEAD, restore tasks from it.\nUseful after git revert or checkout to sync task state.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := container.Tasks.SyncSnapshot(); err != nil {
+				return fmt.Errorf("sync snapshot: %w", err)
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), "Synced with current HEAD")
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+func newSnapshotPruneCmd(container *app.Container) *cobra.Command {
+	var keepCount int
+
+	cmd := &cobra.Command{
+		Use:   "prune",
+		Short: "Remove old snapshots",
+		Long:  "Remove old snapshots, keeping the most recent ones per git SHA.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := container.Tasks.PruneSnapshots(keepCount); err != nil {
+				return fmt.Errorf("prune snapshots: %w", err)
+			}
+
+			fmt.Fprintf(cmd.OutOrStdout(), "Pruned snapshots (kept %d per SHA)\n", keepCount)
+			return nil
+		},
+	}
+
+	cmd.Flags().IntVarP(&keepCount, "keep", "k", 5, "Number of snapshots to keep per git SHA")
 
 	return cmd
 }

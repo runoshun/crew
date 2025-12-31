@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -738,13 +737,116 @@ func splitLast(s, sep string) []string {
 }
 
 // SyncSnapshot syncs task state with the current git HEAD.
+// If a snapshot exists for the current HEAD, restore from it.
 func (s *Store) SyncSnapshot() error {
-	// TODO: Get main branch HEAD and restore if snapshot exists
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Get current HEAD
+	head, err := s.repo.Head()
+	if err != nil {
+		return fmt.Errorf("get HEAD: %w", err)
+	}
+	currentSHA := head.Hash().String()
+
+	// Check if we have snapshots for this SHA
+	snapshots, err := s.listSnapshotsLocked(currentSHA)
+	if err != nil {
+		return err
+	}
+
+	if len(snapshots) == 0 {
+		// No snapshot for current HEAD, nothing to do
+		return nil
+	}
+
+	// Get the latest snapshot for this SHA
+	latestSnapshot := snapshots[len(snapshots)-1]
+
+	// Check current ref - if already pointing to this snapshot, skip
+	currentRef, err := s.repo.Reference(s.currentRef(), true)
+	if err == nil {
+		// Resolve symbolic ref
+		resolved, err := s.repo.Reference(currentRef.Target(), true)
+		if err == nil && string(resolved.Name()) == latestSnapshot.Ref {
+			// Already synced
+			return nil
+		}
+	}
+
+	// Restore from the latest snapshot (without lock since we already hold it)
+	return s.restoreSnapshotLocked(latestSnapshot.Ref)
+}
+
+// restoreSnapshotLocked restores from a snapshot without acquiring lock.
+func (s *Store) restoreSnapshotLocked(snapshotRefStr string) error {
+	// Get snapshot tree
+	snapshotRefName := plumbing.ReferenceName(snapshotRefStr)
+	ref, err := s.repo.Reference(snapshotRefName, true)
+	if err != nil {
+		return fmt.Errorf("get snapshot ref: %w", err)
+	}
+
+	tree, err := s.repo.TreeObject(ref.Hash())
+	if err != nil {
+		return fmt.Errorf("get snapshot tree: %w", err)
+	}
+
+	// Delete all current task refs
+	if err := s.deleteAllTaskRefs(); err != nil {
+		return err
+	}
+
+	// Restore tasks from tree
+	for _, entry := range tree.Entries {
+		taskRefName := plumbing.ReferenceName(s.refPrefix() + "tasks/" + entry.Name)
+		taskRef := plumbing.NewHashReference(taskRefName, entry.Hash)
+		if err := s.repo.Storer.SetReference(taskRef); err != nil {
+			return fmt.Errorf("restore task ref %s: %w", entry.Name, err)
+		}
+	}
+
+	// Update current to point to this snapshot
+	currentRefObj := plumbing.NewSymbolicReference(s.currentRef(), snapshotRefName)
+	if err := s.repo.Storer.SetReference(currentRefObj); err != nil {
+		return fmt.Errorf("set current ref: %w", err)
+	}
+
 	return nil
 }
 
-// PruneSnapshots removes snapshots older than the given duration.
-func (s *Store) PruneSnapshots(olderThan time.Duration) error {
-	// TODO: Implement snapshot pruning
+// PruneSnapshots removes old snapshots, keeping the most recent ones.
+func (s *Store) PruneSnapshots(keepCount int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Get all snapshots (empty string = all SHAs)
+	snapshots, err := s.listSnapshotsLocked("")
+	if err != nil {
+		return err
+	}
+
+	// Group by mainSHA
+	byMainSHA := make(map[string][]domain.SnapshotInfo)
+	for _, snap := range snapshots {
+		byMainSHA[snap.MainSHA] = append(byMainSHA[snap.MainSHA], snap)
+	}
+
+	// For each mainSHA, keep only the latest `keepCount` snapshots
+	for _, snaps := range byMainSHA {
+		if len(snaps) <= keepCount {
+			continue
+		}
+
+		// Remove older ones (snaps are sorted by seq)
+		toRemove := snaps[:len(snaps)-keepCount]
+		for _, snap := range toRemove {
+			refName := plumbing.ReferenceName(snap.Ref)
+			if err := s.repo.Storer.RemoveReference(refName); err != nil {
+				return fmt.Errorf("remove snapshot %s: %w", snap.Ref, err)
+			}
+		}
+	}
+
 	return nil
 }

@@ -57,8 +57,8 @@ type TaskRepository interface {
 	// If a snapshot exists for the current HEAD, restore it.
 	SyncSnapshot() error
 
-	// PruneSnapshots removes snapshots older than the given duration.
-	PruneSnapshots(olderThan time.Duration) error
+	// PruneSnapshots removes old snapshots, keeping the most recent keepCount per mainSHA.
+	PruneSnapshots(keepCount int) error
 }
 
 // SnapshotInfo contains information about a snapshot.

@@ -2,7 +2,6 @@
 package jsonstore
 
 import (
-	"time"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -334,6 +333,6 @@ func (s *Store) SyncSnapshot() error {
 }
 
 // PruneSnapshots is a no-op for JSON store.
-func (s *Store) PruneSnapshots(olderThan time.Duration) error {
+func (s *Store) PruneSnapshots(keepCount int) error {
 	return nil
 }

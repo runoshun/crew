@@ -537,7 +537,7 @@ func (m *MockTaskRepository) SyncSnapshot() error {
 }
 
 // PruneSnapshots is a no-op.
-func (m *MockTaskRepository) PruneSnapshots(olderThan time.Duration) error {
+func (m *MockTaskRepository) PruneSnapshots(keepCount int) error {
 	return nil
 }
 
@@ -564,6 +564,6 @@ func (m *MockTaskRepositoryWithAddCommentError) SyncSnapshot() error {
 }
 
 // PruneSnapshots is a no-op.
-func (m *MockTaskRepositoryWithAddCommentError) PruneSnapshots(olderThan time.Duration) error {
+func (m *MockTaskRepositoryWithAddCommentError) PruneSnapshots(keepCount int) error {
 	return nil
 }
