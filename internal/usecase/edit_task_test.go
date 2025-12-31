@@ -331,6 +331,103 @@ func TestEditTask_Execute_AddDuplicateLabel(t *testing.T) {
 	assert.Contains(t, out.Task.Labels, "new")
 }
 
+func TestEditTask_Execute_ReplaceLabels(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Labels: []string{"old1", "old2"},
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - replace all labels
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:    1,
+		Labels:    []string{"new1", "new2", "new3"},
+		LabelsSet: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Len(t, out.Task.Labels, 3)
+	assert.ElementsMatch(t, []string{"new1", "new2", "new3"}, out.Task.Labels)
+}
+
+func TestEditTask_Execute_ClearLabels(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Labels: []string{"a", "b", "c"},
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - clear all labels by setting empty slice with LabelsSet=true
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:    1,
+		Labels:    []string{},
+		LabelsSet: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Nil(t, out.Task.Labels)
+}
+
+func TestEditTask_Execute_LabelsWithAddLabelsConflict(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Labels: []string{"old"},
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - Labels takes precedence, AddLabels/RemoveLabels are ignored
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:    1,
+		Labels:    []string{"replaced"},
+		LabelsSet: true,
+		AddLabels: []string{"should-be-ignored"},
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Len(t, out.Task.Labels, 1)
+	assert.Contains(t, out.Task.Labels, "replaced")
+	assert.NotContains(t, out.Task.Labels, "should-be-ignored")
+}
+
+func TestEditTask_Execute_LabelsDeduplicated(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Labels: []string{"old"},
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - duplicate labels in input should be deduplicated
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:    1,
+		Labels:    []string{"a", "b", "a", "c", "b"},
+		LabelsSet: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Len(t, out.Task.Labels, 3)
+	assert.ElementsMatch(t, []string{"a", "b", "c"}, out.Task.Labels)
+}
+
 func TestUpdateLabels(t *testing.T) {
 	tests := []struct {
 		name    string

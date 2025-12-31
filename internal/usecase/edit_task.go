@@ -14,9 +14,11 @@ import (
 type EditTaskInput struct {
 	Title        *string  // New title (nil = no change)
 	Description  *string  // New description (nil = no change)
+	Labels       []string // Labels to set (replaces all existing labels, nil = no change)
 	AddLabels    []string // Labels to add
 	RemoveLabels []string // Labels to remove
 	TaskID       int      // Task ID to edit (required)
+	LabelsSet    bool     // True if Labels was explicitly set (to distinguish nil from empty)
 }
 
 // EditTaskOutput contains the result of editing a task.
@@ -39,7 +41,7 @@ func NewEditTask(tasks domain.TaskRepository) *EditTask {
 // Execute edits a task with the given input.
 func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutput, error) {
 	// Validate that at least one field is being updated
-	if in.Title == nil && in.Description == nil && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
+	if in.Title == nil && in.Description == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
@@ -66,7 +68,23 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	}
 
 	// Handle labels
-	if len(in.AddLabels) > 0 || len(in.RemoveLabels) > 0 {
+	if in.LabelsSet {
+		// Replace all labels with the new set (deduplicated)
+		if len(in.Labels) == 0 {
+			task.Labels = nil
+		} else {
+			// Deduplicate using a set
+			labelSet := make(map[string]bool, len(in.Labels))
+			for _, label := range in.Labels {
+				labelSet[label] = true
+			}
+			task.Labels = make([]string, 0, len(labelSet))
+			for label := range labelSet {
+				task.Labels = append(task.Labels, label)
+			}
+			slices.Sort(task.Labels)
+		}
+	} else if len(in.AddLabels) > 0 || len(in.RemoveLabels) > 0 {
 		task.Labels = updateLabels(task.Labels, in.AddLabels, in.RemoveLabels)
 	}
 

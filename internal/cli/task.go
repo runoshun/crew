@@ -296,6 +296,7 @@ func newEditCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		Title        string
 		Description  string
+		Labels       string
 		AddLabels    []string
 		RemoveLabels []string
 	}
@@ -305,7 +306,7 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		Short: "Edit task information",
 		Long: `Edit an existing task's title, description, or labels.
 
-At least one of --title, --desc, --add-label, or --rm-label must be specified.
+At least one of --title, --desc, --labels, --add-label, or --rm-label must be specified.
 
 Examples:
   # Change task title
@@ -313,6 +314,12 @@ Examples:
 
   # Update description
   git crew edit 1 --desc "Updated description text"
+
+  # Replace all labels (comma-separated)
+  git crew edit 1 --labels bug,urgent
+
+  # Clear all labels
+  git crew edit 1 --labels ""
 
   # Add labels
   git crew edit 1 --add-label bug --add-label urgent
@@ -344,6 +351,12 @@ Examples:
 			if cmd.Flags().Changed("desc") {
 				input.Description = &opts.Description
 			}
+			if cmd.Flags().Changed("labels") {
+				input.LabelsSet = true
+				if opts.Labels != "" {
+					input.Labels = strings.Split(opts.Labels, ",")
+				}
+			}
 
 			// Execute use case
 			uc := c.EditTaskUseCase()
@@ -360,6 +373,7 @@ Examples:
 	// Optional flags
 	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
 	cmd.Flags().StringVar(&opts.Description, "desc", "", "New task description")
+	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")
 	cmd.Flags().StringArrayVar(&opts.RemoveLabels, "rm-label", nil, "Labels to remove (can specify multiple)")
 
