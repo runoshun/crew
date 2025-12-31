@@ -20,7 +20,7 @@ type Config struct {
 
 // TasksConfig holds settings for task storage from [tasks] section.
 type TasksConfig struct {
-	Store     string // Storage backend: "json" (default) or "git"
+	Store     string // Storage backend: "git" (default) or "json"
 	Namespace string // Git namespace for refs (default: "crew")
 }
 

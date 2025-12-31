@@ -78,9 +78,14 @@ func New(dir string) (*Container, error) {
 	appConfig, _ := configLoader.Load() // ignore error, use defaults
 
 	// Create task repository based on config
+	// Default is "git" store; use "json" only if explicitly specified
 	var taskRepo domain.TaskRepository
 	var storeInit domain.StoreInitializer
-	if appConfig.Tasks.Store == "git" {
+	if appConfig.Tasks.Store == "json" {
+		jsonStore := jsonstore.New(cfg.StorePath)
+		taskRepo = jsonStore
+		storeInit = jsonStore
+	} else {
 		namespace := appConfig.Tasks.Namespace
 		if namespace == "" {
 			namespace = "crew"
@@ -91,10 +96,6 @@ func New(dir string) (*Container, error) {
 		}
 		taskRepo = gitStore
 		storeInit = gitStore
-	} else {
-		jsonStore := jsonstore.New(cfg.StorePath)
-		taskRepo = jsonStore
-		storeInit = jsonStore
 	}
 
 	// Create logger
