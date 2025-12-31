@@ -301,13 +301,16 @@ Delete a task.
 
 ### Session Management
 
-#### `git crew start <id> [agent]`
+#### `git crew start <id> [agent] [--model <model>]`
 
 Start an AI agent session.
 
 **Arguments**:
 - `id`: Task ID
 - `agent`: Agent name (uses `default_agent` setting if omitted)
+
+**Optional Arguments**:
+- `--model`, `-m`: Model name override (uses agent's default model if omitted)
 
 **Preconditions**:
 - Status is `todo`, `in_review`, or `error`
@@ -316,10 +319,21 @@ Start an AI agent session.
 **Processing**:
 1. Create worktree/branch if they don't exist
 2. Resolve agent command and prompt
-3. Generate task script (with session termination callback)
-4. Start tmux session in background
-5. Update status to `in_progress`
-6. Save agent info
+3. Resolve model (use `--model` value or fall back to agent's default)
+4. Generate task script (with session termination callback)
+5. Start tmux session in background
+6. Update status to `in_progress`
+7. Save agent info
+
+**Examples**:
+```bash
+# Start with default model
+git crew start 1 claude
+
+# Start with specific model
+git crew start 1 claude --model sonnet
+git crew start 1 opencode -m gpt-4o
+```
 
 **Error Conditions**:
 - Task does not exist → error
@@ -894,6 +908,7 @@ args = "--model opus"
 | `{{.PR}}` | PR number |
 | `{{.Prompt}}` | Common prompt |
 | `{{.Args}}` | Agent additional args |
+| `{{.Model}}` | Model name (from `--model` flag or agent's default) |
 | `{{.RepoRoot}}` | Repository root |
 | `{{.GitDir}}` | .git directory |
 
@@ -901,9 +916,13 @@ args = "--model opus"
 
 | Agent | Command Format |
 |-------|----------------|
-| `claude` | `claude [args] "$PROMPT"` |
-| `opencode` | `opencode [args] -p "$PROMPT"` |
-| `codex` | `codex [args] "$PROMPT"` |
+| `claude` | `claude [system-args] [args] "$PROMPT"` |
+| `opencode` | `opencode [system-args] [args] -p "$PROMPT"` |
+| `codex` | `codex [system-args] [args] "$PROMPT"` |
+
+**Argument Types:**
+- `system-args`: System-managed arguments (e.g., `--model`). Set by `--model` flag. Not user-configurable via config.toml.
+- `args`: User-customizable arguments. Can be extended via `[agents.<name>].args` in config.toml.
 
 ---
 

@@ -237,6 +237,71 @@ func TestWorkerAgent_RenderCommand_InvalidPromptTemplate(t *testing.T) {
 	}
 }
 
+func TestAgent_RenderCommand_WithModel(t *testing.T) {
+	tests := []struct {
+		name        string
+		agent       WorkerAgent
+		data        CommandData
+		wantCommand string
+	}{
+		{
+			name: "claude with model in SystemArgs",
+			agent: WorkerAgent{
+				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+				Command:         "claude",
+				SystemArgs:      "--model {{.Model}}",
+				Args:            "--verbose",
+			},
+			data:        CommandData{TaskID: 1, Model: "sonnet"},
+			wantCommand: `claude --model sonnet --verbose "$PROMPT"`,
+		},
+		{
+			name: "opencode with model in SystemArgs",
+			agent: WorkerAgent{
+				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
+				Command:         "opencode",
+				SystemArgs:      "-m {{.Model}}",
+				Args:            "",
+			},
+			data:        CommandData{TaskID: 1, Model: "gpt-4o"},
+			wantCommand: `opencode -m gpt-4o  --prompt "$PROMPT"`,
+		},
+		{
+			name: "model with empty value in SystemArgs",
+			agent: WorkerAgent{
+				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Prompt}}",
+				Command:         "agent",
+				SystemArgs:      "--model {{.Model}}",
+			},
+			data:        CommandData{TaskID: 1, Model: ""},
+			wantCommand: `agent --model  "$PROMPT"`,
+		},
+		{
+			name: "user Args not affected by model",
+			agent: WorkerAgent{
+				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+				Command:         "claude",
+				SystemArgs:      "--model {{.Model}}",
+				Args:            "--custom-flag",
+			},
+			data:        CommandData{TaskID: 1, Model: "opus"},
+			wantCommand: `claude --model opus --custom-flag "$PROMPT"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := tt.agent.RenderCommand(tt.data, `"$PROMPT"`, "default prompt")
+			if err != nil {
+				t.Fatalf("RenderCommand() error = %v", err)
+			}
+			if result.Command != tt.wantCommand {
+				t.Errorf("RenderCommand().Command = %q, want %q", result.Command, tt.wantCommand)
+			}
+		})
+	}
+}
+
 func TestRenderConfigTemplate(t *testing.T) {
 	content, err := RenderConfigTemplate()
 	if err != nil {

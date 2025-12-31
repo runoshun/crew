@@ -697,3 +697,114 @@ func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(scriptContent), "Custom worker prompt for claude")
 }
+
+func TestStartTask_Execute_WithModelOverride(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute with model override
+	out, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+		Model:  "sonnet",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "crew-1", out.SessionName)
+
+	// Verify script uses overridden model
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	// The model should be expanded in Args template: --model {{.Model}} -> --model sonnet
+	assert.Contains(t, script, "--model sonnet")
+}
+
+func TestStartTask_Execute_WithDefaultModel(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute without model (should use agent's default)
+	out, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+		Model:  "", // No model specified
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "crew-1", out.SessionName)
+
+	// Verify script uses default model from BuiltinWorkers
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	// Default model for claude is "opus" (from BuiltinWorkers)
+	assert.Contains(t, script, "--model opus")
+}
+
+func TestStartTask_Execute_OpencodeWithModelOverride(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute with opencode and model override
+	out, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "opencode",
+		Model:  "gpt-4o",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "crew-1", out.SessionName)
+
+	// Verify script uses overridden model
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	// The model should be expanded: -m {{.Model}} -> -m gpt-4o
+	assert.Contains(t, script, "-m gpt-4o")
+}
