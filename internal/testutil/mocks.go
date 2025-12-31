@@ -570,10 +570,10 @@ func (m *MockTaskRepositoryWithAddCommentError) PruneSnapshots(keepCount int) er
 
 // === Remote sync methods (no-op for mock) ===
 
-func (m *MockTaskRepository) Push() error { return nil }
-func (m *MockTaskRepository) Fetch(namespace string) error { return nil }
+func (m *MockTaskRepository) Push() error                       { return nil }
+func (m *MockTaskRepository) Fetch(_ string) error              { return nil }
 func (m *MockTaskRepository) ListNamespaces() ([]string, error) { return nil, nil }
 
-func (m *MockTaskRepositoryWithAddCommentError) Push() error { return nil }
-func (m *MockTaskRepositoryWithAddCommentError) Fetch(namespace string) error { return nil }
+func (m *MockTaskRepositoryWithAddCommentError) Push() error                       { return nil }
+func (m *MockTaskRepositoryWithAddCommentError) Fetch(_ string) error              { return nil }
 func (m *MockTaskRepositoryWithAddCommentError) ListNamespaces() ([]string, error) { return nil, nil }

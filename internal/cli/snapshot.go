@@ -50,7 +50,7 @@ func newSnapshotSaveCmd(container *app.Container) *cobra.Command {
 				return fmt.Errorf("save snapshot: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Snapshot saved for %s\n", head[:7])
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Snapshot saved for %s\n", head[:7])
 			return nil
 		},
 	}
@@ -84,12 +84,12 @@ func newSnapshotListCmd(container *app.Container) *cobra.Command {
 			}
 
 			if len(snapshots) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No snapshots found")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No snapshots found")
 				return nil
 			}
 
 			for _, s := range snapshots {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s_%03d  (%s)\n", s.MainSHA[:7], s.Seq, s.Ref)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s_%03d  (%s)\n", s.MainSHA[:7], s.Seq, s.Ref)
 			}
 
 			return nil
@@ -121,14 +121,14 @@ func newSnapshotRestoreCmd(container *app.Container) *cobra.Command {
 				if err := container.Tasks.SaveSnapshot(head); err != nil {
 					return fmt.Errorf("save current state: %w", err)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Saved current state for %s\n", head[:7])
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Saved current state for %s\n", head[:7])
 			}
 
 			if err := container.Tasks.RestoreSnapshot(snapshotRef); err != nil {
 				return fmt.Errorf("restore snapshot: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Restored from %s\n", snapshotRef)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Restored from %s\n", snapshotRef)
 			return nil
 		},
 	}
@@ -148,7 +148,7 @@ func newSnapshotSyncCmd(container *app.Container) *cobra.Command {
 				return fmt.Errorf("sync snapshot: %w", err)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), "Synced with current HEAD")
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Synced with current HEAD")
 			return nil
 		},
 	}
@@ -168,7 +168,7 @@ func newSnapshotPruneCmd(container *app.Container) *cobra.Command {
 				return fmt.Errorf("prune snapshots: %w", err)
 			}
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Pruned snapshots (kept %d per SHA)\n", keepCount)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Pruned snapshots (kept %d per SHA)\n", keepCount)
 			return nil
 		},
 	}

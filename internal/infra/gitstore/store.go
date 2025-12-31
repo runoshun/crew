@@ -433,8 +433,8 @@ func (s *Store) Initialize() error {
 
 	// Create initial metadata
 	m := &meta{NextTaskID: 1}
-	if err := s.saveMeta(m); err != nil {
-		return err
+	if saveErr := s.saveMeta(m); saveErr != nil {
+		return saveErr
 	}
 
 	// Create initialized marker (empty blob)
@@ -575,8 +575,8 @@ func (s *Store) buildTasksTree() (plumbing.Hash, error) {
 	tree.Entries = entries
 
 	obj := s.repo.Storer.NewEncodedObject()
-	if err := tree.Encode(obj); err != nil {
-		return plumbing.ZeroHash, fmt.Errorf("encode tree: %w", err)
+	if encodeErr := tree.Encode(obj); encodeErr != nil {
+		return plumbing.ZeroHash, fmt.Errorf("encode tree: %w", encodeErr)
 	}
 
 	hash, err := s.repo.Storer.SetEncodedObject(obj)
@@ -864,7 +864,7 @@ func (s *Store) Push() error {
 
 	// Use git command for push (go-git push requires auth config)
 	refspec := fmt.Sprintf("refs/%s/*:refs/%s/*", s.namespace, s.namespace)
-	cmd := exec.Command("git", "-C", s.repoPath, "push", "origin", refspec)
+	cmd := exec.Command("git", "-C", s.repoPath, "push", "origin", refspec) //nolint:gosec // refspec is constructed from trusted namespace
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("push failed: %s: %w", string(output), err)
@@ -882,7 +882,7 @@ func (s *Store) Fetch(namespace string) error {
 	}
 
 	refspec := fmt.Sprintf("refs/%s/*:refs/%s/*", namespace, namespace)
-	cmd := exec.Command("git", "-C", s.repoPath, "fetch", "origin", refspec)
+	cmd := exec.Command("git", "-C", s.repoPath, "fetch", "origin", refspec) //nolint:gosec // refspec is constructed from trusted namespace
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("fetch failed: %s: %w", string(output), err)
@@ -895,7 +895,7 @@ func (s *Store) ListNamespaces() ([]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	cmd := exec.Command("git", "-C", s.repoPath, "ls-remote", "--refs", "origin", "refs/crew-*")
+	cmd := exec.Command("git", "-C", s.repoPath, "ls-remote", "--refs", "origin", "refs/crew-*") //nolint:gosec // args are constants
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("ls-remote failed: %w", err)
@@ -914,9 +914,7 @@ func (s *Store) ListNamespaces() ([]string, error) {
 		}
 		ref := parts[1]
 		// Extract namespace from refs/crew-xxx/...
-		if strings.HasPrefix(ref, "refs/") {
-			ref = ref[5:] // Remove "refs/"
-		}
+		ref = strings.TrimPrefix(ref, "refs/")
 		idx := strings.Index(ref, "/")
 		if idx > 0 {
 			ns := ref[:idx]

@@ -73,11 +73,12 @@ type TaskRepository interface {
 }
 
 // SnapshotInfo contains information about a snapshot.
+// Fields are ordered to minimize memory padding.
 type SnapshotInfo struct {
+	CreatedAt time.Time // When the snapshot was created
 	Ref       string    // Full ref name (e.g., refs/crew-xxx/snapshots/abc123_001)
 	MainSHA   string    // Git commit SHA this snapshot is associated with
 	Seq       int       // Sequence number within the same mainSHA
-	CreatedAt time.Time // When the snapshot was created
 }
 
 // TaskFilter specifies criteria for listing tasks.
