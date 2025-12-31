@@ -513,3 +513,57 @@ func (m *MockConfigManager) InitGlobalConfig() error {
 	m.InitGlobalCalled = true
 	return m.InitGlobalErr
 }
+
+// === Snapshot methods (no-op for mock) ===
+
+// SaveSnapshot is a no-op.
+func (m *MockTaskRepository) SaveSnapshot(mainSHA string) error {
+	return nil
+}
+
+// RestoreSnapshot is a no-op.
+func (m *MockTaskRepository) RestoreSnapshot(snapshotRef string) error {
+	return nil
+}
+
+// ListSnapshots returns empty.
+func (m *MockTaskRepository) ListSnapshots(mainSHA string) ([]domain.SnapshotInfo, error) {
+	return nil, nil
+}
+
+// SyncSnapshot is a no-op.
+func (m *MockTaskRepository) SyncSnapshot() error {
+	return nil
+}
+
+// PruneSnapshots is a no-op.
+func (m *MockTaskRepository) PruneSnapshots(olderThan time.Duration) error {
+	return nil
+}
+
+// === Snapshot methods for MockTaskRepositoryWithAddCommentError ===
+
+// SaveSnapshot is a no-op.
+func (m *MockTaskRepositoryWithAddCommentError) SaveSnapshot(mainSHA string) error {
+	return nil
+}
+
+// RestoreSnapshot is a no-op.
+func (m *MockTaskRepositoryWithAddCommentError) RestoreSnapshot(snapshotRef string) error {
+	return nil
+}
+
+// ListSnapshots returns empty.
+func (m *MockTaskRepositoryWithAddCommentError) ListSnapshots(mainSHA string) ([]domain.SnapshotInfo, error) {
+	return nil, nil
+}
+
+// SyncSnapshot is a no-op.
+func (m *MockTaskRepositoryWithAddCommentError) SyncSnapshot() error {
+	return nil
+}
+
+// PruneSnapshots is a no-op.
+func (m *MockTaskRepositoryWithAddCommentError) PruneSnapshots(olderThan time.Duration) error {
+	return nil
+}

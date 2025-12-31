@@ -38,6 +38,35 @@ type TaskRepository interface {
 
 	// AddComment adds a comment to a task.
 	AddComment(taskID int, comment Comment) error
+
+	// === Snapshot operations ===
+
+	// SaveSnapshot saves the current task state as a snapshot.
+	// mainSHA is the git commit SHA to associate with this snapshot.
+	SaveSnapshot(mainSHA string) error
+
+	// RestoreSnapshot restores tasks from a snapshot.
+	// Before restoring, the current state is saved as a new snapshot.
+	RestoreSnapshot(snapshotRef string) error
+
+	// ListSnapshots returns all snapshots for a given main SHA.
+	// If mainSHA is empty, returns all snapshots.
+	ListSnapshots(mainSHA string) ([]SnapshotInfo, error)
+
+	// SyncSnapshot syncs task state with the current git HEAD.
+	// If a snapshot exists for the current HEAD, restore it.
+	SyncSnapshot() error
+
+	// PruneSnapshots removes snapshots older than the given duration.
+	PruneSnapshots(olderThan time.Duration) error
+}
+
+// SnapshotInfo contains information about a snapshot.
+type SnapshotInfo struct {
+	Ref       string    // Full ref name (e.g., refs/crew-xxx/snapshots/abc123_001)
+	MainSHA   string    // Git commit SHA this snapshot is associated with
+	Seq       int       // Sequence number within the same mainSHA
+	CreatedAt time.Time // When the snapshot was created
 }
 
 // TaskFilter specifies criteria for listing tasks.

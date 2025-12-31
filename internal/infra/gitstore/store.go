@@ -6,9 +6,12 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"gopkg.in/yaml.v3"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -475,3 +478,273 @@ var _ domain.TaskRepository = (*Store)(nil)
 
 // Ensure Store implements StoreInitializer.
 var _ domain.StoreInitializer = (*Store)(nil)
+
+// === Snapshot operations ===
+
+// snapshotRef returns the ref name for a snapshot.
+func (s *Store) snapshotRef(mainSHA string, seq int) plumbing.ReferenceName {
+	return plumbing.ReferenceName(fmt.Sprintf("%ssnapshots/%s_%03d", s.refPrefix(), mainSHA, seq))
+}
+
+// currentRef returns the ref name for the current snapshot pointer.
+func (s *Store) currentRef() plumbing.ReferenceName {
+	return plumbing.ReferenceName(s.refPrefix() + "current")
+}
+
+// SaveSnapshot saves the current task state as a snapshot.
+func (s *Store) SaveSnapshot(mainSHA string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Find next sequence number for this mainSHA
+	seq := 1
+	snapshots, err := s.listSnapshotsLocked(mainSHA)
+	if err != nil {
+		return err
+	}
+	if len(snapshots) > 0 {
+		seq = snapshots[len(snapshots)-1].Seq + 1
+	}
+
+	// Build tree from current tasks
+	treeHash, err := s.buildTasksTree()
+	if err != nil {
+		return err
+	}
+
+	// Create snapshot ref
+	snapshotRefName := s.snapshotRef(mainSHA, seq)
+	ref := plumbing.NewHashReference(snapshotRefName, treeHash)
+	if err := s.repo.Storer.SetReference(ref); err != nil {
+		return fmt.Errorf("set snapshot ref: %w", err)
+	}
+
+	// Update current to point to this snapshot
+	currentRefObj := plumbing.NewSymbolicReference(s.currentRef(), snapshotRefName)
+	if err := s.repo.Storer.SetReference(currentRefObj); err != nil {
+		return fmt.Errorf("set current ref: %w", err)
+	}
+
+	return nil
+}
+
+// buildTasksTree creates a tree object from all current tasks.
+func (s *Store) buildTasksTree() (plumbing.Hash, error) {
+	var entries []object.TreeEntry
+	prefix := s.refPrefix() + "tasks/"
+
+	refs, err := s.repo.References()
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("list refs: %w", err)
+	}
+
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		refName := string(ref.Name())
+		if len(refName) <= len(prefix) || refName[:len(prefix)] != prefix {
+			return nil
+		}
+
+		idStr := refName[len(prefix):]
+		entries = append(entries, object.TreeEntry{
+			Name: idStr,
+			Mode: filemode.Regular,
+			Hash: ref.Hash(),
+		})
+		return nil
+	})
+	if err != nil {
+		return plumbing.ZeroHash, err
+	}
+
+	// Sort entries by name for consistent tree hash
+	slices.SortFunc(entries, func(a, b object.TreeEntry) int {
+		if a.Name < b.Name {
+			return -1
+		}
+		if a.Name > b.Name {
+			return 1
+		}
+		return 0
+	})
+
+	// Create tree object
+	tree := &object.Tree{}
+	tree.Entries = entries
+
+	obj := s.repo.Storer.NewEncodedObject()
+	if err := tree.Encode(obj); err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("encode tree: %w", err)
+	}
+
+	hash, err := s.repo.Storer.SetEncodedObject(obj)
+	if err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("store tree: %w", err)
+	}
+
+	return hash, nil
+}
+
+// RestoreSnapshot restores tasks from a snapshot.
+func (s *Store) RestoreSnapshot(snapshotRefStr string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Get snapshot tree
+	snapshotRefName := plumbing.ReferenceName(snapshotRefStr)
+	ref, err := s.repo.Reference(snapshotRefName, true)
+	if err != nil {
+		return fmt.Errorf("get snapshot ref: %w", err)
+	}
+
+	tree, err := s.repo.TreeObject(ref.Hash())
+	if err != nil {
+		return fmt.Errorf("get snapshot tree: %w", err)
+	}
+
+	// Delete all current task refs
+	if err := s.deleteAllTaskRefs(); err != nil {
+		return err
+	}
+
+	// Restore tasks from tree
+	for _, entry := range tree.Entries {
+		taskRefName := plumbing.ReferenceName(s.refPrefix() + "tasks/" + entry.Name)
+		taskRef := plumbing.NewHashReference(taskRefName, entry.Hash)
+		if err := s.repo.Storer.SetReference(taskRef); err != nil {
+			return fmt.Errorf("restore task ref %s: %w", entry.Name, err)
+		}
+	}
+
+	// Update current to point to this snapshot
+	currentRefObj := plumbing.NewSymbolicReference(s.currentRef(), snapshotRefName)
+	if err := s.repo.Storer.SetReference(currentRefObj); err != nil {
+		return fmt.Errorf("set current ref: %w", err)
+	}
+
+	return nil
+}
+
+// deleteAllTaskRefs removes all task refs.
+func (s *Store) deleteAllTaskRefs() error {
+	prefix := s.refPrefix() + "tasks/"
+	var toDelete []plumbing.ReferenceName
+
+	refs, err := s.repo.References()
+	if err != nil {
+		return fmt.Errorf("list refs: %w", err)
+	}
+
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		refName := string(ref.Name())
+		if len(refName) > len(prefix) && refName[:len(prefix)] == prefix {
+			toDelete = append(toDelete, ref.Name())
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, refName := range toDelete {
+		if err := s.repo.Storer.RemoveReference(refName); err != nil {
+			return fmt.Errorf("remove ref %s: %w", refName, err)
+		}
+	}
+
+	return nil
+}
+
+// ListSnapshots returns all snapshots for a given main SHA.
+func (s *Store) ListSnapshots(mainSHA string) ([]domain.SnapshotInfo, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.listSnapshotsLocked(mainSHA)
+}
+
+// listSnapshotsLocked lists snapshots without locking.
+func (s *Store) listSnapshotsLocked(mainSHA string) ([]domain.SnapshotInfo, error) {
+	var snapshots []domain.SnapshotInfo
+	prefix := s.refPrefix() + "snapshots/"
+
+	refs, err := s.repo.References()
+	if err != nil {
+		return nil, fmt.Errorf("list refs: %w", err)
+	}
+
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		refName := string(ref.Name())
+		if len(refName) <= len(prefix) || refName[:len(prefix)] != prefix {
+			return nil
+		}
+
+		// Parse snapshot ref name: <mainSHA>_<seq>
+		suffix := refName[len(prefix):]
+		parts := splitLast(suffix, "_")
+		if len(parts) != 2 {
+			return nil
+		}
+
+		sha := parts[0]
+		seq, parseErr := strconv.Atoi(parts[1])
+		if parseErr != nil {
+			return nil
+		}
+
+		// Filter by mainSHA if specified
+		if mainSHA != "" && sha != mainSHA {
+			return nil
+		}
+
+		snapshots = append(snapshots, domain.SnapshotInfo{
+			Ref:     refName,
+			MainSHA: sha,
+			Seq:     seq,
+			// CreatedAt: would need commit metadata
+		})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort by mainSHA, then seq
+	slices.SortFunc(snapshots, func(a, b domain.SnapshotInfo) int {
+		if a.MainSHA != b.MainSHA {
+			if a.MainSHA < b.MainSHA {
+				return -1
+			}
+			return 1
+		}
+		return a.Seq - b.Seq
+	})
+
+	return snapshots, nil
+}
+
+// splitLast splits s by the last occurrence of sep.
+func splitLast(s, sep string) []string {
+	idx := -1
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == sep[0] {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return []string{s}
+	}
+	return []string{s[:idx], s[idx+1:]}
+}
+
+// SyncSnapshot syncs task state with the current git HEAD.
+func (s *Store) SyncSnapshot() error {
+	// TODO: Get main branch HEAD and restore if snapshot exists
+	return nil
+}
+
+// PruneSnapshots removes snapshots older than the given duration.
+func (s *Store) PruneSnapshots(olderThan time.Duration) error {
+	// TODO: Implement snapshot pruning
+	return nil
+}

@@ -2,6 +2,7 @@
 package jsonstore
 
 import (
+	"time"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -309,3 +310,30 @@ func containsAll(slice, required []string) bool {
 
 // Ensure Store implements TaskRepository.
 var _ domain.TaskRepository = (*Store)(nil)
+
+// === Snapshot operations (no-op for JSON store) ===
+
+// SaveSnapshot is a no-op for JSON store.
+func (s *Store) SaveSnapshot(mainSHA string) error {
+	return nil
+}
+
+// RestoreSnapshot is a no-op for JSON store.
+func (s *Store) RestoreSnapshot(snapshotRef string) error {
+	return nil
+}
+
+// ListSnapshots returns empty for JSON store.
+func (s *Store) ListSnapshots(mainSHA string) ([]domain.SnapshotInfo, error) {
+	return nil, nil
+}
+
+// SyncSnapshot is a no-op for JSON store.
+func (s *Store) SyncSnapshot() error {
+	return nil
+}
+
+// PruneSnapshots is a no-op for JSON store.
+func (s *Store) PruneSnapshots(olderThan time.Duration) error {
+	return nil
+}

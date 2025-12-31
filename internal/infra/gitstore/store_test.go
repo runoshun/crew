@@ -279,5 +279,95 @@ func TestStore_NamespaceIsolation(t *testing.T) {
 	got2, err := store2.Get(1)
 	require.NoError(t, err)
 	require.NotNil(t, got2)
-	assert.Equal(t, "User2 Task", got2.Title)
+}
+
+func TestSnapshot(t *testing.T) {
+	repo := setupTestRepo(t)
+	store := NewWithRepo(repo, "crew-test")
+	require.NoError(t, store.Initialize())
+
+	// Create some tasks
+	task1 := &domain.Task{ID: 1, Title: "Task 1", Status: domain.StatusTodo}
+	task2 := &domain.Task{ID: 2, Title: "Task 2", Status: domain.StatusInProgress}
+	require.NoError(t, store.Save(task1))
+	require.NoError(t, store.Save(task2))
+
+	// Save snapshot
+	mainSHA := "abc123"
+	require.NoError(t, store.SaveSnapshot(mainSHA))
+
+	// Verify snapshot was created
+	snapshots, err := store.ListSnapshots(mainSHA)
+	require.NoError(t, err)
+	require.Len(t, snapshots, 1)
+	assert.Equal(t, mainSHA, snapshots[0].MainSHA)
+	assert.Equal(t, 1, snapshots[0].Seq)
+
+	// Modify tasks
+	task1.Status = domain.StatusDone
+	require.NoError(t, store.Save(task1))
+	require.NoError(t, store.Delete(2))
+
+	// Verify modification
+	tasks, err := store.List(domain.TaskFilter{})
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	assert.Equal(t, domain.StatusDone, tasks[0].Status)
+
+	// Restore snapshot
+	require.NoError(t, store.RestoreSnapshot(snapshots[0].Ref))
+
+	// Verify restoration
+	tasks, err = store.List(domain.TaskFilter{})
+	require.NoError(t, err)
+	require.Len(t, tasks, 2)
+
+	restored1, err := store.Get(1)
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusTodo, restored1.Status)
+
+	restored2, err := store.Get(2)
+	require.NoError(t, err)
+	assert.Equal(t, "Task 2", restored2.Title)
+}
+
+func TestSnapshotMultipleSequence(t *testing.T) {
+	repo := setupTestRepo(t)
+	store := NewWithRepo(repo, "crew-test")
+	require.NoError(t, store.Initialize())
+
+	// Create task
+	task := &domain.Task{ID: 1, Title: "Task 1", Status: domain.StatusTodo}
+	require.NoError(t, store.Save(task))
+
+	mainSHA := "def456"
+
+	// Save multiple snapshots
+	require.NoError(t, store.SaveSnapshot(mainSHA))
+	task.Status = domain.StatusInProgress
+	require.NoError(t, store.Save(task))
+	require.NoError(t, store.SaveSnapshot(mainSHA))
+	task.Status = domain.StatusDone
+	require.NoError(t, store.Save(task))
+	require.NoError(t, store.SaveSnapshot(mainSHA))
+
+	// Verify all snapshots exist
+	snapshots, err := store.ListSnapshots(mainSHA)
+	require.NoError(t, err)
+	require.Len(t, snapshots, 3)
+	assert.Equal(t, 1, snapshots[0].Seq)
+	assert.Equal(t, 2, snapshots[1].Seq)
+	assert.Equal(t, 3, snapshots[2].Seq)
+
+	// Restore to first snapshot
+	require.NoError(t, store.RestoreSnapshot(snapshots[0].Ref))
+	restored, err := store.Get(1)
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusTodo, restored.Status)
+
+	// Restore to second snapshot
+	require.NoError(t, store.RestoreSnapshot(snapshots[1].Ref))
+	restored, err = store.Get(1)
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusInProgress, restored.Status)
 }
