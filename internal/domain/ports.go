@@ -9,6 +9,8 @@ import (
 type StoreInitializer interface {
 	// Initialize creates the store if it doesn't exist.
 	Initialize() error
+	// IsInitialized checks if the store has been initialized.
+	IsInitialized() bool
 }
 
 // TaskRepository manages task persistence.
@@ -36,6 +38,46 @@ type TaskRepository interface {
 
 	// AddComment adds a comment to a task.
 	AddComment(taskID int, comment Comment) error
+
+	// === Snapshot operations ===
+
+	// SaveSnapshot saves the current task state as a snapshot.
+	// mainSHA is the git commit SHA to associate with this snapshot.
+	SaveSnapshot(mainSHA string) error
+
+	// RestoreSnapshot restores tasks from a snapshot.
+	// Before restoring, the current state is saved as a new snapshot.
+	RestoreSnapshot(snapshotRef string) error
+
+	// ListSnapshots returns all snapshots for a given main SHA.
+	// If mainSHA is empty, returns all snapshots.
+	ListSnapshots(mainSHA string) ([]SnapshotInfo, error)
+
+	// SyncSnapshot syncs task state with the current git HEAD.
+	// If a snapshot exists for the current HEAD, restore it.
+	SyncSnapshot() error
+
+	// PruneSnapshots removes old snapshots, keeping the most recent keepCount per mainSHA.
+	PruneSnapshots(keepCount int) error
+
+	// === Remote sync operations ===
+
+	// Push pushes task refs to remote.
+	Push() error
+
+	// Fetch fetches task refs from remote for a given namespace.
+	Fetch(namespace string) error
+
+	// ListNamespaces returns available namespaces on remote.
+	ListNamespaces() ([]string, error)
+}
+
+// SnapshotInfo contains information about a snapshot.
+type SnapshotInfo struct {
+	Ref       string    // Full ref name (e.g., refs/crew-xxx/snapshots/abc123_001)
+	MainSHA   string    // Git commit SHA this snapshot is associated with
+	Seq       int       // Sequence number within the same mainSHA
+	CreatedAt time.Time // When the snapshot was created
 }
 
 // TaskFilter specifies criteria for listing tasks.

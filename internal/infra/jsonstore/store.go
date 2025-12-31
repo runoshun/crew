@@ -155,6 +155,12 @@ func (s *Store) AddComment(taskID int, comment domain.Comment) error {
 	})
 }
 
+// IsInitialized checks if the store file exists.
+func (s *Store) IsInitialized() bool {
+	_, err := os.Stat(s.path)
+	return err == nil
+}
+
 // Initialize creates an empty store file if it doesn't exist.
 func (s *Store) Initialize() error {
 	// Ensure parent directory exists
@@ -303,3 +309,47 @@ func containsAll(slice, required []string) bool {
 
 // Ensure Store implements TaskRepository.
 var _ domain.TaskRepository = (*Store)(nil)
+
+// === Snapshot operations (no-op for JSON store) ===
+
+// SaveSnapshot is a no-op for JSON store.
+func (s *Store) SaveSnapshot(mainSHA string) error {
+	return nil
+}
+
+// RestoreSnapshot is a no-op for JSON store.
+func (s *Store) RestoreSnapshot(snapshotRef string) error {
+	return nil
+}
+
+// ListSnapshots returns empty for JSON store.
+func (s *Store) ListSnapshots(mainSHA string) ([]domain.SnapshotInfo, error) {
+	return nil, nil
+}
+
+// SyncSnapshot is a no-op for JSON store.
+func (s *Store) SyncSnapshot() error {
+	return nil
+}
+
+// PruneSnapshots is a no-op for JSON store.
+func (s *Store) PruneSnapshots(keepCount int) error {
+	return nil
+}
+
+// === Remote sync operations (no-op for JSON store) ===
+
+// Push is a no-op for JSON store.
+func (s *Store) Push() error {
+	return nil
+}
+
+// Fetch is a no-op for JSON store.
+func (s *Store) Fetch(namespace string) error {
+	return nil
+}
+
+// ListNamespaces returns empty for JSON store.
+func (s *Store) ListNamespaces() ([]string, error) {
+	return nil, nil
+}

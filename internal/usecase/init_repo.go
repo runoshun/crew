@@ -35,7 +35,7 @@ func NewInitRepo(storeInit domain.StoreInitializer) *InitRepo {
 // It creates the .git/crew/ directory, tmux.conf, and empty tasks.json.
 func (uc *InitRepo) Execute(_ context.Context, in InitRepoInput) (*InitRepoOutput, error) {
 	// Check if already initialized
-	if _, err := os.Stat(in.CrewDir); err == nil {
+	if uc.storeInit.IsInitialized() {
 		return nil, domain.ErrAlreadyInitialized
 	}
 

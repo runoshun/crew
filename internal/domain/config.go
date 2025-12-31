@@ -15,6 +15,13 @@ type Config struct {
 	Complete      CompleteConfig         // [complete] settings
 	Diff          DiffConfig             // [diff] settings
 	Log           LogConfig              // [log] settings
+	Tasks         TasksConfig            // [tasks] settings
+}
+
+// TasksConfig holds settings for task storage from [tasks] section.
+type TasksConfig struct {
+	Store     string // Storage backend: "json" (default) or "git"
+	Namespace string // Git namespace for refs (default: "crew")
 }
 
 // WorkersConfig holds common settings for all workers from [workers] section.

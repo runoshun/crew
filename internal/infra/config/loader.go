@@ -58,6 +58,12 @@ type configFile struct {
 	Complete completeSection `toml:"complete"`
 	Diff     diffSection     `toml:"diff"`
 	Log      logSection      `toml:"log"`
+	Tasks    tasksSection    `toml:"tasks"`
+}
+
+type tasksSection struct {
+	Store     string `toml:"store"`
+	Namespace string `toml:"namespace"`
 }
 
 // workersConfig holds the parsed [workers] section.
@@ -268,6 +274,10 @@ func convertToDomainConfig(cf *configFile) *domain.Config {
 		Log: domain.LogConfig{
 			Level: cf.Log.Level,
 		},
+		Tasks: domain.TasksConfig{
+			Store:     cf.Tasks.Store,
+			Namespace: cf.Tasks.Namespace,
+		},
 	}
 }
 
@@ -278,6 +288,7 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		Complete:      base.Complete,
 		Diff:          base.Diff,
 		Log:           base.Log,
+		Tasks:         base.Tasks,
 		Workers:       make(map[string]domain.WorkerAgent),
 	}
 
@@ -304,6 +315,12 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.Log.Level != "" {
 		result.Log.Level = override.Log.Level
+	}
+	if override.Tasks.Store != "" {
+		result.Tasks.Store = override.Tasks.Store
+	}
+	if override.Tasks.Namespace != "" {
+		result.Tasks.Namespace = override.Tasks.Namespace
 	}
 
 	// Merge workers: override individual fields, not entire worker

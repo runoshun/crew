@@ -103,11 +103,18 @@ func (m *MockTaskRepository) AddComment(taskID int, comment domain.Comment) erro
 }
 
 // MockStoreInitializer is a test double for domain.StoreInitializer.
-type MockStoreInitializer struct{}
+type MockStoreInitializer struct {
+	Initialized bool
+}
 
 // Initialize is a no-op for testing.
 func (m *MockStoreInitializer) Initialize() error {
 	return nil
+}
+
+// IsInitialized returns the configured value.
+func (m *MockStoreInitializer) IsInitialized() bool {
+	return m.Initialized
 }
 
 // MockTaskRepositoryWithNextIDError extends MockTaskRepository to return error on NextID.
@@ -506,3 +513,67 @@ func (m *MockConfigManager) InitGlobalConfig() error {
 	m.InitGlobalCalled = true
 	return m.InitGlobalErr
 }
+
+// === Snapshot methods (no-op for mock) ===
+
+// SaveSnapshot is a no-op.
+func (m *MockTaskRepository) SaveSnapshot(mainSHA string) error {
+	return nil
+}
+
+// RestoreSnapshot is a no-op.
+func (m *MockTaskRepository) RestoreSnapshot(snapshotRef string) error {
+	return nil
+}
+
+// ListSnapshots returns empty.
+func (m *MockTaskRepository) ListSnapshots(mainSHA string) ([]domain.SnapshotInfo, error) {
+	return nil, nil
+}
+
+// SyncSnapshot is a no-op.
+func (m *MockTaskRepository) SyncSnapshot() error {
+	return nil
+}
+
+// PruneSnapshots is a no-op.
+func (m *MockTaskRepository) PruneSnapshots(keepCount int) error {
+	return nil
+}
+
+// === Snapshot methods for MockTaskRepositoryWithAddCommentError ===
+
+// SaveSnapshot is a no-op.
+func (m *MockTaskRepositoryWithAddCommentError) SaveSnapshot(mainSHA string) error {
+	return nil
+}
+
+// RestoreSnapshot is a no-op.
+func (m *MockTaskRepositoryWithAddCommentError) RestoreSnapshot(snapshotRef string) error {
+	return nil
+}
+
+// ListSnapshots returns empty.
+func (m *MockTaskRepositoryWithAddCommentError) ListSnapshots(mainSHA string) ([]domain.SnapshotInfo, error) {
+	return nil, nil
+}
+
+// SyncSnapshot is a no-op.
+func (m *MockTaskRepositoryWithAddCommentError) SyncSnapshot() error {
+	return nil
+}
+
+// PruneSnapshots is a no-op.
+func (m *MockTaskRepositoryWithAddCommentError) PruneSnapshots(keepCount int) error {
+	return nil
+}
+
+// === Remote sync methods (no-op for mock) ===
+
+func (m *MockTaskRepository) Push() error { return nil }
+func (m *MockTaskRepository) Fetch(namespace string) error { return nil }
+func (m *MockTaskRepository) ListNamespaces() ([]string, error) { return nil, nil }
+
+func (m *MockTaskRepositoryWithAddCommentError) Push() error { return nil }
+func (m *MockTaskRepositoryWithAddCommentError) Fetch(namespace string) error { return nil }
+func (m *MockTaskRepositoryWithAddCommentError) ListNamespaces() ([]string, error) { return nil, nil }

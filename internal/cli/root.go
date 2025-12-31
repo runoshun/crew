@@ -101,6 +101,9 @@ and isolated task execution.`,
 	tuiCmd := newTUICommand(c)
 	tuiCmd.GroupID = groupTask
 
+	// Snapshot commands
+	snapshotCmd := newSnapshotCmd(c)
+
 	// Internal commands (hidden)
 	sessionEndedCmd := newSessionEndedCommand(c)
 
@@ -126,6 +129,8 @@ and isolated task execution.`,
 		mergeCmd,
 		pruneCmd,
 		tuiCmd,
+		snapshotCmd,
+		newSyncCmd(c),
 		sessionEndedCmd,
 	)
 
