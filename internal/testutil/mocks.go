@@ -397,9 +397,12 @@ func (m *MockWorktreeManager) List() ([]domain.WorktreeInfo, error) {
 
 // MockConfigLoader is a test double for domain.ConfigLoader.
 type MockConfigLoader struct {
-	Config    *domain.Config
-	LoadErr   error
-	GlobalErr error
+	Config       *domain.Config
+	GlobalConfig *domain.Config
+	RepoConfig   *domain.Config
+	LoadErr      error
+	GlobalErr    error
+	RepoErr      error
 }
 
 // NewMockConfigLoader creates a new MockConfigLoader with default empty config.
@@ -427,6 +430,30 @@ func (m *MockConfigLoader) LoadGlobal() (*domain.Config, error) {
 	if m.GlobalErr != nil {
 		return nil, m.GlobalErr
 	}
+	if m.GlobalConfig != nil {
+		return m.GlobalConfig, nil
+	}
+	return m.Config, nil
+}
+
+// LoadRepo returns the configured repo config or error.
+func (m *MockConfigLoader) LoadRepo() (*domain.Config, error) {
+	if m.RepoErr != nil {
+		return nil, m.RepoErr
+	}
+	if m.RepoConfig != nil {
+		return m.RepoConfig, nil
+	}
+	return m.Config, nil
+}
+
+// LoadWithOptions returns config based on options.
+func (m *MockConfigLoader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config, error) {
+	if m.LoadErr != nil {
+		return nil, m.LoadErr
+	}
+	// For testing, just return the default config
+	// More sophisticated mocking can be added if needed
 	return m.Config, nil
 }
 

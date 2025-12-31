@@ -162,6 +162,18 @@ type ConfigLoader interface {
 
 	// LoadGlobal returns only the global configuration.
 	LoadGlobal() (*Config, error)
+
+	// LoadRepo returns only the repository configuration.
+	LoadRepo() (*Config, error)
+
+	// LoadWithOptions returns the merged configuration with options to ignore sources.
+	LoadWithOptions(opts LoadConfigOptions) (*Config, error)
+}
+
+// LoadConfigOptions specifies options for loading configuration.
+type LoadConfigOptions struct {
+	IgnoreGlobal bool // Skip loading global config
+	IgnoreRepo   bool // Skip loading repo config
 }
 
 // ConfigInfo holds information about a config file.

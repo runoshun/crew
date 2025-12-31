@@ -189,7 +189,7 @@ func (c *Container) SessionEndedUseCase() *usecase.SessionEnded {
 
 // ShowConfigUseCase returns a new ShowConfig use case.
 func (c *Container) ShowConfigUseCase() *usecase.ShowConfig {
-	return usecase.NewShowConfig(c.ConfigManager)
+	return usecase.NewShowConfig(c.ConfigManager, c.ConfigLoader)
 }
 
 // InitConfigUseCase returns a new InitConfig use case.

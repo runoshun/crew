@@ -231,3 +231,146 @@ command = 'my-custom-agent --task "{{.Title}}"'
 	// Verify
 	assert.Equal(t, `my-custom-agent --task "{{.Title}}"`, cfg.Workers["my-worker"].Command)
 }
+
+func TestLoader_LoadRepo(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config
+	repoConfig := `
+[workers]
+default = "claude"
+
+[workers.claude]
+args = "--model claude-sonnet"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	require.NoError(t, err)
+
+	// Load repo config
+	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	cfg, err := loader.LoadRepo()
+	require.NoError(t, err)
+
+	// Verify
+	assert.Equal(t, "claude", cfg.WorkersConfig.Default)
+	assert.Equal(t, "--model claude-sonnet", cfg.Workers["claude"].Args)
+}
+
+func TestLoader_LoadRepo_NotFound(t *testing.T) {
+	// Setup: empty directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Load repo config
+	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	cfg, err := loader.LoadRepo()
+
+	// Verify: returns error for non-existent file
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	assert.Nil(t, cfg)
+}
+
+func TestLoader_LoadWithOptions_IgnoreGlobal(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config
+	globalConfig := `
+[workers]
+default = "opencode"
+
+[workers.opencode]
+args = "-m gpt-4"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	require.NoError(t, err)
+
+	// Write repo config
+	repoConfig := `
+[workers]
+default = "claude"
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	require.NoError(t, err)
+
+	// Load with IgnoreGlobal
+	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreGlobal: true})
+	require.NoError(t, err)
+
+	// Verify: only repo config is used
+	assert.Equal(t, "claude", cfg.WorkersConfig.Default)
+	// opencode worker should only have builtin defaults, not the global config args
+	assert.Equal(t, domain.BuiltinWorkers["opencode"].DefaultArgs, cfg.Workers["opencode"].Args)
+}
+
+func TestLoader_LoadWithOptions_IgnoreRepo(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config
+	globalConfig := `
+[workers]
+default = "opencode"
+
+[workers.opencode]
+args = "-m gpt-4"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	require.NoError(t, err)
+
+	// Write repo config
+	repoConfig := `
+[workers]
+default = "claude"
+
+[workers.claude]
+args = "--model repo-model"
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	require.NoError(t, err)
+
+	// Load with IgnoreRepo
+	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreRepo: true})
+	require.NoError(t, err)
+
+	// Verify: only global config is used
+	assert.Equal(t, "opencode", cfg.WorkersConfig.Default)
+	assert.Equal(t, "-m gpt-4", cfg.Workers["opencode"].Args)
+	// claude worker should only have builtin defaults
+	assert.Equal(t, domain.BuiltinWorkers["claude"].DefaultArgs, cfg.Workers["claude"].Args)
+}
+
+func TestLoader_LoadWithOptions_IgnoreBoth(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write both configs
+	globalConfig := `
+[workers]
+default = "opencode"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	require.NoError(t, err)
+
+	repoConfig := `
+[workers]
+default = "claude"
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	require.NoError(t, err)
+
+	// Load with both ignored
+	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreGlobal: true, IgnoreRepo: true})
+	require.NoError(t, err)
+
+	// Verify: only defaults are used
+	assert.Equal(t, domain.DefaultWorkerName, cfg.WorkersConfig.Default)
+}

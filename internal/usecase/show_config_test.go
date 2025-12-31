@@ -12,7 +12,7 @@ import (
 )
 
 func TestShowConfig_Execute(t *testing.T) {
-	t.Run("returns both config infos", func(t *testing.T) {
+	t.Run("returns both config infos and effective config", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RepoConfigInfo = domain.ConfigInfo{
 			Path:    "/test/.git/crew/config.toml",
@@ -25,7 +25,13 @@ func TestShowConfig_Execute(t *testing.T) {
 			Exists:  true,
 		}
 
-		uc := usecase.NewShowConfig(manager)
+		loader := testutil.NewMockConfigLoader()
+		loader.Config = &domain.Config{
+			WorkersConfig: domain.WorkersConfig{Default: "claude"},
+			Workers:       make(map[string]domain.WorkerAgent),
+		}
+
+		uc := usecase.NewShowConfig(manager, loader)
 		out, err := uc.Execute(context.Background(), usecase.ShowConfigInput{})
 
 		require.NoError(t, err)
@@ -35,6 +41,8 @@ func TestShowConfig_Execute(t *testing.T) {
 		assert.Equal(t, "/home/test/.config/git-crew/config.toml", out.GlobalConfig.Path)
 		assert.Equal(t, "[log]\nlevel = \"debug\"", out.GlobalConfig.Content)
 		assert.True(t, out.GlobalConfig.Exists)
+		assert.NotNil(t, out.EffectiveConfig)
+		assert.Equal(t, "claude", out.EffectiveConfig.WorkersConfig.Default)
 	})
 
 	t.Run("handles non-existent files", func(t *testing.T) {
@@ -48,7 +56,10 @@ func TestShowConfig_Execute(t *testing.T) {
 			Exists: false,
 		}
 
-		uc := usecase.NewShowConfig(manager)
+		loader := testutil.NewMockConfigLoader()
+		loader.Config = domain.NewDefaultConfig()
+
+		uc := usecase.NewShowConfig(manager, loader)
 		out, err := uc.Execute(context.Background(), usecase.ShowConfigInput{})
 
 		require.NoError(t, err)
@@ -56,5 +67,60 @@ func TestShowConfig_Execute(t *testing.T) {
 		assert.False(t, out.GlobalConfig.Exists)
 		assert.Empty(t, out.RepoConfig.Content)
 		assert.Empty(t, out.GlobalConfig.Content)
+		assert.NotNil(t, out.EffectiveConfig)
+	})
+
+	t.Run("ignores global config when flag is set", func(t *testing.T) {
+		manager := testutil.NewMockConfigManager()
+		manager.RepoConfigInfo = domain.ConfigInfo{
+			Path:   "/test/.git/crew/config.toml",
+			Exists: true,
+		}
+		manager.GlobalConfigInfo = domain.ConfigInfo{
+			Path:   "/home/test/.config/git-crew/config.toml",
+			Exists: true,
+		}
+
+		loader := testutil.NewMockConfigLoader()
+		loader.Config = domain.NewDefaultConfig()
+
+		uc := usecase.NewShowConfig(manager, loader)
+		out, err := uc.Execute(context.Background(), usecase.ShowConfigInput{
+			IgnoreGlobal: true,
+		})
+
+		require.NoError(t, err)
+		// GlobalConfig should be empty when ignored
+		assert.Empty(t, out.GlobalConfig.Path)
+		assert.False(t, out.GlobalConfig.Exists)
+		// RepoConfig should still be present
+		assert.Equal(t, "/test/.git/crew/config.toml", out.RepoConfig.Path)
+	})
+
+	t.Run("ignores repo config when flag is set", func(t *testing.T) {
+		manager := testutil.NewMockConfigManager()
+		manager.RepoConfigInfo = domain.ConfigInfo{
+			Path:   "/test/.git/crew/config.toml",
+			Exists: true,
+		}
+		manager.GlobalConfigInfo = domain.ConfigInfo{
+			Path:   "/home/test/.config/git-crew/config.toml",
+			Exists: true,
+		}
+
+		loader := testutil.NewMockConfigLoader()
+		loader.Config = domain.NewDefaultConfig()
+
+		uc := usecase.NewShowConfig(manager, loader)
+		out, err := uc.Execute(context.Background(), usecase.ShowConfigInput{
+			IgnoreRepo: true,
+		})
+
+		require.NoError(t, err)
+		// RepoConfig should be empty when ignored
+		assert.Empty(t, out.RepoConfig.Path)
+		assert.False(t, out.RepoConfig.Exists)
+		// GlobalConfig should still be present
+		assert.Equal(t, "/home/test/.config/git-crew/config.toml", out.GlobalConfig.Path)
 	})
 }

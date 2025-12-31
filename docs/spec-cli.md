@@ -41,14 +41,31 @@ Initialize a repository for git-crew.
 
 ---
 
-#### `git crew config`
+#### `git crew config [--ignore-global] [--ignore-repo]`
 
-Display configuration file contents.
+Display configuration information including effective (merged) configuration.
+
+**Optional Arguments**:
+- `--ignore-global`: Exclude global config from effective config calculation
+- `--ignore-repo`: Exclude repository config from effective config calculation
 
 **Output**:
+- Effective configuration (merged result of all config sources)
 - Global config (`~/.config/git-crew/config.toml`) path and contents
 - Repository config (`.git/crew/config.toml`) path and contents
 - Show "(not found)" for non-existent files
+
+**Examples**:
+```bash
+# Show all config (default + global + repo merged)
+git crew config
+
+# Show config without global settings
+git crew config --ignore-global
+
+# Show config without repo settings (global + default only)
+git crew config --ignore-repo
+```
 
 ---
 
