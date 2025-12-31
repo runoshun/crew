@@ -175,6 +175,52 @@ func (l *Loader) LoadGlobal() (*domain.Config, error) {
 	return l.loadFile(globalPath)
 }
 
+// LoadRepo returns only the repository configuration.
+func (l *Loader) LoadRepo() (*domain.Config, error) {
+	repoPath := filepath.Join(l.crewDir, domain.ConfigFileName)
+	return l.loadFile(repoPath)
+}
+
+// LoadWithOptions returns the merged configuration with options to ignore sources.
+func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config, error) {
+	var global, repo *domain.Config
+	var err error
+
+	// Load global config unless ignored
+	if !opts.IgnoreGlobal {
+		global, err = l.LoadGlobal()
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+
+	// Load repo config unless ignored
+	if !opts.IgnoreRepo {
+		repo, err = l.LoadRepo()
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+
+	// Start with default config
+	base := domain.NewDefaultConfig()
+
+	// If both don't exist or are ignored, return default config
+	if global == nil && repo == nil {
+		return base, nil
+	}
+
+	// Merge: default <- global <- repo (later takes precedence)
+	if global != nil {
+		base = mergeConfigs(base, global)
+	}
+	if repo != nil {
+		base = mergeConfigs(base, repo)
+	}
+
+	return base, nil
+}
+
 // loadFile loads a configuration from a file.
 func (l *Loader) loadFile(path string) (*domain.Config, error) {
 	data, err := os.ReadFile(path)
