@@ -498,3 +498,115 @@ func TestUpdateLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestEditTask_Execute_UpdateStatus(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute
+	newStatus := domain.StatusInProgress
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID: 1,
+		Status: &newStatus,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
+}
+
+func TestEditTask_Execute_UpdateStatusWithOtherFields(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Original title",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - update both status and title
+	newStatus := domain.StatusInProgress
+	newTitle := "Updated title"
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID: 1,
+		Status: &newStatus,
+		Title:  &newTitle,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
+	assert.Equal(t, "Updated title", out.Task.Title)
+}
+
+func TestEditTask_Execute_InvalidStatus(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with invalid status
+	invalidStatus := domain.Status("invalid")
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID: 1,
+		Status: &invalidStatus,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrInvalidStatus)
+}
+
+func TestEditTask_Execute_StatusTransitions(t *testing.T) {
+	tests := []struct {
+		name       string
+		fromStatus domain.Status
+		toStatus   domain.Status
+		wantErr    bool
+	}{
+		// Valid transitions
+		{"todo to in_progress", domain.StatusTodo, domain.StatusInProgress, false},
+		{"in_progress to in_review", domain.StatusInProgress, domain.StatusInReview, false},
+		{"in_review to done", domain.StatusInReview, domain.StatusDone, false},
+		{"any to closed", domain.StatusTodo, domain.StatusClosed, false},
+		// Same status (no change)
+		{"todo to todo", domain.StatusTodo, domain.StatusTodo, false},
+		// Backward transitions (allowed for manual edit)
+		{"in_progress to todo", domain.StatusInProgress, domain.StatusTodo, false},
+		{"done to in_progress", domain.StatusDone, domain.StatusInProgress, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := testutil.NewMockTaskRepository()
+			repo.Tasks[1] = &domain.Task{
+				ID:     1,
+				Title:  "Test task",
+				Status: tt.fromStatus,
+			}
+			uc := NewEditTask(repo)
+
+			out, err := uc.Execute(context.Background(), EditTaskInput{
+				TaskID: 1,
+				Status: &tt.toStatus,
+			})
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.toStatus, out.Task.Status)
+			}
+		})
+	}
+}

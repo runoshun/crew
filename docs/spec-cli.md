@@ -218,7 +218,7 @@ Comments:
 
 ---
 
-#### `git crew edit <id> [--title <title>] [--desc <desc>] [--labels <labels>] [--add-label <label>]... [--rm-label <label>]...`
+#### `git crew edit <id> [--title <title>] [--desc <desc>] [--status <status>] [--labels <labels>] [--add-label <label>]... [--rm-label <label>]...`
 
 Edit task information.
 
@@ -228,6 +228,7 @@ Edit task information.
 **Optional Arguments** (at least one required):
 - `--title`: New title
 - `--desc`: New description
+- `--status`: New status (`todo`, `in_progress`, `in_review`, `done`, `closed`, `error`)
 - `--labels`: Replace all labels (comma-separated, e.g., `bug,urgent`)
 - `--add-label`: Labels to add (can specify multiple)
 - `--rm-label`: Labels to remove (can specify multiple)
@@ -236,10 +237,12 @@ Edit task information.
 - `--labels` replaces all existing labels with the specified set
 - If `--labels` is specified, `--add-label` and `--rm-label` are ignored
 - Use `--labels ""` to clear all labels
+- `--status` allows manual status changes without following normal transition rules
 
 **Error Conditions**:
 - Task does not exist → error
 - No options specified → error
+- Invalid status value → error
 
 ---
 
