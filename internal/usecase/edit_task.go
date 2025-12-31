@@ -12,13 +12,14 @@ import (
 // EditTaskInput contains the parameters for editing a task.
 // All fields except TaskID are optional. Only non-nil/non-empty fields will be updated.
 type EditTaskInput struct {
-	Title        *string  // New title (nil = no change)
-	Description  *string  // New description (nil = no change)
-	Labels       []string // Labels to set (replaces all existing labels, nil = no change)
-	AddLabels    []string // Labels to add
-	RemoveLabels []string // Labels to remove
-	TaskID       int      // Task ID to edit (required)
-	LabelsSet    bool     // True if Labels was explicitly set (to distinguish nil from empty)
+	Title        *string        // New title (nil = no change)
+	Description  *string        // New description (nil = no change)
+	Status       *domain.Status // New status (nil = no change)
+	Labels       []string       // Labels to set (replaces all existing labels, nil = no change)
+	AddLabels    []string       // Labels to add
+	RemoveLabels []string       // Labels to remove
+	TaskID       int            // Task ID to edit (required)
+	LabelsSet    bool           // True if Labels was explicitly set (to distinguish nil from empty)
 }
 
 // EditTaskOutput contains the result of editing a task.
@@ -41,13 +42,18 @@ func NewEditTask(tasks domain.TaskRepository) *EditTask {
 // Execute edits a task with the given input.
 func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutput, error) {
 	// Validate that at least one field is being updated
-	if in.Title == nil && in.Description == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
+	if in.Title == nil && in.Description == nil && in.Status == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
 	// Validate title is not empty if provided
 	if in.Title != nil && *in.Title == "" {
 		return nil, domain.ErrEmptyTitle
+	}
+
+	// Validate status is valid if provided
+	if in.Status != nil && !in.Status.IsValid() {
+		return nil, domain.ErrInvalidStatus
 	}
 
 	// Get existing task
@@ -65,6 +71,10 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	}
 	if in.Description != nil {
 		task.Description = *in.Description
+	}
+	if in.Status != nil {
+		// Manual status change via edit bypasses transition rules
+		task.Status = *in.Status
 	}
 
 	// Handle labels

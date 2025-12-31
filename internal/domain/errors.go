@@ -21,4 +21,5 @@ var (
 	ErrNotGitRepository   = errors.New("not a git repository (or any of the parent directories)")
 	ErrNoFieldsToUpdate   = errors.New("no fields to update")
 	ErrConfigExists       = errors.New("config file already exists")
+	ErrInvalidStatus      = errors.New("invalid status")
 )

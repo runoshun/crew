@@ -296,6 +296,7 @@ func newEditCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		Title        string
 		Description  string
+		Status       string
 		Labels       string
 		AddLabels    []string
 		RemoveLabels []string
@@ -304,9 +305,9 @@ func newEditCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "edit <id>",
 		Short: "Edit task information",
-		Long: `Edit an existing task's title, description, or labels.
+		Long: `Edit an existing task's title, description, status, or labels.
 
-At least one of --title, --desc, --labels, --add-label, or --rm-label must be specified.
+At least one of --title, --desc, --status, --labels, --add-label, or --rm-label must be specified.
 
 Examples:
   # Change task title
@@ -314,6 +315,9 @@ Examples:
 
   # Update description
   git crew edit 1 --desc "Updated description text"
+
+  # Change task status
+  git crew edit 1 --status in_review
 
   # Replace all labels (comma-separated)
   git crew edit 1 --labels bug,urgent
@@ -351,6 +355,10 @@ Examples:
 			if cmd.Flags().Changed("desc") {
 				input.Description = &opts.Description
 			}
+			if cmd.Flags().Changed("status") {
+				status := domain.Status(opts.Status)
+				input.Status = &status
+			}
 			if cmd.Flags().Changed("labels") {
 				input.LabelsSet = true
 				if opts.Labels != "" {
@@ -373,6 +381,7 @@ Examples:
 	// Optional flags
 	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
 	cmd.Flags().StringVar(&opts.Description, "desc", "", "New task description")
+	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, in_review, error, done, closed)")
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")
 	cmd.Flags().StringArrayVar(&opts.RemoveLabels, "rm-label", nil, "Labels to remove (can specify multiple)")
