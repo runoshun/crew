@@ -10,6 +10,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/infra/config"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
+	"github.com/runoshun/git-crew/v2/internal/infra/gitstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
 	"github.com/runoshun/git-crew/v2/internal/infra/worktree"
@@ -72,8 +73,29 @@ func New(dir string) (*Container, error) {
 	// Create configuration from git client
 	cfg := newConfig(gitClient)
 
-	// Create task repository
-	store := jsonstore.New(cfg.StorePath)
+	// Load app config to determine store type
+	configLoader := config.NewLoader(cfg.CrewDir)
+	appConfig, _ := configLoader.Load() // ignore error, use defaults
+
+	// Create task repository based on config
+	var taskRepo domain.TaskRepository
+	var storeInit domain.StoreInitializer
+	if appConfig.Tasks.Store == "git" {
+		namespace := appConfig.Tasks.Namespace
+		if namespace == "" {
+			namespace = "crew"
+		}
+		gitStore, err := gitstore.New(cfg.RepoRoot, namespace)
+		if err != nil {
+			return nil, err
+		}
+		taskRepo = gitStore
+		storeInit = gitStore
+	} else {
+		jsonStore := jsonstore.New(cfg.StorePath)
+		taskRepo = jsonStore
+		storeInit = jsonStore
+	}
 
 	// Create logger
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
@@ -86,13 +108,12 @@ func New(dir string) (*Container, error) {
 	// Create session manager
 	sessionClient := tmux.NewClient(cfg.SocketPath, cfg.CrewDir)
 
-	// Create config loader and manager
-	configLoader := config.NewLoader(cfg.CrewDir)
+	// Create config manager
 	configManager := config.NewManager(cfg.CrewDir)
 
 	return &Container{
-		Tasks:            store,
-		StoreInitializer: store,
+		Tasks:            taskRepo,
+		StoreInitializer: storeInit,
 		Clock:            domain.RealClock{},
 		Git:              gitClient,
 		Worktrees:        worktreeClient,
