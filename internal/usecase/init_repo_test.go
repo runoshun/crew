@@ -13,13 +13,18 @@ import (
 
 // mockInitializer is a test double for domain.StoreInitializer.
 type mockInitializer struct {
-	initErr    error
-	initCalled bool
+	initErr       error
+	initCalled    bool
+	isInitialized bool
 }
 
 func (m *mockInitializer) Initialize() error {
 	m.initCalled = true
 	return m.initErr
+}
+
+func (m *mockInitializer) IsInitialized() bool {
+	return m.isInitialized
 }
 
 func TestInitRepo_Execute_Success(t *testing.T) {
@@ -63,7 +68,7 @@ func TestInitRepo_Execute_AlreadyInitialized(t *testing.T) {
 	crewDir := filepath.Join(tmpDir, ".git", "crew")
 	require.NoError(t, os.MkdirAll(crewDir, 0o750))
 
-	mock := &mockInitializer{}
+	mock := &mockInitializer{isInitialized: true}
 	uc := NewInitRepo(mock)
 
 	// Execute

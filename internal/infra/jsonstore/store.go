@@ -155,6 +155,12 @@ func (s *Store) AddComment(taskID int, comment domain.Comment) error {
 	})
 }
 
+// IsInitialized checks if the store file exists.
+func (s *Store) IsInitialized() bool {
+	_, err := os.Stat(s.path)
+	return err == nil
+}
+
 // Initialize creates an empty store file if it doesn't exist.
 func (s *Store) Initialize() error {
 	// Ensure parent directory exists

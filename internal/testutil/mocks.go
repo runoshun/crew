@@ -103,11 +103,18 @@ func (m *MockTaskRepository) AddComment(taskID int, comment domain.Comment) erro
 }
 
 // MockStoreInitializer is a test double for domain.StoreInitializer.
-type MockStoreInitializer struct{}
+type MockStoreInitializer struct {
+	Initialized bool
+}
 
 // Initialize is a no-op for testing.
 func (m *MockStoreInitializer) Initialize() error {
 	return nil
+}
+
+// IsInitialized returns the configured value.
+func (m *MockStoreInitializer) IsInitialized() bool {
+	return m.Initialized
 }
 
 // MockTaskRepositoryWithNextIDError extends MockTaskRepository to return error on NextID.

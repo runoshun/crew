@@ -84,6 +84,11 @@ func (s *Store) metaRef() plumbing.ReferenceName {
 	return plumbing.ReferenceName(s.refPrefix() + "meta")
 }
 
+// initializedRef returns the ref name for the initialized marker.
+func (s *Store) initializedRef() plumbing.ReferenceName {
+	return plumbing.ReferenceName(s.refPrefix() + "initialized")
+}
+
 // Get retrieves a task by ID.
 func (s *Store) Get(id int) (*domain.Task, error) {
 	s.mu.RLock()
@@ -411,17 +416,41 @@ func (s *Store) Initialize() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.repo.Reference(s.metaRef(), true)
+	// Check if already initialized
+	_, err := s.repo.Reference(s.initializedRef(), true)
 	if err == nil {
 		return nil // Already initialized
 	}
 	if err != plumbing.ErrReferenceNotFound {
-		return fmt.Errorf("check meta ref: %w", err)
+		return fmt.Errorf("check initialized ref: %w", err)
 	}
 
 	// Create initial metadata
 	m := &meta{NextTaskID: 1}
-	return s.saveMeta(m)
+	if err := s.saveMeta(m); err != nil {
+		return err
+	}
+
+	// Create initialized marker (empty blob)
+	hash, err := s.writeBlob([]byte("initialized"))
+	if err != nil {
+		return err
+	}
+	ref := plumbing.NewHashReference(s.initializedRef(), hash)
+	if err := s.repo.Storer.SetReference(ref); err != nil {
+		return fmt.Errorf("set initialized ref: %w", err)
+	}
+
+	return nil
+}
+
+// IsInitialized checks if the store has been initialized.
+func (s *Store) IsInitialized() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	_, err := s.repo.Reference(s.initializedRef(), true)
+	return err == nil
 }
 
 // containsAll checks if slice contains all elements in required.

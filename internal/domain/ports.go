@@ -9,6 +9,8 @@ import (
 type StoreInitializer interface {
 	// Initialize creates the store if it doesn't exist.
 	Initialize() error
+	// IsInitialized checks if the store has been initialized.
+	IsInitialized() bool
 }
 
 // TaskRepository manages task persistence.
