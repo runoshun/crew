@@ -22,6 +22,7 @@ type Config struct {
 type TasksConfig struct {
 	Store     string // Storage backend: "git" (default) or "json"
 	Namespace string // Git namespace for refs (default: "crew")
+	Encrypt   bool   // Enable encryption for task data (default: false)
 }
 
 // WorkersConfig holds common settings for all workers from [workers] section.
