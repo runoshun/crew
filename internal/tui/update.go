@@ -81,6 +81,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgReloadTasks:
 		// Reload tasks after returning from external commands
 		return m, m.loadTasks()
+
+	case MsgShowDiff:
+		// Trigger diff display for a task
+		return m, m.showDiff(msg.TaskID)
+
+	case execDiffMsg:
+		// Execute the diff command using ExecCommand from domain
+		return m, tea.Exec(&diffExecCmd{
+			worktreePath: msg.cmd.Dir,
+			diffCommand:  msg.cmd.Args[1], // Args is ["−c", "expanded_command"]
+		}, func(err error) tea.Msg {
+			return MsgReloadTasks{}
+		})
 	}
 
 	return m, nil
@@ -247,14 +260,10 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 		}
 
 	case domain.StatusInReview:
-		// Attach if session exists, otherwise show detail view
-		if task.IsRunning() {
-			return m, func() tea.Msg {
-				return MsgAttachSession{TaskID: task.ID}
-			}
+		// Show diff for review (attach is available via 'a' key)
+		return m, func() tea.Msg {
+			return MsgShowDiff{TaskID: task.ID}
 		}
-		m.mode = ModeDetail
-		return m, nil
 
 	case domain.StatusDone, domain.StatusClosed:
 		// Show detail view for terminal states

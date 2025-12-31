@@ -99,3 +99,11 @@ func (MsgAttachSession) sealed() {}
 type MsgReloadTasks struct{}
 
 func (MsgReloadTasks) sealed() {}
+
+// MsgShowDiff is sent to trigger diff display for a task.
+// This is handled specially to suspend the TUI and run an external command.
+type MsgShowDiff struct {
+	TaskID int
+}
+
+func (MsgShowDiff) sealed() {}

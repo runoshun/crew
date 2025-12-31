@@ -66,16 +66,9 @@ type DiffTemplateData struct {
 	BaseBranch string // Base branch for the task (e.g., "main")
 }
 
-// Execute displays the diff for a task.
-// Preconditions:
-//   - Task exists
-//   - Worktree exists
-//
-// Processing:
-//   - Resolve task's worktree path
-//   - Execute diff using diff.command from config
-//   - Expand {{.Args}} with additional arguments
-func (uc *ShowDiff) Execute(_ context.Context, in ShowDiffInput) (*ShowDiffOutput, error) {
+// GetCommand returns the ExecCommand for showing diff without executing it.
+// This is useful for TUI which needs to execute the command via tea.Exec.
+func (uc *ShowDiff) GetCommand(_ context.Context, in ShowDiffInput) (*domain.ExecCommand, error) {
 	// Get the task
 	task, err := uc.tasks.Get(in.TaskID)
 	if err != nil {
@@ -126,9 +119,31 @@ func (uc *ShowDiff) Execute(_ context.Context, in ShowDiffInput) (*ShowDiffOutpu
 
 	expandedCommand := buf.String()
 
+	return &domain.ExecCommand{
+		Program: "sh",
+		Args:    []string{"-c", expandedCommand},
+		Dir:     worktreePath,
+	}, nil
+}
+
+// Execute displays the diff for a task.
+// Preconditions:
+//   - Task exists
+//   - Worktree exists
+//
+// Processing:
+//   - Resolve task's worktree path
+//   - Execute diff using diff.command from config
+//   - Expand {{.Args}} with additional arguments
+func (uc *ShowDiff) Execute(ctx context.Context, in ShowDiffInput) (*ShowDiffOutput, error) {
+	execCmd, err := uc.GetCommand(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+
 	// Execute the diff command
-	cmd := uc.execCmd("sh", "-c", expandedCommand)
-	cmd.Dir = worktreePath
+	cmd := uc.execCmd(execCmd.Program, execCmd.Args...)
+	cmd.Dir = execCmd.Dir
 	cmd.Stdout = uc.stdout
 	cmd.Stderr = uc.stderr
 
@@ -136,6 +151,6 @@ func (uc *ShowDiff) Execute(_ context.Context, in ShowDiffInput) (*ShowDiffOutpu
 	_ = cmd.Run()
 
 	return &ShowDiffOutput{
-		WorktreePath: worktreePath,
+		WorktreePath: execCmd.Dir,
 	}, nil
 }

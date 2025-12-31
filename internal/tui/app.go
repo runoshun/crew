@@ -405,3 +405,49 @@ func (m *Model) attachToSession(taskID int) tea.Cmd {
 		return MsgReloadTasks{}
 	})
 }
+
+// diffExecCmd implements tea.ExecCommand for showing diff.
+type diffExecCmd struct {
+	stdin        io.Reader
+	stdout       io.Writer
+	stderr       io.Writer
+	worktreePath string
+	diffCommand  string
+}
+
+func (c *diffExecCmd) Run() error {
+	// #nosec G204 - diffCommand is from config, trusted
+	cmd := exec.Command("sh", "-c", c.diffCommand)
+	cmd.Dir = c.worktreePath
+	cmd.Stdin = c.stdin
+	cmd.Stdout = c.stdout
+	cmd.Stderr = c.stderr
+	// Ignore exit code as diff can return non-zero when there are differences
+	_ = cmd.Run()
+	return nil
+}
+
+func (c *diffExecCmd) SetStdin(r io.Reader)  { c.stdin = r }
+func (c *diffExecCmd) SetStdout(w io.Writer) { c.stdout = w }
+func (c *diffExecCmd) SetStderr(w io.Writer) { c.stderr = w }
+
+// showDiff returns a tea.Cmd that shows the diff for a task.
+// After the diff viewer closes, it triggers a task reload.
+func (m *Model) showDiff(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		uc := m.container.ShowDiffUseCaseForCommand()
+		execCmd, err := uc.GetCommand(context.Background(), usecase.ShowDiffInput{
+			TaskID: taskID,
+		})
+		if err != nil {
+			return MsgError{Err: err}
+		}
+
+		return execDiffMsg{cmd: execCmd}
+	}
+}
+
+// execDiffMsg is an internal message to trigger diff execution.
+type execDiffMsg struct {
+	cmd *domain.ExecCommand
+}
