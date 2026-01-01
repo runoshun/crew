@@ -53,10 +53,7 @@ func (m *Model) viewMain() string {
 	b.WriteString(m.viewTaskList())
 
 	// Pagination info
-	if paginationInfo := m.viewPagination(); paginationInfo != "" {
-		b.WriteString("\n")
-		b.WriteString(paginationInfo)
-	}
+	// Pagination info is now shown in header, not at bottom
 
 	// Dialogs/overlays
 	switch m.mode {
@@ -88,12 +85,10 @@ func (m *Model) viewHeader() string {
 	// Left: "Tasks"
 	title := m.styles.HeaderText.Render("Tasks")
 
-	// Right: Task count (muted style)
-	taskCount := len(m.visibleTasks())
-	countText := fmt.Sprintf("%d tasks", taskCount)
-	if taskCount == 1 {
-		countText = "1 task"
-	}
+	// Right: "showing X of Y tasks" (muted style)
+	visibleCount := len(m.visibleTasks())
+	totalCount := len(m.tasks)
+	countText := fmt.Sprintf("showing %d of %d tasks", visibleCount, totalCount)
 	// Use muted text style for task count (no border/padding)
 	rightText := lipgloss.NewStyle().Foreground(Colors.Muted).Render(countText)
 
@@ -121,13 +116,19 @@ func (m *Model) viewTaskList() string {
 
 	var b strings.Builder
 
+	// Calculate row width for full-width background highlight
+	rowWidth := m.width - 6 // Account for app padding
+	if rowWidth < 40 {
+		rowWidth = 40
+	}
+
 	for i, task := range tasks {
 		selected := i == m.cursor
 		line := m.renderTaskItem(task, selected)
 
 		if selected {
-			// Apply subtle background for selected row
-			b.WriteString(m.styles.TaskSelected.Render(line))
+			// Apply subtle background for full row width
+			b.WriteString(m.styles.TaskSelected.Width(rowWidth).Render(line))
 		} else {
 			b.WriteString(line)
 		}
@@ -161,142 +162,6 @@ func (m *Model) viewEmptyState() string {
 	b.WriteString(m.styles.Footer.Render(" to create your first task"))
 	b.WriteString("\n")
 	return b.String()
-}
-
-// listHeight returns the available height for the list.
-func (m *Model) listHeight() int {
-	// Reserve space for header, footer, padding, etc.
-	reserved := 8 // header + footer + margins
-	if m.err != nil {
-		reserved += 2
-	}
-	if m.mode == ModeFilter || m.filterInput.Value() != "" {
-		reserved += 2
-	}
-
-	height := m.height - reserved
-	if height < 5 {
-		height = 5
-	}
-	return height
-}
-
-// visibleRange calculates the start and end indices for visible items.
-func (m *Model) visibleRange(items []listItem, listHeight int) (int, int) {
-	if len(items) == 0 {
-		return 0, 0
-	}
-
-	// Find the current cursor position in items
-	cursorItemIdx := m.findCursorItemIndex(items)
-
-	// Calculate actual line count (headers take 3 lines: blank + header + blank, tasks take 2: task + blank)
-	calcLines := func(start, end int) int {
-		lines := 0
-		for i := start; i < end && i < len(items); i++ {
-			if items[i].isHeader {
-				lines += 3 // blank before + header + blank after
-			} else {
-				lines += 2 // task + blank after
-			}
-		}
-		return lines
-	}
-
-	// Check if all items fit
-	totalLines := calcLines(0, len(items))
-	if totalLines <= listHeight {
-		return 0, len(items)
-	}
-
-	// Need to scroll - center the cursor in the visible window
-	// Start from the beginning and find a window that includes the cursor
-	startIdx := 0
-	endIdx := 0
-
-	// Find the starting position that includes the cursor
-	// We want the cursor to be visible, preferably with some context before it
-	for endIdx < len(items) {
-		linesUsed := calcLines(startIdx, endIdx+1)
-		if linesUsed <= listHeight {
-			endIdx++
-		} else {
-			// Can't fit more, check if cursor is visible
-			if endIdx > cursorItemIdx {
-				break // cursor is visible
-			}
-			// Need to scroll - move start forward
-			startIdx++
-			endIdx++
-		}
-	}
-
-	// Ensure cursor is in the visible range
-	if cursorItemIdx < startIdx {
-		startIdx = cursorItemIdx
-		// Recalculate endIdx
-		endIdx = startIdx
-		for endIdx < len(items) && calcLines(startIdx, endIdx+1) <= listHeight {
-			endIdx++
-		}
-	} else if cursorItemIdx >= endIdx {
-		endIdx = cursorItemIdx + 1
-		// Recalculate startIdx
-		for startIdx < cursorItemIdx && calcLines(startIdx, endIdx) > listHeight {
-			startIdx++
-		}
-	}
-
-	return startIdx, endIdx
-}
-
-// findCursorItemIndex finds the index in items that corresponds to the current cursor.
-func (m *Model) findCursorItemIndex(items []listItem) int {
-	taskIdx := 0
-	for i, item := range items {
-		if item.isHeader {
-			continue
-		}
-		if taskIdx == m.cursor {
-			return i
-		}
-		taskIdx++
-	}
-	return 0
-}
-
-// viewPagination renders pagination info if needed.
-func (m *Model) viewPagination() string {
-	items := m.groupedItems
-	if len(items) == 0 {
-		return ""
-	}
-
-	listHeight := m.listHeight()
-	startIdx, endIdx := m.visibleRange(items, listHeight)
-
-	// Count total tasks (not headers)
-	totalTasks := 0
-	for _, item := range items {
-		if !item.isHeader {
-			totalTasks++
-		}
-	}
-
-	// Count visible tasks
-	visibleTasks := 0
-	for i := startIdx; i < endIdx; i++ {
-		if !items[i].isHeader {
-			visibleTasks++
-		}
-	}
-
-	if visibleTasks >= totalTasks {
-		return "" // All visible, no pagination needed
-	}
-
-	// Show pagination hint
-	return m.styles.Footer.Render(fmt.Sprintf("Showing %d of %d tasks (↑↓ to scroll)", visibleTasks, totalTasks))
 }
 
 // renderTaskItem renders a single task item.
