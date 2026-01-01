@@ -20,3 +20,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+
+.playwright-mcp/
