@@ -51,9 +51,9 @@ var Colors = struct {
 	DescNormal:    lipgloss.Color("#6C7086"), // Overlay0
 	DescSelected:  lipgloss.Color("#A6ADC8"), // Subtext1 (brighter than normal)
 
-	// Status colors
-	Todo:        lipgloss.Color("#89DCEB"), // Sky
-	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow
+	// Status colors (Modern Soft Variant 2)
+	Todo:        lipgloss.Color("#F9E2AF"), // Yellow (matches Variant 2 "● Pending")
+	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow (matches Variant 2 "➜ In Prog")
 	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
 	StatusError: lipgloss.Color("#F38BA8"), // Red
 	Done:        lipgloss.Color("#A6E3A1"), // Green
@@ -149,7 +149,8 @@ func DefaultStyles() Styles {
 		Header: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(Colors.Primary).
-			// Border removed for cleaner look
+			Border(lipgloss.NormalBorder(), false, false, true, false).
+			BorderForeground(Colors.GroupLine).
 			MarginBottom(1),
 
 		HeaderText: lipgloss.NewStyle().
@@ -281,10 +282,14 @@ func DefaultStyles() Styles {
 
 		Footer: lipgloss.NewStyle().
 			Foreground(Colors.Subtle).
+			Border(lipgloss.NormalBorder(), true, false, false, false).
+			BorderForeground(Colors.GroupLine).
 			MarginTop(1),
 
 		FooterKey: lipgloss.NewStyle().
-			Foreground(Colors.Muted),
+			Foreground(lipgloss.Color("#B4BEFE")). // Lavender (Variant 2 key style)
+			Background(Colors.GroupLine).          // #313244
+			Padding(0, 1),
 
 		// Pagination dots
 		PaginationDot: lipgloss.NewStyle().
