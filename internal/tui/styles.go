@@ -171,12 +171,8 @@ func DefaultStyles() Styles {
 			Foreground(Colors.TitleNormal),
 
 		TaskSelected: lipgloss.NewStyle().
-			Bold(true).
-			Background(Colors.GroupLine).
 			Foreground(Colors.TitleSelected).
-			Border(lipgloss.Border{Left: "▎"}, false, false, false, true).
-			BorderForeground(Colors.Primary).
-			MarginLeft(2).
+			Background(lipgloss.Color("#262637")). // Very subtle highlight
 			PaddingRight(1),
 
 		TaskID: lipgloss.NewStyle().
@@ -387,13 +383,33 @@ func (s Styles) StatusStyleSelected(status domain.Status) lipgloss.Style {
 	}
 }
 
+// StatusText returns a short text label for a given status.
+func StatusText(status domain.Status) string {
+	switch status {
+	case domain.StatusTodo:
+		return "Todo"
+	case domain.StatusInProgress:
+		return "InPrg"
+	case domain.StatusInReview:
+		return "Revw"
+	case domain.StatusError:
+		return "Err"
+	case domain.StatusDone:
+		return "Done"
+	case domain.StatusClosed:
+		return "Clsd"
+	default:
+		return "?"
+	}
+}
+
 // StatusIcon returns an icon for a given status.
 func StatusIcon(status domain.Status) string {
 	switch status {
 	case domain.StatusTodo:
-		return "○"
-	case domain.StatusInProgress:
 		return "●"
+	case domain.StatusInProgress:
+		return "➜"
 	case domain.StatusInReview:
 		return "◎"
 	case domain.StatusError:

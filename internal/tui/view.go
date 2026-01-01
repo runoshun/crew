@@ -83,69 +83,68 @@ func (m *Model) viewMain() string {
 	return b.String()
 }
 
-// viewHeader renders the header with branding and task count.
+// viewHeader renders the header with "Tasks" and task count.
 func (m *Model) viewHeader() string {
-	// Brand logo with accent
-	logo := m.styles.HeaderText.Render("◆ git-crew")
+	// Left: "Tasks"
+	title := m.styles.HeaderText.Render("Tasks")
 
-	// Task count badge
+	// Right: Task count (muted style)
 	taskCount := len(m.visibleTasks())
 	countText := fmt.Sprintf("%d tasks", taskCount)
 	if taskCount == 1 {
 		countText = "1 task"
 	}
-	// Subtle badge
-	countBadge := m.styles.Footer.Render(" · " + countText)
+	// Use muted text style for task count (no border/padding)
+	rightText := lipgloss.NewStyle().Foreground(Colors.Muted).Render(countText)
 
-	return m.styles.Header.Render(logo + countBadge)
+	// Calculate spacing to right-align
+	headerWidth := m.width - 6 // padding
+	if headerWidth < 40 {
+		headerWidth = 40
+	}
+	leftLen := lipgloss.Width(title)
+	rightLen := lipgloss.Width(rightText)
+	spacing := headerWidth - leftLen - rightLen
+	if spacing < 1 {
+		spacing = 1
+	}
+
+	return m.styles.Header.Render(title + strings.Repeat(" ", spacing) + rightText)
 }
 
-// viewTaskList renders the grouped task list.
+// viewTaskList renders the flat task list (no group headers).
 func (m *Model) viewTaskList() string {
-	if len(m.groupedItems) == 0 {
+	tasks := m.visibleTasks()
+	if len(tasks) == 0 {
 		return m.viewEmptyState()
 	}
 
-	// Calculate visible range for pagination
-	listHeight := m.listHeight()
-	startIdx, endIdx := m.visibleRange(m.groupedItems, listHeight)
-
-	// Count task index before startIdx
-	taskIdxOffset := 0
-	for i := 0; i < startIdx; i++ {
-		if !m.groupedItems[i].isHeader {
-			taskIdxOffset++
-		}
-	}
-
 	var b strings.Builder
-	taskIdx := taskIdxOffset // Track task index for selection
-	for i := startIdx; i < endIdx; i++ {
-		item := m.groupedItems[i]
 
-		if item.isHeader {
-			// Add blank line before header (except at the very start)
-			if b.Len() > 0 {
-				b.WriteString("\n")
-			}
-			b.WriteString(m.renderGroupHeader(item.status, item.count))
-			b.WriteString("\n")
+	for i, task := range tasks {
+		selected := i == m.cursor
+		line := m.renderTaskItem(task, selected)
+
+		if selected {
+			// Apply subtle background for selected row
+			b.WriteString(m.styles.TaskSelected.Render(line))
 		} else {
-			selected := taskIdx == m.cursor
-			// Render cursor + task item with proper indentation
-			line := m.renderTaskItem(item.task, selected)
+			b.WriteString(line)
+		}
+		b.WriteString("\n")
 
-			// Use the background color for the whole line if selected
-			if selected {
-				// Modern Soft: Left border indicator + Background (handled by TaskSelected style)
-				b.WriteString(m.styles.TaskSelected.Render(line))
-				b.WriteString("\n")
-			} else {
-				// Normal item: Indent to align with content
-				// Selected: MarginLeft(2) + Border(1) = 3 chars offset
-				b.WriteString(fmt.Sprintf("   %s\n", line))
+		// Show description line for in_progress tasks
+		if task.Status == domain.StatusInProgress && task.Description != "" {
+			// Truncate description if too long
+			desc := task.Description
+			maxLen := 50
+			if len(desc) > maxLen {
+				desc = desc[:maxLen-3] + "..."
 			}
-			taskIdx++
+			// Indent to align with title (indicator + id + status = ~15 chars)
+			descLine := m.styles.TaskDesc.Render("  " + desc)
+			b.WriteString(descLine)
+			b.WriteString("\n")
 		}
 	}
 
@@ -266,38 +265,6 @@ func (m *Model) findCursorItemIndex(items []listItem) int {
 	return 0
 }
 
-// renderGroupHeader renders a group header with status icon and count.
-func (m *Model) renderGroupHeader(status domain.Status, count int) string {
-	// Format: "─── ● in_progress (3) ───────────────────"
-	icon := StatusIcon(status)
-	label := fmt.Sprintf(" %s %s ", icon, status)
-	countStr := fmt.Sprintf("(%d)", count)
-
-	// Calculate line widths for balanced appearance
-	contentWidth := m.width - 6 // padding
-	if contentWidth < 40 {
-		contentWidth = 40
-	}
-
-	// Left line is short, right line fills the rest
-	leftLineLen := 3
-	labelLen := len(label) + len(countStr)
-	rightLineLen := contentWidth - leftLineLen - labelLen - 2
-	if rightLineLen < 3 {
-		rightLineLen = 3
-	}
-
-	leftLine := strings.Repeat("─", leftLineLen)
-	rightLine := strings.Repeat("─", rightLineLen)
-
-	// Apply status color to the icon and label
-	statusStyle := m.styles.StatusStyle(status)
-	styledLabel := statusStyle.Render(label)
-	styledCount := m.styles.Footer.Render(countStr)
-
-	return m.styles.GroupHeaderLine.Render(leftLine) + styledLabel + styledCount + " " + m.styles.GroupHeaderLine.Render(rightLine)
-}
-
 // viewPagination renders pagination info if needed.
 func (m *Model) viewPagination() string {
 	items := m.groupedItems
@@ -333,30 +300,37 @@ func (m *Model) viewPagination() string {
 }
 
 // renderTaskItem renders a single task item.
-// Format: "#1  title  [agent]" (cursor is added separately in viewTaskList)
+// Format: "> 17 ✔ Done  Overhaul TUI design" (indicator shown only when selected)
 func (m *Model) renderTaskItem(task *domain.Task, selected bool) string {
-	var idPart, titlePart, agentPart string
-
-	// Task ID with fixed width for alignment
-	idStr := fmt.Sprintf("#%-3d", task.ID)
-
+	// Indicator: ">" for selected, space for normal
+	var indicator string
 	if selected {
-		// When selected, the container has a background, so we just bold the text
-		// and use the primary/selected colors
-		idPart = m.styles.TaskIDSelected.Render(idStr)
-		titlePart = m.styles.TaskTitleSelected.Render(task.Title)
-		if task.Agent != "" {
-			agentPart = m.styles.TaskAgentSelected.Render(fmt.Sprintf(" [%s]", task.Agent))
-		}
+		indicator = m.styles.CursorSelected.Render(">")
 	} else {
-		idPart = m.styles.TaskID.Render(idStr)
-		titlePart = m.styles.TaskTitle.Render(task.Title)
-		if task.Agent != "" {
-			agentPart = m.styles.TaskAgent.Render(fmt.Sprintf(" [%s]", task.Agent))
-		}
+		indicator = " "
 	}
 
-	return fmt.Sprintf("%s %s%s", idPart, titlePart, agentPart)
+	// Task ID with fixed width
+	idStr := fmt.Sprintf("%2d", task.ID)
+
+	// Status: icon + text (e.g., "✔ Done", "➜ InPrg")
+	statusIcon := StatusIcon(task.Status)
+	statusText := StatusText(task.Status)
+	statusFull := fmt.Sprintf("%s %-5s", statusIcon, statusText)
+
+	var idPart, statusPart, titlePart string
+
+	if selected {
+		idPart = m.styles.TaskIDSelected.Render(idStr)
+		statusPart = m.styles.StatusStyleSelected(task.Status).Render(statusFull)
+		titlePart = m.styles.TaskTitleSelected.Render(task.Title)
+	} else {
+		idPart = m.styles.TaskID.Render(idStr)
+		statusPart = m.styles.StatusStyle(task.Status).Render(statusFull)
+		titlePart = m.styles.TaskTitle.Render(task.Title)
+	}
+
+	return fmt.Sprintf("%s %s %s  %s", indicator, idPart, statusPart, titlePart)
 }
 
 // viewConfirmDialog renders the confirmation dialog.
@@ -532,8 +506,14 @@ func (m *Model) renderAgentRow(agent string, selected bool) string {
 func (m *Model) viewFooter() string {
 	switch m.mode {
 	case ModeNormal:
-		// Minimal hint - only show help key (spec: hide help line in Normal mode)
-		return m.styles.Footer.Render("? help")
+		// Match mock format: j/k nav  enter open  n new  ? help  q quit
+		return m.styles.Footer.Render(
+			m.styles.FooterKey.Render("j/k") + " nav  " +
+				m.styles.FooterKey.Render("enter") + " open  " +
+				m.styles.FooterKey.Render("n") + " new  " +
+				m.styles.FooterKey.Render("?") + " help  " +
+				m.styles.FooterKey.Render("q") + " quit",
+		)
 	case ModeFilter:
 		return m.styles.Footer.Render("enter apply · esc cancel")
 	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeStart, ModeHelp, ModeDetail:

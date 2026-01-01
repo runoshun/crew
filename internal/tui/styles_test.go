@@ -47,8 +47,8 @@ func TestStatusIcon(t *testing.T) {
 		status domain.Status
 		want   string
 	}{
-		{domain.StatusTodo, "○"},
-		{domain.StatusInProgress, "●"},
+		{domain.StatusTodo, "●"},
+		{domain.StatusInProgress, "➜"},
 		{domain.StatusInReview, "◎"},
 		{domain.StatusError, "✕"},
 		{domain.StatusDone, "✔"},
