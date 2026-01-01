@@ -23,6 +23,7 @@ var Colors = struct {
 	TitleSelected lipgloss.Color
 	DescNormal    lipgloss.Color
 	DescSelected  lipgloss.Color
+	KeyText       lipgloss.Color
 
 	// Status colors
 	Todo        lipgloss.Color
@@ -50,9 +51,10 @@ var Colors = struct {
 	TitleSelected: lipgloss.Color("#CDD6F4"), // Text (keep white on selection for contrast)
 	DescNormal:    lipgloss.Color("#6C7086"), // Overlay0
 	DescSelected:  lipgloss.Color("#A6ADC8"), // Subtext1 (brighter than normal)
+	KeyText:       lipgloss.Color("#B4BEFE"), // Lavender (for keys)
 
 	// Status colors
-	Todo:        lipgloss.Color("#89DCEB"), // Sky
+	Todo:        lipgloss.Color("#F9E2AF"), // Yellow (matches HTML Mock Variant 2)
 	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow
 	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
 	StatusError: lipgloss.Color("#F38BA8"), // Red
@@ -149,7 +151,9 @@ func DefaultStyles() Styles {
 		Header: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(Colors.Primary).
-			// Border removed for cleaner look
+			Border(lipgloss.NormalBorder(), false, false, true, false).
+			BorderForeground(Colors.GroupLine).
+			Padding(0, 1).
 			MarginBottom(1),
 
 		HeaderText: lipgloss.NewStyle().
@@ -170,7 +174,9 @@ func DefaultStyles() Styles {
 			Bold(true).
 			Background(Colors.GroupLine).
 			Foreground(Colors.TitleSelected).
-			PaddingLeft(1).
+			Border(lipgloss.Border{Left: "▎"}, false, false, false, true).
+			BorderForeground(Colors.Primary).
+			MarginLeft(2).
 			PaddingRight(1),
 
 		TaskID: lipgloss.NewStyle().
@@ -280,11 +286,16 @@ func DefaultStyles() Styles {
 			Foreground(Colors.Subtle),
 
 		Footer: lipgloss.NewStyle().
-			Foreground(Colors.Subtle).
+			Foreground(Colors.DescNormal).
+			Border(lipgloss.NormalBorder(), true, false, false, false).
+			BorderForeground(Colors.GroupLine).
+			Padding(0, 1).
 			MarginTop(1),
 
 		FooterKey: lipgloss.NewStyle().
-			Foreground(Colors.Muted),
+			Foreground(Colors.KeyText).
+			Background(Colors.GroupLine).
+			Padding(0, 1),
 
 		// Pagination dots
 		PaginationDot: lipgloss.NewStyle().

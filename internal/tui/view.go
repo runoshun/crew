@@ -137,35 +137,13 @@ func (m *Model) viewTaskList() string {
 
 			// Use the background color for the whole line if selected
 			if selected {
-				// Modern Soft: Left border indicator + Background
-				// We construct the line manually to control the background
-				// The TaskSelected style now has the background color
-
-				// Indicator is the "Selected Border Left" from design
-				indicator := m.styles.CursorSelected.Render("▎")
-
-				// Render the content with the selected style (which has bg)
-				content := m.styles.TaskSelected.Render(line)
-
-				b.WriteString(fmt.Sprintf("  %s%s", indicator, content))
+				// Modern Soft: Left border indicator + Background (handled by TaskSelected style)
+				b.WriteString(m.styles.TaskSelected.Render(line))
 				b.WriteString("\n")
 			} else {
-				// Normal item: Indent to align with content (indicator width + margin)
-				// Indicator width (1) + margin (0) = 1 space?
-				// Actually CursorSelected has MarginRight(1), so 1 char + 1 space = 2 chars
-				// But we need to align with the *content* inside the background block
-				// TaskSelected has PaddingLeft(1), so we need to account for that too.
-
-				// Let's keep it simple:
-				// Selected: "  ▎ [ BG ... content ... ]"
-				// Normal:   "      ... content ... "
-
-				// "  " (indent) + "▎" (1) + " " (0? CursorSelected has MarginRight(1)) -> 3-4 chars?
-
-				// Let's stick to a clean alignment.
-				// Selected: "▎" (primary) + " " + Content (on bg)
-
-				b.WriteString(fmt.Sprintf("    %s\n", line))
+				// Normal item: Indent to align with content
+				// Selected: MarginLeft(2) + Border(1) = 3 chars offset
+				b.WriteString(fmt.Sprintf("   %s\n", line))
 			}
 			taskIdx++
 		}
