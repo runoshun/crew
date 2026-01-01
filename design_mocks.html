@@ -3,199 +3,316 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TUI Design Mocks</title>
+    <title>TUI Design Mocks - Modern Soft</title>
     <style>
         body {
             background-color: #1a1a1a;
-            color: #e0e0e0;
+            color: #cdd6f4;
             font-family: 'Courier New', Courier, monospace;
-            padding: 20px;
+            padding: 40px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
         }
 
-        .container {
-            border: 1px solid #333;
-            padding: 10px;
-            background-color: #000;
+        .screen-container {
             position: relative;
         }
 
-        .title {
+        .screen-label {
             position: absolute;
-            top: -10px;
-            left: 10px;
-            background-color: #1a1a1a;
-            padding: 0 5px;
+            top: -25px;
+            left: 0;
+            color: #89b4fa;
             font-weight: bold;
-            color: #888;
+            font-family: sans-serif;
+        }
+
+        /* Modern Soft Theme (Variant 2) */
+        .container {
+            background-color: #1e1e2e;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            padding: 15px;
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #313244; /* Subtle border for definition */
         }
 
         /* Common Elements */
-        .header { margin-bottom: 10px; }
-        .list-item { padding: 2px 5px; display: flex; justify-content: space-between; }
-        .list-item.selected { font-weight: bold; }
-        .status { margin-right: 10px; width: 80px; }
-        .desc { color: #666; font-size: 0.9em; margin-left: 20px; display: block;}
-        .footer { margin-top: 10px; border-top: 1px solid #333; padding-top: 5px; font-size: 0.8em; }
-        .key { color: #888; }
+        .header {
+            color: #89b4fa;
+            font-weight: bold;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
 
-        /* Variant 1: Classic Dark */
-        #classic .header { color: #00ff00; border-bottom: 1px dashed #00ff00; }
-        #classic .list-item.selected { color: #000; background-color: #00ff00; }
-        #classic .status.todo { color: #ffff00; }
-        #classic .status.done { color: #00ff00; }
-        #classic .key { color: #00ff00; }
+        .footer {
+            border-top: 1px solid #313244;
+            padding-top: 8px;
+            margin-top: auto;
+            color: #6c7086;
+            font-size: 0.9em;
+            display: flex;
+            gap: 15px;
+        }
 
-        /* Variant 2: Modern Soft */
-        #modern .container { background-color: #1e1e2e; border: none; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        #modern .header { color: #89b4fa; font-size: 1.1em; border-bottom: 1px solid #313244; padding-bottom: 5px; }
-        #modern .list-item { padding: 5px 10px; border-radius: 4px; margin-bottom: 2px; }
-        #modern .list-item.selected { background-color: #313244; color: #cdd6f4; border-left: 3px solid #89b4fa; }
-        #modern .status.todo { color: #f9e2af; }
-        #modern .status.done { color: #a6e3a1; }
-        #modern .desc { color: #a6adc8; }
-        #modern .footer { border-top: 1px solid #313244; color: #6c7086; }
-        #modern .key { color: #b4befe; background: #313244; padding: 0 4px; border-radius: 2px; }
+        .key {
+            color: #b4befe;
+            background: #313244;
+            padding: 0 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
 
-        /* Variant 3: Monochrome Pro */
-        #mono .container { background-color: #000; border: 1px solid #fff; }
-        #mono .header { color: #fff; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px double #fff; }
-        #mono .list-item.selected { color: #000; background-color: #fff; }
-        #mono .status { font-weight: bold; }
-        #mono .status.todo::before { content: "[ ] "; }
-        #mono .status.done::before { content: "[x] "; }
-        #mono .footer { border-top: 1px solid #fff; }
-        #mono .key { border: 1px solid #666; padding: 0 2px; }
+        /* List View Specifics */
+        .list { flex: 1; overflow-y: auto; }
+        .list-item {
+            padding: 4px 10px;
+            margin-bottom: 2px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+        }
+        .list-item.selected {
+            /* No background block as per feedback, just text highlight and border */
+            color: #cdd6f4;
+            border-left: 3px solid #89b4fa;
+            padding-left: 7px; /* Adjust for border width */
+            background-color: rgba(49, 50, 68, 0.3); /* Very subtle highlight */
+        }
+        .status { width: 80px; font-size: 0.9em; }
+        .status.todo { color: #f9e2af; }
+        .status.inprogress { color: #89b4fa; }
+        .status.done { color: #a6e3a1; }
+        .id { color: #6c7086; width: 30px; margin-right: 10px; text-align: right; }
+        
+        .desc-line {
+            color: #a6adc8;
+            margin-left: 43px; /* Align with title */
+            font-size: 0.9em;
+            margin-top: 2px;
+            opacity: 0.8;
+        }
 
-        /* Variant 4: Solarized Light (for TUI usually Dark, but trying something different) - actually stick to Dark for TUI */
-        /* Variant 4: Neon Cyber */
-        #neon .container { background-color: #050510; border: 1px solid #0ff; box-shadow: 0 0 5px #0ff; }
-        #neon .header { color: #f0f; text-shadow: 0 0 2px #f0f; border-bottom: 1px solid #0ff; }
-        #neon .list-item.selected { color: #0ff; text-shadow: 0 0 2px #0ff; border: 1px solid #f0f; }
-        #neon .status.todo { color: #f0f; }
-        #neon .status.done { color: #0ff; }
-        #neon .footer { border-top: 1px solid #0ff; color: #0ff; }
-        #neon .key { color: #ff0; }
+        /* Detail View Specifics */
+        .detail-content { flex: 1; padding: 10px 0; }
+        .detail-row { margin-bottom: 15px; }
+        .detail-label { color: #6c7086; margin-bottom: 5px; font-size: 0.9em; }
+        .detail-value { color: #cdd6f4; line-height: 1.4; }
+        .comments-section { margin-top: 20px; border-top: 1px dashed #313244; padding-top: 10px; }
+        .comment { margin-bottom: 10px; }
+        .comment-header { color: #89b4fa; font-size: 0.8em; margin-bottom: 2px; }
+        .comment-body { color: #bac2de; font-size: 0.9em; }
 
-        /* Variant 5: Minimalist Code */
-        #code .container { background-color: #282c34; border-left: 2px solid #61afef; padding-left: 15px; }
-        #code .header { color: #61afef; font-family: 'Fira Code', monospace; }
-        #code .list-item.selected { color: #98c379; }
-        #code .list-item::before { content: "  "; }
-        #code .list-item.selected::before { content: "> "; color: #61afef; }
-        #code .status.todo { color: #e06c75; }
-        #code .status.done { color: #98c379; }
-        #code .footer { color: #abb2bf; font-size: 0.75em; margin-top: 15px; }
-        #code .key { color: #d19a66; }
+        /* Dialog Overlay */
+        .overlay-container {
+            position: relative;
+        }
+        .dialog {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #1e1e2e;
+            border: 1px solid #89b4fa;
+            border-radius: 8px;
+            padding: 20px;
+            width: 70%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            z-index: 10;
+        }
+        .dialog-title { color: #89b4fa; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #313244; padding-bottom: 5px; }
+        .dialog-body { color: #cdd6f4; margin-bottom: 15px; }
+        .dialog-buttons { display: flex; justify-content: flex-end; gap: 10px; }
+        .btn { padding: 5px 15px; border-radius: 4px; cursor: pointer; }
+        .btn.primary { background-color: #89b4fa; color: #1e1e2e; font-weight: bold; }
+        .btn.secondary { background-color: #313244; color: #cdd6f4; }
+        
+        /* Blur effect for background content */
+        .blurred { filter: blur(2px); opacity: 0.5; }
+
+        /* Help View */
+        .help-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 10px;
+        }
+        .help-group { margin-bottom: 15px; }
+        .help-group-title { color: #f9e2af; border-bottom: 1px dashed #313244; margin-bottom: 5px; padding-bottom: 2px; }
+        .help-item { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .help-key { color: #89b4fa; }
+        .help-desc { color: #a6adc8; }
 
     </style>
 </head>
 <body>
 
-    <!-- Variant 1 -->
-    <div class="container" id="classic">
-        <span class="title">1. Classic Dark</span>
-        <div class="header">Tasks [Feature/TUI-Refine]</div>
-        <div class="list">
-            <div class="list-item">
-                <span><span class="status todo">TODO</span>1. Setup environment</span>
+    <!-- 1. Main List View -->
+    <div class="screen-container">
+        <div class="screen-label">1. Main List View</div>
+        <div class="container">
+            <div class="header">
+                <span>Tasks</span>
+                <span style="color: #6c7086; font-weight: normal;">Feature/TUI-Refine</span>
             </div>
-            <div class="list-item selected">
-                <span><span class="status todo">IN_PRG</span>2. Create HTML Mocks</span>
+            <div class="list">
+                <div class="list-item">
+                    <span class="id">17</span>
+                    <span class="status done">✔ Done</span>
+                    <span>Overhaul TUI design</span>
+                </div>
+                <div class="list-item">
+                    <span class="id">18</span>
+                    <span class="status done">✔ Done</span>
+                    <span>Refine TUI based on feedback</span>
+                </div>
+                <div class="list-item selected">
+                    <span class="id">19</span>
+                    <span class="status inprogress">➜ InPrg</span>
+                    <span>Strict HTML Mock Alignment</span>
+                </div>
+                <div class="desc-line">Fixing colors and borders to match design...</div>
+                <div class="list-item">
+                    <span class="id">20</span>
+                    <span class="status inprogress">➜ InPrg</span>
+                    <span>Comprehensive Mocks</span>
+                </div>
+                <div class="desc-line">Creating mocks for Detail/Help/Dialog...</div>
+                <div class="list-item">
+                    <span class="id">21</span>
+                    <span class="status todo">● Todo</span>
+                    <span>Implement Detail View</span>
+                </div>
             </div>
-            <div class="desc">Creating 5 variants of design...</div>
-            <div class="list-item">
-                <span><span class="status done">DONE</span>3. Initial Planning</span>
+            <div class="footer">
+                <span><span class="key">j/k</span> nav</span>
+                <span><span class="key">enter</span> open</span>
+                <span><span class="key">n</span> new</span>
+                <span><span class="key">?</span> help</span>
+                <span><span class="key">q</span> quit</span>
             </div>
-        </div>
-        <div class="footer">
-            <span class="key">q</span>:quit <span class="key">j/k</span>:nav <span class="key">enter</span>:open
         </div>
     </div>
 
-    <!-- Variant 2 -->
-    <div class="container" id="modern">
-        <span class="title">2. Modern Soft</span>
-        <div class="header">Tasks <span style="color: #6c7086;">/</span> Feature/TUI-Refine</div>
-        <div class="list">
-            <div class="list-item">
-                <span><span class="status todo">● Pending</span>1. Setup environment</span>
+    <!-- 2. Detail View -->
+    <div class="screen-container">
+        <div class="screen-label">2. Detail View</div>
+        <div class="container">
+            <div class="header">
+                <span>Task #19</span>
+                <span class="status inprogress">➜ In Progress</span>
             </div>
-            <div class="list-item selected">
-                <span><span class="status todo">➜ In Prog</span>2. Create HTML Mocks</span>
+            <div class="detail-content">
+                <div class="detail-row">
+                    <div class="detail-label">TITLE</div>
+                    <div class="detail-value" style="font-size: 1.1em; font-weight: bold;">Strict HTML Mock Alignment</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">DESCRIPTION</div>
+                    <div class="detail-value">Align TUI implementation strictly with Variant 2 of design_mocks.html. Fix colors, borders, and spacing to ensure exact match with the approved design.</div>
+                </div>
+                <div class="comments-section">
+                    <div class="detail-label">COMMENTS (2)</div>
+                    <div class="comment">
+                        <div class="comment-header">shun • 2 mins ago</div>
+                        <div class="comment-body">Colors extracted from CSS, applying to styles.go now.</div>
+                    </div>
+                    <div class="comment">
+                        <div class="comment-header">shun • 10 mins ago</div>
+                        <div class="comment-body">Started task.</div>
+                    </div>
+                </div>
             </div>
-            <div class="desc">Creating 5 variants of design...</div>
-            <div class="list-item">
-                <span><span class="status done">✔ Done</span>3. Initial Planning</span>
+            <div class="footer">
+                <span><span class="key">esc</span> back</span>
+                <span><span class="key">e</span> edit</span>
+                <span><span class="key">c</span> comment</span>
             </div>
-        </div>
-        <div class="footer">
-            <span class="key">q</span> quit <span class="key">j/k</span> nav <span class="key">enter</span> open
         </div>
     </div>
 
-    <!-- Variant 3 -->
-    <div class="container" id="mono">
-        <span class="title">3. Monochrome Pro</span>
-        <div class="header">TASKS :: Feature/TUI-Refine</div>
-        <div class="list">
-            <div class="list-item">
-                <span><span class="status todo">TODO</span>1. Setup environment</span>
+    <!-- 3. Dialog / Overlay View -->
+    <div class="screen-container">
+        <div class="screen-label">3. Dialog Overlay</div>
+        <div class="container overlay-container">
+            <!-- Background Content (Blurred) -->
+            <div class="header blurred">
+                <span>Tasks</span>
             </div>
-            <div class="list-item selected">
-                <span><span class="status todo">WIP </span>2. Create HTML Mocks</span>
+            <div class="list blurred">
+                <div class="list-item selected">
+                    <span class="id">19</span>
+                    <span class="status inprogress">➜ InPrg</span>
+                    <span>Strict HTML Mock Alignment</span>
+                </div>
             </div>
-            <div class="desc">Creating 5 variants of design...</div>
-            <div class="list-item">
-                <span><span class="status done">DONE</span>3. Initial Planning</span>
+            
+            <!-- Dialog -->
+            <div class="dialog">
+                <div class="dialog-title">Confirm Action</div>
+                <div class="dialog-body">
+                    Are you sure you want to delete task #19?
+                    <br><br>
+                    <span style="color: #a6adc8; font-size: 0.9em;">This action cannot be undone.</span>
+                </div>
+                <div class="dialog-buttons">
+                    <div class="btn secondary">Cancel</div>
+                    <div class="btn primary">Delete</div>
+                </div>
             </div>
-        </div>
-        <div class="footer">
-            [Q]UIT [J/K]NAV [ENTER]OPEN
+
+            <div class="footer blurred">
+                <span><span class="key">j/k</span> nav</span>
+            </div>
         </div>
     </div>
 
-    <!-- Variant 4 -->
-    <div class="container" id="neon">
-        <span class="title">4. Neon Cyber</span>
-        <div class="header">>> TASKS // SYSTEM_READY</div>
-        <div class="list">
-            <div class="list-item">
-                <span><span class="status todo">[ ]</span>1. Setup environment</span>
+    <!-- 4. Help View -->
+    <div class="screen-container">
+        <div class="screen-label">4. Help View</div>
+        <div class="container">
+            <div class="header">
+                <span>Help</span>
+                <span style="color: #6c7086;">Key Bindings</span>
             </div>
-            <div class="list-item selected">
-                <span><span class="status todo">[*]</span>2. Create HTML Mocks</span>
+            <div class="list"> <!-- reusing list container for scrolling -->
+                <div class="help-grid">
+                    <div class="help-column">
+                        <div class="help-group">
+                            <div class="help-group-title">Navigation</div>
+                            <div class="help-item"><span class="help-key">j / ↓</span> <span class="help-desc">Move down</span></div>
+                            <div class="help-item"><span class="help-key">k / ↑</span> <span class="help-desc">Move up</span></div>
+                            <div class="help-item"><span class="help-key">enter</span> <span class="help-desc">Open task</span></div>
+                            <div class="help-item"><span class="help-key">esc</span> <span class="help-desc">Go back</span></div>
+                        </div>
+                        <div class="help-group">
+                            <div class="help-group-title">Task Management</div>
+                            <div class="help-item"><span class="help-key">n</span> <span class="help-desc">New task</span></div>
+                            <div class="help-item"><span class="help-key">e</span> <span class="help-desc">Edit task</span></div>
+                            <div class="help-item"><span class="help-key">d</span> <span class="help-desc">Delete task</span></div>
+                            <div class="help-item"><span class="help-key">c</span> <span class="help-desc">Add comment</span></div>
+                        </div>
+                    </div>
+                    <div class="help-column">
+                         <div class="help-group">
+                            <div class="help-group-title">System</div>
+                            <div class="help-item"><span class="help-key">?</span> <span class="help-desc">Toggle help</span></div>
+                            <div class="help-item"><span class="help-key">q</span> <span class="help-desc">Quit application</span></div>
+                            <div class="help-item"><span class="help-key">ctrl+c</span> <span class="help-desc">Force quit</span></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="desc">>> Creating 5 variants of design...</div>
-            <div class="list-item">
-                <span><span class="status done">[X]</span>3. Initial Planning</span>
+            <div class="footer">
+                <span><span class="key">?</span> close help</span>
             </div>
-        </div>
-        <div class="footer">
-            <span class="key">Q</span>:ABORT <span class="key">ENT</span>:EXECUTE
-        </div>
-    </div>
-
-    <!-- Variant 5 -->
-    <div class="container" id="code">
-        <span class="title">5. Minimalist Code</span>
-        <div class="header">func main() { // Feature/TUI-Refine</div>
-        <div class="list">
-            <div class="list-item">
-                <span><span class="status todo">todo</span> var setupEnvironment</span>
-            </div>
-            <div class="list-item selected">
-                <span><span class="status todo">wip </span> var createHtmlMocks</span>
-            </div>
-            <div class="desc">// Creating 5 variants of design...</div>
-            <div class="list-item">
-                <span><span class="status done">done</span> var initialPlanning</span>
-            </div>
-        </div>
-        <div class="footer">
-            <span class="key">q</span>.Quit() <span class="key">enter</span>.Open()
         </div>
     </div>
 
