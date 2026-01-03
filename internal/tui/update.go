@@ -25,6 +25,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgTasksLoaded:
 		m.tasks = msg.Tasks
 		m.updateTaskList()
+		// Load comments for selected task if detail panel is visible
+		task := m.SelectedTask()
+		if task != nil && (m.showDetailPanel() || m.mode == ModeDetail) {
+			return m, m.loadComments(task.ID)
+		}
 		return m, nil
 
 	case MsgConfigLoaded:
@@ -97,6 +102,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgTick:
 		// Auto-refresh: reload tasks and schedule next tick
 		return m, tea.Batch(m.loadTasks(), m.tick())
+
+	case MsgCommentsLoaded:
+		m.comments = msg.Comments
+		// Update viewport content if in detail mode
+		if m.mode == ModeDetail {
+			width := m.dialogWidth() - 4
+			m.detailViewport.SetContent(m.detailContent(width))
+		}
+		return m, nil
 	}
 
 	return m, nil
@@ -140,8 +154,16 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down):
+		prevTask := m.SelectedTask()
 		var cmd tea.Cmd
 		m.taskList, cmd = m.taskList.Update(msg)
+		newTask := m.SelectedTask()
+		// If task changed and we're showing detail panel or detail view, load comments
+		if prevTask != newTask && newTask != nil {
+			if m.showDetailPanel() || m.mode == ModeDetail {
+				return m, tea.Batch(cmd, m.loadComments(newTask.ID))
+			}
+		}
 		return m, cmd
 
 	case key.Matches(msg, m.keys.Enter):
@@ -237,9 +259,11 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Detail):
-		if m.SelectedTask() != nil {
+		task := m.SelectedTask()
+		if task != nil {
 			m.initDetailViewport()
 			m.mode = ModeDetail
+			return m, m.loadComments(task.ID)
 		}
 		return m, nil
 	}
