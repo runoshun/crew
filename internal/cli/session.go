@@ -407,6 +407,65 @@ Examples:
 	return cmd
 }
 
+// newExecCommand creates the exec command for executing commands in a task's worktree.
+func newExecCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "exec <id> -- <command...>",
+		Short: "Execute a command in task's worktree",
+		Long: `Execute a command in the task's worktree directory.
+
+This runs the specified command from the task's worktree with stdout/stderr
+piped to the terminal. The command's exit code is preserved.
+
+The task's status is NOT modified. This is a read/execute-only operation.
+
+Preconditions:
+  - Task must exist
+  - Worktree must exist
+
+Examples:
+  # Run tests in task #1's worktree
+  git crew exec 1 -- npm test
+
+  # Check git status in task's worktree
+  git crew exec 1 -- git status
+
+  # Run a build command
+  git crew exec 1 -- make build`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Get command (everything after "--")
+			// Cobra should have already handled "--" separator, so args[1:] should be the command
+			var command []string
+			if len(args) > 1 {
+				command = args[1:]
+			} else {
+				return fmt.Errorf("command is required after task ID")
+			}
+
+			// Execute use case
+			uc := c.ExecCommandUseCase()
+			_, err = uc.Execute(cmd.Context(), usecase.ExecCommandInput{
+				TaskID:  taskID,
+				Command: command,
+			})
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // newMergeCommand creates the merge command for merging a task branch into main.
 func newMergeCommand(c *app.Container) *cobra.Command {
 	var opts struct {
