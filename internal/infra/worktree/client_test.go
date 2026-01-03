@@ -70,7 +70,7 @@ func TestClient_Create_NewBranch(t *testing.T) {
 
 	require.NoError(t, err)
 	// Directory should be named by task ID, not branch name
-	assert.Equal(t, filepath.Join(worktreeDir, "worktrees", "1"), path)
+	assert.Equal(t, filepath.Join(worktreeDir, "1"), path)
 
 	// Verify worktree exists
 	exists, err := client.Exists("crew-1")
@@ -97,7 +97,7 @@ func TestClient_Create_ExistingBranch(t *testing.T) {
 	path, err := client.Create("crew-2", "main")
 
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(worktreeDir, "worktrees", "2"), path)
+	assert.Equal(t, filepath.Join(worktreeDir, "2"), path)
 
 	// Verify worktree exists
 	exists, err := client.Exists("crew-2")
@@ -145,7 +145,7 @@ func TestClient_Create_WithGitHubIssue(t *testing.T) {
 
 	require.NoError(t, err)
 	// Directory should be named by task ID (5), not the full branch name
-	assert.Equal(t, filepath.Join(worktreeDir, "worktrees", "5"), path)
+	assert.Equal(t, filepath.Join(worktreeDir, "5"), path)
 }
 
 func TestClient_Resolve(t *testing.T) {

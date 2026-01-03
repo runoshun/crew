@@ -68,8 +68,9 @@ func TmuxConfigPath(crewDir string) string {
 }
 
 // WorktreePath returns the path to a worktree for a task.
-func WorktreePath(crewDir string, taskID int) string {
-	return filepath.Join(crewDir, "worktrees", fmt.Sprintf("%d", taskID))
+// worktreeDir should be the base directory for worktrees (e.g., .git/crew/worktrees).
+func WorktreePath(worktreeDir string, taskID int) string {
+	return filepath.Join(worktreeDir, fmt.Sprintf("%d", taskID))
 }
 
 // branchPattern matches crew branch names: crew-<id> or crew-<id>-gh-<issue>
