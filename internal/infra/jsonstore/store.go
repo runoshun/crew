@@ -155,6 +155,20 @@ func (s *Store) AddComment(taskID int, comment domain.Comment) error {
 	})
 }
 
+// UpdateComment updates an existing comment of a task.
+func (s *Store) UpdateComment(taskID, index int, comment domain.Comment) error {
+	return s.withLockWrite(func(data *storeData) error {
+		key := strconv.Itoa(taskID)
+		comments, ok := data.Comments[key]
+		if !ok || index < 0 || index >= len(comments) {
+			return domain.ErrCommentNotFound
+		}
+		comments[index] = comment
+		data.Comments[key] = comments
+		return nil
+	})
+}
+
 // IsInitialized checks if the store file exists.
 func (s *Store) IsInitialized() bool {
 	_, err := os.Stat(s.path)

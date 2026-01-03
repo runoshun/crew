@@ -326,6 +326,44 @@ func (s *Store) AddComment(taskID int, comment domain.Comment) error {
 	return nil
 }
 
+// UpdateComment updates an existing comment of a task.
+func (s *Store) UpdateComment(taskID, index int, comment domain.Comment) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Load existing comments
+	comments, err := s.getCommentsLocked(taskID)
+	if err != nil {
+		return err
+	}
+
+	if index < 0 || index >= len(comments) {
+		return domain.ErrCommentNotFound
+	}
+
+	// Update comment
+	comments[index] = comment
+
+	// Save comments
+	data := commentsData{Comments: comments}
+	yamlData, err := yaml.Marshal(&data)
+	if err != nil {
+		return fmt.Errorf("marshal comments: %w", err)
+	}
+
+	hash, err := s.writeBlob(yamlData)
+	if err != nil {
+		return err
+	}
+
+	ref := plumbing.NewHashReference(s.commentsRef(taskID), hash)
+	if err := s.repo.Storer.SetReference(ref); err != nil {
+		return fmt.Errorf("set comments ref: %w", err)
+	}
+
+	return nil
+}
+
 // getCommentsLocked loads comments without locking (caller must hold lock).
 func (s *Store) getCommentsLocked(taskID int) ([]domain.Comment, error) {
 	ref, err := s.repo.Reference(s.commentsRef(taskID), true)

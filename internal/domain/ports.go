@@ -39,6 +39,9 @@ type TaskRepository interface {
 	// AddComment adds a comment to a task.
 	AddComment(taskID int, comment Comment) error
 
+	// UpdateComment updates an existing comment of a task.
+	UpdateComment(taskID, index int, comment Comment) error
+
 	// === Snapshot operations ===
 
 	// SaveSnapshot saves the current task state as a snapshot.

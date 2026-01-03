@@ -102,6 +102,17 @@ func (m *MockTaskRepository) AddComment(taskID int, comment domain.Comment) erro
 	return nil
 }
 
+// UpdateComment updates an existing comment of a task.
+func (m *MockTaskRepository) UpdateComment(taskID, index int, comment domain.Comment) error {
+	comments := m.Comments[taskID]
+	if index < 0 || index >= len(comments) {
+		return domain.ErrCommentNotFound
+	}
+	comments[index] = comment
+	m.Comments[taskID] = comments
+	return nil
+}
+
 // MockStoreInitializer is a test double for domain.StoreInitializer.
 type MockStoreInitializer struct {
 	Initialized bool
@@ -197,6 +208,20 @@ type MockTaskRepositoryWithAddCommentError struct {
 func (m *MockTaskRepositoryWithAddCommentError) AddComment(_ int, _ domain.Comment) error {
 	if m.AddCommentErr != nil {
 		return m.AddCommentErr
+	}
+	return nil
+}
+
+// MockTaskRepositoryWithUpdateCommentError extends MockTaskRepository to return error on UpdateComment.
+type MockTaskRepositoryWithUpdateCommentError struct {
+	*MockTaskRepository
+	UpdateCommentErr error
+}
+
+// UpdateComment returns an error if configured.
+func (m *MockTaskRepositoryWithUpdateCommentError) UpdateComment(_ int, _ int, _ domain.Comment) error {
+	if m.UpdateCommentErr != nil {
+		return m.UpdateCommentErr
 	}
 	return nil
 }
@@ -577,3 +602,18 @@ func (m *MockTaskRepository) ListNamespaces() ([]string, error) { return nil, ni
 func (m *MockTaskRepositoryWithAddCommentError) Push() error                       { return nil }
 func (m *MockTaskRepositoryWithAddCommentError) Fetch(_ string) error              { return nil }
 func (m *MockTaskRepositoryWithAddCommentError) ListNamespaces() ([]string, error) { return nil, nil }
+
+func (m *MockTaskRepositoryWithUpdateCommentError) SaveSnapshot(mainSHA string) error { return nil }
+func (m *MockTaskRepositoryWithUpdateCommentError) RestoreSnapshot(snapshotRef string) error {
+	return nil
+}
+func (m *MockTaskRepositoryWithUpdateCommentError) ListSnapshots(mainSHA string) ([]domain.SnapshotInfo, error) {
+	return nil, nil
+}
+func (m *MockTaskRepositoryWithUpdateCommentError) SyncSnapshot() error                { return nil }
+func (m *MockTaskRepositoryWithUpdateCommentError) PruneSnapshots(keepCount int) error { return nil }
+func (m *MockTaskRepositoryWithUpdateCommentError) Push() error                        { return nil }
+func (m *MockTaskRepositoryWithUpdateCommentError) Fetch(_ string) error               { return nil }
+func (m *MockTaskRepositoryWithUpdateCommentError) ListNamespaces() ([]string, error) {
+	return nil, nil
+}

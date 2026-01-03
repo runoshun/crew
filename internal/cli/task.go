@@ -491,6 +491,10 @@ Examples:
 
 // newCommentCommand creates the comment command for adding comments to tasks.
 func newCommentCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		Edit int
+	}
+
 	cmd := &cobra.Command{
 		Use:   "comment <id> <message>",
 		Short: "Add a comment to a task",
@@ -503,8 +507,8 @@ Examples:
   # Add a comment to task #1
   git crew comment 1 "Started working on authentication"
 
-  # Add a comment with spaces
-  git crew comment 1 "Fixed the login bug, needs testing"
+  # Edit an existing comment (index starts from 0)
+  git crew comment 1 --edit 0 "Updated message"
 
   # Use with task ID prefix
   git crew comment "#1" "Completed initial implementation"`,
@@ -516,7 +520,23 @@ Examples:
 				return fmt.Errorf("invalid task ID: %w", err)
 			}
 
-			// Execute use case
+			if cmd.Flags().Changed("edit") {
+				// Execute edit comment use case
+				uc := c.EditCommentUseCase()
+				err = uc.Execute(cmd.Context(), usecase.EditCommentInput{
+					TaskID:  taskID,
+					Index:   opts.Edit,
+					Message: args[1],
+				})
+				if err != nil {
+					return err
+				}
+
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated comment %d of task #%d\n", opts.Edit, taskID)
+				return nil
+			}
+
+			// Execute add comment use case
 			uc := c.AddCommentUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.AddCommentInput{
 				TaskID:  taskID,
@@ -531,6 +551,8 @@ Examples:
 			return nil
 		},
 	}
+
+	cmd.Flags().IntVar(&opts.Edit, "edit", -1, "Edit an existing comment by index")
 
 	return cmd
 }
@@ -634,8 +656,8 @@ func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
 	// Comments
 	if len(out.Comments) > 0 {
 		_, _ = fmt.Fprintln(w, "\nComments:")
-		for _, comment := range out.Comments {
-			_, _ = fmt.Fprintf(w, "  [%s] %s\n", comment.Time.Format(time.RFC3339), comment.Text)
+		for i, comment := range out.Comments {
+			_, _ = fmt.Fprintf(w, "  %d: [%s] %s\n", i, comment.Time.Format(time.RFC3339), comment.Text)
 		}
 	}
 }
