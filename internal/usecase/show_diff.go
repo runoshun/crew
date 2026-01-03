@@ -18,8 +18,9 @@ const DefaultDiffCommand = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}
 // ShowDiffInput contains the parameters for showing task diff.
 // Fields are ordered to minimize memory padding.
 type ShowDiffInput struct {
-	Args   []string // Additional diff arguments
-	TaskID int      // Task ID (required)
+	Args          []string // Additional diff arguments
+	TaskID        int      // Task ID (required)
+	UseTUICommand bool     // If true, use tui_command instead of command
 }
 
 // ShowDiffOutput contains the result of showing task diff.
@@ -92,9 +93,14 @@ func (uc *ShowDiff) GetCommand(_ context.Context, in ShowDiffInput) (*domain.Exe
 	}
 
 	// Get diff command from config or use default
+	// If UseTUICommand is true and tui_command is configured, use it
 	diffCommand := DefaultDiffCommand
-	if cfg != nil && cfg.Diff.Command != "" {
-		diffCommand = cfg.Diff.Command
+	if cfg != nil {
+		if in.UseTUICommand && cfg.Diff.TUICommand != "" {
+			diffCommand = cfg.Diff.TUICommand
+		} else if cfg.Diff.Command != "" {
+			diffCommand = cfg.Diff.Command
+		}
 	}
 
 	// Expand template with args and task info
