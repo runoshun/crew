@@ -112,3 +112,11 @@ func (MsgShowDiff) sealed() {}
 type MsgTick struct{}
 
 func (MsgTick) sealed() {}
+
+// MsgCommentsLoaded is sent when comments are loaded for a task.
+type MsgCommentsLoaded struct {
+	Comments []domain.Comment
+	TaskID   int
+}
+
+func (MsgCommentsLoaded) sealed() {}

@@ -622,5 +622,23 @@ func (m *Model) viewDetailPanel() string {
 		b.WriteString(descStyle.Render(task.Description))
 	}
 
+	if len(m.comments) > 0 {
+		b.WriteString("\n\n")
+		commentLabelStyle := lipgloss.NewStyle().
+			Foreground(Colors.Muted).
+			Bold(true)
+		b.WriteString(commentLabelStyle.Render("Comments"))
+		b.WriteString("\n")
+		for _, comment := range m.comments {
+			timeStr := comment.Time.Format("01/02 15:04")
+			commentStyle := lipgloss.NewStyle().
+				Foreground(Colors.DescSelected).
+				Width(DetailPanelWidth - 4)
+			b.WriteString(lipgloss.NewStyle().Foreground(Colors.Muted).Render("[" + timeStr + "] "))
+			b.WriteString(commentStyle.Render(comment.Text))
+			b.WriteString("\n")
+		}
+	}
+
 	return panelStyle.Render(b.String())
 }

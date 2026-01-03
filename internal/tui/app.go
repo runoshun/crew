@@ -30,6 +30,7 @@ type Model struct {
 
 	// State (slices - contain pointers)
 	tasks         []*domain.Task
+	comments      []domain.Comment
 	builtinAgents []string
 	customAgents  []string
 	agentCommands map[string]string
@@ -152,6 +153,17 @@ func (m *Model) loadConfig() tea.Cmd {
 	}
 }
 
+// loadComments returns a command that loads comments for a task.
+func (m *Model) loadComments(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		out, err := m.container.ShowTaskUseCase().Execute(context.Background(), usecase.ShowTaskInput{TaskID: taskID})
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgCommentsLoaded{TaskID: taskID, Comments: out.Comments}
+	}
+}
+
 // SelectedTask returns the currently selected task, or nil if none.
 func (m *Model) SelectedTask() *domain.Task {
 	if m.taskList.SelectedItem() == nil {
@@ -245,6 +257,17 @@ func (m *Model) detailContent(width int) string {
 		lines = append(lines, lineStyle.Render(""))
 		lines = append(lines, lineStyle.Render(m.styles.DetailLabel.Background(Colors.Background).Render("Description")))
 		lines = append(lines, wrapStyle.Render(m.styles.DetailDesc.Background(Colors.Background).Width(width).Render(task.Description)))
+	}
+
+	if len(m.comments) > 0 {
+		lines = append(lines, lineStyle.Render(""))
+		lines = append(lines, lineStyle.Render(m.styles.DetailLabel.Background(Colors.Background).Render("Comments")))
+		for _, comment := range m.comments {
+			timeStr := comment.Time.Format("2006-01-02 15:04")
+			commentLine := m.styles.DetailValue.Background(Colors.Background).Render("["+timeStr+"] ") +
+				m.styles.DetailDesc.Background(Colors.Background).Render(comment.Text)
+			lines = append(lines, wrapStyle.Render(commentLine))
+		}
 	}
 
 	result := ""
