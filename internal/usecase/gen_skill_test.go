@@ -30,7 +30,7 @@ func TestGenSkill_Execute(t *testing.T) {
 	expectedDirs := []string{
 		".claude/skills/crew-manager",
 		".codex/skills/crew-manager",
-		".opencode/skills/crew-manager",
+		".opencode/skill/crew-manager",
 	}
 
 	for i, dir := range expectedDirs {
@@ -71,7 +71,7 @@ func TestGenSkill_Execute_CreatesDirectories(t *testing.T) {
 	dirs := []string{
 		".claude/skills/crew-manager",
 		".codex/skills/crew-manager",
-		".opencode/skills/crew-manager",
+		".opencode/skill/crew-manager",
 	}
 
 	for _, dir := range dirs {
