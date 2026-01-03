@@ -72,6 +72,9 @@ func TestNewDefaultConfig(t *testing.T) {
 		if worker.Args != builtin.DefaultArgs {
 			t.Errorf("%s.Args = %q, want %q", name, worker.Args, builtin.DefaultArgs)
 		}
+		if worker.Model != "" {
+			t.Errorf("%s.Model = %q, want empty (falls back to builtin default)", name, worker.Model)
+		}
 		// Worker.Prompt is empty; defaults come from WorkersConfig.Prompt
 		if worker.Prompt != "" {
 			t.Errorf("%s.Prompt = %q, want empty (falls back to WorkersConfig.Prompt)", name, worker.Prompt)
@@ -382,10 +385,12 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 						SystemArgs:      "--system",
 						Args:            "--base-arg",
 						Prompt:          "base prompt",
+						Model:           "base-model",
 					},
 					"child": {
 						Inherit:    "base",
 						SystemArgs: "--child-system",
+						Model:      "child-model",
 					},
 				},
 			},
@@ -396,6 +401,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					SystemArgs:      "--system",
 					Args:            "--base-arg",
 					Prompt:          "base prompt",
+					Model:           "base-model",
 				},
 				"child": {
 					CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
@@ -403,6 +409,35 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					SystemArgs:      "--child-system",
 					Args:            "--base-arg",
 					Prompt:          "base prompt",
+					Model:           "child-model",
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "model inheritance fallback",
+			config: &Config{
+				Workers: map[string]WorkerAgent{
+					"base": {
+						CommandTemplate: "{{.Command}}",
+						Command:         "base",
+						Model:           "base-model",
+					},
+					"child": {
+						Inherit: "base",
+					},
+				},
+			},
+			want: map[string]WorkerAgent{
+				"base": {
+					CommandTemplate: "{{.Command}}",
+					Command:         "base",
+					Model:           "base-model",
+				},
+				"child": {
+					CommandTemplate: "{{.Command}}",
+					Command:         "base",
+					Model:           "base-model",
 				},
 			},
 			wantErr: nil,
@@ -554,6 +589,9 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 				}
 				if got.Prompt != want.Prompt {
 					t.Errorf("worker %q: Prompt = %q, want %q", name, got.Prompt, want.Prompt)
+				}
+				if got.Model != want.Model {
+					t.Errorf("worker %q: Model = %q, want %q", name, got.Model, want.Model)
 				}
 			}
 		})

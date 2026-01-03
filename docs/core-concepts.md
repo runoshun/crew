@@ -517,15 +517,16 @@ Workers can inherit settings from other workers using the `inherit` field. This 
 [workers.opencode]
 command = "opencode"
 args = "-m anthropic/claude-sonnet-4-5"
+model = "anthropic/claude-sonnet-4-5"
 
 # Inherit and override model only
 [workers.opencode-hard]
 inherit = "opencode"
-args = "-m anthropic/claude-opus-4"
+model = "anthropic/claude-opus-4"
 
 [workers.opencode-easy]
 inherit = "opencode"
-args = "-m anthropic/claude-haiku"
+model = "anthropic/claude-haiku"
 ```
 
 **Features**:
@@ -533,6 +534,7 @@ args = "-m anthropic/claude-haiku"
 - Can inherit from custom workers
 - Multi-level inheritance supported (child can inherit from parent that inherits from another)
 - Only non-empty fields in child override parent fields
+- `model` field lets you pick a default without editing `args`
 
 **Usage**:
 

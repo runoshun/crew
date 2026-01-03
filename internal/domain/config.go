@@ -38,6 +38,7 @@ type WorkerAgent struct {
 	Command         string // Base command (e.g., "claude", "opencode")
 	SystemArgs      string // System arguments required for crew operation (auto-applied)
 	Args            string // User-customizable arguments (e.g., model selection)
+	Model           string // Default model for this worker (overrides builtin default)
 	Prompt          string // Prompt template for this worker
 }
 
@@ -389,6 +390,9 @@ func (c *Config) resolveWorker(name string, visited, resolving map[string]bool) 
 	}
 	if worker.Prompt != "" {
 		resolved.Prompt = worker.Prompt
+	}
+	if worker.Model != "" {
+		resolved.Model = worker.Model
 	}
 
 	// Clear Inherit field after resolution

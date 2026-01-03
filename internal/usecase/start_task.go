@@ -102,8 +102,11 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	// Get agent configuration
 	workerAgent, defaultModel := uc.resolveWorkerAgent(agent, cfg)
 
-	// Resolve model: use input model, fall back to agent's default
+	// Resolve model priority: CLI flag > worker config > builtin default
 	model := in.Model
+	if model == "" && workerAgent.Model != "" {
+		model = workerAgent.Model
+	}
 	if model == "" {
 		model = defaultModel
 	}

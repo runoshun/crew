@@ -22,6 +22,7 @@ default = "claude"
 
 [workers.claude]
 args = "--model claude-sonnet-4-20250514"
+model = "anthropic/claude-sonnet-4-20250514"
 prompt = "When done, run 'crew complete'."
 
 [complete]
@@ -41,6 +42,7 @@ level = "debug"
 	// Verify
 	assert.Equal(t, "claude", cfg.WorkersConfig.Default)
 	assert.Equal(t, "--model claude-sonnet-4-20250514", cfg.Workers["claude"].Args)
+	assert.Equal(t, "anthropic/claude-sonnet-4-20250514", cfg.Workers["claude"].Model)
 	assert.Equal(t, "When done, run 'crew complete'.", cfg.Workers["claude"].Prompt)
 	assert.Equal(t, "mise run ci", cfg.Complete.Command)
 	assert.Equal(t, "debug", cfg.Log.Level)
@@ -58,6 +60,7 @@ default = "opencode"
 
 [workers.opencode]
 args = "-m gpt-4"
+model = "github-copilot/gpt-4"
 `
 	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
 	require.NoError(t, err)
@@ -70,6 +73,7 @@ args = "-m gpt-4"
 	// Verify
 	assert.Equal(t, "opencode", cfg.WorkersConfig.Default)
 	assert.Equal(t, "-m gpt-4", cfg.Workers["opencode"].Args)
+	assert.Equal(t, "github-copilot/gpt-4", cfg.Workers["opencode"].Model)
 }
 
 func TestLoader_Load_MergeRepoOverridesGlobal(t *testing.T) {
@@ -84,10 +88,12 @@ default = "opencode"
 
 [workers.opencode]
 args = "-m gpt-4"
+model = "global-opencode-model"
 prompt = "Global prompt"
 
 [workers.claude]
 args = "--model global-model"
+model = "global-claude-model"
 
 [complete]
 command = "go test ./..."
@@ -105,6 +111,7 @@ default = "claude"
 
 [workers.claude]
 args = "--model repo-model"
+model = "repo-claude-model"
 
 [complete]
 command = "mise run ci"
@@ -118,12 +125,14 @@ command = "mise run ci"
 	require.NoError(t, err)
 
 	// Verify: repo overrides global
-	assert.Equal(t, "claude", cfg.WorkersConfig.Default)              // Overridden by repo
-	assert.Equal(t, "Global prompt", cfg.Workers["opencode"].Prompt)  // From global (not overridden)
-	assert.Equal(t, "--model repo-model", cfg.Workers["claude"].Args) // Overridden by repo
-	assert.Equal(t, "-m gpt-4", cfg.Workers["opencode"].Args)         // From global
-	assert.Equal(t, "mise run ci", cfg.Complete.Command)              // Overridden by repo
-	assert.Equal(t, "info", cfg.Log.Level)                            // From global (not overridden)
+	assert.Equal(t, "claude", cfg.WorkersConfig.Default)                    // Overridden by repo
+	assert.Equal(t, "Global prompt", cfg.Workers["opencode"].Prompt)        // From global (not overridden)
+	assert.Equal(t, "--model repo-model", cfg.Workers["claude"].Args)       // Overridden by repo
+	assert.Equal(t, "repo-claude-model", cfg.Workers["claude"].Model)       // Overridden by repo
+	assert.Equal(t, "-m gpt-4", cfg.Workers["opencode"].Args)               // From global
+	assert.Equal(t, "global-opencode-model", cfg.Workers["opencode"].Model) // From global
+	assert.Equal(t, "mise run ci", cfg.Complete.Command)                    // Overridden by repo
+	assert.Equal(t, "info", cfg.Log.Level)                                  // From global (not overridden)
 }
 
 func TestLoader_Load_NoConfigFiles(t *testing.T) {
