@@ -640,5 +640,33 @@ func (m *Model) viewDetailPanel() string {
 		}
 	}
 
-	return panelStyle.Render(b.String())
+	content := b.String()
+
+	// Truncate content if it exceeds panel height
+	// Note: lipgloss renders with word wrapping, so we need to count actual display lines
+	renderedLines := strings.Split(content, "\n")
+	totalLines := 0
+	truncatedLines := make([]string, 0, len(renderedLines))
+
+	for _, line := range renderedLines {
+		// Calculate how many display lines this logical line will take
+		lineHeight := lipgloss.Height(line)
+		if lineHeight == 0 {
+			lineHeight = 1 // Empty lines still take 1 line
+		}
+
+		if totalLines+lineHeight > panelHeight {
+			// Truncate and add ellipsis indicator
+			if totalLines < panelHeight {
+				truncatedLines = append(truncatedLines, "...")
+			}
+			break
+		}
+
+		truncatedLines = append(truncatedLines, line)
+		totalLines += lineHeight
+	}
+
+	content = strings.Join(truncatedLines, "\n")
+	return panelStyle.Render(content)
 }
