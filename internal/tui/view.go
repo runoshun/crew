@@ -9,7 +9,7 @@ import (
 
 const (
 	MinWidthForDetailPanel = 100
-	DetailPanelWidth       = 40
+	MinDetailPanelWidth    = 40
 	GutterWidth            = 1
 	appPadding             = 4
 )
@@ -531,24 +531,37 @@ func (m *Model) showDetailPanel() bool {
 	return m.width >= MinWidthForDetailPanel
 }
 
+func (m *Model) detailPanelWidth() int {
+	if !m.showDetailPanel() {
+		return 0
+	}
+	// 40% of screen width, but at least MinDetailPanelWidth
+	w := int(float64(m.width) * 0.4)
+	if w < MinDetailPanelWidth {
+		w = MinDetailPanelWidth
+	}
+	return w
+}
+
 func (m *Model) contentWidth() int {
 	return m.width - appPadding
 }
 
 func (m *Model) listWidth() int {
 	if m.showDetailPanel() {
-		return m.contentWidth() - DetailPanelWidth - GutterWidth
+		return m.contentWidth() - m.detailPanelWidth() - GutterWidth
 	}
 	return m.contentWidth()
 }
 
 func (m *Model) viewDetailPanel() string {
+	panelWidth := m.detailPanelWidth()
 	panelHeight := m.height - 2
 	if panelHeight < 10 {
 		panelHeight = 10
 	}
 	panelStyle := lipgloss.NewStyle().
-		Width(DetailPanelWidth).
+		Width(panelWidth).
 		Height(panelHeight).
 		PaddingLeft(GutterWidth).
 		BorderLeft(true).
@@ -603,7 +616,7 @@ func (m *Model) viewDetailPanel() string {
 		Foreground(Colors.Primary).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
 		BorderForeground(Colors.GroupLine).
-		Width(DetailPanelWidth - 4)
+		Width(panelWidth - 4)
 	if !addLines(headerStyle.Render(fmt.Sprintf("Task #%d", task.ID)), "") {
 		return panelStyle.Render(strings.Join(contentLines, "\n"))
 	}
@@ -612,7 +625,7 @@ func (m *Model) viewDetailPanel() string {
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(Colors.TitleSelected).
-		Width(DetailPanelWidth - 4)
+		Width(panelWidth - 4)
 	if !addLines(titleStyle.Render(task.Title), "") {
 		return panelStyle.Render(strings.Join(contentLines, "\n"))
 	}
@@ -660,7 +673,7 @@ func (m *Model) viewDetailPanel() string {
 			Bold(true)
 		descStyle := lipgloss.NewStyle().
 			Foreground(Colors.DescSelected).
-			Width(DetailPanelWidth - 4)
+			Width(panelWidth - 4)
 		if !addLines("", descLabelStyle.Render("Description"), descStyle.Render(task.Description)) {
 			return panelStyle.Render(strings.Join(contentLines, "\n"))
 		}
@@ -679,7 +692,7 @@ func (m *Model) viewDetailPanel() string {
 			timeStr := comment.Time.Format("01/02 15:04")
 			commentStyle := lipgloss.NewStyle().
 				Foreground(Colors.DescSelected).
-				Width(DetailPanelWidth - 4)
+				Width(panelWidth - 4)
 			commentLine := lipgloss.NewStyle().Foreground(Colors.Muted).Render("["+timeStr+"] ") + commentStyle.Render(comment.Text)
 			if !addLines(commentLine) {
 				return panelStyle.Render(strings.Join(contentLines, "\n"))

@@ -139,6 +139,47 @@ func TestViewDetailPanel_EmptyTask(t *testing.T) {
 	assert.Contains(t, result, "Select a task")
 }
 
+func TestDetailPanelWidth(t *testing.T) {
+	tests := []struct {
+		name     string
+		width    int
+		expected int
+	}{
+		{
+			name:     "Narrow screen, no panel",
+			width:    80,
+			expected: 0,
+		},
+		{
+			name:     "Threshold width, minimum width panel",
+			width:    100, // 40% is 40, which is MinDetailPanelWidth
+			expected: 40,
+		},
+		{
+			name:     "Slightly wider screen, 40% panel",
+			width:    110, // 40% is 44
+			expected: 44,
+		},
+		{
+			name:     "Wide screen, 40% panel",
+			width:    200,
+			expected: 80,
+		},
+		{
+			name:     "Very wide screen, 40% panel",
+			width:    300,
+			expected: 120,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Model{width: tt.width}
+			assert.Equal(t, tt.expected, m.detailPanelWidth())
+		})
+	}
+}
+
 func TestViewDetailPanel_TitleWrapping(t *testing.T) {
 	// Test that long titles are properly handled
 	longTitle := strings.Repeat("Very long task title ", 10)
