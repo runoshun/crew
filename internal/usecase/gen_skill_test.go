@@ -109,3 +109,111 @@ func TestGenSkill_Execute_OverwritesExistingFile(t *testing.T) {
 	assert.NotEqual(t, oldContent, string(content))
 	assert.Contains(t, string(content), "# Crew Manager Skill")
 }
+
+func TestGenSkill_Execute_ClaudeOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	uc := NewGenSkill(tmpDir)
+
+	out, err := uc.Execute(context.Background(), GenSkillInput{
+		Claude: true,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, out.CreatedPaths, 1)
+
+	// Only .claude should be created
+	claudePath := filepath.Join(tmpDir, ".claude/skills/crew-manager/SKILL.md")
+	assert.Equal(t, claudePath, out.CreatedPaths[0])
+
+	_, err = os.Stat(claudePath)
+	require.NoError(t, err)
+
+	// Other directories should not exist
+	_, err = os.Stat(filepath.Join(tmpDir, ".codex/skills/crew-manager/SKILL.md"))
+	assert.True(t, os.IsNotExist(err))
+
+	_, err = os.Stat(filepath.Join(tmpDir, ".opencode/skill/crew-manager/SKILL.md"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestGenSkill_Execute_OpenCodeOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	uc := NewGenSkill(tmpDir)
+
+	out, err := uc.Execute(context.Background(), GenSkillInput{
+		OpenCode: true,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, out.CreatedPaths, 1)
+
+	// Only .opencode should be created
+	opencodePath := filepath.Join(tmpDir, ".opencode/skill/crew-manager/SKILL.md")
+	assert.Equal(t, opencodePath, out.CreatedPaths[0])
+
+	_, err = os.Stat(opencodePath)
+	require.NoError(t, err)
+
+	// Other directories should not exist
+	_, err = os.Stat(filepath.Join(tmpDir, ".claude/skills/crew-manager/SKILL.md"))
+	assert.True(t, os.IsNotExist(err))
+
+	_, err = os.Stat(filepath.Join(tmpDir, ".codex/skills/crew-manager/SKILL.md"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestGenSkill_Execute_CodexOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	uc := NewGenSkill(tmpDir)
+
+	out, err := uc.Execute(context.Background(), GenSkillInput{
+		Codex: true,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, out.CreatedPaths, 1)
+
+	// Only .codex should be created
+	codexPath := filepath.Join(tmpDir, ".codex/skills/crew-manager/SKILL.md")
+	assert.Equal(t, codexPath, out.CreatedPaths[0])
+
+	_, err = os.Stat(codexPath)
+	require.NoError(t, err)
+
+	// Other directories should not exist
+	_, err = os.Stat(filepath.Join(tmpDir, ".claude/skills/crew-manager/SKILL.md"))
+	assert.True(t, os.IsNotExist(err))
+
+	_, err = os.Stat(filepath.Join(tmpDir, ".opencode/skill/crew-manager/SKILL.md"))
+	assert.True(t, os.IsNotExist(err))
+}
+
+func TestGenSkill_Execute_MultipleFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+	uc := NewGenSkill(tmpDir)
+
+	out, err := uc.Execute(context.Background(), GenSkillInput{
+		Claude: true,
+		Codex:  true,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, out.CreatedPaths, 2)
+
+	// Both .claude and .codex should be created
+	claudePath := filepath.Join(tmpDir, ".claude/skills/crew-manager/SKILL.md")
+	codexPath := filepath.Join(tmpDir, ".codex/skills/crew-manager/SKILL.md")
+
+	assert.Contains(t, out.CreatedPaths, claudePath)
+	assert.Contains(t, out.CreatedPaths, codexPath)
+
+	_, err = os.Stat(claudePath)
+	require.NoError(t, err)
+
+	_, err = os.Stat(codexPath)
+	require.NoError(t, err)
+
+	// .opencode should not exist
+	_, err = os.Stat(filepath.Join(tmpDir, ".opencode/skill/crew-manager/SKILL.md"))
+	assert.True(t, os.IsNotExist(err))
+}

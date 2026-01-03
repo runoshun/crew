@@ -24,6 +24,12 @@ func newGenCommand(c *app.Container) *cobra.Command {
 
 // newGenSkillCommand creates the gen skill subcommand.
 func newGenSkillCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		claude   bool
+		opencode bool
+		codex    bool
+	}
+
 	cmd := &cobra.Command{
 		Use:   "skill",
 		Short: "Generate crew-manager skill file",
@@ -35,10 +41,20 @@ the complete workflow: task creation → agent startup → monitoring → review
 The skill file will be generated at:
 - .claude/skills/crew-manager/SKILL.md
 - .codex/skills/crew-manager/SKILL.md
-- .opencode/skills/crew-manager/SKILL.md`,
+- .opencode/skill/crew-manager/SKILL.md
+
+Use flags to specify output destinations:
+  --claude    Generate only for .claude/
+  --opencode  Generate only for .opencode/
+  --codex     Generate only for .codex/
+  (no flags)  Generate for all destinations (default)`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			uc := c.GenSkillUseCase()
-			out, err := uc.Execute(cmd.Context(), usecase.GenSkillInput{})
+			out, err := uc.Execute(cmd.Context(), usecase.GenSkillInput{
+				Claude:   opts.claude,
+				OpenCode: opts.opencode,
+				Codex:    opts.codex,
+			})
 			if err != nil {
 				return err
 			}
@@ -50,6 +66,10 @@ The skill file will be generated at:
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&opts.claude, "claude", false, "Generate only for .claude/ directory")
+	cmd.Flags().BoolVar(&opts.opencode, "opencode", false, "Generate only for .opencode/ directory")
+	cmd.Flags().BoolVar(&opts.codex, "codex", false, "Generate only for .codex/ directory")
 
 	return cmd
 }
