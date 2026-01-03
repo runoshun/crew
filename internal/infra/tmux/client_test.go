@@ -206,6 +206,74 @@ func TestClient_Stop_KillsChildProcesses(t *testing.T) {
 	}, 2*time.Second, 50*time.Millisecond, "child process should be terminated after stop")
 }
 
+func TestClient_Stop_KillsNestedChildProcesses(t *testing.T) {
+	socketPath, crewDir, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	client := NewClient(socketPath, crewDir)
+	sessionName := "test-session"
+
+	// Create PID files for both child and grandchild processes
+	childPIDFile := filepath.Join(crewDir, "child.pid")
+	grandchildPIDFile := filepath.Join(crewDir, "grandchild.pid")
+
+	// Start session with a command that spawns nested child processes
+	// This simulates an agent (child) spawning a subprocess (grandchild)
+	// The structure is: tmux -> bash (child) -> bash (grandchild) -> sleep
+	command := fmt.Sprintf(`bash -c 'echo $$ > %s; bash -c "echo \$\$ > %s; sleep 60"'`,
+		childPIDFile, grandchildPIDFile)
+
+	err := client.Start(context.Background(), domain.StartSessionOptions{
+		Name:    sessionName,
+		Dir:     crewDir,
+		Command: command,
+		TaskID:  1,
+	})
+	require.NoError(t, err)
+
+	// Wait for both processes to start and write their PIDs
+	var childPID, grandchildPID string
+	require.Eventually(t, func() bool {
+		childData, err1 := os.ReadFile(childPIDFile)
+		grandchildData, err2 := os.ReadFile(grandchildPIDFile)
+		if err1 != nil || err2 != nil {
+			return false
+		}
+		childPID = strings.TrimSpace(string(childData))
+		grandchildPID = strings.TrimSpace(string(grandchildData))
+		return childPID != "" && grandchildPID != ""
+	}, 3*time.Second, 50*time.Millisecond, "both child and grandchild processes should write their PIDs")
+
+	// Verify both processes are running
+	checkCmd := exec.Command("kill", "-0", childPID)
+	require.NoError(t, checkCmd.Run(), "child process should be running before stop")
+	checkCmd = exec.Command("kill", "-0", grandchildPID)
+	require.NoError(t, checkCmd.Run(), "grandchild process should be running before stop")
+
+	// Stop session - this should kill all processes in the process group
+	err = client.Stop(sessionName)
+	require.NoError(t, err)
+
+	// Verify session is stopped
+	running, err := client.IsRunning(sessionName)
+	require.NoError(t, err)
+	assert.False(t, running)
+
+	// Verify the grandchild process is no longer running
+	// This is the key test - pkill -P would not kill grandchildren,
+	// but sending SIGTERM to the process group should
+	assert.Eventually(t, func() bool {
+		checkCmd := exec.Command("kill", "-0", grandchildPID)
+		return checkCmd.Run() != nil
+	}, 2*time.Second, 50*time.Millisecond, "grandchild process should be terminated after stop")
+
+	// Verify the child process is also terminated
+	assert.Eventually(t, func() bool {
+		checkCmd := exec.Command("kill", "-0", childPID)
+		return checkCmd.Run() != nil
+	}, 2*time.Second, 50*time.Millisecond, "child process should be terminated after stop")
+}
+
 func TestClient_Peek(t *testing.T) {
 	socketPath, crewDir, cleanup := setupTestEnv(t)
 	defer cleanup()
