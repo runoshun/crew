@@ -506,6 +506,52 @@ pr_body = "## {{.Title}}\n\n{{.Description}}"
 default_agent = "claude"
 ```
 
+### Worker Inheritance
+
+Workers can inherit settings from other workers using the `inherit` field. This allows creating variants with different models or settings while reusing the base configuration.
+
+**Example**:
+
+```toml
+# Base worker
+[workers.opencode]
+command = "opencode"
+args = "-m anthropic/claude-sonnet-4-5"
+
+# Inherit and override model only
+[workers.opencode-hard]
+inherit = "opencode"
+args = "-m anthropic/claude-opus-4"
+
+[workers.opencode-easy]
+inherit = "opencode"
+args = "-m anthropic/claude-haiku"
+```
+
+**Features**:
+- Can inherit from built-in workers (`claude`, `opencode`, `codex`)
+- Can inherit from custom workers
+- Multi-level inheritance supported (child can inherit from parent that inherits from another)
+- Only non-empty fields in child override parent fields
+
+**Usage**:
+
+```bash
+crew start 12 opencode       # Uses sonnet
+crew start 12 opencode-hard  # Uses opus
+crew start 12 opencode-easy  # Uses haiku
+```
+
+**Error Handling**:
+- Circular inheritance is detected and returns an error
+- Missing parent worker returns an error
+
+**Inheritance Resolution**:
+- Inheritance is resolved after merging global and repository configs
+- Parent fields are used as defaults
+- Child fields override parent if non-empty
+- `inherit` field is cleared after resolution
+
 ### Template Variables
 
 | Variable | Description |
