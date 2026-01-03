@@ -3,11 +3,13 @@
 ## Workers configuration
 # [workers]
 # default = "<<.DefaultWorker>>"  # Default worker to use when starting tasks
-# prompt = <<.WorkersPrompt>>
+# system_prompt = <<.WorkersSystemPrompt>> # System prompt (automatically set by crew)
+# prompt = <<.WorkersPrompt>>               # User custom instructions (added after system_prompt)
 
 ## Built-in worker customization
 ## - args: user-customizable arguments (e.g., logging verbosity)
 ## - model: default model name for this worker (overrides built-in default)
+## - system_prompt: override the common system prompt for this worker
 ## - prompt: override the common prompt for this worker
 ## - system_args: auto-applied for crew operation (rarely need to change)
 ## - command: base command to run

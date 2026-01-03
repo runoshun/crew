@@ -248,15 +248,16 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerA
 		Model:       model,
 	}
 
-	// Determine default prompt: use config's WorkersConfig.Prompt or fall back to DefaultWorkerPrompt
-	defaultPrompt := cfg.WorkersConfig.Prompt
-	if defaultPrompt == "" {
-		defaultPrompt = domain.DefaultWorkerPrompt
+	// Determine default prompts: use config's WorkersConfig settings
+	defaultSystemPrompt := cfg.WorkersConfig.SystemPrompt
+	if defaultSystemPrompt == "" {
+		defaultSystemPrompt = domain.DefaultSystemPrompt
 	}
+	defaultPrompt := cfg.WorkersConfig.Prompt
 
 	// Render command and prompt using WorkerAgent.RenderCommand
 	// Pass shell variable reference as promptOverride - will be expanded at runtime
-	result, err := workerAgent.RenderCommand(cmdData, `"$PROMPT"`, defaultPrompt)
+	result, err := workerAgent.RenderCommand(cmdData, `"$PROMPT"`, defaultSystemPrompt, defaultPrompt)
 	if err != nil {
 		return "", fmt.Errorf("render agent command: %w", err)
 	}
