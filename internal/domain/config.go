@@ -16,6 +16,7 @@ type Config struct {
 	Diff          DiffConfig             // [diff] settings
 	Log           LogConfig              // [log] settings
 	Tasks         TasksConfig            // [tasks] settings
+	Warnings      []string               // [warning] Unknown keys or other issues
 }
 
 // TasksConfig holds settings for task storage from [tasks] section.

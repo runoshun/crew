@@ -26,6 +26,7 @@ type Model struct {
 	// Dependencies (pointers first for alignment)
 	container *app.Container
 	config    *domain.Config
+	warnings  []string
 	err       error
 
 	// State (slices - contain pointers)

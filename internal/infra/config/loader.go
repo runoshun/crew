@@ -3,8 +3,10 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -47,103 +49,6 @@ func defaultGlobalConfigDir() string {
 		configHome = filepath.Join(home, ".config")
 	}
 	return domain.GlobalCrewDir(configHome)
-}
-
-// configFile represents the structure of config.toml.
-// Using separate struct to handle TOML tag mapping.
-// Note: Workers is map[string]any because it contains both top-level fields (default, prompt)
-// and subtables (per-worker definitions). We parse it manually after unmarshaling.
-type configFile struct {
-	Workers  map[string]any  `toml:"workers"`
-	Complete completeSection `toml:"complete"`
-	Diff     diffSection     `toml:"diff"`
-	Log      logSection      `toml:"log"`
-	Tasks    tasksSection    `toml:"tasks"`
-}
-
-type tasksSection struct {
-	Store     string `toml:"store"`
-	Namespace string `toml:"namespace"`
-	Encrypt   bool   `toml:"encrypt"`
-}
-
-// workersConfig holds the parsed [workers] section.
-type workersConfig struct {
-	Defs    map[string]workerDef // Per-worker definitions from [workers.<name>]
-	Default string               // Default worker name from [workers].default
-	Prompt  string               // Common prompt from [workers].prompt
-}
-
-// parseWorkersSection parses the raw workers map into structured workersConfig.
-func parseWorkersSection(raw map[string]any) workersConfig {
-	result := workersConfig{
-		Defs: make(map[string]workerDef),
-	}
-
-	for key, value := range raw {
-		switch key {
-		case "default":
-			if s, ok := value.(string); ok {
-				result.Default = s
-			}
-		case "prompt":
-			if s, ok := value.(string); ok {
-				result.Prompt = s
-			}
-		default:
-			// Treat as worker definition
-			if subMap, ok := value.(map[string]any); ok {
-				def := workerDef{}
-				if v, ok := subMap["inherit"].(string); ok {
-					def.Inherit = v
-				}
-				if v, ok := subMap["command_template"].(string); ok {
-					def.CommandTemplate = v
-				}
-				if v, ok := subMap["command"].(string); ok {
-					def.Command = v
-				}
-				if v, ok := subMap["system_args"].(string); ok {
-					def.SystemArgs = v
-				}
-				if v, ok := subMap["args"].(string); ok {
-					def.Args = v
-				}
-				if v, ok := subMap["prompt"].(string); ok {
-					def.Prompt = v
-				}
-				if v, ok := subMap["model"].(string); ok {
-					def.Model = v
-				}
-				result.Defs[key] = def
-			}
-		}
-	}
-
-	return result
-}
-
-type workerDef struct {
-	Inherit         string
-	CommandTemplate string
-	Command         string
-	SystemArgs      string
-	Args            string
-	Prompt          string
-	Model           string
-}
-
-type completeSection struct {
-	Command string `toml:"command"`
-}
-
-type diffSection struct {
-	Command    string `toml:"command"`
-	TUICommand string `toml:"tui_command"`
-}
-
-type logSection struct {
-	Level string `toml:"level"`
 }
 
 // Load returns the merged configuration (repo + global).
@@ -253,54 +158,203 @@ func (l *Loader) loadFile(path string) (*domain.Config, error) {
 		return nil, err
 	}
 
-	var cf configFile
-	if err := toml.Unmarshal(data, &cf); err != nil {
+	var raw map[string]any
+	if err := toml.Unmarshal(data, &raw); err != nil {
 		return nil, err
 	}
 
-	return convertToDomainConfig(&cf), nil
+	return convertRawToDomainConfig(raw), nil
 }
 
-// convertToDomainConfig converts the file config to domain config.
-func convertToDomainConfig(cf *configFile) *domain.Config {
-	// Parse the workers section
-	wc := parseWorkersSection(cf.Workers)
+// convertRawToDomainConfig converts the raw map to domain config and collects warnings.
+func convertRawToDomainConfig(raw map[string]any) *domain.Config {
+	res := &domain.Config{
+		Workers: make(map[string]domain.WorkerAgent),
+	}
+	var warnings []string
 
-	workers := make(map[string]domain.WorkerAgent)
-	for name, def := range wc.Defs {
-		workers[name] = domain.WorkerAgent{
-			Inherit:         def.Inherit,
-			CommandTemplate: def.CommandTemplate,
-			Command:         def.Command,
-			SystemArgs:      def.SystemArgs,
-			Args:            def.Args,
-			Prompt:          def.Prompt,
-			Model:           def.Model,
+	for section, value := range raw {
+		switch section {
+		case "workers":
+			if m, ok := value.(map[string]any); ok {
+				wc := parseWorkersSection(m)
+				res.WorkersConfig.Default = wc.Default
+				res.WorkersConfig.Prompt = wc.Prompt
+				for name, def := range wc.Defs {
+					res.Workers[name] = domain.WorkerAgent{
+						Inherit:         def.Inherit,
+						CommandTemplate: def.CommandTemplate,
+						Command:         def.Command,
+						SystemArgs:      def.SystemArgs,
+						Args:            def.Args,
+						Prompt:          def.Prompt,
+						Model:           def.Model,
+					}
+					for k := range def.Extra {
+						warnings = append(warnings, fmt.Sprintf("unknown key in [workers.%s]: %s", name, k))
+					}
+				}
+				for _, k := range wc.Unknowns {
+					warnings = append(warnings, fmt.Sprintf("unknown key in [workers]: %s", k))
+				}
+			}
+		case "complete":
+			if m, ok := value.(map[string]any); ok {
+				for k, v := range m {
+					switch k {
+					case "command":
+						if s, ok := v.(string); ok {
+							res.Complete.Command = s
+						}
+					default:
+						warnings = append(warnings, fmt.Sprintf("unknown key in [complete]: %s", k))
+					}
+				}
+			}
+		case "diff":
+			if m, ok := value.(map[string]any); ok {
+				for k, v := range m {
+					switch k {
+					case "command":
+						if s, ok := v.(string); ok {
+							res.Diff.Command = s
+						}
+					case "tui_command":
+						if s, ok := v.(string); ok {
+							res.Diff.TUICommand = s
+						}
+					default:
+						warnings = append(warnings, fmt.Sprintf("unknown key in [diff]: %s", k))
+					}
+				}
+			}
+		case "log":
+			if m, ok := value.(map[string]any); ok {
+				for k, v := range m {
+					switch k {
+					case "level":
+						if s, ok := v.(string); ok {
+							res.Log.Level = s
+						}
+					default:
+						warnings = append(warnings, fmt.Sprintf("unknown key in [log]: %s", k))
+					}
+				}
+			}
+		case "tasks":
+			if m, ok := value.(map[string]any); ok {
+				for k, v := range m {
+					switch k {
+					case "store":
+						if s, ok := v.(string); ok {
+							res.Tasks.Store = s
+						}
+					case "namespace":
+						if s, ok := v.(string); ok {
+							res.Tasks.Namespace = s
+						}
+					case "encrypt":
+						if b, ok := v.(bool); ok {
+							res.Tasks.Encrypt = b
+						}
+					default:
+						warnings = append(warnings, fmt.Sprintf("unknown key in [tasks]: %s", k))
+					}
+				}
+			}
+		default:
+			warnings = append(warnings, fmt.Sprintf("unknown section: %s", section))
 		}
 	}
 
-	return &domain.Config{
-		WorkersConfig: domain.WorkersConfig{
-			Default: wc.Default,
-			Prompt:  wc.Prompt,
-		},
-		Workers: workers,
-		Complete: domain.CompleteConfig{
-			Command: cf.Complete.Command,
-		},
-		Diff: domain.DiffConfig{
-			Command:    cf.Diff.Command,
-			TUICommand: cf.Diff.TUICommand,
-		},
-		Log: domain.LogConfig{
-			Level: cf.Log.Level,
-		},
-		Tasks: domain.TasksConfig{
-			Store:     cf.Tasks.Store,
-			Namespace: cf.Tasks.Namespace,
-			Encrypt:   cf.Tasks.Encrypt,
-		},
+	sort.Strings(warnings)
+	res.Warnings = warnings
+	return res
+}
+
+// workersConfig holds the parsed [workers] section.
+type workersConfig struct {
+	Defs     map[string]workerDef // Per-worker definitions from [workers.<name>]
+	Default  string               // Default worker name from [workers].default
+	Prompt   string               // Common prompt from [workers].prompt
+	Unknowns []string             // Unknown keys in [workers]
+}
+
+type workerDef struct {
+	Extra           map[string]any
+	Inherit         string
+	CommandTemplate string
+	Command         string
+	SystemArgs      string
+	Args            string
+	Prompt          string
+	Model           string
+}
+
+// parseWorkersSection parses the raw workers map into structured workersConfig.
+func parseWorkersSection(raw map[string]any) workersConfig {
+	result := workersConfig{
+		Defs: make(map[string]workerDef),
 	}
+
+	for key, value := range raw {
+		switch key {
+		case "default":
+			if s, ok := value.(string); ok {
+				result.Default = s
+			}
+		case "prompt":
+			if s, ok := value.(string); ok {
+				result.Prompt = s
+			}
+		default:
+			// Treat as worker definition
+			if subMap, ok := value.(map[string]any); ok {
+				def := workerDef{
+					Extra: make(map[string]any),
+				}
+				for k, v := range subMap {
+					switch k {
+					case "inherit":
+						if s, ok := v.(string); ok {
+							def.Inherit = s
+						}
+					case "command_template":
+						if s, ok := v.(string); ok {
+							def.CommandTemplate = s
+						}
+					case "command":
+						if s, ok := v.(string); ok {
+							def.Command = s
+						}
+					case "system_args":
+						if s, ok := v.(string); ok {
+							def.SystemArgs = s
+						}
+					case "args":
+						if s, ok := v.(string); ok {
+							def.Args = s
+						}
+					case "prompt":
+						if s, ok := v.(string); ok {
+							def.Prompt = s
+						}
+					case "model":
+						if s, ok := v.(string); ok {
+							def.Model = s
+						}
+					default:
+						def.Extra[k] = v
+					}
+				}
+				result.Defs[key] = def
+			} else {
+				result.Unknowns = append(result.Unknowns, key)
+			}
+		}
+	}
+
+	return result
 }
 
 // mergeConfigs merges two configs, with override taking precedence.
@@ -312,7 +366,11 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		Log:           base.Log,
 		Tasks:         base.Tasks,
 		Workers:       make(map[string]domain.WorkerAgent),
+		Warnings:      append([]string{}, base.Warnings...),
 	}
+
+	// Add override warnings
+	result.Warnings = append(result.Warnings, override.Warnings...)
 
 	// Copy base workers
 	for name, worker := range base.Workers {

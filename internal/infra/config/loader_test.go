@@ -383,3 +383,55 @@ default = "claude"
 	// Verify: only defaults are used
 	assert.Equal(t, domain.DefaultWorkerName, cfg.WorkersConfig.Default)
 }
+
+func TestLoader_Load_UnknownKeys(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write config with unknown keys
+	config := `
+[unknown_section]
+key = "value"
+
+[workers]
+default = "claude"
+unknown_workers_key = "value"
+
+[workers.claude]
+args = "--model claude-sonnet"
+unknown_worker_key = "value"
+
+[complete]
+command = "mise run ci"
+unknown_complete_key = "value"
+
+[tasks]
+unknown_tasks_key = "value"
+
+[diff]
+unknown_diff_key = "value"
+
+[log]
+unknown_log_key = "value"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify warnings
+	expected := []string{
+		"unknown key in [complete]: unknown_complete_key",
+		"unknown key in [diff]: unknown_diff_key",
+		"unknown key in [log]: unknown_log_key",
+		"unknown key in [tasks]: unknown_tasks_key",
+		"unknown key in [workers.claude]: unknown_worker_key",
+		"unknown key in [workers]: unknown_workers_key",
+		"unknown section: unknown_section",
+	}
+	assert.Equal(t, expected, cfg.Warnings)
+}
