@@ -4,6 +4,7 @@ package worktree
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -57,18 +58,39 @@ func (c *Client) Create(branch, baseBranch string) (string, error) {
 		return "", fmt.Errorf("check branch exists: %w", err)
 	}
 
-	var cmd *exec.Cmd
+	// Build the git worktree add command
+	var args []string
 	if branchExists {
 		// Branch exists, create worktree for existing branch
-		cmd = exec.Command("git", "worktree", "add", path, branch)
+		args = []string{"worktree", "add", path, branch}
 	} else {
 		// Branch doesn't exist, create new branch from baseBranch
-		cmd = exec.Command("git", "worktree", "add", "-b", branch, path, baseBranch)
+		args = []string{"worktree", "add", "-b", branch, path, baseBranch}
 	}
-	cmd.Dir = c.repoRoot
 
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return "", fmt.Errorf("create worktree: %w: %s", err, string(out))
+	// Execute the command
+	cmd := exec.Command("git", args...)
+	cmd.Dir = c.repoRoot
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// Check if this is an "already registered" error (orphaned worktree)
+		outStr := string(out)
+		if strings.Contains(outStr, "already registered") {
+			// Worktree is registered but directory is missing
+			// Prune stale worktree entries and retry
+			if pruneErr := c.prune(); pruneErr != nil {
+				return "", fmt.Errorf("prune stale worktrees: %w", pruneErr)
+			}
+			// Retry the command with a fresh exec.Cmd
+			cmd = exec.Command("git", args...)
+			cmd.Dir = c.repoRoot
+			out, err = cmd.CombinedOutput()
+			if err != nil {
+				return "", fmt.Errorf("create worktree after prune: %w: %s", err, string(out))
+			}
+		} else {
+			return "", fmt.Errorf("create worktree: %w: %s", err, outStr)
+		}
 	}
 
 	return path, nil
@@ -119,6 +141,7 @@ func (c *Client) Remove(branch string) error {
 }
 
 // Exists checks if a worktree exists for the branch.
+// Returns true only if both git registration and directory exist.
 func (c *Client) Exists(branch string) (bool, error) {
 	worktrees, err := c.List()
 	if err != nil {
@@ -127,6 +150,14 @@ func (c *Client) Exists(branch string) (bool, error) {
 
 	for _, wt := range worktrees {
 		if wt.Branch == branch {
+			// Found in git worktree list, but verify directory exists
+			if _, err := os.Stat(wt.Path); err != nil {
+				if os.IsNotExist(err) {
+					// Directory doesn't exist - treat as not existing
+					return false, nil
+				}
+				return false, fmt.Errorf("check worktree directory: %w", err)
+			}
 			return true, nil
 		}
 	}
@@ -188,6 +219,19 @@ func parseWorktreeList(output string) ([]domain.WorktreeInfo, error) {
 	}
 
 	return worktrees, nil
+}
+
+// prune removes stale worktree entries.
+// This cleans up worktree registrations where the directory no longer exists.
+func (c *Client) prune() error {
+	cmd := exec.Command("git", "worktree", "prune")
+	cmd.Dir = c.repoRoot
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("prune worktrees: %w: %s", err, string(out))
+	}
+
+	return nil
 }
 
 // branchExists checks if a branch exists in the repository.
