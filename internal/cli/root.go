@@ -44,6 +44,9 @@ and isolated task execution.`,
 	configCmd := newConfigCommand(c)
 	configCmd.GroupID = groupSetup
 
+	genCmd := newGenCommand(c)
+	genCmd.GroupID = groupSetup
+
 	// Task management commands
 	newCmd := newNewCommand(c)
 	newCmd.GroupID = groupTask
@@ -111,6 +114,7 @@ and isolated task execution.`,
 	root.AddCommand(
 		initCmd,
 		configCmd,
+		genCmd,
 		newCmd,
 		listCmd,
 		showCmd,

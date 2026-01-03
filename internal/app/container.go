@@ -250,3 +250,8 @@ func (c *Container) StopTaskUseCase() *usecase.StopTask {
 func (c *Container) PruneTasksUseCase() *usecase.PruneTasks {
 	return usecase.NewPruneTasks(c.Tasks, c.Worktrees, c.Git)
 }
+
+// GenSkillUseCase returns a new GenSkill use case.
+func (c *Container) GenSkillUseCase() *usecase.GenSkill {
+	return usecase.NewGenSkill(c.Config.RepoRoot)
+}
