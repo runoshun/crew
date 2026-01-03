@@ -40,7 +40,7 @@ func (uc *GenSkill) Execute(_ context.Context, _ GenSkillInput) (*GenSkillOutput
 	targetDirs := []string{
 		".claude/skills/crew-manager",
 		".codex/skills/crew-manager",
-		".opencode/skills/crew-manager",
+		".opencode/skill/crew-manager",
 	}
 
 	createdPaths := make([]string, 0, len(targetDirs))
