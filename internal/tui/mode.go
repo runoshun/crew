@@ -77,3 +77,32 @@ func (a ConfirmAction) String() string {
 	}
 	return ""
 }
+
+type SortMode int
+
+const (
+	SortByStatus SortMode = iota
+	SortByID
+)
+
+func (s SortMode) String() string {
+	switch s {
+	case SortByStatus:
+		return "status"
+	case SortByID:
+		return "id"
+	default:
+		return "unknown"
+	}
+}
+
+func (s SortMode) Next() SortMode {
+	switch s {
+	case SortByStatus:
+		return SortByID
+	case SortByID:
+		return SortByStatus
+	default:
+		return SortByStatus
+	}
+}

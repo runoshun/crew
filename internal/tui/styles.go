@@ -62,7 +62,7 @@ var Colors = struct {
 	Closed:      lipgloss.Color("#6C7086"), // Overlay0
 
 	// Group header / UI Elements
-	GroupLine: lipgloss.Color("#313244"), // Surface0 (Used for separators and selection bg)
+	GroupLine: lipgloss.Color("#313244"), // Surface0
 }
 
 // Styles contains all the lipgloss styles for the TUI.
@@ -75,20 +75,21 @@ type Styles struct {
 	HeaderText lipgloss.Style
 
 	// Task list
-	TaskList          lipgloss.Style
-	TaskItem          lipgloss.Style
-	TaskNormal        lipgloss.Style
-	TaskSelected      lipgloss.Style
-	TaskID            lipgloss.Style
-	TaskIDSelected    lipgloss.Style
-	TaskTitle         lipgloss.Style
-	TaskTitleSelected lipgloss.Style
-	TaskDesc          lipgloss.Style
-	TaskDescSelected  lipgloss.Style
-	TaskAgent         lipgloss.Style
-	TaskAgentSelected lipgloss.Style
-	CursorNormal      lipgloss.Style
-	CursorSelected    lipgloss.Style
+	TaskList           lipgloss.Style
+	TaskItem           lipgloss.Style
+	TaskNormal         lipgloss.Style
+	TaskSelected       lipgloss.Style
+	SelectionIndicator lipgloss.Style
+	TaskID             lipgloss.Style
+	TaskIDSelected     lipgloss.Style
+	TaskTitle          lipgloss.Style
+	TaskTitleSelected  lipgloss.Style
+	TaskDesc           lipgloss.Style
+	TaskDescSelected   lipgloss.Style
+	TaskAgent          lipgloss.Style
+	TaskAgentSelected  lipgloss.Style
+	CursorNormal       lipgloss.Style
+	CursorSelected     lipgloss.Style
 
 	// Group header
 	GroupHeaderLine  lipgloss.Style
@@ -171,12 +172,13 @@ func DefaultStyles() Styles {
 			Foreground(Colors.TitleNormal),
 
 		TaskSelected: lipgloss.NewStyle().
-			Foreground(Colors.TitleSelected).
-			Background(lipgloss.Color("#262637")). // Very subtle highlight
-			PaddingRight(1),
+			Background(lipgloss.Color("#262637")), // Very subtle highlight, no foreground override
+
+		SelectionIndicator: lipgloss.NewStyle().
+			Foreground(Colors.Primary),
 
 		TaskID: lipgloss.NewStyle().
-			Foreground(Colors.Subtle).
+			Foreground(Colors.Muted).
 			Width(3).
 			MarginRight(1),
 

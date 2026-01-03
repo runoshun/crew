@@ -2,42 +2,21 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os/exec"
+	"sort"
 
 	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
-
-// statusOrder defines the display order of statuses (v1-style).
-var statusOrder = []domain.Status{
-	domain.StatusInProgress,
-	domain.StatusInReview,
-	domain.StatusError,
-	domain.StatusTodo,
-	domain.StatusDone,
-	domain.StatusClosed,
-}
-
-// listItem represents an item in the task list (task or group header).
-type listItem struct {
-	task     *domain.Task  // nil for group header
-	status   domain.Status // status for group header
-	count    int           // task count for group header
-	isHeader bool
-}
-
-// FilterValue implements list.Item interface.
-func (i listItem) FilterValue() string {
-	if i.isHeader {
-		return ""
-	}
-	return i.task.Title
-}
 
 // Model is the main bubbletea model for the TUI.
 type Model struct {
@@ -48,32 +27,32 @@ type Model struct {
 
 	// State (slices - contain pointers)
 	tasks         []*domain.Task
-	filteredTasks []*domain.Task
-	groupedItems  []listItem        // Cached grouped items for display
-	builtinAgents []string          // Built-in agent names (claude, opencode, codex)
-	customAgents  []string          // Custom agent names from config
-	agentCommands map[string]string // Agent name -> command preview
+	builtinAgents []string
+	customAgents  []string
+	agentCommands map[string]string
 
 	// Components (structs with pointers)
-	keys   KeyMap
-	styles Styles
-	help   help.Model
+	keys           KeyMap
+	styles         Styles
+	help           help.Model
+	taskList       list.Model
+	detailViewport viewport.Model
 
 	// Input state (large structs)
 	titleInput  textinput.Model
 	descInput   textinput.Model
 	filterInput textinput.Model
-	customInput textinput.Model // Custom agent command input
+	customInput textinput.Model
 
 	// Numeric state (smaller types last)
 	mode             Mode
 	confirmAction    ConfirmAction
-	cursor           int // Index into groupedItems (task items only)
+	sortMode         SortMode
 	width            int
 	height           int
 	confirmTaskID    int
 	agentCursor      int
-	startFocusCustom bool // true = focus on custom input, false = focus on agent list
+	startFocusCustom bool
 }
 
 // New creates a new TUI Model with the given container.
@@ -94,15 +73,24 @@ func New(c *app.Container) *Model {
 	ci.Placeholder = "Enter custom command..."
 	ci.CharLimit = 500
 
+	styles := DefaultStyles()
+	delegate := newTaskDelegate(styles)
+	taskList := list.New([]list.Item{}, delegate, 0, 0)
+	taskList.SetShowTitle(false)
+	taskList.SetShowStatusBar(false)
+	taskList.SetShowHelp(false)
+	taskList.SetShowPagination(false)
+	taskList.SetFilteringEnabled(true)
+	taskList.DisableQuitKeybindings()
+
 	return &Model{
 		container:        c,
 		mode:             ModeNormal,
 		tasks:            nil,
-		filteredTasks:    nil,
-		cursor:           0,
 		keys:             DefaultKeyMap(),
-		styles:           DefaultStyles(),
+		styles:           styles,
 		help:             help.New(),
+		taskList:         taskList,
 		titleInput:       ti,
 		descInput:        di,
 		filterInput:      fi,
@@ -148,82 +136,131 @@ func (m *Model) loadConfig() tea.Cmd {
 
 // SelectedTask returns the currently selected task, or nil if none.
 func (m *Model) SelectedTask() *domain.Task {
-	// cursor is the index into task items (excluding headers) in groupedItems
-	items := m.groupedItems
-	if len(items) == 0 {
+	if m.taskList.SelectedItem() == nil {
 		return nil
 	}
-
-	taskIdx := 0
-	for _, item := range items {
-		if item.isHeader {
-			continue
-		}
-		if taskIdx == m.cursor {
-			return item.task
-		}
-		taskIdx++
+	if ti, ok := m.taskList.SelectedItem().(taskItem); ok {
+		return ti.task
 	}
 	return nil
 }
 
-// taskCount returns the number of task items in groupedItems.
-func (m *Model) taskCount() int {
-	count := 0
-	for _, item := range m.groupedItems {
-		if !item.isHeader {
-			count++
-		}
+// updateTaskList updates the task list items from tasks.
+func (m *Model) updateTaskList() {
+	sorted := m.sortedTasks()
+	items := make([]list.Item, 0, len(sorted))
+	for _, task := range sorted {
+		items = append(items, taskItem{task: task})
 	}
-	return count
+	m.taskList.SetItems(items)
 }
 
-// rebuildGroupedItems rebuilds the cached grouped items.
-func (m *Model) rebuildGroupedItems() {
-	tasks := m.visibleTasks()
-	if len(tasks) == 0 {
-		m.groupedItems = nil
-		return
+func (m *Model) initDetailViewport() {
+	width := m.width - 12
+	height := m.height - 10
+	if width < 40 {
+		width = 40
+	}
+	if height < 10 {
+		height = 10
+	}
+	m.detailViewport = viewport.New(width, height)
+	m.detailViewport.Style = lipgloss.NewStyle().Background(Colors.Background)
+	m.detailViewport.SetContent(m.detailContent(width))
+}
+
+func (m *Model) detailContent(width int) string {
+	task := m.SelectedTask()
+	if task == nil {
+		return "No task selected"
 	}
 
-	// Group tasks by status
-	grouped := make(map[domain.Status][]*domain.Task)
-	for _, task := range tasks {
-		grouped[task.Status] = append(grouped[task.Status], task)
+	lineStyle := lipgloss.NewStyle().
+		Width(width).
+		Background(Colors.Background)
+
+	wrapStyle := lipgloss.NewStyle().
+		Width(width).
+		Background(Colors.Background)
+
+	var lines []string
+
+	lines = append(lines, lineStyle.Render(m.styles.DetailTitle.Background(Colors.Background).Render(fmt.Sprintf("Task #%d", task.ID))))
+	lines = append(lines, wrapStyle.Render(m.styles.TaskTitleSelected.Background(Colors.Background).Render(task.Title)))
+	lines = append(lines, lineStyle.Render(""))
+
+	lines = append(lines, lineStyle.Render(
+		m.styles.DetailLabel.Background(Colors.Background).Render("Status")+
+			m.styles.StatusStyle(task.Status).Background(Colors.Background).Render(string(task.Status))))
+
+	if task.Agent != "" {
+		lines = append(lines, lineStyle.Render(
+			m.styles.DetailLabel.Background(Colors.Background).Render("Agent")+
+				m.styles.DetailValue.Background(Colors.Background).Render(task.Agent)))
 	}
 
-	// Build items in status order
-	items := make([]listItem, 0, len(statusOrder)+len(tasks))
-	for _, status := range statusOrder {
-		tasksForStatus := grouped[status]
-		if len(tasksForStatus) == 0 {
-			continue
+	if task.Session != "" {
+		lines = append(lines, lineStyle.Render(
+			m.styles.DetailLabel.Background(Colors.Background).Render("Session")+
+				m.styles.DetailValue.Background(Colors.Background).Render(task.Session)))
+	}
+
+	lines = append(lines, lineStyle.Render(
+		m.styles.DetailLabel.Background(Colors.Background).Render("Created")+
+			m.styles.DetailValue.Background(Colors.Background).Render(task.Created.Format("2006-01-02 15:04"))))
+
+	if !task.Started.IsZero() {
+		lines = append(lines, lineStyle.Render(
+			m.styles.DetailLabel.Background(Colors.Background).Render("Started")+
+				m.styles.DetailValue.Background(Colors.Background).Render(task.Started.Format("2006-01-02 15:04"))))
+	}
+
+	if task.Description != "" {
+		lines = append(lines, lineStyle.Render(""))
+		lines = append(lines, lineStyle.Render(m.styles.DetailLabel.Background(Colors.Background).Render("Description")))
+		lines = append(lines, wrapStyle.Render(m.styles.DetailDesc.Background(Colors.Background).Width(width).Render(task.Description)))
+	}
+
+	result := ""
+	for i, line := range lines {
+		result += line
+		if i < len(lines)-1 {
+			result += "\n"
 		}
+	}
+	return result
+}
 
-		// Add group header
-		items = append(items, listItem{
-			isHeader: true,
-			status:   status,
-			count:    len(tasksForStatus),
+var statusPriority = map[domain.Status]int{
+	domain.StatusInReview:   0,
+	domain.StatusInProgress: 1,
+	domain.StatusError:      2,
+	domain.StatusTodo:       3,
+	domain.StatusDone:       4,
+	domain.StatusClosed:     5,
+}
+
+func (m *Model) sortedTasks() []*domain.Task {
+	tasks := make([]*domain.Task, len(m.tasks))
+	copy(tasks, m.tasks)
+
+	switch m.sortMode {
+	case SortByStatus:
+		sort.Slice(tasks, func(i, j int) bool {
+			pi := statusPriority[tasks[i].Status]
+			pj := statusPriority[tasks[j].Status]
+			if pi != pj {
+				return pi < pj
+			}
+			return tasks[i].ID < tasks[j].ID
 		})
-
-		// Add tasks
-		for _, task := range tasksForStatus {
-			items = append(items, listItem{
-				task: task,
-			})
-		}
+	case SortByID:
+		sort.Slice(tasks, func(i, j int) bool {
+			return tasks[i].ID < tasks[j].ID
+		})
 	}
 
-	m.groupedItems = items
-}
-
-// visibleTasks returns the tasks that should be displayed.
-func (m *Model) visibleTasks() []*domain.Task {
-	if m.filterInput.Value() != "" && m.filteredTasks != nil {
-		return m.filteredTasks
-	}
-	return m.tasks
+	return tasks
 }
 
 // startTask returns a command that starts a task with the given agent.

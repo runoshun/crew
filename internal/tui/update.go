@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -18,15 +19,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help.Width = msg.Width
+		m.taskList.SetSize(m.listWidth(), msg.Height-8)
 		return m, nil
 
 	case MsgTasksLoaded:
 		m.tasks = msg.Tasks
-		m.applyFilter()
-		m.rebuildGroupedItems()
-		if m.cursor >= m.taskCount() {
-			m.cursor = max(0, m.taskCount()-1)
-		}
+		m.updateTaskList()
 		return m, nil
 
 	case MsgConfigLoaded:
@@ -134,17 +132,10 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
 
-	case key.Matches(msg, m.keys.Up):
-		if m.cursor > 0 {
-			m.cursor--
-		}
-		return m, nil
-
-	case key.Matches(msg, m.keys.Down):
-		if m.cursor < m.taskCount()-1 {
-			m.cursor++
-		}
-		return m, nil
+	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down):
+		var cmd tea.Cmd
+		m.taskList, cmd = m.taskList.Update(msg)
+		return m, cmd
 
 	case key.Matches(msg, m.keys.Enter):
 		return m.handleSmartAction()
@@ -226,12 +217,18 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filterInput.Focus()
 		return m, nil
 
+	case key.Matches(msg, m.keys.Sort):
+		m.sortMode = m.sortMode.Next()
+		m.updateTaskList()
+		return m, nil
+
 	case key.Matches(msg, m.keys.Help):
 		m.mode = ModeHelp
 		return m, nil
 
 	case key.Matches(msg, m.keys.Detail):
 		if m.SelectedTask() != nil {
+			m.initDetailViewport()
 			m.mode = ModeDetail
 		}
 		return m, nil
@@ -280,8 +277,7 @@ func (m *Model) handleFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Escape):
 		m.mode = ModeNormal
 		m.filterInput.Reset()
-		m.filteredTasks = nil
-		m.cursor = 0
+		m.updateTaskList()
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
@@ -293,16 +289,13 @@ func (m *Model) handleFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.filterInput, cmd = m.filterInput.Update(msg)
 	m.applyFilter()
-	m.rebuildGroupedItems()
-	m.cursor = 0
 	return m, cmd
 }
 
-// applyFilter filters tasks based on the current filter input.
 func (m *Model) applyFilter() {
 	query := strings.ToLower(m.filterInput.Value())
 	if query == "" {
-		m.filteredTasks = nil
+		m.updateTaskList()
 		return
 	}
 
@@ -314,7 +307,12 @@ func (m *Model) applyFilter() {
 			filtered = append(filtered, t)
 		}
 	}
-	m.filteredTasks = filtered
+
+	items := make([]list.Item, 0, len(filtered))
+	for _, task := range filtered {
+		items = append(items, taskItem{task: task})
+	}
+	m.taskList.SetItems(items)
 }
 
 // handleConfirmMode handles keys in confirm mode.
@@ -504,5 +502,7 @@ func (m *Model) handleDetailMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
-	return m, nil
+	var cmd tea.Cmd
+	m.detailViewport, cmd = m.detailViewport.Update(msg)
+	return m, cmd
 }

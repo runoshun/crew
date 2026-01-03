@@ -27,6 +27,7 @@ type KeyMap struct {
 	// View
 	Refresh key.Binding // Refresh task list
 	Filter  key.Binding // Enter filter mode
+	Sort    key.Binding // Toggle sort mode
 	Help    key.Binding // Show help
 	Detail  key.Binding // Toggle detail view
 
@@ -94,6 +95,10 @@ func DefaultKeyMap() KeyMap {
 		Filter: key.NewBinding(
 			key.WithKeys("/"),
 			key.WithHelp("/", "filter"),
+		),
+		Sort: key.NewBinding(
+			key.WithKeys("o"),
+			key.WithHelp("o", "sort"),
 		),
 		Help: key.NewBinding(
 			key.WithKeys("?"),

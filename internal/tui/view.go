@@ -5,7 +5,13 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/runoshun/git-crew/v2/internal/domain"
+)
+
+const (
+	MinWidthForDetailPanel = 100
+	DetailPanelWidth       = 40
+	GutterWidth            = 1
+	appPadding             = 4
 )
 
 // View renders the TUI.
@@ -14,142 +20,110 @@ func (m *Model) View() string {
 		return "Loading..."
 	}
 
-	var content string
+	base := m.viewMain()
+
+	var dialog string
 	switch m.mode {
-	case ModeHelp:
-		content = m.viewHelp()
-	case ModeDetail:
-		content = m.viewDetail()
-	case ModeNormal, ModeFilter, ModeConfirm, ModeInputTitle, ModeInputDesc, ModeStart:
-		content = m.viewMain()
-	}
-
-	return m.styles.App.Render(content)
-}
-
-// viewMain renders the main task list view.
-func (m *Model) viewMain() string {
-	var b strings.Builder
-
-	// Header
-	b.WriteString(m.viewHeader())
-	b.WriteString("\n")
-
-	// Error message (if any)
-	if m.err != nil {
-		b.WriteString(m.styles.ErrorMsg.Render("Error: "+m.err.Error()) + "\n\n")
-	}
-
-	// Filter input (if in filter mode)
-	if m.mode == ModeFilter {
-		b.WriteString(m.styles.InputPrompt.Render("Filter: "))
-		b.WriteString(m.filterInput.View())
-		b.WriteString("\n\n")
-	} else if m.filterInput.Value() != "" {
-		b.WriteString(m.styles.Footer.Render("Filtered: "+m.filterInput.Value()) + "\n\n")
-	}
-
-	// Task list (grouped)
-	b.WriteString(m.viewTaskList())
-
-	// Pagination info
-	// Pagination info is now shown in header, not at bottom
-
-	// Dialogs/overlays
-	switch m.mode {
-	case ModeNormal, ModeFilter, ModeHelp, ModeDetail:
-		// No overlay for these modes
+	case ModeNormal, ModeFilter:
 	case ModeConfirm:
-		b.WriteString("\n")
-		b.WriteString(m.viewConfirmDialog())
+		dialog = m.viewConfirmDialog()
 	case ModeInputTitle:
-		b.WriteString("\n")
-		b.WriteString(m.viewTitleInput())
+		dialog = m.viewTitleInput()
 	case ModeInputDesc:
-		b.WriteString("\n")
-		b.WriteString(m.viewDescInput())
+		dialog = m.viewDescInput()
 	case ModeStart:
-		b.WriteString("\n")
-		b.WriteString(m.viewAgentPicker())
+		dialog = m.viewAgentPicker()
+	case ModeHelp:
+		dialog = m.viewHelp()
+	case ModeDetail:
+		dialog = m.viewDetail()
 	}
 
-	// Footer
-	b.WriteString("\n")
-	b.WriteString(m.viewFooter())
+	if dialog != "" {
+		return m.styles.App.Render(m.overlayDialog(base, dialog))
+	}
 
-	return b.String()
+	return m.styles.App.Render(base)
 }
 
-// viewHeader renders the header with "Tasks" and task count.
+func (m *Model) overlayDialog(_, dialog string) string {
+	return lipgloss.Place(
+		m.width-appPadding,
+		m.height-2,
+		lipgloss.Center,
+		lipgloss.Center,
+		dialog,
+	)
+}
+
+func (m *Model) viewMain() string {
+	var leftPane strings.Builder
+
+	leftPane.WriteString(m.viewHeader())
+	leftPane.WriteString("\n")
+
+	if m.err != nil {
+		leftPane.WriteString(m.styles.ErrorMsg.Render("Error: "+m.err.Error()) + "\n\n")
+	}
+
+	if m.mode == ModeFilter {
+		leftPane.WriteString(m.styles.InputPrompt.Render("Filter: "))
+		leftPane.WriteString(m.filterInput.View())
+		leftPane.WriteString("\n\n")
+	} else if m.filterInput.Value() != "" {
+		leftPane.WriteString(m.styles.Footer.Render("Filtered: "+m.filterInput.Value()) + "\n\n")
+	}
+
+	leftPane.WriteString(m.viewTaskList())
+	leftPane.WriteString("\n")
+	leftPane.WriteString(m.viewFooter())
+
+	if m.showDetailPanel() {
+		rightContent := m.viewDetailPanel()
+		return lipgloss.JoinHorizontal(lipgloss.Top, leftPane.String(), rightContent)
+	}
+
+	return leftPane.String()
+}
+
+func (m *Model) headerFooterContentWidth() int {
+	width := m.listWidth() - 6
+	if m.showDetailPanel() {
+		width -= 1
+	}
+	if width < 40 {
+		width = 40
+	}
+	return width
+}
+
 func (m *Model) viewHeader() string {
-	// Left: "Tasks"
 	title := m.styles.HeaderText.Render("Tasks")
 
-	// Right: "showing X of Y tasks" (muted style)
-	visibleCount := len(m.visibleTasks())
+	contentWidth := m.headerFooterContentWidth()
+	visibleCount := len(m.taskList.Items())
 	totalCount := len(m.tasks)
-	countText := fmt.Sprintf("showing %d of %d tasks", visibleCount, totalCount)
-	// Use muted text style for task count (no border/padding)
+
+	sortLabel := "by " + m.sortMode.String()
+	countText := fmt.Sprintf("%s · %d/%d", sortLabel, visibleCount, totalCount)
 	rightText := lipgloss.NewStyle().Foreground(Colors.Muted).Render(countText)
 
-	// Calculate spacing to right-align
-	headerWidth := m.width - 6 // padding
-	if headerWidth < 40 {
-		headerWidth = 40
-	}
 	leftLen := lipgloss.Width(title)
 	rightLen := lipgloss.Width(rightText)
-	spacing := headerWidth - leftLen - rightLen
+	spacing := contentWidth - leftLen - rightLen
 	if spacing < 1 {
 		spacing = 1
 	}
 
-	return m.styles.Header.Render(title + strings.Repeat(" ", spacing) + rightText)
+	content := title + strings.Repeat(" ", spacing) + rightText
+	return m.styles.Header.Render(content)
 }
 
-// viewTaskList renders the flat task list (no group headers).
 func (m *Model) viewTaskList() string {
-	tasks := m.visibleTasks()
-	if len(tasks) == 0 {
+	if len(m.taskList.Items()) == 0 {
 		return m.viewEmptyState()
 	}
-
-	var b strings.Builder
-
-	// Calculate row width for full-width background highlight
-	rowWidth := m.width - 6 // Account for app padding
-	if rowWidth < 40 {
-		rowWidth = 40
-	}
-
-	for i, task := range tasks {
-		selected := i == m.cursor
-		line := m.renderTaskItem(task, selected)
-
-		if selected {
-			// Apply subtle background for full row width
-			b.WriteString(m.styles.TaskSelected.Width(rowWidth).Render(line))
-		} else {
-			b.WriteString(line)
-		}
-		b.WriteString("\n")
-
-		// Show description line for in_progress tasks
-		if task.Status == domain.StatusInProgress && task.Description != "" {
-			// Truncate description if too long
-			desc := task.Description
-			maxLen := 50
-			if len(desc) > maxLen {
-				desc = desc[:maxLen-3] + "..."
-			}
-			// Indent to align with title (indicator + id + status = ~15 chars)
-			descLine := m.styles.TaskDesc.Render("  " + desc)
-			b.WriteString(descLine)
-			b.WriteString("\n")
-		}
-	}
-
-	return m.styles.TaskList.Render(b.String())
+	return m.taskList.View()
 }
 
 // viewEmptyState renders a friendly empty state message.
@@ -162,40 +136,6 @@ func (m *Model) viewEmptyState() string {
 	b.WriteString(m.styles.Footer.Render(" to create your first task"))
 	b.WriteString("\n")
 	return b.String()
-}
-
-// renderTaskItem renders a single task item.
-// Format: "> 17 ✔ Done  Overhaul TUI design" (indicator shown only when selected)
-func (m *Model) renderTaskItem(task *domain.Task, selected bool) string {
-	// Indicator: ">" for selected, space for normal
-	var indicator string
-	if selected {
-		indicator = m.styles.CursorSelected.Render(">")
-	} else {
-		indicator = " "
-	}
-
-	// Task ID with fixed width
-	idStr := fmt.Sprintf("%2d", task.ID)
-
-	// Status: icon + text (e.g., "✔ Done", "➜ InPrg")
-	statusIcon := StatusIcon(task.Status)
-	statusText := StatusText(task.Status)
-	statusFull := fmt.Sprintf("%s %-5s", statusIcon, statusText)
-
-	var idPart, statusPart, titlePart string
-
-	if selected {
-		idPart = m.styles.TaskIDSelected.Render(idStr)
-		statusPart = m.styles.StatusStyleSelected(task.Status).Render(statusFull)
-		titlePart = m.styles.TaskTitleSelected.Render(task.Title)
-	} else {
-		idPart = m.styles.TaskID.Render(idStr)
-		statusPart = m.styles.StatusStyle(task.Status).Render(statusFull)
-		titlePart = m.styles.TaskTitle.Render(task.Title)
-	}
-
-	return fmt.Sprintf("%s %s %s  %s", indicator, idPart, statusPart, titlePart)
 }
 
 // viewConfirmDialog renders the confirmation dialog.
@@ -367,25 +307,35 @@ func (m *Model) renderAgentRow(agent string, selected bool) string {
 	return "    " + name + "  " + preview
 }
 
-// viewFooter renders the footer with key hints.
 func (m *Model) viewFooter() string {
+	var content string
 	switch m.mode {
 	case ModeNormal:
-		// Match mock format: j/k nav  enter open  n new  ? help  q quit
-		return m.styles.Footer.Render(
-			m.styles.FooterKey.Render("j/k") + " nav  " +
-				m.styles.FooterKey.Render("enter") + " open  " +
-				m.styles.FooterKey.Render("n") + " new  " +
-				m.styles.FooterKey.Render("?") + " help  " +
-				m.styles.FooterKey.Render("q") + " quit",
-		)
+		content = m.styles.FooterKey.Render("j/k") + " nav  " +
+			m.styles.FooterKey.Render("enter") + " open  " +
+			m.styles.FooterKey.Render("n") + " new  " +
+			m.styles.FooterKey.Render("?") + " help  " +
+			m.styles.FooterKey.Render("q") + " quit"
 	case ModeFilter:
-		return m.styles.Footer.Render("enter apply · esc cancel")
+		content = "enter apply · esc cancel"
 	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeStart, ModeHelp, ModeDetail:
-		// Hints are shown in the dialogs/views themselves
+		return ""
+	default:
 		return ""
 	}
-	return ""
+
+	pagination := m.taskList.Paginator.View()
+
+	contentWidth := m.headerFooterContentWidth()
+	contentLen := lipgloss.Width(content)
+	paginationLen := lipgloss.Width(pagination)
+	spacing := contentWidth - contentLen - paginationLen
+	if spacing < 1 {
+		spacing = 1
+	}
+
+	fullContent := content + strings.Repeat(" ", spacing) + pagination
+	return m.styles.Footer.Render(fullContent)
 }
 
 // viewHelp renders the help view.
@@ -474,74 +424,116 @@ func (m *Model) viewHelp() string {
 		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", content))
 }
 
-// viewDetail renders the task detail view.
 func (m *Model) viewDetail() string {
+	width := m.width - 8
+	if width < 40 {
+		width = 40
+	}
+
+	footer := m.styles.Footer.Render("[↑↓] scroll  [esc] back")
+
+	dialogStyle := lipgloss.NewStyle().
+		Background(Colors.Background).
+		Padding(1, 2).
+		Width(width + 4)
+
+	return dialogStyle.Render(m.detailViewport.View() + "\n\n" + footer)
+}
+
+func (m *Model) showDetailPanel() bool {
+	return m.width >= MinWidthForDetailPanel
+}
+
+func (m *Model) contentWidth() int {
+	return m.width - appPadding
+}
+
+func (m *Model) listWidth() int {
+	if m.showDetailPanel() {
+		return m.contentWidth() - DetailPanelWidth - GutterWidth
+	}
+	return m.contentWidth()
+}
+
+func (m *Model) viewDetailPanel() string {
+	panelHeight := m.height - 2
+	if panelHeight < 10 {
+		panelHeight = 10
+	}
+	panelStyle := lipgloss.NewStyle().
+		Width(DetailPanelWidth).
+		Height(panelHeight).
+		PaddingLeft(GutterWidth).
+		BorderLeft(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(Colors.GroupLine)
+
 	task := m.SelectedTask()
 	if task == nil {
-		return "No task selected"
+		emptyStyle := lipgloss.NewStyle().
+			Foreground(Colors.Muted).
+			Padding(2, 1)
+		return panelStyle.Render(emptyStyle.Render("Select a task\nto view details"))
 	}
 
 	var b strings.Builder
 
-	// Styles
-	labelStyle := m.styles.DetailLabel
-	valueStyle := m.styles.DetailValue
-	sectionStyle := m.styles.DetailTitle
-
-	// Header
-	b.WriteString(sectionStyle.Render(fmt.Sprintf("Task #%d", task.ID)))
-	b.WriteString("\n")
-	b.WriteString(m.styles.TaskTitleSelected.Render(task.Title))
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(Colors.Primary).
+		Border(lipgloss.NormalBorder(), false, false, true, false).
+		BorderForeground(Colors.GroupLine).
+		Width(DetailPanelWidth - 4)
+	b.WriteString(headerStyle.Render(fmt.Sprintf("Task #%d", task.ID)))
 	b.WriteString("\n\n")
 
-	// Properties Grid
-	// Status
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(Colors.TitleSelected).
+		Width(DetailPanelWidth - 4)
+	b.WriteString(titleStyle.Render(task.Title))
+	b.WriteString("\n\n")
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(Colors.Muted).
+		Width(10)
+	valueStyle := lipgloss.NewStyle().
+		Foreground(Colors.TitleNormal)
+
 	b.WriteString(labelStyle.Render("Status"))
-	b.WriteString(m.styles.StatusStyle(task.Status).Render(string(task.Status)))
+	statusIcon := StatusIcon(task.Status)
+	statusText := StatusText(task.Status)
+	b.WriteString(m.styles.StatusStyle(task.Status).Render(statusIcon + " " + statusText))
 	b.WriteString("\n")
 
-	// Agent
 	if task.Agent != "" {
 		b.WriteString(labelStyle.Render("Agent"))
 		b.WriteString(valueStyle.Render(task.Agent))
 		b.WriteString("\n")
 	}
 
-	// Session
-	if task.Session != "" {
-		b.WriteString(labelStyle.Render("Session"))
-		b.WriteString(valueStyle.Render(task.Session))
-		b.WriteString("\n")
-	}
-
-	// Created
 	b.WriteString(labelStyle.Render("Created"))
-	b.WriteString(valueStyle.Render(task.Created.Format("2006-01-02 15:04")))
+	b.WriteString(valueStyle.Render(task.Created.Format("01/02 15:04")))
 	b.WriteString("\n")
 
-	// Started
 	if !task.Started.IsZero() {
 		b.WriteString(labelStyle.Render("Started"))
-		b.WriteString(valueStyle.Render(task.Started.Format("2006-01-02 15:04")))
+		b.WriteString(valueStyle.Render(task.Started.Format("01/02 15:04")))
 		b.WriteString("\n")
 	}
 
-	// Description Section
 	if task.Description != "" {
 		b.WriteString("\n")
-		b.WriteString(m.styles.DetailLabel.Render("Description"))
+		descLabelStyle := lipgloss.NewStyle().
+			Foreground(Colors.Muted).
+			Bold(true)
+		b.WriteString(descLabelStyle.Render("Description"))
 		b.WriteString("\n")
-		b.WriteString(m.styles.DetailDesc.Render(task.Description))
-		b.WriteString("\n")
+		descStyle := lipgloss.NewStyle().
+			Foreground(Colors.DescSelected).
+			Width(DetailPanelWidth - 4)
+		b.WriteString(descStyle.Render(task.Description))
 	}
 
-	// Footer
-	b.WriteString("\n")
-	b.WriteString(m.styles.Footer.Render("[esc] back"))
-
-	// Wrap in a nice box
-	return m.styles.Dialog.
-		Width(m.width - 4).
-		BorderForeground(Colors.Muted).
-		Render(b.String())
+	return panelStyle.Render(b.String())
 }
