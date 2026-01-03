@@ -112,6 +112,9 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 				if v, ok := subMap["prompt"].(string); ok {
 					def.Prompt = v
 				}
+				if v, ok := subMap["model"].(string); ok {
+					def.Model = v
+				}
 				result.Defs[key] = def
 			}
 		}
@@ -127,6 +130,7 @@ type workerDef struct {
 	SystemArgs      string
 	Args            string
 	Prompt          string
+	Model           string
 }
 
 type completeSection struct {
@@ -271,6 +275,7 @@ func convertToDomainConfig(cf *configFile) *domain.Config {
 			SystemArgs:      def.SystemArgs,
 			Args:            def.Args,
 			Prompt:          def.Prompt,
+			Model:           def.Model,
 		}
 	}
 
@@ -363,6 +368,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		}
 		if overrideWorker.Prompt != "" {
 			baseWorker.Prompt = overrideWorker.Prompt
+		}
+		if overrideWorker.Model != "" {
+			baseWorker.Model = overrideWorker.Model
 		}
 		result.Workers[name] = baseWorker
 	}

@@ -930,7 +930,7 @@ args = "--model opus"
 | `{{.PR}}` | PR number |
 | `{{.Prompt}}` | Common prompt |
 | `{{.Args}}` | Agent additional args |
-| `{{.Model}}` | Model name (from `--model` flag or agent's default) |
+| `{{.Model}}` | Model name (from `--model` flag, worker `model` field, or built-in default) |
 | `{{.RepoRoot}}` | Repository root |
 | `{{.GitDir}}` | .git directory |
 
@@ -943,15 +943,16 @@ Workers can inherit settings from other workers using the `inherit` field:
 [workers.opencode]
 command = "opencode"
 args = "-m anthropic/claude-sonnet-4-5"
+model = "anthropic/claude-sonnet-4-5"
 
 # Variants with different models
 [workers.opencode-hard]
 inherit = "opencode"
-args = "-m anthropic/claude-opus-4"
+model = "anthropic/claude-opus-4"
 
 [workers.opencode-easy]
 inherit = "opencode"
-args = "-m anthropic/claude-haiku"
+model = "anthropic/claude-haiku"
 ```
 
 **Usage:**
@@ -966,6 +967,7 @@ crew start 12 opencode-easy  # Uses haiku
 - Multi-level inheritance supported
 - Child fields override parent fields if non-empty
 - Circular inheritance is detected and returns an error
+- `model` field provides config-level defaults; `crew start -m` still overrides it
 
 ### Built-in Agents
 

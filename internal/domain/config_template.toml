@@ -6,7 +6,8 @@
 # prompt = <<.WorkersPrompt>>
 
 ## Built-in worker customization
-## - args: user-customizable arguments (e.g., model selection)
+## - args: user-customizable arguments (e.g., logging verbosity)
+## - model: default model name for this worker (overrides built-in default)
 ## - prompt: override the common prompt for this worker
 ## - system_args: auto-applied for crew operation (rarely need to change)
 ## - command: base command to run
@@ -18,9 +19,11 @@
 
 # [workers.opencode]
 # args = "<<.OpencodeArgs>>"
+# model = "anthropic/claude-opus-4-5"
 
 # [workers.codex]
 # args = "<<.CodexArgs>>"
+# model = "gpt-5.2-codex"
 
 ## Custom worker example
 # [workers.my-worker]
@@ -34,11 +37,11 @@
 ## Useful for creating model variants with different settings.
 # [workers.claude-hard]
 # inherit = "claude"  # Inherit all settings from the "claude" worker
-# args = "--model opus"  # Override only the model
+# model = "anthropic/claude-opus-4"
 #
 # [workers.claude-easy]
 # inherit = "claude"
-# args = "--model haiku"
+# model = "anthropic/claude-haiku"
 
 ## CI gate on completion
 # [complete]

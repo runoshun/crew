@@ -711,6 +711,12 @@ func TestStartTask_Execute_WithModelOverride(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Workers["claude"] = domain.WorkerAgent{
+		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+		Command:         "claude",
+		SystemArgs:      "--model {{.Model}}",
+		Model:           "config-model",
+	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
@@ -731,8 +737,49 @@ func TestStartTask_Execute_WithModelOverride(t *testing.T) {
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
 	script := string(scriptContent)
-	// The model should be expanded in Args template: --model {{.Model}} -> --model sonnet
+	// CLI flag should take precedence over config model
 	assert.Contains(t, script, "--model sonnet")
+	assert.NotContains(t, script, "--model config-model")
+}
+
+func TestStartTask_Execute_WithConfigModel(t *testing.T) {
+	crewDir := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Workers["claude"] = domain.WorkerAgent{
+		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+		Command:         "claude",
+		SystemArgs:      "--model {{.Model}}",
+		Model:           "config-model",
+	}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	repoRoot := t.TempDir()
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute without specifying model flag
+	out, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "crew-1", out.SessionName)
+
+	// Verify script uses config-defined model
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	assert.Contains(t, string(scriptContent), "--model config-model")
 }
 
 func TestStartTask_Execute_WithDefaultModel(t *testing.T) {
