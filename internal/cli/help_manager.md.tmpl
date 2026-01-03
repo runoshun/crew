@@ -1,0 +1,173 @@
+# git-crew Manager Guide
+
+This guide is for manager agents that support users with task management.
+Execute various operations based on user instructions: task creation, monitoring, review, merge, etc.
+
+---
+
+## Role
+
+- Support users with task management
+- Execute various operations based on user instructions
+- Delegate code implementation to worker agents
+
+---
+
+## Common Requests and Workflows
+
+### "Implement this feature"
+
+```bash
+# 1. Create task
+crew new --title "Implement feature X" --body "Detailed description..."
+
+# 2. Start agent
+crew start <id> opencode -m anthropic/claude-sonnet-4-5
+
+# 3. Monitor progress
+crew peek <id>
+```
+
+### "Review this"
+
+```bash
+# 1. Check diff
+crew diff <id>
+
+# 2. Run CI (using crew exec)
+crew exec <id> -- mise run ci
+
+# 3. Merge if OK
+echo "y" | crew merge <id>
+
+# If issues found, provide feedback
+crew comment <id> "Description of the issue"
+crew edit <id> --status in_progress
+crew send <id> "Check comments with crew show <id> and fix"
+crew send <id> Enter
+```
+
+### "What's the progress?"
+
+```bash
+crew list              # List all tasks
+crew peek <id>         # Check session output
+crew show <id>         # Task details
+```
+
+### "Update the binary"
+
+```bash
+crew exec <id> -- go build -o /path/to/binary ./cmd/...
+```
+
+### "Fix the conflict"
+
+```bash
+# Merge main in worktree (use main, NOT origin/main)
+crew exec <id> -- git merge main
+
+# Or send instruction directly
+crew send <id> "Resolve conflict with git merge main"
+crew send <id> Enter
+```
+
+### "Stop this task"
+
+```bash
+crew stop <id>
+```
+
+### "Start over"
+
+```bash
+# Reset worktree to main
+crew exec <id> -- git reset --hard main
+
+# Stop session first, then reset
+crew stop <id>
+crew exec <id> -- git reset --hard main
+crew start <id> opencode
+```
+
+---
+
+## Task Creation Best Practices
+
+**What to include in --body**:
+1. **Files to change**: File names and line numbers if possible
+2. **Implementation plan**: Break down into steps
+3. **Completion criteria**: Clear checklist format
+4. **References**: Pointers to related existing implementations
+
+**Good example**:
+```markdown
+## Files to Change
+
+| File | Changes |
+|------|---------|
+| internal/cli/task.go | --desc -> --body |
+| internal/cli/task_test.go | Update tests |
+
+## Implementation Plan
+
+1. Change CLI flag definition
+2. Update tests
+3. Run CI
+
+## Completion Criteria
+
+- [ ] --body flag works
+- [ ] All tests pass
+```
+
+---
+
+## Important Notes
+
+1. **Send Enter after send**: `crew send <id> "..."` alone doesn't confirm input
+2. **Use crew exec for worktree operations**: `crew exec <id> -- <command>` runs command in worktree
+3. **Use main (NOT origin/main)**: In worktree, use `git merge main`
+4. **Use echo "y" for merge**: Skip interactive confirmation
+
+---
+
+## Available Commands
+
+### Task Management
+| Command | Description |
+|---------|-------------|
+| `crew list` | List tasks |
+| `crew show <id>` | Task details |
+| `crew new` | Create task |
+| `crew edit` | Edit task |
+| `crew comment` | Add comment |
+| `crew close` | Close task |
+
+### Session Management
+| Command | Description |
+|---------|-------------|
+| `crew start` | Start task |
+| `crew stop` | Stop session |
+| `crew peek` | Check session output |
+| `crew send` | Send key input |
+| `crew attach` | Attach to session |
+
+### Worktree Operations
+| Command | Description |
+|---------|-------------|
+| `crew exec <id> -- <cmd>` | Run command in worktree |
+| `crew diff` | Show diff |
+
+### Review & Completion
+| Command | Description |
+|---------|-------------|
+| `crew merge` | Merge to main |
+
+---
+
+## Constraints
+
+- Do not edit files directly (read-only mode)
+- Do not write code directly
+- Delegate work to worker agents

@@ -2,6 +2,8 @@
 package cli
 
 import (
+	"errors"
+
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/spf13/cobra"
 )
@@ -16,19 +18,42 @@ const (
 // NewRootCommand creates the root command for git-crew.
 // It receives the container for dependency injection and version for display.
 func NewRootCommand(c *app.Container, version string) *cobra.Command {
+	var fullWorker bool
+	var fullManager bool
+
 	root := &cobra.Command{
 		Use:   "crew",
 		Short: "AI agent task management CLI",
 		Long: `git-crew is a CLI tool for managing AI coding agent tasks.
 It combines git worktree + tmux to achieve a model where 
 1 task = 1 worktree = 1 AI session, enabling fully parallel 
-and isolated task execution.`,
+and isolated task execution.
+
+Use --full-worker or --full-manager for role-specific detailed help.`,
 		Version: version,
 		// SilenceUsage prevents usage from being printed on errors
 		SilenceUsage: true,
 		// SilenceErrors prevents Cobra from printing errors (we handle it in main)
 		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Handle role-specific help flags
+			if fullWorker && fullManager {
+				return errors.New("cannot use both --full-worker and --full-manager")
+			}
+			if fullWorker {
+				return RenderWorkerHelp(cmd.OutOrStdout(), HelpTemplateData{})
+			}
+			if fullManager {
+				return RenderManagerHelp(cmd.OutOrStdout(), HelpTemplateData{})
+			}
+			// Default: show standard help
+			return cmd.Help()
+		},
 	}
+
+	// Add role-specific help flags
+	root.Flags().BoolVar(&fullWorker, "full-worker", false, "Show detailed help for worker agents")
+	root.Flags().BoolVar(&fullManager, "full-manager", false, "Show detailed help for manager agents")
 
 	// Define command groups
 	root.AddGroup(

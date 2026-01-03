@@ -165,17 +165,10 @@ const (
 
 // DefaultWorkerPrompt is the default prompt template for workers.
 // It uses Go template syntax with CommandData fields.
-// Task details should be viewed with 'crew show <id>' to see comments and full description.
+// Kept minimal - detailed workflow is in 'crew help --full-worker'.
 const DefaultWorkerPrompt = `You are working on Task #{{.TaskID}}.
 
-Run 'crew show' to see full task details including description and comments.
-
-Report progress using 'crew comment {{.TaskID}} "<message>"' in these situations:
-- When you need user input or clarification on important decisions
-- When you encounter blockers or unexpected issues
-- When the task is complete (summary of what was done)
-
-When the task is complete, commit your changes and run 'crew complete'.
+Run 'crew help --full-worker' for workflow guide.
 `
 
 // BuiltinWorker defines a built-in worker configuration.
