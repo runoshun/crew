@@ -3,14 +3,14 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
 // MergeTaskInput contains the parameters for merging a task.
 type MergeTaskInput struct {
-	TaskID int  // Task ID to merge
-	Force  bool // Force stop session if running
+	TaskID int // Task ID to merge
 }
 
 // MergeTaskOutput contains the result of merging a task.
@@ -24,6 +24,7 @@ type MergeTask struct {
 	sessions  domain.SessionManager
 	worktrees domain.WorktreeManager
 	git       domain.Git
+	crewDir   string
 }
 
 // NewMergeTask creates a new MergeTask use case.
@@ -32,12 +33,14 @@ func NewMergeTask(
 	sessions domain.SessionManager,
 	worktrees domain.WorktreeManager,
 	git domain.Git,
+	crewDir string,
 ) *MergeTask {
 	return &MergeTask{
 		tasks:     tasks,
 		sessions:  sessions,
 		worktrees: worktrees,
 		git:       git,
+		crewDir:   crewDir,
 	}
 }
 
@@ -45,13 +48,13 @@ func NewMergeTask(
 // Preconditions:
 // - Current branch is main
 // - main's working tree is clean
-// - No session running (unless --force)
 //
 // Processing:
-// 1. If session is running and --force, stop it
-// 2. Delete worktree
-// 3. Execute git merge --no-ff
-// 4. Update status to done
+// 1. If session is running, stop it
+// 2. Execute git merge --no-ff
+// 3. Delete worktree
+// 4. Delete branch
+// 5. Update status to done
 func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOutput, error) {
 	// Get the task
 	task, err := uc.tasks.Get(in.TaskID)
@@ -92,13 +95,12 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	}
 
 	if running {
-		if !in.Force {
-			return nil, domain.ErrSessionRunning
-		}
-		// Force stop session
+		// Always stop session before merge
 		if stopErr := uc.sessions.Stop(sessionName); stopErr != nil {
 			return nil, fmt.Errorf("stop session: %w", stopErr)
 		}
+		// Clean up script files (mirroring StopTask behavior)
+		uc.cleanupScriptFiles(task.ID)
 	}
 
 	// Execute git merge --no-ff first (before deleting worktree)
@@ -133,4 +135,12 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	}
 
 	return &MergeTaskOutput{Task: task}, nil
+}
+
+// cleanupScriptFiles removes the generated script files.
+func (uc *MergeTask) cleanupScriptFiles(taskID int) {
+	scriptPath := domain.ScriptPath(uc.crewDir, taskID)
+	_ = os.Remove(scriptPath)
+	promptPath := domain.PromptPath(uc.crewDir, taskID)
+	_ = os.Remove(promptPath)
 }

@@ -410,8 +410,7 @@ Examples:
 // newMergeCommand creates the merge command for merging a task branch into main.
 func newMergeCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		force bool
-		yes   bool
+		yes bool
 	}
 
 	cmd := &cobra.Command{
@@ -425,17 +424,14 @@ Preconditions:
   - No merge conflict
 
 Processing:
-  1. If session is running and --force is specified, stop it
-  2. Delete the worktree
-  3. Execute git merge --no-ff
+  1. If session is running, stop it
+  2. Execute git merge --no-ff
+  3. Delete the worktree
   4. Update task status to 'done'
 
 Examples:
   # Merge task #1 into main
   git crew merge 1
-
-  # Force stop session and merge
-  git crew merge 1 --force
 
   # Skip confirmation prompt
   git crew merge 1 --yes`,
@@ -478,7 +474,6 @@ Examples:
 			uc := c.MergeTaskUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.MergeTaskInput{
 				TaskID: taskID,
-				Force:  opts.force,
 			})
 			if err != nil {
 				return err
@@ -489,7 +484,6 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.force, "force", "f", false, "Force stop session if running")
 	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "Skip confirmation prompt")
 
 	return cmd

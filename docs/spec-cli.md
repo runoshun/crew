@@ -507,7 +507,7 @@ Handle session termination (called from task script).
 
 ### Task Completion
 
-#### `git crew merge <id> [--force] [--yes]`
+#### `git crew merge <id> [--yes]`
 
 Merge task into main and complete.
 
@@ -515,7 +515,6 @@ Merge task into main and complete.
 - `id`: Task ID
 
 **Optional Arguments**:
-- `--force`: Force stop session if running and merge
 - `--yes`, `-y`: Skip confirmation prompt
 
 **Preconditions**:
@@ -524,9 +523,7 @@ Merge task into main and complete.
 - No merge conflict
 
 **Processing**:
-1. If session is running:
-   - Without `--force` → error
-   - With `--force` → stop session
+1. If session is running, stop it
 2. Display confirmation prompt (skip with `--yes`)
 3. Execute `git merge --no-ff`
 4. Delete worktree
@@ -539,7 +536,6 @@ Merge task into main and complete.
 - Current branch is not `main` → error
 - Working tree has uncommitted changes → error
 - Merge conflict exists → error
-- Session running and no `--force` → error
 
 ---
 

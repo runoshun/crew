@@ -226,7 +226,7 @@ func (c *Container) CompleteTaskUseCase() *usecase.CompleteTask {
 
 // MergeTaskUseCase returns a new MergeTask use case.
 func (c *Container) MergeTaskUseCase() *usecase.MergeTask {
-	return usecase.NewMergeTask(c.Tasks, c.Sessions, c.Worktrees, c.Git)
+	return usecase.NewMergeTask(c.Tasks, c.Sessions, c.Worktrees, c.Git, c.Config.CrewDir)
 }
 
 // ShowDiffUseCase returns a new ShowDiff use case.
