@@ -107,3 +107,8 @@ type MsgShowDiff struct {
 }
 
 func (MsgShowDiff) sealed() {}
+
+// MsgTick is sent periodically for auto-refresh.
+type MsgTick struct{}
+
+func (MsgTick) sealed() {}

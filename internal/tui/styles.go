@@ -54,8 +54,8 @@ var Colors = struct {
 	KeyText:       lipgloss.Color("#B4BEFE"), // Lavender (for keys)
 
 	// Status colors
-	Todo:        lipgloss.Color("#F9E2AF"), // Yellow (matches HTML Mock Variant 2)
-	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow
+	Todo:        lipgloss.Color("#89B4FA"), // Blue (pending)
+	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow (active work)
 	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
 	StatusError: lipgloss.Color("#F38BA8"), // Red
 	Done:        lipgloss.Color("#A6E3A1"), // Green

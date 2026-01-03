@@ -42,6 +42,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = ModeNormal
 		m.titleInput.Reset()
 		m.descInput.Reset()
+		m.parentInput.Reset()
 		return m, m.loadTasks()
 
 	case MsgTaskDeleted:
@@ -92,6 +93,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}, func(err error) tea.Msg {
 			return MsgReloadTasks{}
 		})
+
+	case MsgTick:
+		// Auto-refresh: reload tasks and schedule next tick
+		return m, tea.Batch(m.loadTasks(), m.tick())
 	}
 
 	return m, nil
@@ -115,6 +120,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleInputTitleMode(msg)
 	case ModeInputDesc:
 		return m.handleInputDescMode(msg)
+	case ModeNewTask:
+		return m.handleNewTaskMode(msg)
 	case ModeStart:
 		return m.handleStartMode(msg)
 	case ModeHelp:
@@ -168,8 +175,11 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, m.keys.New):
-		m.mode = ModeInputTitle
+		m.mode = ModeNewTask
+		m.newTaskField = FieldTitle
 		m.titleInput.Focus()
+		m.descInput.Blur()
+		m.parentInput.Blur()
 		return m, nil
 
 	case key.Matches(msg, m.keys.Copy):
@@ -382,6 +392,67 @@ func (m *Model) handleInputDescMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.descInput, cmd = m.descInput.Update(msg)
 	return m, cmd
+}
+
+// handleNewTaskMode handles keys in new task form mode.
+func (m *Model) handleNewTaskMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		m.titleInput.Reset()
+		m.descInput.Reset()
+		m.parentInput.Reset()
+		return m, nil
+
+	case msg.Type == tea.KeyTab:
+		// Move to next field
+		m.newTaskField = m.newTaskField.Next()
+		m.focusNewTaskField()
+		return m, nil
+
+	case msg.Type == tea.KeyShiftTab:
+		// Move to previous field
+		m.newTaskField = m.newTaskField.Prev()
+		m.focusNewTaskField()
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		title := m.titleInput.Value()
+		if title == "" {
+			return m, nil
+		}
+		desc := m.descInput.Value()
+		parent := m.parentInput.Value()
+		return m, m.createTaskWithParent(title, desc, parent)
+	}
+
+	// Forward to current input field
+	var cmd tea.Cmd
+	switch m.newTaskField {
+	case FieldTitle:
+		m.titleInput, cmd = m.titleInput.Update(msg)
+	case FieldDesc:
+		m.descInput, cmd = m.descInput.Update(msg)
+	case FieldParent:
+		m.parentInput, cmd = m.parentInput.Update(msg)
+	}
+	return m, cmd
+}
+
+// focusNewTaskField focuses the current field in new task form.
+func (m *Model) focusNewTaskField() {
+	m.titleInput.Blur()
+	m.descInput.Blur()
+	m.parentInput.Blur()
+
+	switch m.newTaskField {
+	case FieldTitle:
+		m.titleInput.Focus()
+	case FieldDesc:
+		m.descInput.Focus()
+	case FieldParent:
+		m.parentInput.Focus()
+	}
 }
 
 // handleStartMode handles keys in agent picker mode.

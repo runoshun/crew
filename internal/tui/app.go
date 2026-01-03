@@ -6,6 +6,7 @@ import (
 	"io"
 	"os/exec"
 	"sort"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
@@ -17,6 +18,8 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
+
+const autoRefreshInterval = 5 * time.Second
 
 // Model is the main bubbletea model for the TUI.
 type Model struct {
@@ -41,6 +44,7 @@ type Model struct {
 	// Input state (large structs)
 	titleInput  textinput.Model
 	descInput   textinput.Model
+	parentInput textinput.Model
 	filterInput textinput.Model
 	customInput textinput.Model
 
@@ -48,6 +52,7 @@ type Model struct {
 	mode             Mode
 	confirmAction    ConfirmAction
 	sortMode         SortMode
+	newTaskField     NewTaskField
 	width            int
 	height           int
 	confirmTaskID    int
@@ -64,6 +69,10 @@ func New(c *app.Container) *Model {
 	di := textinput.New()
 	di.Placeholder = "Task description (optional)"
 	di.CharLimit = 1000
+
+	pi := textinput.New()
+	pi.Placeholder = "Parent task ID (optional)"
+	pi.CharLimit = 10
 
 	fi := textinput.New()
 	fi.Placeholder = "Filter tasks..."
@@ -93,6 +102,7 @@ func New(c *app.Container) *Model {
 		taskList:         taskList,
 		titleInput:       ti,
 		descInput:        di,
+		parentInput:      pi,
 		filterInput:      fi,
 		customInput:      ci,
 		builtinAgents:    []string{"claude", "opencode", "codex"},
@@ -108,7 +118,15 @@ func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.loadTasks(),
 		m.loadConfig(),
+		m.tick(),
 	)
+}
+
+// tick returns a command that sends a tick message after the refresh interval.
+func (m *Model) tick() tea.Cmd {
+	return tea.Tick(autoRefreshInterval, func(t time.Time) tea.Msg {
+		return MsgTick{}
+	})
 }
 
 // loadTasks returns a command that loads tasks from the repository.
@@ -156,17 +174,25 @@ func (m *Model) updateTaskList() {
 }
 
 func (m *Model) initDetailViewport() {
-	width := m.width - 12
-	height := m.height - 10
-	if width < 40 {
-		width = 40
-	}
+	width := m.dialogWidth() - 4
+	height := m.height - 12
 	if height < 10 {
 		height = 10
 	}
 	m.detailViewport = viewport.New(width, height)
 	m.detailViewport.Style = lipgloss.NewStyle().Background(Colors.Background)
 	m.detailViewport.SetContent(m.detailContent(width))
+}
+
+func (m *Model) dialogWidth() int {
+	width := m.width - 16
+	if width < 50 {
+		width = 50
+	}
+	if width > 80 {
+		width = 80
+	}
+	return width
 }
 
 func (m *Model) detailContent(width int) string {
@@ -297,6 +323,30 @@ func (m *Model) createTask(title, desc string) tea.Cmd {
 		out, err := m.container.NewTaskUseCase().Execute(
 			context.Background(),
 			usecase.NewTaskInput{Title: title, Description: desc},
+		)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgTaskCreated{TaskID: out.TaskID}
+	}
+}
+
+// createTaskWithParent returns a command that creates a new task with optional parent.
+func (m *Model) createTaskWithParent(title, desc, parentStr string) tea.Cmd {
+	return func() tea.Msg {
+		input := usecase.NewTaskInput{Title: title, Description: desc}
+
+		// Parse parent ID if provided
+		if parentStr != "" {
+			var parentID int
+			if _, err := fmt.Sscanf(parentStr, "%d", &parentID); err == nil {
+				input.ParentID = &parentID
+			}
+		}
+
+		out, err := m.container.NewTaskUseCase().Execute(
+			context.Background(),
+			input,
 		)
 		if err != nil {
 			return MsgError{Err: err}

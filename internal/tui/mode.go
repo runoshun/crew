@@ -8,8 +8,9 @@ const (
 	ModeNormal     Mode = iota // Default navigation mode
 	ModeFilter                 // Text filtering mode
 	ModeConfirm                // Confirmation dialog mode
-	ModeInputTitle             // Title input mode (for new task)
-	ModeInputDesc              // Description input mode (for new task)
+	ModeInputTitle             // Title input mode (for new task) - deprecated, use ModeNewTask
+	ModeInputDesc              // Description input mode (for new task) - deprecated, use ModeNewTask
+	ModeNewTask                // New task form mode (title, desc, parent)
 	ModeStart                  // Agent picker mode
 	ModeHelp                   // Help overlay mode
 	ModeDetail                 // Task detail view mode
@@ -28,6 +29,8 @@ func (m Mode) String() string {
 		return "input_title"
 	case ModeInputDesc:
 		return "input_desc"
+	case ModeNewTask:
+		return "new_task"
 	case ModeStart:
 		return "start"
 	case ModeHelp:
@@ -53,12 +56,47 @@ const (
 // IsInputMode returns true if the mode accepts text input.
 func (m Mode) IsInputMode() bool {
 	switch m {
-	case ModeFilter, ModeInputTitle, ModeInputDesc:
+	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask:
 		return true
 	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeDetail:
 		return false
 	}
 	return false
+}
+
+// NewTaskField represents the currently focused field in the new task form.
+type NewTaskField int
+
+const (
+	FieldTitle NewTaskField = iota
+	FieldDesc
+	FieldParent
+)
+
+func (f NewTaskField) Next() NewTaskField {
+	switch f {
+	case FieldTitle:
+		return FieldDesc
+	case FieldDesc:
+		return FieldParent
+	case FieldParent:
+		return FieldTitle
+	default:
+		return FieldTitle
+	}
+}
+
+func (f NewTaskField) Prev() NewTaskField {
+	switch f {
+	case FieldTitle:
+		return FieldParent
+	case FieldDesc:
+		return FieldTitle
+	case FieldParent:
+		return FieldDesc
+	default:
+		return FieldTitle
+	}
 }
 
 // String returns a human-readable description of the action.
