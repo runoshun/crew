@@ -400,6 +400,11 @@ func (m *MockWorktreeManager) Create(_, _ string) (string, error) {
 	return m.CreatePath, nil
 }
 
+// SetupWorktree is a no-op mock implementation.
+func (m *MockWorktreeManager) SetupWorktree(_ string, _ *domain.WorktreeConfig) error {
+	return nil
+}
+
 // Resolve returns the configured path or error.
 func (m *MockWorktreeManager) Resolve(_ string) (string, error) {
 	if m.ResolveErr != nil {

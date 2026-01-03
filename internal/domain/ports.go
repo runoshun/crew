@@ -125,6 +125,9 @@ type WorktreeManager interface {
 	// Create creates a new worktree for the given branch.
 	Create(branch, baseBranch string) (path string, err error)
 
+	// SetupWorktree performs post-creation setup tasks (file copying and command execution).
+	SetupWorktree(wtPath string, config *WorktreeConfig) error
+
 	// Resolve returns the path of an existing worktree for the branch.
 	Resolve(branch string) (path string, err error)
 

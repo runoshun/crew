@@ -16,6 +16,7 @@ type Config struct {
 	Diff          DiffConfig             // [diff] settings
 	Log           LogConfig              // [log] settings
 	Tasks         TasksConfig            // [tasks] settings
+	Worktree      WorktreeConfig         // [worktree] settings
 	Warnings      []string               // [warning] Unknown keys or other issues
 }
 
@@ -157,6 +158,12 @@ type DiffConfig struct {
 // LogConfig holds logging settings from [log] section.
 type LogConfig struct {
 	Level string // Log level: debug, info, warn, error
+}
+
+// WorktreeConfig holds worktree customization settings from [worktree] section.
+type WorktreeConfig struct {
+	SetupCommand string   // Command to run after worktree creation
+	Copy         []string // Files/directories to copy (with CoW if available)
 }
 
 // Default configuration values.

@@ -52,9 +52,10 @@ func (m *mockWorktreeForPrune) Remove(branch string) error {
 }
 
 // Other methods
-func (m *mockWorktreeForPrune) Create(string, string) (string, error) { return "", nil }
-func (m *mockWorktreeForPrune) Resolve(string) (string, error)        { return "", nil }
-func (m *mockWorktreeForPrune) Exists(string) (bool, error)           { return false, nil }
+func (m *mockWorktreeForPrune) Create(string, string) (string, error)              { return "", nil }
+func (m *mockWorktreeForPrune) SetupWorktree(string, *domain.WorktreeConfig) error { return nil }
+func (m *mockWorktreeForPrune) Resolve(string) (string, error)                     { return "", nil }
+func (m *mockWorktreeForPrune) Exists(string) (bool, error)                        { return false, nil }
 
 func TestPruneTasks_Execute_Real(t *testing.T) {
 	tests := []struct {

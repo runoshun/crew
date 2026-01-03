@@ -262,6 +262,27 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 					}
 				}
 			}
+		case "worktree":
+			if m, ok := value.(map[string]any); ok {
+				for k, v := range m {
+					switch k {
+					case "setup_command":
+						if s, ok := v.(string); ok {
+							res.Worktree.SetupCommand = s
+						}
+					case "copy":
+						if arr, ok := v.([]any); ok {
+							for _, item := range arr {
+								if s, ok := item.(string); ok {
+									res.Worktree.Copy = append(res.Worktree.Copy, s)
+								}
+							}
+						}
+					default:
+						warnings = append(warnings, fmt.Sprintf("unknown key in [worktree]: %s", k))
+					}
+				}
+			}
 		default:
 			warnings = append(warnings, fmt.Sprintf("unknown section: %s", section))
 		}
@@ -365,6 +386,7 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		Diff:          base.Diff,
 		Log:           base.Log,
 		Tasks:         base.Tasks,
+		Worktree:      base.Worktree,
 		Workers:       make(map[string]domain.WorkerAgent),
 		Warnings:      append([]string{}, base.Warnings...),
 	}
@@ -404,6 +426,12 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.Tasks.Encrypt {
 		result.Tasks.Encrypt = override.Tasks.Encrypt
+	}
+	if override.Worktree.SetupCommand != "" {
+		result.Worktree.SetupCommand = override.Worktree.SetupCommand
+	}
+	if len(override.Worktree.Copy) > 0 {
+		result.Worktree.Copy = override.Worktree.Copy
 	}
 
 	// Merge workers: override individual fields, not entire worker

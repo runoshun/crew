@@ -123,6 +123,12 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, fmt.Errorf("create worktree: %w", err)
 	}
 
+	// Setup worktree (copy files and run setup command)
+	if setupErr := uc.worktrees.SetupWorktree(wtPath, &cfg.Worktree); setupErr != nil {
+		_ = uc.worktrees.Remove(branch)
+		return nil, fmt.Errorf("setup worktree: %w", setupErr)
+	}
+
 	// Generate prompt and script files
 	scriptPath, err := uc.generateScript(task, wtPath, workerAgent, cfg, model)
 	if err != nil {

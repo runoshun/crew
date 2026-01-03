@@ -435,3 +435,50 @@ unknown_log_key = "value"
 	}
 	assert.Equal(t, expected, cfg.Warnings)
 }
+
+func TestLoader_Load_WorktreeConfig(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config with worktree section
+	repoConfig := `
+[worktree]
+setup_command = "mise install && npm install"
+copy = ["node_modules", ".env.local"]
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify worktree config
+	assert.Equal(t, "mise install && npm install", cfg.Worktree.SetupCommand)
+	assert.Equal(t, []string{"node_modules", ".env.local"}, cfg.Worktree.Copy)
+}
+
+func TestLoader_Load_WorktreeConfig_Empty(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config without worktree section
+	repoConfig := `
+[workers]
+default = "claude"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify empty worktree config
+	assert.Equal(t, "", cfg.Worktree.SetupCommand)
+	assert.Empty(t, cfg.Worktree.Copy)
+}
