@@ -27,7 +27,7 @@ func TestMergeTask_Execute_Success(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -67,7 +67,7 @@ func TestMergeTask_Execute_SuccessWithIssue(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -81,7 +81,7 @@ func TestMergeTask_Execute_SuccessWithIssue(t *testing.T) {
 	assert.Equal(t, "crew-1-gh-123", git.DeletedBranch)
 }
 
-func TestMergeTask_Execute_ForceStopSession(t *testing.T) {
+func TestMergeTask_Execute_StopsRunningSession(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -99,12 +99,11 @@ func TestMergeTask_Execute_ForceStopSession(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
-	// Execute with force
+	// Execute - session should be stopped automatically
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
 		TaskID: 1,
-		Force:  true,
 	})
 
 	// Assert
@@ -130,7 +129,7 @@ func TestMergeTask_Execute_NoWorktree(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -151,7 +150,7 @@ func TestMergeTask_Execute_TaskNotFound(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	git := &testutil.MockGit{}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -176,7 +175,7 @@ func TestMergeTask_Execute_NotOnMain(t *testing.T) {
 		CurrentBranchName: "feature-branch", // Not on main
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -202,7 +201,7 @@ func TestMergeTask_Execute_UncommittedChanges(t *testing.T) {
 		HasUncommittedChangesV: true, // Has uncommitted changes
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -213,36 +212,6 @@ func TestMergeTask_Execute_UncommittedChanges(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrUncommittedChanges)
 }
 
-func TestMergeTask_Execute_SessionRunningNoForce(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:      1,
-		Title:   "Task with running session",
-		Status:  domain.StatusInProgress,
-		Agent:   "claude",
-		Session: "crew-1",
-	}
-	sessions := testutil.NewMockSessionManager()
-	sessions.IsRunningVal = true
-	worktrees := testutil.NewMockWorktreeManager()
-	git := &testutil.MockGit{
-		CurrentBranchName: "main",
-	}
-
-	uc := NewMergeTask(repo, sessions, worktrees, git)
-
-	// Execute without force
-	_, err := uc.Execute(context.Background(), MergeTaskInput{
-		TaskID: 1,
-		Force:  false,
-	})
-
-	// Assert
-	assert.ErrorIs(t, err, domain.ErrSessionRunning)
-	assert.False(t, sessions.StopCalled)
-}
-
 func TestMergeTask_Execute_GetTaskError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
@@ -251,7 +220,7 @@ func TestMergeTask_Execute_GetTaskError(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	git := &testutil.MockGit{}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -280,7 +249,7 @@ func TestMergeTask_Execute_MergeError(t *testing.T) {
 		MergeErr:          assert.AnError,
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -309,7 +278,7 @@ func TestMergeTask_Execute_DeleteBranchError(t *testing.T) {
 		DeleteBranchErr:   assert.AnError,
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -338,7 +307,7 @@ func TestMergeTask_Execute_SaveError(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -368,12 +337,11 @@ func TestMergeTask_Execute_StopSessionError(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
-	// Execute with force
+	// Execute - stopping session should fail
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
 		TaskID: 1,
-		Force:  true,
 	})
 
 	// Assert
@@ -398,7 +366,7 @@ func TestMergeTask_Execute_RemoveWorktreeError(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git)
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
