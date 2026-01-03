@@ -159,4 +159,13 @@ func TestPathFunctions(t *testing.T) {
 			t.Errorf("TmuxConfigPath(%q) = %q, want %q", crewDir, got, want)
 		}
 	})
+
+	t.Run("WorktreePath", func(t *testing.T) {
+		worktreeDir := "/repo/.git/crew/worktrees"
+		got := WorktreePath(worktreeDir, 1)
+		want := "/repo/.git/crew/worktrees/1"
+		if got != want {
+			t.Errorf("WorktreePath(%q, 1) = %q, want %q", worktreeDir, got, want)
+		}
+	})
 }
