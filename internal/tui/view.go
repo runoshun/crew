@@ -115,7 +115,7 @@ func (m *Model) viewMain() string {
 
 	if len(m.warnings) > 0 {
 		for _, w := range m.warnings {
-			leftPane.WriteString(m.styles.ErrorMsg.Copy().Foreground(Colors.Warning).Render("Warning: "+w) + "\n")
+			leftPane.WriteString(m.styles.ErrorMsg.Foreground(Colors.Warning).Render("Warning: "+w) + "\n")
 		}
 		leftPane.WriteString("\n")
 	}

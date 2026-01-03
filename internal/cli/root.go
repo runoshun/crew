@@ -49,7 +49,7 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 			}
 
 			for _, w := range cfg.Warnings {
-				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", w)
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", w)
 			}
 			return nil
 		},

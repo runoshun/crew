@@ -281,6 +281,7 @@ type workersConfig struct {
 }
 
 type workerDef struct {
+	Extra           map[string]any
 	Inherit         string
 	CommandTemplate string
 	Command         string
@@ -288,7 +289,6 @@ type workerDef struct {
 	Args            string
 	Prompt          string
 	Model           string
-	Extra           map[string]any
 }
 
 // parseWorkersSection parses the raw workers map into structured workersConfig.
