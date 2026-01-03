@@ -228,6 +228,10 @@ Examples:
 
 // newCompleteCommand creates the complete command for marking a task as complete.
 func newCompleteCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		comment string
+	}
+
 	cmd := &cobra.Command{
 		Use:   "complete [id]",
 		Short: "Mark task as complete",
@@ -246,6 +250,9 @@ Examples:
   # Complete task by ID
   git crew complete 1
 
+  # Complete with a comment
+  git crew complete 1 --comment "Implementation done"
+
   # Auto-detect task from current branch (when working in a worktree)
   git crew complete`,
 		Args: cobra.MaximumNArgs(1),
@@ -259,7 +266,8 @@ Examples:
 			// Execute use case
 			uc := c.CompleteTaskUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.CompleteTaskInput{
-				TaskID: taskID,
+				TaskID:  taskID,
+				Comment: opts.comment,
 			})
 			if err != nil {
 				return err
@@ -269,6 +277,8 @@ Examples:
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVarP(&opts.comment, "comment", "m", "", "Add a completion comment")
 
 	return cmd
 }

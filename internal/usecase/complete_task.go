@@ -10,7 +10,8 @@ import (
 
 // CompleteTaskInput contains the parameters for completing a task.
 type CompleteTaskInput struct {
-	TaskID int // Task ID to complete
+	Comment string // Optional completion comment
+	TaskID  int    // Task ID to complete
 }
 
 // CompleteTaskOutput contains the result of completing a task.
@@ -25,6 +26,7 @@ type CompleteTask struct {
 	worktrees domain.WorktreeManager
 	git       domain.Git
 	config    domain.ConfigLoader
+	clock     domain.Clock
 	execCmd   func(name string, args ...string) *exec.Cmd
 }
 
@@ -34,12 +36,14 @@ func NewCompleteTask(
 	worktrees domain.WorktreeManager,
 	git domain.Git,
 	config domain.ConfigLoader,
+	clock domain.Clock,
 ) *CompleteTask {
 	return &CompleteTask{
 		tasks:     tasks,
 		worktrees: worktrees,
 		git:       git,
 		config:    config,
+		clock:     clock,
 		execCmd:   exec.Command,
 	}
 }
@@ -106,6 +110,17 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 
 	// Update status to in_review
 	task.Status = domain.StatusInReview
+
+	// Add comment if provided
+	if in.Comment != "" {
+		comment := domain.Comment{
+			Text: in.Comment,
+			Time: uc.clock.Now(),
+		}
+		if err := uc.tasks.AddComment(task.ID, comment); err != nil {
+			return nil, fmt.Errorf("add comment: %w", err)
+		}
+	}
 
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {

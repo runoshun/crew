@@ -802,7 +802,7 @@ func (c *Container) StopTask() *usecase.StopTask {
 }
 
 func (c *Container) CompleteTask() *usecase.CompleteTask {
-    return usecase.NewCompleteTask(c.Tasks, c.Git, c.Config)
+    return usecase.NewCompleteTask(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Clock)
 }
 
 func (c *Container) MergeTask() *usecase.MergeTask {
