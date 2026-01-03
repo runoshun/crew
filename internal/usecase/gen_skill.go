@@ -14,7 +14,9 @@ var crewManagerSkillContent string
 
 // GenSkillInput contains the input for the GenSkill use case.
 type GenSkillInput struct {
-	// Currently no input needed
+	Claude   bool // Generate only for .claude/ directory
+	OpenCode bool // Generate only for .opencode/ directory
+	Codex    bool // Generate only for .codex/ directory
 }
 
 // GenSkillOutput contains the output of the GenSkill use case.
@@ -35,12 +37,34 @@ func NewGenSkill(repoRoot string) *GenSkill {
 }
 
 // Execute creates crew-manager skill files in .claude, .codex, and .opencode directories.
-func (uc *GenSkill) Execute(_ context.Context, _ GenSkillInput) (*GenSkillOutput, error) {
-	// Define target directories
-	targetDirs := []string{
-		".claude/skills/crew-manager",
-		".codex/skills/crew-manager",
-		".opencode/skill/crew-manager",
+func (uc *GenSkill) Execute(_ context.Context, in GenSkillInput) (*GenSkillOutput, error) {
+	// Define all possible target directories
+	allTargetDirs := map[string]string{
+		"claude":   ".claude/skills/crew-manager",
+		"codex":    ".codex/skills/crew-manager",
+		"opencode": ".opencode/skill/crew-manager",
+	}
+
+	// Determine which directories to generate based on input flags
+	var targetDirs []string
+	if !in.Claude && !in.OpenCode && !in.Codex {
+		// No flags specified, generate for all
+		targetDirs = []string{
+			allTargetDirs["claude"],
+			allTargetDirs["codex"],
+			allTargetDirs["opencode"],
+		}
+	} else {
+		// Generate only for specified flags
+		if in.Claude {
+			targetDirs = append(targetDirs, allTargetDirs["claude"])
+		}
+		if in.Codex {
+			targetDirs = append(targetDirs, allTargetDirs["codex"])
+		}
+		if in.OpenCode {
+			targetDirs = append(targetDirs, allTargetDirs["opencode"])
+		}
 	}
 
 	createdPaths := make([]string, 0, len(targetDirs))
