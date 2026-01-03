@@ -255,3 +255,8 @@ func (c *Container) PruneTasksUseCase() *usecase.PruneTasks {
 func (c *Container) GenSkillUseCase() *usecase.GenSkill {
 	return usecase.NewGenSkill(c.Config.RepoRoot)
 }
+
+// ExecCommandUseCase returns a new ExecCommand use case.
+func (c *Container) ExecCommandUseCase() *usecase.ExecCommand {
+	return usecase.NewExecCommand(c.Tasks, c.Worktrees)
+}

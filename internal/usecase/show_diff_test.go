@@ -410,3 +410,140 @@ func TestShowDiff_Execute_EmptyBaseBranchDefaultsToMain(t *testing.T) {
 	// Verify empty BaseBranch defaults to "main"
 	assert.Equal(t, "git diff main...HEAD", capturedCommand)
 }
+
+func TestShowDiff_Execute_UseTUICommand(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with TUI diff",
+		Status:     domain.StatusInProgress,
+		BaseBranch: "main",
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config = &domain.Config{
+		Diff: domain.DiffConfig{
+			Command:    "git diff main...HEAD | delta",
+			TUICommand: "git diff --color main...HEAD | less -R",
+		},
+		Workers: make(map[string]domain.WorkerAgent),
+	}
+
+	var stdout, stderr bytes.Buffer
+	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+
+	var capturedCommand string
+	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
+		if len(args) >= 2 {
+			capturedCommand = args[1]
+		}
+		return exec.Command("echo", "diff output")
+	})
+
+	// Execute with UseTUICommand = true
+	_, err := uc.Execute(context.Background(), ShowDiffInput{
+		TaskID:        1,
+		UseTUICommand: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	// Verify TUICommand was used instead of Command
+	assert.Contains(t, capturedCommand, "less -R")
+	assert.NotContains(t, capturedCommand, "delta")
+}
+
+func TestShowDiff_Execute_UseTUICommandFallbackToCommand(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with no TUI command",
+		Status:     domain.StatusInProgress,
+		BaseBranch: "main",
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config = &domain.Config{
+		Diff: domain.DiffConfig{
+			Command:    "git diff main...HEAD | delta",
+			TUICommand: "", // Empty TUICommand
+		},
+		Workers: make(map[string]domain.WorkerAgent),
+	}
+
+	var stdout, stderr bytes.Buffer
+	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+
+	var capturedCommand string
+	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
+		if len(args) >= 2 {
+			capturedCommand = args[1]
+		}
+		return exec.Command("echo", "diff output")
+	})
+
+	// Execute with UseTUICommand = true but TUICommand is empty
+	_, err := uc.Execute(context.Background(), ShowDiffInput{
+		TaskID:        1,
+		UseTUICommand: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	// Verify Command was used as fallback when TUICommand is empty
+	assert.Contains(t, capturedCommand, "delta")
+}
+
+func TestShowDiff_Execute_UseTUICommandFalse(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with CLI diff",
+		Status:     domain.StatusInProgress,
+		BaseBranch: "main",
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config = &domain.Config{
+		Diff: domain.DiffConfig{
+			Command:    "git diff main...HEAD | delta",
+			TUICommand: "git diff --color main...HEAD | less -R",
+		},
+		Workers: make(map[string]domain.WorkerAgent),
+	}
+
+	var stdout, stderr bytes.Buffer
+	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+
+	var capturedCommand string
+	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
+		if len(args) >= 2 {
+			capturedCommand = args[1]
+		}
+		return exec.Command("echo", "diff output")
+	})
+
+	// Execute with UseTUICommand = false (default)
+	_, err := uc.Execute(context.Background(), ShowDiffInput{
+		TaskID:        1,
+		UseTUICommand: false,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	// Verify Command was used (not TUICommand) when UseTUICommand is false
+	assert.Contains(t, capturedCommand, "delta")
+	assert.NotContains(t, capturedCommand, "less -R")
+}

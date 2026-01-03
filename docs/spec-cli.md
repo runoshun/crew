@@ -934,6 +934,39 @@ args = "--model opus"
 | `{{.RepoRoot}}` | Repository root |
 | `{{.GitDir}}` | .git directory |
 
+### Worker Inheritance
+
+Workers can inherit settings from other workers using the `inherit` field:
+
+```toml
+# Base worker
+[workers.opencode]
+command = "opencode"
+args = "-m anthropic/claude-sonnet-4-5"
+
+# Variants with different models
+[workers.opencode-hard]
+inherit = "opencode"
+args = "-m anthropic/claude-opus-4"
+
+[workers.opencode-easy]
+inherit = "opencode"
+args = "-m anthropic/claude-haiku"
+```
+
+**Usage:**
+```bash
+crew start 12 opencode       # Uses sonnet
+crew start 12 opencode-hard  # Uses opus
+crew start 12 opencode-easy  # Uses haiku
+```
+
+**Features:**
+- Inherit from built-in workers (`claude`, `opencode`, `codex`) or custom workers
+- Multi-level inheritance supported
+- Child fields override parent fields if non-empty
+- Circular inheritance is detected and returns an error
+
 ### Built-in Agents
 
 | Agent | Command Format |

@@ -29,6 +29,17 @@
 # args = "--task"
 # prompt = "Complete the task and run 'crew complete'"
 
+## Worker inheritance example
+## You can inherit from another worker and override specific fields.
+## Useful for creating model variants with different settings.
+# [workers.claude-hard]
+# inherit = "claude"  # Inherit all settings from the "claude" worker
+# args = "--model opus"  # Override only the model
+#
+# [workers.claude-easy]
+# inherit = "claude"
+# args = "--model haiku"
+
 ## CI gate on completion
 # [complete]
 # command = "mise run ci"
