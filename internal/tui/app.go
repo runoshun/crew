@@ -265,7 +265,7 @@ func (m *Model) detailContent(width int) string {
 		for _, comment := range m.comments {
 			timeStr := comment.Time.Format("2006-01-02 15:04")
 			commentLine := m.styles.DetailValue.Background(Colors.Background).Render("["+timeStr+"] ") +
-				m.styles.DetailDesc.Background(Colors.Background).Render(comment.Text)
+				m.styles.DetailDesc.Background(Colors.Background).Width(width).Render(comment.Text)
 			lines = append(lines, wrapStyle.Render(commentLine))
 		}
 	}
