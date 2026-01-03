@@ -52,3 +52,20 @@ func TestUpdate_MsgCommentsLoaded_EmptyComments(t *testing.T) {
 	assert.True(t, ok, "Update should return *Model")
 	assert.Empty(t, result.comments, "Comments should be empty")
 }
+
+func TestUpdate_MsgConfigLoaded_Warnings(t *testing.T) {
+	m := &Model{}
+
+	cfg := &domain.Config{
+		Warnings: []string{"unknown key: xxx"},
+	}
+
+	msg := MsgConfigLoaded{
+		Config: cfg,
+	}
+
+	updatedModel, _ := m.Update(msg)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, []string{"unknown key: xxx"}, result.warnings)
+}

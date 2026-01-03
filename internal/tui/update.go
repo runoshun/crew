@@ -34,6 +34,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgConfigLoaded:
 		m.config = msg.Config
+		m.warnings = msg.Config.Warnings
 		m.updateAgents()
 		return m, nil
 

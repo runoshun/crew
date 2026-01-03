@@ -113,6 +113,13 @@ func (m *Model) viewMain() string {
 		leftPane.WriteString(m.styles.ErrorMsg.Render("Error: "+m.err.Error()) + "\n\n")
 	}
 
+	if len(m.warnings) > 0 {
+		for _, w := range m.warnings {
+			leftPane.WriteString(m.styles.ErrorMsg.Copy().Foreground(Colors.Warning).Render("Warning: "+w) + "\n")
+		}
+		leftPane.WriteString("\n")
+	}
+
 	if m.mode == ModeFilter {
 		leftPane.WriteString(m.styles.InputPrompt.Render("Filter: "))
 		leftPane.WriteString(m.filterInput.View())

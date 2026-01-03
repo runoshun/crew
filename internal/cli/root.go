@@ -3,6 +3,7 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/spf13/cobra"
@@ -35,6 +36,23 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 		SilenceUsage: true,
 		// SilenceErrors prevents Cobra from printing errors (we handle it in main)
 		SilenceErrors: true,
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			// Skip for some commands
+			if cmd.Name() == "_session-ended" || cmd.Name() == "init" {
+				return nil
+			}
+
+			cfg, err := c.ConfigLoader.Load()
+			if err != nil {
+				// Ignore error (e.g. not initialized)
+				return nil
+			}
+
+			for _, w := range cfg.Warnings {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Warning: %s\n", w)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Handle role-specific help flags
 			if fullWorker && fullManager {
