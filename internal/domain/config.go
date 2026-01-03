@@ -165,10 +165,10 @@ const (
 
 // DefaultWorkerPrompt is the default prompt template for workers.
 // It uses Go template syntax with CommandData fields.
-// Kept minimal - detailed workflow is in 'crew help --full-worker'.
+// Kept minimal - detailed workflow is in 'crew help --help-worker'.
 const DefaultWorkerPrompt = `You are working on Task #{{.TaskID}}.
 
-Run 'crew help --full-worker' for workflow guide.
+Run 'crew help --help-worker' for workflow guide.
 `
 
 // BuiltinWorker defines a built-in worker configuration.
