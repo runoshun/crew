@@ -24,4 +24,5 @@ var (
 	ErrInvalidStatus         = errors.New("invalid status")
 	ErrCircularInheritance   = errors.New("circular inheritance detected in worker configuration")
 	ErrInheritParentNotFound = errors.New("inherit parent worker not found")
+	ErrCommentNotFound       = errors.New("comment not found")
 )
