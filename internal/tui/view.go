@@ -640,5 +640,14 @@ func (m *Model) viewDetailPanel() string {
 		}
 	}
 
-	return panelStyle.Render(b.String())
+	content := b.String()
+
+	// Truncate content if it exceeds panel height
+	lines := strings.Split(content, "\n")
+	if len(lines) > panelHeight {
+		lines = lines[:panelHeight]
+		content = strings.Join(lines, "\n")
+	}
+
+	return panelStyle.Render(content)
 }
