@@ -563,110 +563,129 @@ func (m *Model) viewDetailPanel() string {
 		return panelStyle.Render(emptyStyle.Render("Select a task\nto view details"))
 	}
 
-	var b strings.Builder
+	// Track lines as we build content, stopping when we exceed panelHeight
+	contentLines := make([]string, 0, panelHeight)
+	totalHeight := 0
 
+	// Helper function to add lines and track height
+	addLines := func(lines ...string) bool {
+		allAdded := true
+		for _, line := range lines {
+			h := lipgloss.Height(line)
+			if h == 0 {
+				h = 1
+			}
+			if totalHeight+h > panelHeight {
+				allAdded = false
+				break
+			}
+			contentLines = append(contentLines, line)
+			totalHeight += h
+		}
+		// If we couldn't add all lines, add ellipsis
+		if !allAdded {
+			if totalHeight < panelHeight {
+				// There's space for ellipsis
+				contentLines = append(contentLines, "...")
+				totalHeight++
+			} else if len(contentLines) > 0 {
+				// Panel is full, replace last line with ellipsis
+				lastIdx := len(contentLines) - 1
+				contentLines[lastIdx] = "..."
+			}
+		}
+		return allAdded
+	}
+
+	// Header: "Task #N"
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(Colors.Primary).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
 		BorderForeground(Colors.GroupLine).
 		Width(DetailPanelWidth - 4)
-	b.WriteString(headerStyle.Render(fmt.Sprintf("Task #%d", task.ID)))
-	b.WriteString("\n\n")
+	if !addLines(headerStyle.Render(fmt.Sprintf("Task #%d", task.ID)), "") {
+		return panelStyle.Render(strings.Join(contentLines, "\n"))
+	}
 
+	// Title (may wrap to multiple lines)
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(Colors.TitleSelected).
 		Width(DetailPanelWidth - 4)
-	b.WriteString(titleStyle.Render(task.Title))
-	b.WriteString("\n\n")
+	if !addLines(titleStyle.Render(task.Title), "") {
+		return panelStyle.Render(strings.Join(contentLines, "\n"))
+	}
 
+	// Status
 	labelStyle := lipgloss.NewStyle().
 		Foreground(Colors.Muted).
 		Width(10)
 	valueStyle := lipgloss.NewStyle().
 		Foreground(Colors.TitleNormal)
 
-	b.WriteString(labelStyle.Render("Status"))
 	statusIcon := StatusIcon(task.Status)
 	statusText := StatusText(task.Status)
-	b.WriteString(m.styles.StatusStyle(task.Status).Render(statusIcon + " " + statusText))
-	b.WriteString("\n")
+	statusLine := labelStyle.Render("Status") + m.styles.StatusStyle(task.Status).Render(statusIcon+" "+statusText)
+	if !addLines(statusLine) {
+		return panelStyle.Render(strings.Join(contentLines, "\n"))
+	}
 
+	// Agent (if present)
 	if task.Agent != "" {
-		b.WriteString(labelStyle.Render("Agent"))
-		b.WriteString(valueStyle.Render(task.Agent))
-		b.WriteString("\n")
+		agentLine := labelStyle.Render("Agent") + valueStyle.Render(task.Agent)
+		if !addLines(agentLine) {
+			return panelStyle.Render(strings.Join(contentLines, "\n"))
+		}
 	}
 
-	b.WriteString(labelStyle.Render("Created"))
-	b.WriteString(valueStyle.Render(task.Created.Format("01/02 15:04")))
-	b.WriteString("\n")
+	// Created
+	createdLine := labelStyle.Render("Created") + valueStyle.Render(task.Created.Format("01/02 15:04"))
+	if !addLines(createdLine) {
+		return panelStyle.Render(strings.Join(contentLines, "\n"))
+	}
 
+	// Started (if present)
 	if !task.Started.IsZero() {
-		b.WriteString(labelStyle.Render("Started"))
-		b.WriteString(valueStyle.Render(task.Started.Format("01/02 15:04")))
-		b.WriteString("\n")
+		startedLine := labelStyle.Render("Started") + valueStyle.Render(task.Started.Format("01/02 15:04"))
+		if !addLines(startedLine) {
+			return panelStyle.Render(strings.Join(contentLines, "\n"))
+		}
 	}
 
+	// Description (may wrap to multiple lines)
 	if task.Description != "" {
-		b.WriteString("\n")
 		descLabelStyle := lipgloss.NewStyle().
 			Foreground(Colors.Muted).
 			Bold(true)
-		b.WriteString(descLabelStyle.Render("Description"))
-		b.WriteString("\n")
 		descStyle := lipgloss.NewStyle().
 			Foreground(Colors.DescSelected).
 			Width(DetailPanelWidth - 4)
-		b.WriteString(descStyle.Render(task.Description))
+		if !addLines("", descLabelStyle.Render("Description"), descStyle.Render(task.Description)) {
+			return panelStyle.Render(strings.Join(contentLines, "\n"))
+		}
 	}
 
+	// Comments (may wrap and have multiple entries)
 	if len(m.comments) > 0 {
-		b.WriteString("\n\n")
 		commentLabelStyle := lipgloss.NewStyle().
 			Foreground(Colors.Muted).
 			Bold(true)
-		b.WriteString(commentLabelStyle.Render("Comments"))
-		b.WriteString("\n")
+		if !addLines("", commentLabelStyle.Render("Comments")) {
+			return panelStyle.Render(strings.Join(contentLines, "\n"))
+		}
+
 		for _, comment := range m.comments {
 			timeStr := comment.Time.Format("01/02 15:04")
 			commentStyle := lipgloss.NewStyle().
 				Foreground(Colors.DescSelected).
 				Width(DetailPanelWidth - 4)
-			b.WriteString(lipgloss.NewStyle().Foreground(Colors.Muted).Render("[" + timeStr + "] "))
-			b.WriteString(commentStyle.Render(comment.Text))
-			b.WriteString("\n")
-		}
-	}
-
-	content := b.String()
-
-	// Truncate content if it exceeds panel height
-	// Note: lipgloss renders with word wrapping, so we need to count actual display lines
-	renderedLines := strings.Split(content, "\n")
-	totalLines := 0
-	truncatedLines := make([]string, 0, len(renderedLines))
-
-	for _, line := range renderedLines {
-		// Calculate how many display lines this logical line will take
-		lineHeight := lipgloss.Height(line)
-		if lineHeight == 0 {
-			lineHeight = 1 // Empty lines still take 1 line
-		}
-
-		if totalLines+lineHeight > panelHeight {
-			// Truncate and add ellipsis indicator
-			if totalLines < panelHeight {
-				truncatedLines = append(truncatedLines, "...")
+			commentLine := lipgloss.NewStyle().Foreground(Colors.Muted).Render("["+timeStr+"] ") + commentStyle.Render(comment.Text)
+			if !addLines(commentLine) {
+				return panelStyle.Render(strings.Join(contentLines, "\n"))
 			}
-			break
 		}
-
-		truncatedLines = append(truncatedLines, line)
-		totalLines += lineHeight
 	}
 
-	content = strings.Join(truncatedLines, "\n")
-	return panelStyle.Render(content)
+	return panelStyle.Render(strings.Join(contentLines, "\n"))
 }
