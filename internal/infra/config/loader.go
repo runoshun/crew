@@ -94,6 +94,9 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 			// Treat as worker definition
 			if subMap, ok := value.(map[string]any); ok {
 				def := workerDef{}
+				if v, ok := subMap["inherit"].(string); ok {
+					def.Inherit = v
+				}
 				if v, ok := subMap["command_template"].(string); ok {
 					def.CommandTemplate = v
 				}
@@ -118,6 +121,7 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 }
 
 type workerDef struct {
+	Inherit         string
 	CommandTemplate string
 	Command         string
 	SystemArgs      string
@@ -168,6 +172,11 @@ func (l *Loader) Load() (*domain.Config, error) {
 	}
 	if repo != nil {
 		base = mergeConfigs(base, repo)
+	}
+
+	// Resolve inheritance after merging
+	if err := base.ResolveInheritance(); err != nil {
+		return nil, err
 	}
 
 	return base, nil
@@ -225,6 +234,11 @@ func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config,
 		base = mergeConfigs(base, repo)
 	}
 
+	// Resolve inheritance after merging
+	if err := base.ResolveInheritance(); err != nil {
+		return nil, err
+	}
+
 	return base, nil
 }
 
@@ -251,6 +265,7 @@ func convertToDomainConfig(cf *configFile) *domain.Config {
 	workers := make(map[string]domain.WorkerAgent)
 	for name, def := range wc.Defs {
 		workers[name] = domain.WorkerAgent{
+			Inherit:         def.Inherit,
 			CommandTemplate: def.CommandTemplate,
 			Command:         def.Command,
 			SystemArgs:      def.SystemArgs,
@@ -331,6 +346,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	// Merge workers: override individual fields, not entire worker
 	for name, overrideWorker := range override.Workers {
 		baseWorker := result.Workers[name]
+		if overrideWorker.Inherit != "" {
+			baseWorker.Inherit = overrideWorker.Inherit
+		}
 		if overrideWorker.CommandTemplate != "" {
 			baseWorker.CommandTemplate = overrideWorker.CommandTemplate
 		}

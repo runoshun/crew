@@ -33,6 +33,7 @@ type WorkersConfig struct {
 
 // WorkerAgent holds per-worker configuration from [workers.<name>] sections.
 type WorkerAgent struct {
+	Inherit         string // Name of worker to inherit from (optional)
 	CommandTemplate string // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
 	Command         string // Base command (e.g., "claude", "opencode")
 	SystemArgs      string // System arguments required for crew operation (auto-applied)
@@ -312,4 +313,95 @@ func formatPromptForTemplate(prompt string) string {
 	buf.WriteString("\n# \"\"\"")
 
 	return buf.String()
+}
+
+// ResolveInheritance resolves worker inheritance by applying parent worker settings
+// to child workers. It detects circular dependencies and returns an error if found.
+// Workers without Inherit field are left unchanged.
+// Only non-empty fields from the child override the parent fields.
+func (c *Config) ResolveInheritance() error {
+	// Track visited workers during traversal to detect circular dependencies
+	visited := make(map[string]bool)
+	resolving := make(map[string]bool)
+
+	// Resolve each worker
+	for name := range c.Workers {
+		if err := c.resolveWorker(name, visited, resolving); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// resolveWorker recursively resolves inheritance for a single worker.
+func (c *Config) resolveWorker(name string, visited, resolving map[string]bool) error {
+	// Already resolved
+	if visited[name] {
+		return nil
+	}
+
+	// Circular dependency detected
+	if resolving[name] {
+		return ErrCircularInheritance
+	}
+
+	worker := c.Workers[name]
+
+	// No inheritance, mark as resolved
+	if worker.Inherit == "" {
+		visited[name] = true
+		return nil
+	}
+
+	// Mark as currently resolving
+	resolving[name] = true
+
+	// Check if parent exists
+	_, exists := c.Workers[worker.Inherit]
+	if !exists {
+		delete(resolving, name)
+		return ErrInheritParentNotFound
+	}
+
+	// Resolve parent first (recursive)
+	if err := c.resolveWorker(worker.Inherit, visited, resolving); err != nil {
+		delete(resolving, name)
+		return err
+	}
+
+	// Get the resolved parent
+	parent := c.Workers[worker.Inherit]
+
+	// Apply inheritance: parent fields are used as defaults, child overrides if non-empty
+	resolved := parent
+
+	// Child overrides
+	if worker.CommandTemplate != "" {
+		resolved.CommandTemplate = worker.CommandTemplate
+	}
+	if worker.Command != "" {
+		resolved.Command = worker.Command
+	}
+	if worker.SystemArgs != "" {
+		resolved.SystemArgs = worker.SystemArgs
+	}
+	if worker.Args != "" {
+		resolved.Args = worker.Args
+	}
+	if worker.Prompt != "" {
+		resolved.Prompt = worker.Prompt
+	}
+
+	// Clear Inherit field after resolution
+	resolved.Inherit = ""
+
+	// Save resolved worker
+	c.Workers[name] = resolved
+
+	// Mark as resolved
+	delete(resolving, name)
+	visited[name] = true
+
+	return nil
 }

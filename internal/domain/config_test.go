@@ -335,3 +335,227 @@ func TestRenderConfigTemplate(t *testing.T) {
 		t.Error("expected header to be present")
 	}
 }
+
+func TestConfig_ResolveInheritance(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  *Config
+		want    map[string]WorkerAgent
+		wantErr error
+	}{
+		{
+			name: "simple inheritance",
+			config: &Config{
+				Workers: map[string]WorkerAgent{
+					"base": {
+						CommandTemplate: "{{.Command}} {{.Args}}",
+						Command:         "base-cmd",
+						Args:            "--base-arg",
+					},
+					"child": {
+						Inherit: "base",
+						Args:    "--child-arg",
+					},
+				},
+			},
+			want: map[string]WorkerAgent{
+				"base": {
+					CommandTemplate: "{{.Command}} {{.Args}}",
+					Command:         "base-cmd",
+					Args:            "--base-arg",
+				},
+				"child": {
+					CommandTemplate: "{{.Command}} {{.Args}}",
+					Command:         "base-cmd",
+					Args:            "--child-arg",
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "partial override",
+			config: &Config{
+				Workers: map[string]WorkerAgent{
+					"base": {
+						CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
+						Command:         "base-cmd",
+						SystemArgs:      "--system",
+						Args:            "--base-arg",
+						Prompt:          "base prompt",
+					},
+					"child": {
+						Inherit:    "base",
+						SystemArgs: "--child-system",
+					},
+				},
+			},
+			want: map[string]WorkerAgent{
+				"base": {
+					CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
+					Command:         "base-cmd",
+					SystemArgs:      "--system",
+					Args:            "--base-arg",
+					Prompt:          "base prompt",
+				},
+				"child": {
+					CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
+					Command:         "base-cmd",
+					SystemArgs:      "--child-system",
+					Args:            "--base-arg",
+					Prompt:          "base prompt",
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "multi-level inheritance",
+			config: &Config{
+				Workers: map[string]WorkerAgent{
+					"base": {
+						CommandTemplate: "{{.Command}} {{.Args}}",
+						Command:         "base-cmd",
+						Args:            "--base",
+					},
+					"middle": {
+						Inherit: "base",
+						Args:    "--middle",
+					},
+					"child": {
+						Inherit: "middle",
+						Args:    "--child",
+					},
+				},
+			},
+			want: map[string]WorkerAgent{
+				"base": {
+					CommandTemplate: "{{.Command}} {{.Args}}",
+					Command:         "base-cmd",
+					Args:            "--base",
+				},
+				"middle": {
+					CommandTemplate: "{{.Command}} {{.Args}}",
+					Command:         "base-cmd",
+					Args:            "--middle",
+				},
+				"child": {
+					CommandTemplate: "{{.Command}} {{.Args}}",
+					Command:         "base-cmd",
+					Args:            "--child",
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "no inheritance",
+			config: &Config{
+				Workers: map[string]WorkerAgent{
+					"worker1": {
+						CommandTemplate: "{{.Command}}",
+						Command:         "cmd1",
+					},
+					"worker2": {
+						CommandTemplate: "{{.Command}}",
+						Command:         "cmd2",
+					},
+				},
+			},
+			want: map[string]WorkerAgent{
+				"worker1": {
+					CommandTemplate: "{{.Command}}",
+					Command:         "cmd1",
+				},
+				"worker2": {
+					CommandTemplate: "{{.Command}}",
+					Command:         "cmd2",
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "circular dependency - direct",
+			config: &Config{
+				Workers: map[string]WorkerAgent{
+					"a": {
+						Inherit: "b",
+					},
+					"b": {
+						Inherit: "a",
+					},
+				},
+			},
+			wantErr: ErrCircularInheritance,
+		},
+		{
+			name: "circular dependency - indirect",
+			config: &Config{
+				Workers: map[string]WorkerAgent{
+					"a": {
+						Inherit: "b",
+					},
+					"b": {
+						Inherit: "c",
+					},
+					"c": {
+						Inherit: "a",
+					},
+				},
+			},
+			wantErr: ErrCircularInheritance,
+		},
+		{
+			name: "parent not found",
+			config: &Config{
+				Workers: map[string]WorkerAgent{
+					"child": {
+						Inherit: "nonexistent",
+					},
+				},
+			},
+			wantErr: ErrInheritParentNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.ResolveInheritance()
+
+			if tt.wantErr != nil {
+				if err != tt.wantErr {
+					t.Errorf("ResolveInheritance() error = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("ResolveInheritance() unexpected error = %v", err)
+			}
+
+			for name, want := range tt.want {
+				got, ok := tt.config.Workers[name]
+				if !ok {
+					t.Errorf("worker %q not found in config", name)
+					continue
+				}
+
+				if got.Inherit != "" {
+					t.Errorf("worker %q: Inherit = %q, want empty (should be cleared after resolution)", name, got.Inherit)
+				}
+				if got.CommandTemplate != want.CommandTemplate {
+					t.Errorf("worker %q: CommandTemplate = %q, want %q", name, got.CommandTemplate, want.CommandTemplate)
+				}
+				if got.Command != want.Command {
+					t.Errorf("worker %q: Command = %q, want %q", name, got.Command, want.Command)
+				}
+				if got.SystemArgs != want.SystemArgs {
+					t.Errorf("worker %q: SystemArgs = %q, want %q", name, got.SystemArgs, want.SystemArgs)
+				}
+				if got.Args != want.Args {
+					t.Errorf("worker %q: Args = %q, want %q", name, got.Args, want.Args)
+				}
+				if got.Prompt != want.Prompt {
+					t.Errorf("worker %q: Prompt = %q, want %q", name, got.Prompt, want.Prompt)
+				}
+			}
+		})
+	}
+}
