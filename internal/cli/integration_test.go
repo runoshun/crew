@@ -210,7 +210,7 @@ func TestIntegration_New_WithAllOptions(t *testing.T) {
 	// Create task with all options
 	out := crewMust(t, dir, "new",
 		"--title", "Full task",
-		"--desc", "Task description",
+		"--body", "Task description",
 		"--label", "bug",
 		"--label", "urgent",
 		"--issue", "42",
@@ -309,7 +309,7 @@ func TestIntegration_Show(t *testing.T) {
 	dir := testRepo(t)
 	crewMust(t, dir, "init")
 
-	crewMust(t, dir, "new", "--title", "Show test", "--desc", "Test description")
+	crewMust(t, dir, "new", "--title", "Show test", "--body", "Test description")
 
 	out := crewMust(t, dir, "show", "1")
 	assert.Contains(t, out, "Task 1: Show test")
@@ -397,7 +397,7 @@ func TestIntegration_Cp(t *testing.T) {
 	dir := testRepo(t)
 	crewMust(t, dir, "init")
 
-	crewMust(t, dir, "new", "--title", "Original", "--desc", "Description", "--label", "test")
+	crewMust(t, dir, "new", "--title", "Original", "--body", "Description", "--label", "test")
 
 	// Copy
 	out := crewMust(t, dir, "cp", "1")

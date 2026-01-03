@@ -342,7 +342,7 @@ Tasks can have parent-child relationships to organize large work into smaller pi
 
 ```bash
 # Create parent task
-git crew new --title "Auth refactoring" --desc "## Goal\n..."
+git crew new --title "Auth refactoring" --body "## Goal\n..."
 
 # Create sub-task
 git crew new --parent 1 --title "OAuth2.0 implementation"

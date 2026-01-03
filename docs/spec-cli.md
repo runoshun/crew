@@ -102,7 +102,7 @@ Auto-detect and configure an appropriate `[complete].command` for the project.
 
 ### Task Management
 
-#### `git crew new --title <title> [--desc <desc>] [--issue <num>] [--label <label>]... [--parent <id>]`
+#### `git crew new --title <title> [--body <desc>] [--issue <num>] [--label <label>]... [--parent <id>]`
 
 Create a new task.
 
@@ -110,7 +110,7 @@ Create a new task.
 - `--title`: Task title
 
 **Optional Arguments**:
-- `--desc`: Task description
+- `--body`: Task description
 - `--issue`: Linked GitHub issue number
 - `--label`: Labels (can specify multiple)
 - `--parent`: Parent task ID (creates a sub-task)
@@ -218,7 +218,7 @@ Comments:
 
 ---
 
-#### `git crew edit <id> [--title <title>] [--desc <desc>] [--status <status>] [--labels <labels>] [--add-label <label>]... [--rm-label <label>]...`
+#### `git crew edit <id> [--title <title>] [--body <desc>] [--status <status>] [--labels <labels>] [--add-label <label>]... [--rm-label <label>]...`
 
 Edit task information.
 
@@ -227,7 +227,7 @@ Edit task information.
 
 **Optional Arguments** (at least one required):
 - `--title`: New title
-- `--desc`: New description
+- `--body`: New description
 - `--status`: New status (`todo`, `in_progress`, `in_review`, `done`, `closed`, `error`)
 - `--labels`: Replace all labels (comma-separated, e.g., `bug,urgent`)
 - `--add-label`: Labels to add (can specify multiple)

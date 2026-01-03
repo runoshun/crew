@@ -74,7 +74,7 @@ Examples:
 	_ = cmd.MarkFlagRequired("title")
 
 	// Optional flags
-	cmd.Flags().StringVar(&opts.Description, "desc", "", "Task description")
+	cmd.Flags().StringVar(&opts.Description, "body", "", "Task description")
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Parent task ID (creates a sub-task)")
 	cmd.Flags().IntVar(&opts.Issue, "issue", 0, "Linked GitHub issue number")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Labels (can specify multiple)")
@@ -307,14 +307,14 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		Short: "Edit task information",
 		Long: `Edit an existing task's title, description, status, or labels.
 
-At least one of --title, --desc, --status, --labels, --add-label, or --rm-label must be specified.
+At least one of --title, --body, --status, --labels, --add-label, or --rm-label must be specified.
 
 Examples:
   # Change task title
   git crew edit 1 --title "New task title"
 
   # Update description
-  git crew edit 1 --desc "Updated description text"
+  git crew edit 1 --body "Updated description text"
 
   # Change task status
   git crew edit 1 --status in_review
@@ -352,7 +352,7 @@ Examples:
 			if cmd.Flags().Changed("title") {
 				input.Title = &opts.Title
 			}
-			if cmd.Flags().Changed("desc") {
+			if cmd.Flags().Changed("body") {
 				input.Description = &opts.Description
 			}
 			if cmd.Flags().Changed("status") {
@@ -380,7 +380,7 @@ Examples:
 
 	// Optional flags
 	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
-	cmd.Flags().StringVar(&opts.Description, "desc", "", "New task description")
+	cmd.Flags().StringVar(&opts.Description, "body", "", "New task description")
 	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, in_review, error, done, closed)")
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")
