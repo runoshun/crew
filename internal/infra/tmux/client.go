@@ -86,9 +86,9 @@ func (c *Client) Start(ctx context.Context, opts domain.StartSessionOptions) err
 }
 
 // Stop terminates a tmux session.
-// It first kills all processes running in the session's panes, then kills the session itself.
-// This ensures that child processes (like AI agents) are properly terminated
-// and don't become orphaned when the session is closed.
+// It first sends SIGTERM to the process group of each pane to terminate all processes
+// (including nested children like AI agents), then kills the session itself.
+// This ensures that child processes are properly terminated and don't become orphaned.
 func (c *Client) Stop(sessionName string) error {
 	// Check if session exists
 	running, err := c.IsRunning(sessionName)
@@ -110,19 +110,23 @@ func (c *Client) Stop(sessionName string) error {
 	)
 	out, err := listCmd.Output()
 	if err == nil && len(out) > 0 {
-		// Kill child processes of each pane
-		// We use SIGTERM to allow graceful shutdown
+		// Send SIGTERM to the process group of each pane
+		// Using negative PID sends the signal to the entire process group,
+		// which terminates all child processes including nested ones (like AI agents)
 		pids := strings.Split(strings.TrimSpace(string(out)), "\n")
-		for _, pid := range pids {
-			if pid == "" {
+		for _, pidStr := range pids {
+			if pidStr == "" {
 				continue
 			}
-			// pkill -TERM -P <pid> sends SIGTERM to all child processes
-			// We ignore errors here because:
-			// - The process might have already exited
-			// - There might be no child processes
-			killCmd := exec.Command("pkill", "-TERM", "-P", pid)
-			_ = killCmd.Run()
+			// Parse PID
+			var pid int
+			if _, parseErr := fmt.Sscanf(pidStr, "%d", &pid); parseErr != nil || pid <= 0 {
+				continue
+			}
+			// Send SIGTERM to the process group (negative PID)
+			// syscall.Kill with negative pid sends signal to all processes in the group
+			// We ignore ESRCH (no such process) as the process may have already exited
+			_ = syscall.Kill(-pid, syscall.SIGTERM)
 		}
 	}
 	// If list-panes fails, we still try to kill the session
