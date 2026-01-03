@@ -29,7 +29,7 @@ It combines git worktree + tmux to achieve a model where
 1 task = 1 worktree = 1 AI session, enabling fully parallel 
 and isolated task execution.
 
-Use --full-worker or --full-manager for role-specific detailed help.`,
+Use --help-worker or --help-manager for role-specific detailed help.`,
 		Version: version,
 		// SilenceUsage prevents usage from being printed on errors
 		SilenceUsage: true,
@@ -38,7 +38,7 @@ Use --full-worker or --full-manager for role-specific detailed help.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Handle role-specific help flags
 			if fullWorker && fullManager {
-				return errors.New("cannot use both --full-worker and --full-manager")
+				return errors.New("cannot use both --help-worker and --help-manager")
 			}
 			if fullWorker {
 				return RenderWorkerHelp(cmd.OutOrStdout(), HelpTemplateData{})
@@ -52,8 +52,8 @@ Use --full-worker or --full-manager for role-specific detailed help.`,
 	}
 
 	// Add role-specific help flags
-	root.Flags().BoolVar(&fullWorker, "full-worker", false, "Show detailed help for worker agents")
-	root.Flags().BoolVar(&fullManager, "full-manager", false, "Show detailed help for manager agents")
+	root.Flags().BoolVar(&fullWorker, "help-worker", false, "Show detailed help for worker agents")
+	root.Flags().BoolVar(&fullManager, "help-manager", false, "Show detailed help for manager agents")
 
 	// Define command groups
 	root.AddGroup(
