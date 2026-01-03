@@ -14,6 +14,44 @@ const (
 	appPadding             = 4
 )
 
+// dialogStyles holds common styles for dialog rendering.
+type dialogStyles struct {
+	line       lipgloss.Style // Full-width line with background
+	text       lipgloss.Style // Normal text
+	key        lipgloss.Style // Key hints (bold)
+	muted      lipgloss.Style // Muted/secondary text
+	label      lipgloss.Style // Active label (primary color, bold)
+	labelMuted lipgloss.Style // Inactive label (muted)
+	bg         lipgloss.Color
+	width      int
+}
+
+// newDialogStyles creates common styles for dialog rendering.
+func (m *Model) newDialogStyles() dialogStyles {
+	bg := Colors.Background
+	width := m.dialogWidth() - 4
+	return dialogStyles{
+		width:      width,
+		bg:         bg,
+		line:       lipgloss.NewStyle().Background(bg).Width(width),
+		text:       lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal),
+		key:        lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true),
+		muted:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
+		label:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true),
+		labelMuted: lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
+	}
+}
+
+// emptyLine returns an empty line with background.
+func (ds dialogStyles) emptyLine() string {
+	return ds.line.Render("")
+}
+
+// renderLine renders text with full width and background.
+func (ds dialogStyles) renderLine(s string) string {
+	return ds.line.Render(s)
+}
+
 func (m *Model) dialogStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Background(Colors.Background).
@@ -181,27 +219,21 @@ func (m *Model) viewConfirmDialog() string {
 		}
 	}
 
-	bg := Colors.Background
-	width := m.dialogWidth() - 4
-	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
-	textStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal)
-	keyStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true)
-	mutedStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted)
+	ds := m.newDialogStyles()
+	titleStyle := lipgloss.NewStyle().Background(ds.bg).Foreground(color).Bold(true)
 
-	title := lineStyle.Render(lipgloss.NewStyle().Background(bg).Foreground(color).Bold(true).
-		Render(fmt.Sprintf("%s %s?", action, target)))
-	taskTitleLine := lineStyle.Render(mutedStyle.Render(taskTitle))
-	prompt := lineStyle.Render(textStyle.Render("This action cannot be undone."))
-	emptyLine := lineStyle.Render("")
-	buttons := lineStyle.Render(keyStyle.Render("[ y ]") + textStyle.Render(" Confirm  ") +
-		mutedStyle.Render("[ n ]") + mutedStyle.Render(" Cancel"))
+	title := ds.renderLine(titleStyle.Render(fmt.Sprintf("%s %s?", action, target)))
+	taskTitleLine := ds.renderLine(ds.muted.Render(taskTitle))
+	prompt := ds.renderLine(ds.text.Render("This action cannot be undone."))
+	buttons := ds.renderLine(ds.key.Render("[ y ]") + ds.text.Render(" Confirm  ") +
+		ds.muted.Render("[ n ]") + ds.muted.Render(" Cancel"))
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		taskTitleLine,
-		emptyLine,
+		ds.emptyLine(),
 		prompt,
-		emptyLine,
+		ds.emptyLine(),
 		buttons,
 	)
 
@@ -209,99 +241,78 @@ func (m *Model) viewConfirmDialog() string {
 }
 
 func (m *Model) viewTitleInput() string {
-	bg := Colors.Background
-	width := m.dialogWidth() - 4
-	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
-	textStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal)
-	keyStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true)
-	mutedStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted)
-	labelStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true)
+	ds := m.newDialogStyles()
 
-	title := lineStyle.Render(labelStyle.Render("New Task"))
-	stepInfo := lineStyle.Render(mutedStyle.Render("Step 1 of 2"))
-	label := lineStyle.Render(labelStyle.Render("Title"))
-	input := lineStyle.Render(m.titleInput.View())
-	emptyLine := lineStyle.Render("")
-	hint := lineStyle.Render(keyStyle.Render("enter") + textStyle.Render(" next  ") +
-		keyStyle.Render("esc") + textStyle.Render(" cancel"))
+	title := ds.renderLine(ds.label.Render("New Task"))
+	stepInfo := ds.renderLine(ds.muted.Render("Step 1 of 2"))
+	label := ds.renderLine(ds.label.Render("Title"))
+	input := ds.renderLine(m.titleInput.View())
+	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" next  ") +
+		ds.key.Render("esc") + ds.text.Render(" cancel"))
 
-	content := lipgloss.JoinVertical(lipgloss.Left, title, stepInfo, emptyLine, label, input, emptyLine, hint)
+	content := lipgloss.JoinVertical(lipgloss.Left, title, stepInfo, ds.emptyLine(), label, input, ds.emptyLine(), hint)
 	return m.dialogStyle().Render(content)
 }
 
 func (m *Model) viewDescInput() string {
-	bg := Colors.Background
-	width := m.dialogWidth() - 4
-	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
-	textStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal)
-	keyStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true)
-	mutedStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted)
-	labelStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true)
+	ds := m.newDialogStyles()
 
-	title := lineStyle.Render(labelStyle.Render("New Task"))
-	stepInfo := lineStyle.Render(mutedStyle.Render("Step 2 of 2"))
-	titleLabel := lineStyle.Render(mutedStyle.Render("Title: ") + textStyle.Render(m.titleInput.Value()))
-	label := lineStyle.Render(labelStyle.Render("Description (optional)"))
-	input := lineStyle.Render(m.descInput.View())
-	emptyLine := lineStyle.Render("")
-	hint := lineStyle.Render(keyStyle.Render("enter") + textStyle.Render(" create  ") +
-		keyStyle.Render("esc") + textStyle.Render(" back"))
+	title := ds.renderLine(ds.label.Render("New Task"))
+	stepInfo := ds.renderLine(ds.muted.Render("Step 2 of 2"))
+	titleLabel := ds.renderLine(ds.muted.Render("Title: ") + ds.text.Render(m.titleInput.Value()))
+	label := ds.renderLine(ds.label.Render("Description (optional)"))
+	input := ds.renderLine(m.descInput.View())
+	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" create  ") +
+		ds.key.Render("esc") + ds.text.Render(" back"))
 
-	content := lipgloss.JoinVertical(lipgloss.Left, title, stepInfo, emptyLine, titleLabel, emptyLine, label, input, emptyLine, hint)
+	content := lipgloss.JoinVertical(lipgloss.Left, title, stepInfo, ds.emptyLine(), titleLabel, ds.emptyLine(), label, input, ds.emptyLine(), hint)
 	return m.dialogStyle().Render(content)
 }
 
 func (m *Model) viewNewTaskDialog() string {
-	bg := Colors.Background
-	width := m.dialogWidth() - 4
-	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
-	textStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal)
-	keyStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true)
-	labelStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true)
-	labelMutedStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted)
+	ds := m.newDialogStyles()
 
-	title := lineStyle.Render(labelStyle.Render("New Task"))
+	title := ds.renderLine(ds.label.Render("New Task"))
 
 	// Title field
-	titleLabel := labelMutedStyle.Render("Title")
+	titleLabel := ds.labelMuted.Render("Title")
 	if m.newTaskField == FieldTitle {
-		titleLabel = labelStyle.Render("Title")
+		titleLabel = ds.label.Render("Title")
 	}
-	titleInput := lineStyle.Render(m.titleInput.View())
+	titleInput := ds.renderLine(m.titleInput.View())
 
 	// Description field
-	descLabel := labelMutedStyle.Render("Description (optional)")
+	descLabel := ds.labelMuted.Render("Description (optional)")
 	if m.newTaskField == FieldDesc {
-		descLabel = labelStyle.Render("Description (optional)")
+		descLabel = ds.label.Render("Description (optional)")
 	}
-	descInput := lineStyle.Render(m.descInput.View())
+	descInput := ds.renderLine(m.descInput.View())
 
 	// Parent field
-	parentLabel := labelMutedStyle.Render("Parent ID (optional)")
+	parentLabel := ds.labelMuted.Render("Parent ID (optional)")
 	if m.newTaskField == FieldParent {
-		parentLabel = labelStyle.Render("Parent ID (optional)")
+		parentLabel = ds.label.Render("Parent ID (optional)")
 	}
-	parentInput := lineStyle.Render(m.parentInput.View())
+	parentInput := ds.renderLine(m.parentInput.View())
 
-	emptyLine := lineStyle.Render("")
-	hint := lineStyle.Render(
-		keyStyle.Render("tab") + textStyle.Render(" next  ") +
-			keyStyle.Render("shift+tab") + textStyle.Render(" prev  ") +
-			keyStyle.Render("enter") + textStyle.Render(" create  ") +
-			keyStyle.Render("esc") + textStyle.Render(" cancel"))
+	hint := ds.renderLine(
+		ds.key.Render("tab") + ds.text.Render(" next  ") +
+			ds.key.Render("shift+tab") + ds.text.Render(" prev  ") +
+			ds.key.Render("enter") + ds.text.Render(" create  ") +
+			ds.key.Render("esc") + ds.text.Render(" cancel"))
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title,
-		emptyLine,
-		lineStyle.Render(titleLabel),
+		ds.emptyLine(),
+		ds.renderLine(titleLabel),
 		titleInput,
-		emptyLine,
-		lineStyle.Render(descLabel),
+		ds.emptyLine(),
+		ds.renderLine(descLabel),
 		descInput,
-		emptyLine,
-		lineStyle.Render(parentLabel),
+		ds.emptyLine(),
+		ds.renderLine(parentLabel),
 		parentInput,
-		emptyLine,
+		ds.emptyLine(),
 		hint,
 	)
 
@@ -314,89 +325,83 @@ func (m *Model) viewAgentPicker() string {
 		return ""
 	}
 
-	bg := Colors.Background
-	width := m.dialogWidth() - 4
-	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
-	textStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal)
-	keyStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true)
-	mutedStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted)
-	labelStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true)
+	ds := m.newDialogStyles()
 
-	title := lineStyle.Render(labelStyle.Render(fmt.Sprintf("Start Task #%d", task.ID)))
-	taskTitle := lineStyle.Render(mutedStyle.Render(task.Title))
-	selectLabel := lineStyle.Render(labelStyle.Render("Select agent"))
-	emptyLine := lineStyle.Render("")
+	title := ds.renderLine(ds.label.Render(fmt.Sprintf("Start Task #%d", task.ID)))
+	taskTitle := ds.renderLine(ds.muted.Render(task.Title))
+	selectLabel := ds.renderLine(ds.label.Render("Select agent"))
 
 	// Build agent rows
 	agentRows := make([]string, 0, len(m.builtinAgents)+len(m.customAgents)+1)
 	cursor := 0
 
 	for _, agent := range m.builtinAgents {
-		row := m.renderAgentRow(agent, cursor == m.agentCursor && !m.startFocusCustom, width, bg)
+		row := m.renderAgentRow(agent, cursor == m.agentCursor && !m.startFocusCustom, ds)
 		agentRows = append(agentRows, row)
 		cursor++
 	}
 
 	if len(m.customAgents) > 0 {
-		separator := lipgloss.NewStyle().Background(bg).Foreground(Colors.GroupLine).Width(width).
+		separator := lipgloss.NewStyle().Background(ds.bg).Foreground(Colors.GroupLine).Width(ds.width).
 			Render("────────────────────────")
 		agentRows = append(agentRows, separator)
 
 		for _, agent := range m.customAgents {
-			row := m.renderAgentRow(agent, cursor == m.agentCursor && !m.startFocusCustom, width, bg)
+			row := m.renderAgentRow(agent, cursor == m.agentCursor && !m.startFocusCustom, ds)
 			agentRows = append(agentRows, row)
 			cursor++
 		}
 	}
 
-	customLabel := lineStyle.Render(mutedStyle.Render("Or enter custom command"))
+	customLabel := ds.renderLine(ds.muted.Render("Or enter custom command"))
 	if m.startFocusCustom {
-		customLabel = lineStyle.Render(labelStyle.Render("Or enter custom command"))
+		customLabel = ds.renderLine(ds.label.Render("Or enter custom command"))
 	}
-	customInputView := lineStyle.Render(m.customInput.View())
+	customInputView := ds.renderLine(m.customInput.View())
 
 	var hint string
 	if m.startFocusCustom {
-		hint = keyStyle.Render("tab") + textStyle.Render(" agents  ") +
-			keyStyle.Render("enter") + textStyle.Render(" start  ") +
-			keyStyle.Render("esc") + textStyle.Render(" cancel")
+		hint = ds.key.Render("tab") + ds.text.Render(" agents  ") +
+			ds.key.Render("enter") + ds.text.Render(" start  ") +
+			ds.key.Render("esc") + ds.text.Render(" cancel")
 	} else {
-		hint = keyStyle.Render("↑↓") + textStyle.Render(" select  ") +
-			keyStyle.Render("tab") + textStyle.Render(" custom  ") +
-			keyStyle.Render("enter") + textStyle.Render(" start  ") +
-			keyStyle.Render("esc") + textStyle.Render(" cancel")
+		hint = ds.key.Render("↑↓") + ds.text.Render(" select  ") +
+			ds.key.Render("tab") + ds.text.Render(" custom  ") +
+			ds.key.Render("enter") + ds.text.Render(" start  ") +
+			ds.key.Render("esc") + ds.text.Render(" cancel")
 	}
 
 	// Build content
-	lines := []string{title, taskTitle, emptyLine, selectLabel}
+	lines := []string{title, taskTitle, ds.emptyLine(), selectLabel}
 	lines = append(lines, agentRows...)
-	lines = append(lines, customLabel, customInputView, emptyLine, lineStyle.Render(hint))
+	lines = append(lines, customLabel, customInputView, ds.emptyLine(), ds.renderLine(hint))
 
 	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
 	return m.dialogStyle().Render(content)
 }
 
 // renderAgentRow renders a single agent row with cursor and command preview.
-func (m *Model) renderAgentRow(agent string, selected bool, width int, bg lipgloss.Color) string {
-	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
-	nameStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal)
-	previewStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted)
-
+func (m *Model) renderAgentRow(agent string, selected bool, ds dialogStyles) string {
 	// Get command preview
 	cmdPreview := m.agentCommands[agent]
 	if cmdPreview == "" {
 		cmdPreview = agent
 	}
 
+	// Use a base style with background for all parts
+	baseStyle := lipgloss.NewStyle().Background(ds.bg)
+	space := baseStyle.Render(" ")
+	doubleSpace := baseStyle.Render("  ")
+
 	// Format: "  ▸ agent_name    command_preview"
 	name := fmt.Sprintf("%-12s", agent)
 
 	if selected {
-		cursorStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary)
-		selectedNameStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleSelected).Bold(true)
-		return lineStyle.Render("  " + cursorStyle.Render("▸") + " " + selectedNameStyle.Render(name) + "  " + previewStyle.Render(cmdPreview))
+		cursorStyle := baseStyle.Foreground(Colors.Primary)
+		selectedNameStyle := baseStyle.Foreground(Colors.TitleSelected).Bold(true)
+		return ds.renderLine(doubleSpace + cursorStyle.Render("▸") + space + selectedNameStyle.Render(name) + doubleSpace + ds.muted.Render(cmdPreview))
 	}
-	return lineStyle.Render("    " + nameStyle.Render(name) + "  " + previewStyle.Render(cmdPreview))
+	return ds.renderLine(baseStyle.Render("    ") + ds.text.Render(name) + doubleSpace + ds.muted.Render(cmdPreview))
 }
 
 func (m *Model) viewFooter() string {
@@ -431,16 +436,11 @@ func (m *Model) viewFooter() string {
 }
 
 func (m *Model) viewHelp() string {
-	bg := Colors.Background
-	width := m.dialogWidth() - 4
-	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
-	labelStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true)
-	keyStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true).Width(8)
-	descStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted)
-	sectionStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted).Bold(true)
+	ds := m.newDialogStyles()
+	keyStyleWide := ds.key.Width(8)
+	sectionStyle := lipgloss.NewStyle().Background(ds.bg).Foreground(Colors.Muted).Bold(true)
 
-	title := lineStyle.Render(labelStyle.Render("KEYBOARD SHORTCUTS"))
-	emptyLine := lineStyle.Render("")
+	title := ds.renderLine(ds.label.Render("KEYBOARD SHORTCUTS"))
 
 	sections := []struct {
 		name  string
@@ -497,8 +497,8 @@ func (m *Model) viewHelp() string {
 		b.WriteString(sectionStyle.Render(section.name))
 		b.WriteString("\n")
 		for _, bind := range section.binds {
-			key := keyStyle.Render(bind.key)
-			desc := descStyle.Render(bind.desc)
+			key := keyStyleWide.Render(bind.key)
+			desc := ds.muted.Render(bind.desc)
 			fmt.Fprintf(b, "%s %s\n", key, desc)
 		}
 		b.WriteString("\n")
@@ -514,19 +514,15 @@ func (m *Model) viewHelp() string {
 		col2.String(),
 	)
 
-	hint := lineStyle.Render(keyStyle.Width(0).Render("esc") + descStyle.Render(" close"))
+	hint := ds.renderLine(ds.key.Render("esc") + ds.muted.Render(" close"))
 
-	return m.dialogStyle().Render(lipgloss.JoinVertical(lipgloss.Left, title, emptyLine, lineStyle.Render(content), hint))
+	return m.dialogStyle().Render(lipgloss.JoinVertical(lipgloss.Left, title, ds.emptyLine(), ds.renderLine(content), hint))
 }
 
 func (m *Model) viewDetail() string {
-	bg := Colors.Background
-	width := m.dialogWidth() - 4
-	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
-	keyStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true)
-	textStyle := lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted)
-	footer := lineStyle.Render(keyStyle.Render("↑↓") + textStyle.Render(" scroll  ") +
-		keyStyle.Render("esc") + textStyle.Render(" back"))
+	ds := m.newDialogStyles()
+	footer := ds.renderLine(ds.key.Render("↑↓") + ds.muted.Render(" scroll  ") +
+		ds.key.Render("esc") + ds.muted.Render(" back"))
 
 	return m.dialogStyle().Render(m.detailViewport.View() + "\n\n" + footer)
 }
