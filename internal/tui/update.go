@@ -105,6 +105,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgCommentsLoaded:
 		m.comments = msg.Comments
+		// Update viewport content if in detail mode
+		if m.mode == ModeDetail {
+			width := m.dialogWidth() - 4
+			m.detailViewport.SetContent(m.detailContent(width))
+		}
 		return m, nil
 	}
 
