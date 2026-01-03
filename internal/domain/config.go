@@ -169,6 +169,11 @@ const DefaultWorkerPrompt = `You are working on Task #{{.TaskID}}.
 
 Run 'crew show' to see full task details including description and comments.
 
+Report progress using 'crew comment {{.TaskID}} "<message>"' in these situations:
+- When you need user input or clarification on important decisions
+- When you encounter blockers or unexpected issues
+- When the task is complete (summary of what was done)
+
 When the task is complete, commit your changes and run 'crew complete'.
 `
 
