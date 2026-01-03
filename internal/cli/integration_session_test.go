@@ -180,7 +180,7 @@ func TestIntegration_SessionWorkflow(t *testing.T) {
 	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
 
 	// Create task
-	crewMust(t, dir, "new", "--title", "Workflow test", "--desc", "Test session workflow")
+	crewMust(t, dir, "new", "--title", "Workflow test", "--body", "Test session workflow")
 
 	// Verify initial status
 	out := crewMust(t, dir, "show", "1")

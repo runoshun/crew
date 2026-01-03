@@ -63,7 +63,7 @@ func TestNewNewCommand_WithDescription(t *testing.T) {
 	cmd := newNewCommand(container)
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"--title", "Test task", "--desc", "Task description"})
+	cmd.SetArgs([]string{"--title", "Test task", "--body", "Task description"})
 
 	// Execute
 	err := cmd.Execute()
@@ -531,7 +531,7 @@ func TestNewEditCommand_UpdateDescription(t *testing.T) {
 	cmd := newEditCommand(container)
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"1", "--desc", "New description"})
+	cmd.SetArgs([]string{"1", "--body", "New description"})
 
 	// Execute
 	err := cmd.Execute()
@@ -628,7 +628,7 @@ func TestNewEditCommand_MultipleUpdates(t *testing.T) {
 	cmd := newEditCommand(container)
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"1", "--title", "New Title", "--desc", "New desc", "--add-label", "new", "--rm-label", "old"})
+	cmd.SetArgs([]string{"1", "--title", "New Title", "--body", "New desc", "--add-label", "new", "--rm-label", "old"})
 
 	// Execute
 	err := cmd.Execute()
