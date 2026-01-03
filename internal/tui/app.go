@@ -547,7 +547,8 @@ func (m *Model) showDiff(taskID int) tea.Cmd {
 	return func() tea.Msg {
 		uc := m.container.ShowDiffUseCaseForCommand()
 		execCmd, err := uc.GetCommand(context.Background(), usecase.ShowDiffInput{
-			TaskID: taskID,
+			TaskID:        taskID,
+			UseTUICommand: true, // Use tui_command for TUI context
 		})
 		if err != nil {
 			return MsgError{Err: err}
