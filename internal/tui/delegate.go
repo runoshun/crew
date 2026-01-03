@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
@@ -16,6 +17,14 @@ type taskItem struct {
 
 func (t taskItem) FilterValue() string {
 	return t.task.Title
+}
+
+// escapeNewlines replaces newline characters with spaces for single-line display.
+func escapeNewlines(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	return s
 }
 
 type taskDelegate struct {
@@ -91,7 +100,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 
 	descLine := "                   "
 	if task.Description != "" {
-		desc := task.Description
+		desc := escapeNewlines(task.Description)
 		maxDescLen := listWidth - prefixWidth - 2
 		if maxDescLen < 10 {
 			maxDescLen = 10
