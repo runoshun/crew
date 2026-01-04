@@ -8,7 +8,7 @@ var opencodeAgentConfig = BuiltinAgent{
 	DefaultModel:        "anthropic/claude-opus-4-5",
 	Description:         "General purpose coding agent via opencode CLI",
 	WorktreeSetupScript: opencodeSetupScript,
-	ExcludePatterns:     []string{".opencode/"},
+	ExcludePatterns:     []string{".opencode/plugin/crew-hooks.ts"},
 }
 
 const opencodeSetupScript = `#!/bin/bash
@@ -18,7 +18,6 @@ PLUGIN_DIR=.opencode/plugin
 PLUGIN_FILE=${PLUGIN_DIR}/crew-hooks.ts
 
 mkdir -p ${PLUGIN_DIR}/
-grep -qxF "${PLUGIN_FILE}" {{.RepoRoot}}/.git/info/exclude || echo "${PLUGIN_FILE}" >> {{.RepoRoot}}/.git/info/exclude
 
 cat > ${PLUGIN_FILE} << 'EOF'
 import type { Plugin } from "@opencode-ai/plugin"

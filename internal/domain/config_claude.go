@@ -8,7 +8,7 @@ var claudeAgentConfig = BuiltinAgent{
 	DefaultModel:        "opus",
 	Description:         "Claude model via Anthropic CLI",
 	WorktreeSetupScript: claudeSetupScript,
-	ExcludePatterns:     nil,
+	ExcludePatterns:     []string{".claude/crew-plugin/"},
 }
 
 const claudeAllowedTools = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show) Bash(crew edit:*)'`
@@ -17,8 +17,6 @@ const claudeSetupScript = `#!/bin/bash
 cd {{.Worktree}}
 
 PLUGIN_DIR=.claude/crew-plugin
-
-grep -qxF "${PLUGIN_DIR}/" {{.RepoRoot}}/.git/info/exclude || echo "${PLUGIN_DIR}/" >> {{.RepoRoot}}/.git/info/exclude
 
 mkdir -p ${PLUGIN_DIR}/.claude-plugin
 cat > ${PLUGIN_DIR}/plugin.json << 'EOF'
