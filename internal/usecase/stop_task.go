@@ -74,9 +74,9 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 	task.Agent = ""
 	task.Session = ""
 
-	// Update status to in_review if currently in_progress
+	// Update status to stopped if currently in_progress
 	if task.Status == domain.StatusInProgress {
-		task.Status = domain.StatusInReview
+		task.Status = domain.StatusStopped
 	}
 
 	// Save task

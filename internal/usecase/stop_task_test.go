@@ -32,14 +32,14 @@ func TestStopTask_Execute_Success_InProgress(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusInReview, out.Task.Status)
+	assert.Equal(t, domain.StatusStopped, out.Task.Status)
 	assert.Empty(t, out.Task.Agent, "agent should be cleared")
 	assert.Empty(t, out.Task.Session, "session should be cleared")
 	assert.True(t, sessions.StopCalled, "session should be stopped")
 
 	// Verify task is updated in repository
 	savedTask := repo.Tasks[1]
-	assert.Equal(t, domain.StatusInReview, savedTask.Status)
+	assert.Equal(t, domain.StatusStopped, savedTask.Status)
 }
 
 func TestStopTask_Execute_NoRunningSession(t *testing.T) {
@@ -64,7 +64,7 @@ func TestStopTask_Execute_NoRunningSession(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusInReview, out.Task.Status)
+	assert.Equal(t, domain.StatusStopped, out.Task.Status)
 	assert.Empty(t, out.Task.Agent, "agent should be cleared")
 	assert.Empty(t, out.Task.Session, "session should be cleared")
 	assert.False(t, sessions.StopCalled, "stop should not be called when no session running")

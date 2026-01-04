@@ -18,6 +18,7 @@ func TestStatus_CanTransitionTo(t *testing.T) {
 
 		// From in_progress
 		{"in_progress -> in_review", StatusInProgress, StatusInReview, true},
+		{"in_progress -> stopped", StatusInProgress, StatusStopped, true},
 		{"in_progress -> error", StatusInProgress, StatusError, true},
 		{"in_progress -> closed", StatusInProgress, StatusClosed, true},
 		{"in_progress -> done", StatusInProgress, StatusDone, false},
@@ -29,6 +30,12 @@ func TestStatus_CanTransitionTo(t *testing.T) {
 		{"in_review -> closed", StatusInReview, StatusClosed, true},
 		{"in_review -> error", StatusInReview, StatusError, false},
 		{"in_review -> todo", StatusInReview, StatusTodo, false},
+
+		// From stopped
+		{"stopped -> in_progress", StatusStopped, StatusInProgress, true},
+		{"stopped -> closed", StatusStopped, StatusClosed, true},
+		{"stopped -> todo", StatusStopped, StatusTodo, false},
+		{"stopped -> done", StatusStopped, StatusDone, false},
 
 		// From error
 		{"error -> in_progress", StatusError, StatusInProgress, true},
@@ -78,6 +85,7 @@ func TestStatus_IsTerminal(t *testing.T) {
 		{StatusTodo, false},
 		{StatusInProgress, false},
 		{StatusInReview, false},
+		{StatusStopped, false},
 		{StatusError, false},
 		{StatusDone, false},
 		{StatusClosed, true},
@@ -100,6 +108,7 @@ func TestStatus_CanStart(t *testing.T) {
 		{StatusTodo, true},
 		{StatusInProgress, false},
 		{StatusInReview, true},
+		{StatusStopped, true},
 		{StatusError, true},
 		{StatusDone, false},
 		{StatusClosed, false},
@@ -122,6 +131,7 @@ func TestStatus_Display(t *testing.T) {
 		{StatusTodo, "To Do"},
 		{StatusInProgress, "In Progress"},
 		{StatusInReview, "In Review"},
+		{StatusStopped, "Stopped"},
 		{StatusError, "Error"},
 		{StatusDone, "Done"},
 		{StatusClosed, "Closed"},
@@ -145,6 +155,7 @@ func TestStatus_IsValid(t *testing.T) {
 		{StatusTodo, true},
 		{StatusInProgress, true},
 		{StatusInReview, true},
+		{StatusStopped, true},
 		{StatusError, true},
 		{StatusDone, true},
 		{StatusClosed, true},
@@ -167,6 +178,7 @@ func TestAllStatuses(t *testing.T) {
 		StatusTodo,
 		StatusInProgress,
 		StatusInReview,
+		StatusStopped,
 		StatusError,
 		StatusDone,
 		StatusClosed,

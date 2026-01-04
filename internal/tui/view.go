@@ -210,7 +210,7 @@ func (m *Model) viewConfirmDialog() string {
 	case ConfirmStop:
 		action = "Stop"
 		target = fmt.Sprintf("session for task #%d", m.confirmTaskID)
-		color = Colors.Error
+		color = Colors.Stopped
 	case ConfirmMerge:
 		action = "Merge"
 		target = fmt.Sprintf("task #%d", m.confirmTaskID)
