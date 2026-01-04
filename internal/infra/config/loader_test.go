@@ -147,7 +147,7 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 		worker := cfg.Workers[name]
 		assert.Equal(t, builtin.CommandTemplate, worker.CommandTemplate)
 		assert.Equal(t, builtin.Command, worker.Command)
-		assert.Equal(t, builtin.SystemArgs, worker.SystemArgs)
+		assert.Equal(t, builtin.WorkerSystemArgs, worker.SystemArgs)
 		assert.Equal(t, builtin.DefaultArgs, worker.Args)
 		// Worker.SystemPrompt and Worker.Prompt are empty; falls back to WorkersConfig
 		assert.Empty(t, worker.SystemPrompt)

@@ -1,12 +1,14 @@
 package domain
 
 var claudeAgentConfig = BuiltinAgent{
-	CommandTemplate:     "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-	Command:             "claude",
-	SystemArgs:          "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,
-	DefaultArgs:         "",
-	DefaultModel:        "opus",
-	Description:         "Claude model via Anthropic CLI",
+	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+	Command:           "claude",
+	WorkerSystemArgs:  "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,
+	ManagerSystemArgs: "--model {{.Model}} --permission-mode bypassPermissions",
+	DefaultArgs:       "",
+	DefaultModel:      "opus",
+	Description:       "Claude model via Anthropic CLI",
+	// WorktreeSetupScript and ExcludePatterns are Worker-only (Managers don't use worktrees)
 	WorktreeSetupScript: claudeSetupScript,
 	ExcludePatterns:     []string{".claude/crew-plugin/"},
 }

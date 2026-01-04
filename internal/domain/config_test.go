@@ -75,8 +75,8 @@ func TestNewDefaultConfig(t *testing.T) {
 		if worker.Command != builtin.Command {
 			t.Errorf("%s.Command = %q, want %q", name, worker.Command, builtin.Command)
 		}
-		if worker.SystemArgs != builtin.SystemArgs {
-			t.Errorf("%s.SystemArgs = %q, want %q", name, worker.SystemArgs, builtin.SystemArgs)
+		if worker.SystemArgs != builtin.WorkerSystemArgs {
+			t.Errorf("%s.SystemArgs = %q, want %q", name, worker.SystemArgs, builtin.WorkerSystemArgs)
 		}
 		if worker.Args != builtin.DefaultArgs {
 			t.Errorf("%s.Args = %q, want %q", name, worker.Args, builtin.DefaultArgs)

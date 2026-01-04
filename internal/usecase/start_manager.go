@@ -118,29 +118,41 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 
 // resolveWorkerFromManager resolves a Worker configuration from a Manager's Agent reference.
 // Returns the Worker, default model, and any error.
+// Note: For Managers, we use ManagerSystemArgs instead of WorkerSystemArgs.
 func (uc *StartManager) resolveWorkerFromManager(manager domain.Manager, cfg *domain.Config) (domain.Worker, string, error) {
 	// Manager must have an Agent reference
 	if manager.Agent == "" {
 		return domain.Worker{}, "", fmt.Errorf("manager has no agent reference")
 	}
 
-	// Check if the Agent is a Worker name
+	// Check if the Agent is a Worker name (for sharing command settings)
 	if worker, ok := cfg.Workers[manager.Agent]; ok {
 		defaultModel := ""
-		// Check for builtin defaults
-		if builtin, ok := domain.BuiltinAgents[manager.Agent]; ok {
-			defaultModel = builtin.DefaultModel
+		// Use Manager's SystemArgs if set, otherwise get from builtin
+		systemArgs := manager.SystemArgs
+		if systemArgs == "" {
+			if builtin, ok := domain.BuiltinAgents[manager.Agent]; ok {
+				defaultModel = builtin.DefaultModel
+				systemArgs = builtin.ManagerSystemArgs
+			}
 		}
+		// Override worker's SystemArgs with manager-specific one
+		worker.SystemArgs = systemArgs
 		return worker, defaultModel, nil
 	}
 
 	// Check if the Agent is a builtin agent
 	if builtin, ok := domain.BuiltinAgents[manager.Agent]; ok {
+		// Use Manager's SystemArgs if set, otherwise use builtin ManagerSystemArgs
+		systemArgs := manager.SystemArgs
+		if systemArgs == "" {
+			systemArgs = builtin.ManagerSystemArgs
+		}
 		return domain.Worker{
 			Agent:           manager.Agent,
 			CommandTemplate: builtin.CommandTemplate,
 			Command:         builtin.Command,
-			SystemArgs:      builtin.SystemArgs,
+			SystemArgs:      systemArgs,
 			Args:            builtin.DefaultArgs,
 		}, builtin.DefaultModel, nil
 	}

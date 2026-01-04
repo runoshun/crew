@@ -184,7 +184,6 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 					res.Agents[name] = domain.Agent{
 						Command:             def.Command,
 						CommandTemplate:     def.CommandTemplate,
-						SystemArgs:          def.SystemArgs,
 						DefaultModel:        def.DefaultModel,
 						Description:         def.Description,
 						WorktreeSetupScript: def.WorktreeSetupScript,
@@ -234,6 +233,7 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 					res.Managers[name] = domain.Manager{
 						Agent:        def.Agent,
 						Model:        def.Model,
+						SystemArgs:   def.SystemArgs,
 						Args:         def.Args,
 						SystemPrompt: def.SystemPrompt,
 						Prompt:       def.Prompt,
@@ -374,7 +374,6 @@ type agentDef struct {
 	Extra               map[string]any
 	Command             string
 	CommandTemplate     string
-	SystemArgs          string
 	DefaultModel        string
 	Description         string
 	WorktreeSetupScript string
@@ -401,10 +400,6 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 				case "command_template":
 					if s, ok := v.(string); ok {
 						def.CommandTemplate = s
-					}
-				case "system_args":
-					if s, ok := v.(string); ok {
-						def.SystemArgs = s
 					}
 				case "default_model":
 					if s, ok := v.(string); ok {
@@ -531,6 +526,7 @@ type managerDef struct {
 	Extra        map[string]any
 	Agent        string
 	Model        string
+	SystemArgs   string
 	Args         string
 	SystemPrompt string
 	Prompt       string
@@ -567,6 +563,10 @@ func parseManagersSection(raw map[string]any) managersConfig {
 					case "model":
 						if s, ok := v.(string); ok {
 							def.Model = s
+						}
+					case "system_args":
+						if s, ok := v.(string); ok {
+							def.SystemArgs = s
 						}
 					case "args":
 						if s, ok := v.(string); ok {
@@ -676,6 +676,7 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 
 	// Merge agents: override individual fields, not entire agent
+	// Note: SystemArgs is NOT in Agent; it's role-specific (Worker/Manager)
 	for name, overrideAgent := range override.Agents {
 		baseAgent := result.Agents[name]
 		if overrideAgent.Command != "" {
@@ -683,9 +684,6 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		}
 		if overrideAgent.CommandTemplate != "" {
 			baseAgent.CommandTemplate = overrideAgent.CommandTemplate
-		}
-		if overrideAgent.SystemArgs != "" {
-			baseAgent.SystemArgs = overrideAgent.SystemArgs
 		}
 		if overrideAgent.DefaultModel != "" {
 			baseAgent.DefaultModel = overrideAgent.DefaultModel
@@ -746,6 +744,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		}
 		if overrideManager.Model != "" {
 			baseManager.Model = overrideManager.Model
+		}
+		if overrideManager.SystemArgs != "" {
+			baseManager.SystemArgs = overrideManager.SystemArgs
 		}
 		if overrideManager.Args != "" {
 			baseManager.Args = overrideManager.Args

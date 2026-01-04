@@ -44,10 +44,10 @@ type ManagersConfig struct {
 
 // Agent defines a base agent configuration that Workers and Managers can reference.
 // Agents define the core command execution pattern without being tied to a specific role.
+// Note: SystemArgs is NOT defined here; it's a role-specific (Worker/Manager) concern.
 type Agent struct {
 	Command             string   // Base command (e.g., "claude", "opencode")
 	CommandTemplate     string   // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
-	SystemArgs          string   // System arguments required for crew operation (auto-applied)
 	DefaultModel        string   // Default model for this agent
 	Description         string   // Description of the agent's purpose
 	WorktreeSetupScript string   // Script to run after worktree creation (template-expanded)
@@ -74,6 +74,7 @@ type Worker struct {
 type Manager struct {
 	Agent        string // Name of the Agent to inherit from (optional)
 	Model        string // Model override for this manager
+	SystemArgs   string // System arguments required for crew operation (auto-applied)
 	Args         string // Additional arguments for this manager
 	SystemPrompt string // System prompt template for this manager
 	Prompt       string // Prompt template for this manager
@@ -248,10 +249,12 @@ Your role is to:
 - Delegate code implementation to worker agents (do not edit files directly)`
 
 // BuiltinAgent defines a built-in agent configuration.
+// SystemArgs is role-specific: Workers and Managers have different system arguments.
 type BuiltinAgent struct {
 	CommandTemplate     string   // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
 	Command             string   // Base command (e.g., "claude")
-	SystemArgs          string   // System arguments (model, permissions) - NOT overridable by user config
+	WorkerSystemArgs    string   // System arguments for Workers - NOT overridable by user config
+	ManagerSystemArgs   string   // System arguments for Managers - NOT overridable by user config
 	DefaultArgs         string   // Default user-customizable arguments (overridable in config.toml)
 	DefaultModel        string   // Default model name for this agent
 	Description         string   // Description of the agent's purpose
@@ -301,18 +304,17 @@ func NewDefaultConfig() *Config {
 		agents[name] = Agent{
 			Command:             builtin.Command,
 			CommandTemplate:     builtin.CommandTemplate,
-			SystemArgs:          builtin.SystemArgs,
 			DefaultModel:        builtin.DefaultModel,
 			Description:         builtin.Description,
 			WorktreeSetupScript: builtin.WorktreeSetupScript,
 			ExcludePatterns:     builtin.ExcludePatterns,
 		}
-		// Also create builtin workers
+		// Also create builtin workers with role-specific SystemArgs
 		workers[name] = Worker{
 			Agent:           name,
 			CommandTemplate: builtin.CommandTemplate,
 			Command:         builtin.Command,
-			SystemArgs:      builtin.SystemArgs,
+			SystemArgs:      builtin.WorkerSystemArgs,
 			Args:            builtin.DefaultArgs,
 			Description:     builtin.Description,
 		}

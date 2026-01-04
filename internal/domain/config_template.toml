@@ -9,6 +9,7 @@
 ## Built-in worker customization
 ## - agent: Name of the agent to use (builtin: claude, opencode)
 ## - model: Model name override (takes precedence over agent's default_model)
+## - system_args: System arguments for crew operation (rarely need to change)
 ## - args: User-customizable arguments
 ## - system_prompt: Override the common system prompt for this worker
 ## - prompt: Override the common prompt for this worker
@@ -35,9 +36,10 @@
 ## Manager configuration
 ## Managers are read-only agents for task orchestration.
 ## They can create and monitor tasks but delegate code to workers.
-# agent = "opencode"  # Agent to use (builtin: claude, opencode)
-# model = ""          # Model override (optional)
-# args = ""           # Additional arguments (optional)
+# agent = "opencode"   # Agent to use (builtin: claude, opencode)
+# model = ""           # Model override (optional)
+# system_args = ""     # System arguments (optional, defaults to builtin ManagerSystemArgs)
+# args = ""            # Additional arguments (optional)
 
 [complete]
 ## CI gate on completion
@@ -58,11 +60,13 @@
 ## Agents define the core command execution pattern for AI tools.
 ## Built-in agents: claude, opencode
 ##
+## Note: system_args is defined in Workers/Managers, not in Agents.
+##       Agents only define command structure; Workers/Managers add role-specific args.
+##
 ## Fields:
 ## - command: Base command to execute (e.g., "claude", "opencode")
 ## - command_template: How to assemble the full command
 ##   Available variables: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
-## - system_args: System arguments required for crew operation (auto-applied)
 ## - default_model: Default model for this agent
 ## - description: Description of the agent's purpose
 ## - worktree_setup_script: Script to run after worktree creation (template-expanded)
@@ -73,7 +77,6 @@
 # [agents.my-agent]
 # command = "my-custom-agent"
 # command_template = "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}"
-# system_args = "--api-key $MY_API_KEY"
 # default_model = "my-model"
 # description = "My custom AI agent"
 # worktree_setup_script = """

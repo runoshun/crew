@@ -226,14 +226,12 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) resolv
 			result.ExcludePatterns = agentDef.ExcludePatterns
 			result.DefaultModel = agentDef.DefaultModel
 			// Inherit command fields if not set in worker
+			// Note: SystemArgs is NOT inherited from Agent; it's Worker-specific
 			if result.Worker.CommandTemplate == "" {
 				result.Worker.CommandTemplate = agentDef.CommandTemplate
 			}
 			if result.Worker.Command == "" {
 				result.Worker.Command = agentDef.Command
-			}
-			if result.Worker.SystemArgs == "" {
-				result.Worker.SystemArgs = agentDef.SystemArgs
 			}
 		}
 
@@ -250,6 +248,7 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) resolv
 				result.ExcludePatterns = builtin.ExcludePatterns
 			}
 			// Inherit command fields from builtin if not set
+			// Use WorkerSystemArgs for Workers
 			if result.Worker.CommandTemplate == "" {
 				result.Worker.CommandTemplate = builtin.CommandTemplate
 			}
@@ -257,7 +256,7 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) resolv
 				result.Worker.Command = builtin.Command
 			}
 			if result.Worker.SystemArgs == "" {
-				result.Worker.SystemArgs = builtin.SystemArgs
+				result.Worker.SystemArgs = builtin.WorkerSystemArgs
 			}
 		}
 
@@ -271,7 +270,7 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) resolv
 				Agent:           agent,
 				CommandTemplate: builtin.CommandTemplate,
 				Command:         builtin.Command,
-				SystemArgs:      builtin.SystemArgs,
+				SystemArgs:      builtin.WorkerSystemArgs,
 				Args:            builtin.DefaultArgs,
 			},
 			DefaultModel:        builtin.DefaultModel,
