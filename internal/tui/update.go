@@ -42,6 +42,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.loadTasks()
 
 	case MsgTaskStopped:
+		m.mode = ModeNormal
+		m.confirmAction = ConfirmNone
 		return m, m.loadTasks()
 
 	case MsgTaskCreated:
@@ -280,7 +282,7 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 	}
 
 	switch task.Status {
-	case domain.StatusTodo, domain.StatusError:
+	case domain.StatusTodo, domain.StatusError, domain.StatusStopped:
 		// Start the task
 		m.mode = ModeStart
 		return m, nil

@@ -29,6 +29,7 @@ var Colors = struct {
 	Todo        lipgloss.Color
 	InProgress  lipgloss.Color
 	InReview    lipgloss.Color
+	Stopped     lipgloss.Color
 	StatusError lipgloss.Color
 	Done        lipgloss.Color
 	Closed      lipgloss.Color
@@ -57,6 +58,7 @@ var Colors = struct {
 	Todo:        lipgloss.Color("#89B4FA"), // Blue (pending)
 	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow (active work)
 	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
+	Stopped:     lipgloss.Color("#FAB387"), // Peach/Orange
 	StatusError: lipgloss.Color("#F38BA8"), // Red
 	Done:        lipgloss.Color("#A6E3A1"), // Green
 	Closed:      lipgloss.Color("#6C7086"), // Overlay0
@@ -99,6 +101,7 @@ type Styles struct {
 	StatusTodo       lipgloss.Style
 	StatusInProgress lipgloss.Style
 	StatusInReview   lipgloss.Style
+	StatusStopped    lipgloss.Style
 	StatusError      lipgloss.Style
 	StatusDone       lipgloss.Style
 	StatusClosed     lipgloss.Style
@@ -107,6 +110,7 @@ type Styles struct {
 	StatusTodoSelected       lipgloss.Style
 	StatusInProgressSelected lipgloss.Style
 	StatusInReviewSelected   lipgloss.Style
+	StatusStoppedSelected    lipgloss.Style
 	StatusErrorSelected      lipgloss.Style
 	StatusDoneSelected       lipgloss.Style
 	StatusClosedSelected     lipgloss.Style
@@ -237,6 +241,9 @@ func DefaultStyles() Styles {
 		StatusInReview: lipgloss.NewStyle().
 			Foreground(Colors.InReview),
 
+		StatusStopped: lipgloss.NewStyle().
+			Foreground(Colors.Stopped),
+
 		StatusError: lipgloss.NewStyle().
 			Foreground(Colors.StatusError),
 
@@ -257,6 +264,10 @@ func DefaultStyles() Styles {
 
 		StatusInReviewSelected: lipgloss.NewStyle().
 			Foreground(Colors.InReview).
+			Bold(true),
+
+		StatusStoppedSelected: lipgloss.NewStyle().
+			Foreground(Colors.Stopped).
 			Bold(true),
 
 		StatusErrorSelected: lipgloss.NewStyle().
@@ -354,6 +365,8 @@ func (s Styles) StatusStyle(status domain.Status) lipgloss.Style {
 		return s.StatusInProgress
 	case domain.StatusInReview:
 		return s.StatusInReview
+	case domain.StatusStopped:
+		return s.StatusStopped
 	case domain.StatusError:
 		return s.StatusError
 	case domain.StatusDone:
@@ -374,6 +387,8 @@ func (s Styles) StatusStyleSelected(status domain.Status) lipgloss.Style {
 		return s.StatusInProgressSelected
 	case domain.StatusInReview:
 		return s.StatusInReviewSelected
+	case domain.StatusStopped:
+		return s.StatusStoppedSelected
 	case domain.StatusError:
 		return s.StatusErrorSelected
 	case domain.StatusDone:
@@ -394,6 +409,8 @@ func StatusText(status domain.Status) string {
 		return "InPrg"
 	case domain.StatusInReview:
 		return "Revw"
+	case domain.StatusStopped:
+		return "Stop"
 	case domain.StatusError:
 		return "Err"
 	case domain.StatusDone:
@@ -414,6 +431,8 @@ func StatusIcon(status domain.Status) string {
 		return "➜"
 	case domain.StatusInReview:
 		return "◎"
+	case domain.StatusStopped:
+		return "⏸"
 	case domain.StatusError:
 		return "✕"
 	case domain.StatusDone:

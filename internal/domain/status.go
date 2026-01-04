@@ -10,6 +10,7 @@ const (
 	StatusError      Status = "error"       // Session terminated abnormally
 	StatusDone       Status = "done"        // Merge complete
 	StatusClosed     Status = "closed"      // Discarded without merge
+	StatusStopped    Status = "stopped"     // Manually stopped
 )
 
 // AllStatuses returns all valid status values.
@@ -18,6 +19,7 @@ func AllStatuses() []Status {
 		StatusTodo,
 		StatusInProgress,
 		StatusInReview,
+		StatusStopped,
 		StatusError,
 		StatusDone,
 		StatusClosed,
@@ -27,8 +29,9 @@ func AllStatuses() []Status {
 // transitions defines the allowed status transitions.
 var transitions = map[Status][]Status{
 	StatusTodo:       {StatusInProgress, StatusClosed},
-	StatusInProgress: {StatusInReview, StatusError, StatusClosed},
+	StatusInProgress: {StatusInReview, StatusStopped, StatusError, StatusClosed},
 	StatusInReview:   {StatusInProgress, StatusDone, StatusClosed},
+	StatusStopped:    {StatusInProgress, StatusClosed},
 	StatusError:      {StatusInProgress, StatusClosed},
 	StatusDone:       {StatusClosed},
 	StatusClosed:     {},
@@ -55,7 +58,7 @@ func (s Status) IsTerminal() bool {
 
 // CanStart returns true if a task in this status can be started.
 func (s Status) CanStart() bool {
-	return s == StatusTodo || s == StatusInReview || s == StatusError
+	return s == StatusTodo || s == StatusInReview || s == StatusStopped || s == StatusError
 }
 
 // Display returns a human-readable representation of the status.
@@ -67,6 +70,8 @@ func (s Status) Display() string {
 		return "In Progress"
 	case StatusInReview:
 		return "In Review"
+	case StatusStopped:
+		return "Stopped"
 	case StatusError:
 		return "Error"
 	case StatusDone:
@@ -81,7 +86,7 @@ func (s Status) Display() string {
 // IsValid returns true if the status is a known valid value.
 func (s Status) IsValid() bool {
 	switch s {
-	case StatusTodo, StatusInProgress, StatusInReview, StatusError, StatusDone, StatusClosed:
+	case StatusTodo, StatusInProgress, StatusInReview, StatusStopped, StatusError, StatusDone, StatusClosed:
 		return true
 	default:
 		return false
