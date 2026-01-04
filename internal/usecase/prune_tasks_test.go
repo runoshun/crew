@@ -64,12 +64,12 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 		tasks             []*domain.Task
 		branches          []string
 		worktrees         []domain.WorktreeInfo
-		expectedTasks     int
 		expectedBranches  int
 		expectedWorktrees int
+		// Tasks are NOT deleted, so we verify they remain in DB
 	}{
 		{
-			name: "prune closed tasks",
+			name: "prune closed tasks - only delete branches/worktrees",
 			input: PruneTasksInput{
 				All:    false,
 				DryRun: false,
@@ -80,12 +80,11 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 			},
 			branches:          []string{"crew-1", "other"},
 			worktrees:         nil,
-			expectedTasks:     1, // Task 1
 			expectedBranches:  1, // crew-1
 			expectedWorktrees: 0,
 		},
 		{
-			name: "prune all (closed and done)",
+			name: "prune all (closed and done) - only delete branches/worktrees",
 			input: PruneTasksInput{
 				All:    true,
 				DryRun: false,
@@ -97,7 +96,6 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 			},
 			branches:          []string{"crew-1", "crew-2", "crew-3"},
 			worktrees:         nil,
-			expectedTasks:     2, // 1 and 2
 			expectedBranches:  2, // crew-1 and crew-2
 			expectedWorktrees: 0,
 		},
@@ -112,7 +110,6 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 			},
 			branches:          []string{"crew-1", "crew-2"}, // crew-1 is orphan (task 1 not in DB)
 			worktrees:         nil,
-			expectedTasks:     0,
 			expectedBranches:  1, // crew-1
 			expectedWorktrees: 0,
 		},
@@ -127,7 +124,6 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 			},
 			branches:          []string{"crew-1"},
 			worktrees:         nil,
-			expectedTasks:     1,
 			expectedBranches:  1,
 			expectedWorktrees: 0,
 		},
@@ -143,7 +139,6 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 			worktrees: []domain.WorktreeInfo{
 				{Branch: "crew-1", Path: "/tmp/1"},
 			},
-			expectedTasks:     1,
 			expectedBranches:  1,
 			expectedWorktrees: 1,
 		},
@@ -166,10 +161,6 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if len(out.DeletedTasks) != tt.expectedTasks {
-				t.Errorf("expected %d deleted tasks, got %d", tt.expectedTasks, len(out.DeletedTasks))
-			}
-
 			if len(out.DeletedBranches) != tt.expectedBranches {
 				t.Errorf("expected %d deleted branches, got %d", tt.expectedBranches, len(out.DeletedBranches))
 			}
@@ -180,11 +171,11 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 
 			// Verify actual deletion for non-dry-run
 			if !tt.input.DryRun {
-				// Check DB
-				for _, dt := range out.DeletedTasks {
-					got, _ := repo.Get(dt.ID)
-					if got != nil {
-						t.Errorf("task %d should have been deleted from DB", dt.ID)
+				// Verify tasks are NOT deleted from DB
+				for _, task := range tt.tasks {
+					got, _ := repo.Get(task.ID)
+					if got == nil {
+						t.Errorf("task %d should NOT have been deleted from DB", task.ID)
 					}
 				}
 				// Check Git
