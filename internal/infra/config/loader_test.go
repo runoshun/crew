@@ -24,6 +24,7 @@ default = "claude"
 args = "--model claude-sonnet-4-20250514"
 model = "anthropic/claude-sonnet-4-20250514"
 prompt = "When done, run 'crew complete'."
+description = "Custom Claude description"
 
 [complete]
 command = "mise run ci"
@@ -44,6 +45,7 @@ level = "debug"
 	assert.Equal(t, "--model claude-sonnet-4-20250514", cfg.Workers["claude"].Args)
 	assert.Equal(t, "anthropic/claude-sonnet-4-20250514", cfg.Workers["claude"].Model)
 	assert.Equal(t, "When done, run 'crew complete'.", cfg.Workers["claude"].Prompt)
+	assert.Equal(t, "Custom Claude description", cfg.Workers["claude"].Description)
 	assert.Equal(t, "mise run ci", cfg.Complete.Command)
 	assert.Equal(t, "debug", cfg.Log.Level)
 }

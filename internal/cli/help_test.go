@@ -27,7 +27,14 @@ func TestRenderWorkerHelp(t *testing.T) {
 func TestRenderManagerHelp(t *testing.T) {
 	var buf bytes.Buffer
 
-	err := RenderManagerHelp(&buf, HelpTemplateData{})
+	data := HelpTemplateData{
+		Workers: []WorkerInfo{
+			{Name: "worker1", Model: "model1", Description: "desc1"},
+			{Name: "worker2", Model: "model2", Description: "desc2"},
+		},
+	}
+
+	err := RenderManagerHelp(&buf, data)
 
 	require.NoError(t, err)
 	content := buf.String()
@@ -39,4 +46,9 @@ func TestRenderManagerHelp(t *testing.T) {
 	assert.Contains(t, content, "crew peek")
 	assert.Contains(t, content, "crew merge")
 	assert.Contains(t, content, "Send Enter after send")
+
+	// Check available workers section
+	assert.Contains(t, content, "## Available Workers")
+	assert.Contains(t, content, "| worker1 | model1 | desc1 |")
+	assert.Contains(t, content, "| worker2 | model2 | desc2 |")
 }

@@ -191,7 +191,9 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						SystemPrompt:    def.SystemPrompt,
 						Prompt:          def.Prompt,
 						Model:           def.Model,
+						Description:     def.Description,
 					}
+
 					for k := range def.Extra {
 						warnings = append(warnings, fmt.Sprintf("unknown key in [workers.%s]: %s", name, k))
 					}
@@ -314,6 +316,7 @@ type workerDef struct {
 	SystemPrompt    string
 	Prompt          string
 	Model           string
+	Description     string
 }
 
 // parseWorkersSection parses the raw workers map into structured workersConfig.
@@ -375,6 +378,10 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 					case "model":
 						if s, ok := v.(string); ok {
 							def.Model = s
+						}
+					case "description":
+						if s, ok := v.(string); ok {
+							def.Description = s
 						}
 					default:
 						def.Extra[k] = v
@@ -475,6 +482,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		}
 		if overrideWorker.Model != "" {
 			baseWorker.Model = overrideWorker.Model
+		}
+		if overrideWorker.Description != "" {
+			baseWorker.Description = overrideWorker.Description
 		}
 		result.Workers[name] = baseWorker
 	}

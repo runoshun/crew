@@ -44,6 +44,7 @@ type WorkerAgent struct {
 	Model           string // Default model for this worker (overrides builtin default)
 	SystemPrompt    string // System prompt template for this worker
 	Prompt          string // Prompt template for this worker
+	Description     string // Description of the worker's purpose
 }
 
 // CommandData holds data for rendering agent commands and prompts.
@@ -205,6 +206,7 @@ type BuiltinWorker struct {
 	SystemArgs      string // System arguments (model, permissions) - NOT overridable by user config
 	DefaultArgs     string // Default user-customizable arguments (overridable in config.toml)
 	DefaultModel    string // Default model name for this worker
+	Description     string // Description of the worker's purpose
 }
 
 const claudeAllowedTools = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show)'`
@@ -221,6 +223,7 @@ var BuiltinWorkers = map[string]BuiltinWorker{
 		SystemArgs:      "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,
 		DefaultArgs:     "",
 		DefaultModel:    "opus",
+		Description:     "Claude model via Anthropic CLI",
 	},
 	"opencode": {
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
@@ -228,6 +231,7 @@ var BuiltinWorkers = map[string]BuiltinWorker{
 		SystemArgs:      "-m {{.Model}}",
 		DefaultArgs:     "",
 		DefaultModel:    "anthropic/claude-opus-4-5",
+		Description:     "General purpose coding agent via opencode CLI",
 	},
 	"codex": {
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
@@ -235,6 +239,7 @@ var BuiltinWorkers = map[string]BuiltinWorker{
 		SystemArgs:      "--model {{.Model}} --full-auto",
 		DefaultArgs:     "",
 		DefaultModel:    "gpt-5.2-codex",
+		Description:     "Highly autonomous coding agent via codex CLI",
 	},
 }
 
@@ -275,6 +280,7 @@ func NewDefaultConfig() *Config {
 			Command:         builtin.Command,
 			SystemArgs:      builtin.SystemArgs,
 			Args:            builtin.DefaultArgs,
+			Description:     builtin.Description,
 			// SystemPrompt/Prompt are empty; falls back to WorkersConfig
 		}
 	}
@@ -424,6 +430,9 @@ func (c *Config) resolveWorker(name string, visited, resolving map[string]bool) 
 	}
 	if worker.Model != "" {
 		resolved.Model = worker.Model
+	}
+	if worker.Description != "" {
+		resolved.Description = worker.Description
 	}
 
 	// Clear Inherit field after resolution
