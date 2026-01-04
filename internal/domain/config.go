@@ -39,13 +39,13 @@ type WorkersConfig struct {
 // Agent defines a base agent configuration that Workers and Managers can reference.
 // Agents define the core command execution pattern without being tied to a specific role.
 type Agent struct {
-	Command         string   // Base command (e.g., "claude", "opencode")
-	CommandTemplate string   // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
-	SystemArgs      string   // System arguments required for crew operation (auto-applied)
-	DefaultModel    string   // Default model for this agent
-	Description     string   // Description of the agent's purpose
-	SetupScript     string   // Script to run after worktree creation (template-expanded)
-	ExcludePatterns []string // Patterns to add to .git/info/exclude for this agent
+	Command             string   // Base command (e.g., "claude", "opencode")
+	CommandTemplate     string   // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
+	SystemArgs          string   // System arguments required for crew operation (auto-applied)
+	DefaultModel        string   // Default model for this agent
+	Description         string   // Description of the agent's purpose
+	WorktreeSetupScript string   // Script to run after worktree creation (template-expanded)
+	ExcludePatterns     []string // Patterns to add to .git/info/exclude for this agent
 }
 
 // Worker holds per-worker configuration from [workers.<name>] sections.
@@ -228,54 +228,20 @@ IMPORTANT: First run 'crew --help-worker' and follow the workflow instructions e
 
 // BuiltinAgent defines a built-in agent configuration.
 type BuiltinAgent struct {
-	CommandTemplate string   // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
-	Command         string   // Base command (e.g., "claude")
-	SystemArgs      string   // System arguments (model, permissions) - NOT overridable by user config
-	DefaultArgs     string   // Default user-customizable arguments (overridable in config.toml)
-	DefaultModel    string   // Default model name for this agent
-	Description     string   // Description of the agent's purpose
-	SetupScript     string   // Script to run after worktree creation (template-expanded)
-	ExcludePatterns []string // Patterns to add to .git/info/exclude for this agent
+	CommandTemplate     string   // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
+	Command             string   // Base command (e.g., "claude")
+	SystemArgs          string   // System arguments (model, permissions) - NOT overridable by user config
+	DefaultArgs         string   // Default user-customizable arguments (overridable in config.toml)
+	DefaultModel        string   // Default model name for this agent
+	Description         string   // Description of the agent's purpose
+	WorktreeSetupScript string   // Script to run after worktree creation (template-expanded)
+	ExcludePatterns     []string // Patterns to add to .git/info/exclude for this agent
 }
 
-const claudeAllowedTools = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show)'`
-
 // BuiltinAgents contains preset configurations for known agents.
-// Note: Use --option=value format for options that take variadic arguments (like --allowedTools)
-// to prevent them from consuming the prompt argument.
-// The {{.Model}} template variable in SystemArgs is replaced with the runtime model selection.
-// SystemArgs cannot be overridden by user config; Args can be customized in config.toml.
 var BuiltinAgents = map[string]BuiltinAgent{
-	"claude": {
-		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-		Command:         "claude",
-		SystemArgs:      "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,
-		DefaultArgs:     "",
-		DefaultModel:    "opus",
-		Description:     "Claude model via Anthropic CLI",
-		SetupScript:     "",
-		ExcludePatterns: nil,
-	},
-	"opencode": {
-		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
-		Command:         "opencode",
-		SystemArgs:      "-m {{.Model}}",
-		DefaultArgs:     "",
-		DefaultModel:    "anthropic/claude-opus-4-5",
-		Description:     "General purpose coding agent via opencode CLI",
-		SetupScript:     "",
-		ExcludePatterns: []string{".opencode/"},
-	},
-	"codex": {
-		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-		Command:         "codex",
-		SystemArgs:      "--model {{.Model}} --full-auto",
-		DefaultArgs:     "",
-		DefaultModel:    "gpt-5.2-codex",
-		Description:     "Highly autonomous coding agent via codex CLI",
-		SetupScript:     "",
-		ExcludePatterns: nil,
-	},
+	"claude":   claudeAgentConfig,
+	"opencode": opencodeAgentConfig,
 }
 
 // Directory and file names for git-crew.
@@ -312,13 +278,13 @@ func NewDefaultConfig() *Config {
 	workers := make(map[string]Worker)
 	for name, builtin := range BuiltinAgents {
 		agents[name] = Agent{
-			Command:         builtin.Command,
-			CommandTemplate: builtin.CommandTemplate,
-			SystemArgs:      builtin.SystemArgs,
-			DefaultModel:    builtin.DefaultModel,
-			Description:     builtin.Description,
-			SetupScript:     builtin.SetupScript,
-			ExcludePatterns: builtin.ExcludePatterns,
+			Command:             builtin.Command,
+			CommandTemplate:     builtin.CommandTemplate,
+			SystemArgs:          builtin.SystemArgs,
+			DefaultModel:        builtin.DefaultModel,
+			Description:         builtin.Description,
+			WorktreeSetupScript: builtin.WorktreeSetupScript,
+			ExcludePatterns:     builtin.ExcludePatterns,
 		}
 		workers[name] = Worker{
 			Agent:           name,
@@ -361,7 +327,6 @@ func RenderConfigTemplate() (string, error) {
 		"LogLevel":            cfg.Log.Level,
 		"ClaudeArgs":          cfg.Workers["claude"].Args,
 		"OpencodeArgs":        cfg.Workers["opencode"].Args,
-		"CodexArgs":           cfg.Workers["codex"].Args,
 	}
 
 	tmpl, err := template.New("config").Delims("<<", ">>").Parse(configTemplate)

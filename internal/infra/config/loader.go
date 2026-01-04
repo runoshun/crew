@@ -182,13 +182,13 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 				ac := parseAgentsSection(m)
 				for name, def := range ac.Defs {
 					res.Agents[name] = domain.Agent{
-						Command:         def.Command,
-						CommandTemplate: def.CommandTemplate,
-						SystemArgs:      def.SystemArgs,
-						DefaultModel:    def.DefaultModel,
-						Description:     def.Description,
-						SetupScript:     def.SetupScript,
-						ExcludePatterns: def.ExcludePatterns,
+						Command:             def.Command,
+						CommandTemplate:     def.CommandTemplate,
+						SystemArgs:          def.SystemArgs,
+						DefaultModel:        def.DefaultModel,
+						Description:         def.Description,
+						WorktreeSetupScript: def.WorktreeSetupScript,
+						ExcludePatterns:     def.ExcludePatterns,
 					}
 					for k := range def.Extra {
 						warnings = append(warnings, fmt.Sprintf("unknown key in [agents.%s]: %s", name, k))
@@ -369,14 +369,14 @@ type agentsConfig struct {
 }
 
 type agentDef struct {
-	Extra           map[string]any
-	Command         string
-	CommandTemplate string
-	SystemArgs      string
-	DefaultModel    string
-	Description     string
-	SetupScript     string
-	ExcludePatterns []string
+	Extra               map[string]any
+	Command             string
+	CommandTemplate     string
+	SystemArgs          string
+	DefaultModel        string
+	Description         string
+	WorktreeSetupScript string
+	ExcludePatterns     []string
 }
 
 // parseAgentsSection parses the raw agents map into structured agentsConfig.
@@ -412,9 +412,9 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 					if s, ok := v.(string); ok {
 						def.Description = s
 					}
-				case "setup_script":
+				case "worktree_setup_script":
 					if s, ok := v.(string); ok {
-						def.SetupScript = s
+						def.WorktreeSetupScript = s
 					}
 				case "exclude_patterns":
 					if arr, ok := v.([]any); ok {
@@ -664,8 +664,8 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		if overrideAgent.Description != "" {
 			baseAgent.Description = overrideAgent.Description
 		}
-		if overrideAgent.SetupScript != "" {
-			baseAgent.SetupScript = overrideAgent.SetupScript
+		if overrideAgent.WorktreeSetupScript != "" {
+			baseAgent.WorktreeSetupScript = overrideAgent.WorktreeSetupScript
 		}
 		if len(overrideAgent.ExcludePatterns) > 0 {
 			baseAgent.ExcludePatterns = overrideAgent.ExcludePatterns
