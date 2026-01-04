@@ -130,8 +130,14 @@ func (c *Client) Stop(sessionName string) error {
 			_ = syscall.Kill(-pid, syscall.SIGTERM)
 
 			// Wait for processes to terminate (max 5 seconds)
+			// If the process doesn't exit after the first SIGTERM, send a second SIGTERM
+			// after a short delay to ensure it terminates (experimentally required).
 			for i := 0; i < 50; i++ {
 				time.Sleep(100 * time.Millisecond)
+				// Send SIGTERM again after ~500ms (i == 5)
+				if i == 5 {
+					_ = syscall.Kill(-pid, syscall.SIGTERM)
+				}
 				// Check if process still exists
 				// syscall.Kill with 0 signal checks for existence
 				if err := syscall.Kill(pid, 0); err != nil {
