@@ -169,12 +169,35 @@ func (l *Loader) loadFile(path string) (*domain.Config, error) {
 // convertRawToDomainConfig converts the raw map to domain config and collects warnings.
 func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 	res := &domain.Config{
-		Workers: make(map[string]domain.WorkerAgent),
+		Agents:   make(map[string]domain.Agent),
+		Workers:  make(map[string]domain.Worker),
+		Managers: make(map[string]domain.Manager),
 	}
 	var warnings []string
 
 	for section, value := range raw {
 		switch section {
+		case "agents":
+			if m, ok := value.(map[string]any); ok {
+				ac := parseAgentsSection(m)
+				for name, def := range ac.Defs {
+					res.Agents[name] = domain.Agent{
+						Command:         def.Command,
+						CommandTemplate: def.CommandTemplate,
+						SystemArgs:      def.SystemArgs,
+						DefaultModel:    def.DefaultModel,
+						Description:     def.Description,
+						SetupScript:     def.SetupScript,
+						ExcludePatterns: def.ExcludePatterns,
+					}
+					for k := range def.Extra {
+						warnings = append(warnings, fmt.Sprintf("unknown key in [agents.%s]: %s", name, k))
+					}
+				}
+				for _, k := range ac.Unknowns {
+					warnings = append(warnings, fmt.Sprintf("unknown key in [agents]: %s", k))
+				}
+			}
 		case "workers":
 			if m, ok := value.(map[string]any); ok {
 				wc := parseWorkersSection(m)
@@ -182,7 +205,8 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 				res.WorkersConfig.SystemPrompt = wc.SystemPrompt
 				res.WorkersConfig.Prompt = wc.Prompt
 				for name, def := range wc.Defs {
-					res.Workers[name] = domain.WorkerAgent{
+					res.Workers[name] = domain.Worker{
+						Agent:           def.Agent,
 						Inherit:         def.Inherit,
 						CommandTemplate: def.CommandTemplate,
 						Command:         def.Command,
@@ -200,6 +224,24 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 				}
 				for _, k := range wc.Unknowns {
 					warnings = append(warnings, fmt.Sprintf("unknown key in [workers]: %s", k))
+				}
+			}
+		case "managers":
+			if m, ok := value.(map[string]any); ok {
+				mc := parseManagersSection(m)
+				for name, def := range mc.Defs {
+					res.Managers[name] = domain.Manager{
+						Agent:       def.Agent,
+						Model:       def.Model,
+						Args:        def.Args,
+						Description: def.Description,
+					}
+					for k := range def.Extra {
+						warnings = append(warnings, fmt.Sprintf("unknown key in [managers.%s]: %s", name, k))
+					}
+				}
+				for _, k := range mc.Unknowns {
+					warnings = append(warnings, fmt.Sprintf("unknown key in [managers]: %s", k))
 				}
 			}
 		case "complete":
@@ -308,6 +350,7 @@ type workersConfig struct {
 
 type workerDef struct {
 	Extra           map[string]any
+	Agent           string
 	Inherit         string
 	CommandTemplate string
 	Command         string
@@ -317,6 +360,81 @@ type workerDef struct {
 	Prompt          string
 	Model           string
 	Description     string
+}
+
+// agentsConfig holds the parsed [agents] section.
+type agentsConfig struct {
+	Defs     map[string]agentDef // Per-agent definitions from [agents.<name>]
+	Unknowns []string            // Unknown keys in [agents]
+}
+
+type agentDef struct {
+	Extra           map[string]any
+	Command         string
+	CommandTemplate string
+	SystemArgs      string
+	DefaultModel    string
+	Description     string
+	SetupScript     string
+	ExcludePatterns []string
+}
+
+// parseAgentsSection parses the raw agents map into structured agentsConfig.
+func parseAgentsSection(raw map[string]any) agentsConfig {
+	result := agentsConfig{
+		Defs: make(map[string]agentDef),
+	}
+
+	for key, value := range raw {
+		if subMap, ok := value.(map[string]any); ok {
+			def := agentDef{
+				Extra: make(map[string]any),
+			}
+			for k, v := range subMap {
+				switch k {
+				case "command":
+					if s, ok := v.(string); ok {
+						def.Command = s
+					}
+				case "command_template":
+					if s, ok := v.(string); ok {
+						def.CommandTemplate = s
+					}
+				case "system_args":
+					if s, ok := v.(string); ok {
+						def.SystemArgs = s
+					}
+				case "default_model":
+					if s, ok := v.(string); ok {
+						def.DefaultModel = s
+					}
+				case "description":
+					if s, ok := v.(string); ok {
+						def.Description = s
+					}
+				case "setup_script":
+					if s, ok := v.(string); ok {
+						def.SetupScript = s
+					}
+				case "exclude_patterns":
+					if arr, ok := v.([]any); ok {
+						for _, item := range arr {
+							if s, ok := item.(string); ok {
+								def.ExcludePatterns = append(def.ExcludePatterns, s)
+							}
+						}
+					}
+				default:
+					def.Extra[k] = v
+				}
+			}
+			result.Defs[key] = def
+		} else {
+			result.Unknowns = append(result.Unknowns, key)
+		}
+	}
+
+	return result
 }
 
 // parseWorkersSection parses the raw workers map into structured workersConfig.
@@ -347,6 +465,10 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 				}
 				for k, v := range subMap {
 					switch k {
+					case "agent":
+						if s, ok := v.(string); ok {
+							def.Agent = s
+						}
 					case "inherit":
 						if s, ok := v.(string); ok {
 							def.Inherit = s
@@ -397,25 +519,93 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 	return result
 }
 
+// managersConfig holds the parsed [managers] section.
+type managersConfig struct {
+	Defs     map[string]managerDef // Per-manager definitions from [managers.<name>]
+	Unknowns []string              // Unknown keys in [managers]
+}
+
+type managerDef struct {
+	Extra       map[string]any
+	Agent       string
+	Model       string
+	Args        string
+	Description string
+}
+
+// parseManagersSection parses the raw managers map into structured managersConfig.
+func parseManagersSection(raw map[string]any) managersConfig {
+	result := managersConfig{
+		Defs: make(map[string]managerDef),
+	}
+
+	for key, value := range raw {
+		if subMap, ok := value.(map[string]any); ok {
+			def := managerDef{
+				Extra: make(map[string]any),
+			}
+			for k, v := range subMap {
+				switch k {
+				case "agent":
+					if s, ok := v.(string); ok {
+						def.Agent = s
+					}
+				case "model":
+					if s, ok := v.(string); ok {
+						def.Model = s
+					}
+				case "args":
+					if s, ok := v.(string); ok {
+						def.Args = s
+					}
+				case "description":
+					if s, ok := v.(string); ok {
+						def.Description = s
+					}
+				default:
+					def.Extra[k] = v
+				}
+			}
+			result.Defs[key] = def
+		} else {
+			result.Unknowns = append(result.Unknowns, key)
+		}
+	}
+
+	return result
+}
+
 // mergeConfigs merges two configs, with override taking precedence.
 func mergeConfigs(base, override *domain.Config) *domain.Config {
 	result := &domain.Config{
+		Agents:        make(map[string]domain.Agent),
 		WorkersConfig: base.WorkersConfig,
+		Workers:       make(map[string]domain.Worker),
+		Managers:      make(map[string]domain.Manager),
 		Complete:      base.Complete,
 		Diff:          base.Diff,
 		Log:           base.Log,
 		Tasks:         base.Tasks,
 		Worktree:      base.Worktree,
-		Workers:       make(map[string]domain.WorkerAgent),
 		Warnings:      append([]string{}, base.Warnings...),
 	}
 
 	// Add override warnings
 	result.Warnings = append(result.Warnings, override.Warnings...)
 
+	// Copy base agents
+	for name, agent := range base.Agents {
+		result.Agents[name] = agent
+	}
+
 	// Copy base workers
 	for name, worker := range base.Workers {
 		result.Workers[name] = worker
+	}
+
+	// Copy base managers
+	for name, manager := range base.Managers {
+		result.Managers[name] = manager
 	}
 
 	// Override with override config
@@ -456,9 +646,39 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		result.Worktree.Copy = override.Worktree.Copy
 	}
 
+	// Merge agents: override individual fields, not entire agent
+	for name, overrideAgent := range override.Agents {
+		baseAgent := result.Agents[name]
+		if overrideAgent.Command != "" {
+			baseAgent.Command = overrideAgent.Command
+		}
+		if overrideAgent.CommandTemplate != "" {
+			baseAgent.CommandTemplate = overrideAgent.CommandTemplate
+		}
+		if overrideAgent.SystemArgs != "" {
+			baseAgent.SystemArgs = overrideAgent.SystemArgs
+		}
+		if overrideAgent.DefaultModel != "" {
+			baseAgent.DefaultModel = overrideAgent.DefaultModel
+		}
+		if overrideAgent.Description != "" {
+			baseAgent.Description = overrideAgent.Description
+		}
+		if overrideAgent.SetupScript != "" {
+			baseAgent.SetupScript = overrideAgent.SetupScript
+		}
+		if len(overrideAgent.ExcludePatterns) > 0 {
+			baseAgent.ExcludePatterns = overrideAgent.ExcludePatterns
+		}
+		result.Agents[name] = baseAgent
+	}
+
 	// Merge workers: override individual fields, not entire worker
 	for name, overrideWorker := range override.Workers {
 		baseWorker := result.Workers[name]
+		if overrideWorker.Agent != "" {
+			baseWorker.Agent = overrideWorker.Agent
+		}
 		if overrideWorker.Inherit != "" {
 			baseWorker.Inherit = overrideWorker.Inherit
 		}
@@ -487,6 +707,24 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 			baseWorker.Description = overrideWorker.Description
 		}
 		result.Workers[name] = baseWorker
+	}
+
+	// Merge managers: override individual fields, not entire manager
+	for name, overrideManager := range override.Managers {
+		baseManager := result.Managers[name]
+		if overrideManager.Agent != "" {
+			baseManager.Agent = overrideManager.Agent
+		}
+		if overrideManager.Model != "" {
+			baseManager.Model = overrideManager.Model
+		}
+		if overrideManager.Args != "" {
+			baseManager.Args = overrideManager.Args
+		}
+		if overrideManager.Description != "" {
+			baseManager.Description = overrideManager.Description
+		}
+		result.Managers[name] = baseManager
 	}
 
 	return result

@@ -631,7 +631,7 @@ func TestStartTask_Execute_WithConfiguredAgent(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
 	// Configure a custom agent in config
-	configLoader.Config.Workers["my-agent"] = domain.WorkerAgent{
+	configLoader.Config.Workers["my-agent"] = domain.Worker{
 		CommandTemplate: "{{.Command}} {{.Args}} {{.Prompt}}",
 		Command:         "my-agent-bin",
 		Args:            "--custom-flag",
@@ -673,7 +673,7 @@ func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
 	// Configure worker-specific prompt
-	configLoader.Config.Workers["claude"] = domain.WorkerAgent{
+	configLoader.Config.Workers["claude"] = domain.Worker{
 		CommandTemplate: "{{.Command}} {{.Prompt}}",
 		Command:         "claude",
 		Prompt:          "Custom worker prompt for claude",
@@ -711,7 +711,7 @@ func TestStartTask_Execute_WithModelOverride(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Workers["claude"] = domain.WorkerAgent{
+	configLoader.Config.Workers["claude"] = domain.Worker{
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 		Command:         "claude",
 		SystemArgs:      "--model {{.Model}}",
@@ -755,7 +755,7 @@ func TestStartTask_Execute_WithConfigModel(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Workers["claude"] = domain.WorkerAgent{
+	configLoader.Config.Workers["claude"] = domain.Worker{
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 		Command:         "claude",
 		SystemArgs:      "--model {{.Model}}",

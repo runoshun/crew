@@ -10,14 +10,16 @@ import (
 
 // Config represents the application configuration.
 type Config struct {
-	WorkersConfig WorkersConfig          // Common [workers] settings (including default)
-	Workers       map[string]WorkerAgent // Per-worker settings [workers.<name>]
-	Complete      CompleteConfig         // [complete] settings
-	Diff          DiffConfig             // [diff] settings
-	Log           LogConfig              // [log] settings
-	Tasks         TasksConfig            // [tasks] settings
-	Worktree      WorktreeConfig         // [worktree] settings
-	Warnings      []string               // [warning] Unknown keys or other issues
+	Agents        map[string]Agent   // Agent definitions from [agents.<name>]
+	WorkersConfig WorkersConfig      // Common [workers] settings (including default)
+	Workers       map[string]Worker  // Per-worker settings [workers.<name>]
+	Managers      map[string]Manager // Manager definitions from [managers.<name>]
+	Complete      CompleteConfig     // [complete] settings
+	Diff          DiffConfig         // [diff] settings
+	Log           LogConfig          // [log] settings
+	Tasks         TasksConfig        // [tasks] settings
+	Worktree      WorktreeConfig     // [worktree] settings
+	Warnings      []string           // [warning] Unknown keys or other issues
 }
 
 // TasksConfig holds settings for task storage from [tasks] section.
@@ -34,9 +36,23 @@ type WorkersConfig struct {
 	Prompt       string // Default prompt for all workers (can be overridden per worker)
 }
 
-// WorkerAgent holds per-worker configuration from [workers.<name>] sections.
-type WorkerAgent struct {
-	Inherit         string // Name of worker to inherit from (optional)
+// Agent defines a base agent configuration that Workers and Managers can reference.
+// Agents define the core command execution pattern without being tied to a specific role.
+type Agent struct {
+	Command         string   // Base command (e.g., "claude", "opencode")
+	CommandTemplate string   // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
+	SystemArgs      string   // System arguments required for crew operation (auto-applied)
+	DefaultModel    string   // Default model for this agent
+	Description     string   // Description of the agent's purpose
+	SetupScript     string   // Script to run after worktree creation (template-expanded)
+	ExcludePatterns []string // Patterns to add to .git/info/exclude for this agent
+}
+
+// Worker holds per-worker configuration from [workers.<name>] sections.
+// Workers are task execution agents that can reference an Agent for base settings.
+type Worker struct {
+	Agent           string // Name of the Agent to inherit from (optional)
+	Inherit         string // Name of worker to inherit from (optional, for worker-to-worker inheritance)
 	CommandTemplate string // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
 	Command         string // Base command (e.g., "claude", "opencode")
 	SystemArgs      string // System arguments required for crew operation (auto-applied)
@@ -45,6 +61,15 @@ type WorkerAgent struct {
 	SystemPrompt    string // System prompt template for this worker
 	Prompt          string // Prompt template for this worker
 	Description     string // Description of the worker's purpose
+}
+
+// Manager holds configuration for manager agents from [managers.<name>] sections.
+// Managers are read-only orchestration agents that can create and monitor tasks.
+type Manager struct {
+	Agent       string // Name of the Agent to inherit from (optional)
+	Model       string // Model override for this manager
+	Args        string // Additional arguments for this manager
+	Description string // Description of the manager's purpose
 }
 
 // CommandData holds data for rendering agent commands and prompts.
@@ -74,7 +99,7 @@ type RenderCommandResult struct {
 	Prompt  string // The prompt content to be stored in PROMPT shell variable
 }
 
-// RenderCommand renders the full command string and prompt content for this agent.
+// RenderCommand renders the full command string and prompt content for this worker.
 // It performs three-phase template expansion:
 // 1. Expand SystemArgs and Args with CommandData (for GitDir, RepoRoot, TaskID, etc.)
 // 2. Expand SystemPrompt and Prompt templates with CommandData to generate prompt content
@@ -82,21 +107,21 @@ type RenderCommandResult struct {
 //
 // The promptOverride parameter is the shell variable reference (e.g., `"$PROMPT"`) that will be
 // embedded in the command and expanded at runtime to the actual prompt content.
-// The defaultSystemPrompt is used when WorkerAgent.SystemPrompt is empty.
-// The defaultPrompt is used when WorkerAgent.Prompt is empty.
-func (a *WorkerAgent) RenderCommand(data CommandData, promptOverride, defaultSystemPrompt, defaultPrompt string) (RenderCommandResult, error) {
+// The defaultSystemPrompt is used when Worker.SystemPrompt is empty.
+// The defaultPrompt is used when Worker.Prompt is empty.
+func (w *Worker) RenderCommand(data CommandData, promptOverride, defaultSystemPrompt, defaultPrompt string) (RenderCommandResult, error) {
 	// Phase 1: Expand SystemArgs and Args
-	systemArgs, err := expandString(a.SystemArgs, data)
+	systemArgs, err := expandString(w.SystemArgs, data)
 	if err != nil {
 		return RenderCommandResult{}, err
 	}
-	args, err := expandString(a.Args, data)
+	args, err := expandString(w.Args, data)
 	if err != nil {
 		return RenderCommandResult{}, err
 	}
 
 	// Phase 2: Expand Prompt templates to generate prompt content
-	sysPromptTemplate := a.SystemPrompt
+	sysPromptTemplate := w.SystemPrompt
 	if sysPromptTemplate == "" {
 		sysPromptTemplate = defaultSystemPrompt
 	}
@@ -105,7 +130,7 @@ func (a *WorkerAgent) RenderCommand(data CommandData, promptOverride, defaultSys
 		return RenderCommandResult{}, err
 	}
 
-	userPromptTemplate := a.Prompt
+	userPromptTemplate := w.Prompt
 	if userPromptTemplate == "" {
 		userPromptTemplate = defaultPrompt
 	}
@@ -126,13 +151,13 @@ func (a *WorkerAgent) RenderCommand(data CommandData, promptOverride, defaultSys
 
 	// Phase 3: Expand CommandTemplate
 	cmdData := map[string]string{
-		"Command":    a.Command,
+		"Command":    w.Command,
 		"SystemArgs": systemArgs,
 		"Args":       args,
 		"Prompt":     promptOverride,
 	}
 
-	tmpl, err := template.New("cmd").Parse(a.CommandTemplate)
+	tmpl, err := template.New("cmd").Parse(w.CommandTemplate)
 	if err != nil {
 		return RenderCommandResult{}, err
 	}
@@ -201,24 +226,26 @@ const DefaultSystemPrompt = `You are working on Task #{{.TaskID}}.
 
 IMPORTANT: First run 'crew --help-worker' and follow the workflow instructions exactly.`
 
-// BuiltinWorker defines a built-in worker configuration.
-type BuiltinWorker struct {
-	CommandTemplate string // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
-	Command         string // Base command (e.g., "claude")
-	SystemArgs      string // System arguments (model, permissions) - NOT overridable by user config
-	DefaultArgs     string // Default user-customizable arguments (overridable in config.toml)
-	DefaultModel    string // Default model name for this worker
-	Description     string // Description of the worker's purpose
+// BuiltinAgent defines a built-in agent configuration.
+type BuiltinAgent struct {
+	CommandTemplate string   // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
+	Command         string   // Base command (e.g., "claude")
+	SystemArgs      string   // System arguments (model, permissions) - NOT overridable by user config
+	DefaultArgs     string   // Default user-customizable arguments (overridable in config.toml)
+	DefaultModel    string   // Default model name for this agent
+	Description     string   // Description of the agent's purpose
+	SetupScript     string   // Script to run after worktree creation (template-expanded)
+	ExcludePatterns []string // Patterns to add to .git/info/exclude for this agent
 }
 
 const claudeAllowedTools = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show)'`
 
-// BuiltinWorkers contains preset configurations for known workers.
+// BuiltinAgents contains preset configurations for known agents.
 // Note: Use --option=value format for options that take variadic arguments (like --allowedTools)
 // to prevent them from consuming the prompt argument.
 // The {{.Model}} template variable in SystemArgs is replaced with the runtime model selection.
 // SystemArgs cannot be overridden by user config; Args can be customized in config.toml.
-var BuiltinWorkers = map[string]BuiltinWorker{
+var BuiltinAgents = map[string]BuiltinAgent{
 	"claude": {
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 		Command:         "claude",
@@ -226,6 +253,8 @@ var BuiltinWorkers = map[string]BuiltinWorker{
 		DefaultArgs:     "",
 		DefaultModel:    "opus",
 		Description:     "Claude model via Anthropic CLI",
+		SetupScript:     "",
+		ExcludePatterns: nil,
 	},
 	"opencode": {
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
@@ -234,6 +263,8 @@ var BuiltinWorkers = map[string]BuiltinWorker{
 		DefaultArgs:     "",
 		DefaultModel:    "anthropic/claude-opus-4-5",
 		Description:     "General purpose coding agent via opencode CLI",
+		SetupScript:     "",
+		ExcludePatterns: []string{".opencode/"},
 	},
 	"codex": {
 		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
@@ -242,6 +273,8 @@ var BuiltinWorkers = map[string]BuiltinWorker{
 		DefaultArgs:     "",
 		DefaultModel:    "gpt-5.2-codex",
 		Description:     "Highly autonomous coding agent via codex CLI",
+		SetupScript:     "",
+		ExcludePatterns: nil,
 	},
 }
 
@@ -275,9 +308,20 @@ func GlobalConfigPath(configHome string) string {
 
 // NewDefaultConfig returns a Config with default values.
 func NewDefaultConfig() *Config {
-	workers := make(map[string]WorkerAgent)
-	for name, builtin := range BuiltinWorkers {
-		workers[name] = WorkerAgent{
+	agents := make(map[string]Agent)
+	workers := make(map[string]Worker)
+	for name, builtin := range BuiltinAgents {
+		agents[name] = Agent{
+			Command:         builtin.Command,
+			CommandTemplate: builtin.CommandTemplate,
+			SystemArgs:      builtin.SystemArgs,
+			DefaultModel:    builtin.DefaultModel,
+			Description:     builtin.Description,
+			SetupScript:     builtin.SetupScript,
+			ExcludePatterns: builtin.ExcludePatterns,
+		}
+		workers[name] = Worker{
+			Agent:           name,
 			CommandTemplate: builtin.CommandTemplate,
 			Command:         builtin.Command,
 			SystemArgs:      builtin.SystemArgs,
@@ -287,12 +331,14 @@ func NewDefaultConfig() *Config {
 		}
 	}
 	return &Config{
+		Agents: agents,
 		WorkersConfig: WorkersConfig{
 			Default:      DefaultWorkerName,
 			SystemPrompt: DefaultSystemPrompt,
 			Prompt:       "",
 		},
-		Workers: workers,
+		Workers:  workers,
+		Managers: make(map[string]Manager),
 		Log: LogConfig{
 			Level: DefaultLogLevel,
 		},
@@ -412,6 +458,9 @@ func (c *Config) resolveWorker(name string, visited, resolving map[string]bool) 
 	resolved := parent
 
 	// Child overrides
+	if worker.Agent != "" {
+		resolved.Agent = worker.Agent
+	}
 	if worker.CommandTemplate != "" {
 		resolved.CommandTemplate = worker.CommandTemplate
 	}
