@@ -265,3 +265,9 @@ func (c *Container) GenSkillUseCase() *usecase.GenSkill {
 func (c *Container) ExecCommandUseCase() *usecase.ExecCommand {
 	return usecase.NewExecCommand(c.Tasks, c.Worktrees)
 }
+
+// StartManagerUseCase returns a new StartManager use case.
+// helpContent is the rendered help-manager content to inject into the prompt.
+func (c *Container) StartManagerUseCase(helpContent string) *usecase.StartManager {
+	return usecase.NewStartManager(c.ConfigLoader, c.Config.RepoRoot, c.Config.GitDir, helpContent)
+}
