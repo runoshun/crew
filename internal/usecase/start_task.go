@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -100,15 +101,15 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	}
 
 	// Get agent configuration
-	workerAgent, defaultModel := uc.resolveWorkerAgent(agent, cfg)
+	resolved := uc.resolveWorkerAgent(agent, cfg)
 
 	// Resolve model priority: CLI flag > worker config > builtin default
 	model := in.Model
-	if model == "" && workerAgent.Model != "" {
-		model = workerAgent.Model
+	if model == "" && resolved.Worker.Model != "" {
+		model = resolved.Worker.Model
 	}
 	if model == "" {
-		model = defaultModel
+		model = resolved.DefaultModel
 	}
 
 	// Create or resolve worktree
@@ -129,8 +130,14 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, fmt.Errorf("setup worktree: %w", setupErr)
 	}
 
+	// Setup agent-specific configurations (SetupScript and ExcludePatterns)
+	if setupErr := uc.setupAgent(task, wtPath, resolved); setupErr != nil {
+		_ = uc.worktrees.Remove(branch)
+		return nil, fmt.Errorf("setup agent: %w", setupErr)
+	}
+
 	// Generate prompt and script files
-	scriptPath, err := uc.generateScript(task, wtPath, workerAgent, cfg, model)
+	scriptPath, err := uc.generateScript(task, wtPath, resolved.Worker, cfg, model)
 	if err != nil {
 		_ = uc.worktrees.Remove(branch)
 		return nil, fmt.Errorf("generate script: %w", err)
@@ -192,35 +199,75 @@ func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, work
 	return scriptPath, nil
 }
 
+// resolvedWorkerResult holds the result of resolveWorkerAgent.
+type resolvedWorkerResult struct {
+	Worker              domain.Worker
+	DefaultModel        string
+	WorktreeSetupScript string   // Agent's setup script (template to expand)
+	ExcludePatterns     []string // Agent's exclude patterns to add to .git/info/exclude
+}
+
 // resolveWorkerAgent resolves the Worker configuration for the given agent name.
-// Returns the Worker and the default model for that agent.
-func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) (domain.Worker, string) {
+// Returns the Worker, default model, and agent-specific settings (SetupScript, ExcludePatterns).
+func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) resolvedWorkerResult {
 	// Check if agent is configured in config
 	if worker, ok := cfg.Workers[agent]; ok {
-		// For user-configured workers, check if there's a built-in default model
-		defaultModel := ""
-		if builtin, ok := domain.BuiltinAgents[agent]; ok {
-			defaultModel = builtin.DefaultModel
+		result := resolvedWorkerResult{
+			Worker:       worker,
+			DefaultModel: "",
 		}
-		return worker, defaultModel
+
+		// Check for agent reference in worker
+		if worker.Agent != "" {
+			if agentDef, ok := cfg.Agents[worker.Agent]; ok {
+				result.WorktreeSetupScript = agentDef.WorktreeSetupScript
+				result.ExcludePatterns = agentDef.ExcludePatterns
+				if result.DefaultModel == "" {
+					result.DefaultModel = agentDef.DefaultModel
+				}
+			}
+		}
+
+		// Check for built-in agent defaults
+		if builtin, ok := domain.BuiltinAgents[agent]; ok {
+			if result.DefaultModel == "" {
+				result.DefaultModel = builtin.DefaultModel
+			}
+			// Use built-in setup script/patterns if not set from config Agent
+			if result.WorktreeSetupScript == "" {
+				result.WorktreeSetupScript = builtin.WorktreeSetupScript
+			}
+			if len(result.ExcludePatterns) == 0 {
+				result.ExcludePatterns = builtin.ExcludePatterns
+			}
+		}
+
+		return result
 	}
 
 	// Check if it's a built-in agent
 	if builtin, ok := domain.BuiltinAgents[agent]; ok {
-		return domain.Worker{
-			Agent:           agent,
-			CommandTemplate: builtin.CommandTemplate,
-			Command:         builtin.Command,
-			SystemArgs:      builtin.SystemArgs,
-			Args:            builtin.DefaultArgs,
-		}, builtin.DefaultModel
+		return resolvedWorkerResult{
+			Worker: domain.Worker{
+				Agent:           agent,
+				CommandTemplate: builtin.CommandTemplate,
+				Command:         builtin.Command,
+				SystemArgs:      builtin.SystemArgs,
+				Args:            builtin.DefaultArgs,
+			},
+			DefaultModel:        builtin.DefaultModel,
+			WorktreeSetupScript: builtin.WorktreeSetupScript,
+			ExcludePatterns:     builtin.ExcludePatterns,
+		}
 	}
 
 	// Unknown agent - use the agent name as-is (custom agent)
-	return domain.Worker{
-		CommandTemplate: "{{.Command}} {{.Prompt}}",
-		Command:         agent,
-	}, ""
+	return resolvedWorkerResult{
+		Worker: domain.Worker{
+			CommandTemplate: "{{.Command}} {{.Prompt}}",
+			Command:         agent,
+		},
+	}
 }
 
 // scriptTemplateData holds the data for script template execution.
@@ -317,3 +364,122 @@ trap 'exit 129' HUP        # hangup -> exit code 129
 # Run agent
 {{.AgentCommand}}
 `
+
+// agentSetupData holds the data for agent setup script template expansion.
+type agentSetupData struct {
+	GitDir   string // Path to .git directory
+	RepoRoot string // Repository root path
+	Worktree string // Worktree path
+	TaskID   int    // Task ID
+}
+
+// setupAgent runs agent-specific setup: SetupScript execution and ExcludePatterns application.
+func (uc *StartTask) setupAgent(task *domain.Task, wtPath string, resolved resolvedWorkerResult) error {
+	gitDir := filepath.Join(uc.repoRoot, ".git")
+
+	// Apply exclude patterns
+	if len(resolved.ExcludePatterns) > 0 {
+		if err := uc.applyExcludePatterns(gitDir, resolved.ExcludePatterns); err != nil {
+			return fmt.Errorf("apply exclude patterns: %w", err)
+		}
+	}
+
+	// Run setup script
+	if resolved.WorktreeSetupScript != "" {
+		if err := uc.runSetupScript(task, wtPath, resolved.WorktreeSetupScript); err != nil {
+			return fmt.Errorf("run setup script: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// applyExcludePatterns adds patterns to .git/info/exclude if not already present.
+func (uc *StartTask) applyExcludePatterns(gitDir string, patterns []string) error {
+	excludePath := filepath.Join(gitDir, "info", "exclude")
+
+	// Ensure info directory exists
+	infoDir := filepath.Dir(excludePath)
+	if err := os.MkdirAll(infoDir, 0750); err != nil {
+		return fmt.Errorf("create info directory: %w", err)
+	}
+
+	// Read existing patterns
+	existingPatterns := make(map[string]bool)
+	if content, err := os.ReadFile(excludePath); err == nil {
+		for _, line := range strings.Split(string(content), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "#") {
+				existingPatterns[line] = true
+			}
+		}
+	}
+
+	// Collect patterns to add
+	var toAdd []string
+	for _, pattern := range patterns {
+		if !existingPatterns[pattern] {
+			toAdd = append(toAdd, pattern)
+		}
+	}
+
+	// Append new patterns
+	if len(toAdd) > 0 {
+		// Use 0644 for exclude file as it's not sensitive and needs to be readable
+		f, err := os.OpenFile(excludePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) //nolint:gosec // exclude file is not sensitive
+		if err != nil {
+			return fmt.Errorf("open exclude file: %w", err)
+		}
+
+		var writeErr error
+		for _, pattern := range toAdd {
+			if _, err := f.WriteString(pattern + "\n"); err != nil {
+				writeErr = fmt.Errorf("write pattern: %w", err)
+				break
+			}
+		}
+
+		if err := f.Close(); err != nil && writeErr == nil {
+			return fmt.Errorf("close exclude file: %w", err)
+		}
+		if writeErr != nil {
+			return writeErr
+		}
+	}
+
+	return nil
+}
+
+// runSetupScript expands and runs the agent's setup script.
+func (uc *StartTask) runSetupScript(task *domain.Task, wtPath, scriptTemplate string) error {
+	gitDir := filepath.Join(uc.repoRoot, ".git")
+
+	// Expand template
+	data := agentSetupData{
+		GitDir:   gitDir,
+		RepoRoot: uc.repoRoot,
+		Worktree: wtPath,
+		TaskID:   task.ID,
+	}
+
+	tmpl, err := template.New("setup").Parse(scriptTemplate)
+	if err != nil {
+		return fmt.Errorf("parse setup script template: %w", err)
+	}
+
+	var script strings.Builder
+	if err := tmpl.Execute(&script, data); err != nil {
+		return fmt.Errorf("expand setup script template: %w", err)
+	}
+
+	// Execute the script
+	// G204: Script content is from built-in agent config or user config (trusted source)
+	cmd := exec.Command("sh", "-c", script.String()) //nolint:gosec // Script from trusted config
+	cmd.Dir = wtPath
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("execute setup script: %w: %s", err, string(out))
+	}
+
+	return nil
+}
