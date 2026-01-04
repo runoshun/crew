@@ -26,9 +26,7 @@ func TestStartManager_Execute_Success(t *testing.T) {
 		SystemArgs:      "--model {{.Model}}",
 	}
 
-	helpContent := "# Manager Help\nThis is the help content."
-
-	uc := NewStartManager(configLoader, repoRoot, gitDir, helpContent)
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -40,7 +38,8 @@ func TestStartManager_Execute_Success(t *testing.T) {
 	assert.NotEmpty(t, out.Command)
 	assert.NotEmpty(t, out.Prompt)
 	assert.Contains(t, out.Command, "claude")
-	assert.Contains(t, out.Prompt, "Manager Help")
+	// Prompt should contain the default manager system prompt
+	assert.Contains(t, out.Prompt, "crew --help-manager")
 }
 
 func TestStartManager_Execute_ManagerNotFound(t *testing.T) {
@@ -50,7 +49,7 @@ func TestStartManager_Execute_ManagerNotFound(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	// No managers configured
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir, "")
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartManagerInput{
@@ -68,7 +67,7 @@ func TestStartManager_Execute_ConfigLoadError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	configLoader.LoadErr = assert.AnError
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir, "")
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartManagerInput{
@@ -95,7 +94,7 @@ func TestStartManager_Execute_WithModelOverride(t *testing.T) {
 		SystemArgs:      "--model {{.Model}}",
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir, "")
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute with model override
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -125,7 +124,7 @@ func TestStartManager_Execute_WithConfigModel(t *testing.T) {
 		SystemArgs:      "--model {{.Model}}",
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir, "")
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute without model override
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -152,7 +151,7 @@ func TestStartManager_Execute_WithManagerArgs(t *testing.T) {
 		Args:            "--base-flag",
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir, "")
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -177,7 +176,7 @@ func TestStartManager_Execute_WithBuiltinAgent(t *testing.T) {
 	}
 	// No workers configured - should fall back to builtin
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir, "")
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -199,7 +198,7 @@ func TestStartManager_Execute_NoAgentReference(t *testing.T) {
 		// Agent is empty
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir, "")
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartManagerInput{
@@ -221,7 +220,7 @@ func TestStartManager_Execute_AgentNotFound(t *testing.T) {
 		Agent: "unknown-agent",
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir, "")
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartManagerInput{
@@ -340,26 +339,4 @@ func TestSplitCommand(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-
-func TestStartManager_buildManagerSystemPrompt(t *testing.T) {
-	uc := &StartManager{
-		helpContent: "# Help Content",
-	}
-
-	prompt := uc.buildManagerSystemPrompt()
-
-	assert.Contains(t, prompt, "You are a Manager agent")
-	assert.Contains(t, prompt, "crew --help-manager")
-	assert.Contains(t, prompt, "# Help Content")
-}
-
-func TestStartManager_buildManagerSystemPrompt_Empty(t *testing.T) {
-	uc := &StartManager{
-		helpContent: "",
-	}
-
-	prompt := uc.buildManagerSystemPrompt()
-
-	assert.Empty(t, prompt)
 }

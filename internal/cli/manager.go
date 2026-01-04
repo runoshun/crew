@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -40,18 +39,8 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			managerName := args[0]
 
-			// Render help-manager content to inject into prompt
-			cfg, _ := c.ConfigLoader.Load()
-			helpData := NewHelpTemplateData(cfg)
-
-			var helpBuf bytes.Buffer
-			if err := RenderManagerHelp(&helpBuf, helpData); err != nil {
-				return fmt.Errorf("render help: %w", err)
-			}
-			helpContent := helpBuf.String()
-
 			// Execute use case
-			uc := c.StartManagerUseCase(helpContent)
+			uc := c.StartManagerUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.StartManagerInput{
 				Name:  managerName,
 				Model: opts.model,

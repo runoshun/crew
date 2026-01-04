@@ -27,7 +27,6 @@ type StartManager struct {
 	configLoader domain.ConfigLoader
 	repoRoot     string
 	gitDir       string
-	helpContent  string // Content of help-manager for injection into prompt
 }
 
 // NewStartManager creates a new StartManager use case.
@@ -35,13 +34,11 @@ func NewStartManager(
 	configLoader domain.ConfigLoader,
 	repoRoot string,
 	gitDir string,
-	helpContent string,
 ) *StartManager {
 	return &StartManager{
 		configLoader: configLoader,
 		repoRoot:     repoRoot,
 		gitDir:       gitDir,
-		helpContent:  helpContent,
 	}
 }
 
@@ -95,8 +92,8 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		Model:    model,
 	}
 
-	// Build the prompt with help-manager content injected
-	systemPrompt := uc.buildManagerSystemPrompt()
+	// Build the system prompt (simple instruction to check help-manager)
+	systemPrompt := managerSystemPrompt
 	defaultPrompt := cfg.WorkersConfig.Prompt
 
 	// Render command and prompt
@@ -143,34 +140,16 @@ func (uc *StartManager) resolveWorkerFromManager(manager domain.Manager, cfg *do
 	return domain.Worker{}, "", fmt.Errorf("agent %q not found", manager.Agent)
 }
 
-// buildManagerSystemPrompt creates the system prompt for a manager.
-// It includes the help-manager content to guide the manager's behavior.
-func (uc *StartManager) buildManagerSystemPrompt() string {
-	if uc.helpContent == "" {
-		return ""
-	}
-
-	const promptTemplate = `You are a Manager agent for git-crew.
+// managerSystemPrompt is the default system prompt for manager agents.
+// It instructs the agent to check crew --help-manager for detailed usage.
+const managerSystemPrompt = `You are a Manager agent for git-crew.
 
 IMPORTANT: Run 'crew --help-manager' for detailed usage instructions.
 
-Below is the complete manager guide:
-
-{{.HelpContent}}`
-
-	tmpl := template.Must(template.New("prompt").Parse(promptTemplate))
-	data := map[string]string{
-		"HelpContent": uc.helpContent,
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		// Fallback to just the help content
-		return uc.helpContent
-	}
-
-	return buf.String()
-}
+Your role is to:
+- Support users with task management
+- Create, monitor, and manage tasks using crew commands
+- Delegate code implementation to worker agents (do not edit files directly)`
 
 // GetCommand returns the executable path and arguments for the manager command.
 // This is a convenience method for callers that need to exec the command.
