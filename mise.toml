@@ -60,7 +60,7 @@ run = "go mod tidy"
 [tasks.install]
 description = "Install to ~/.local/bin"
 depends = ["build"]
-run = "cp crew ~/.local/bin/"
+run = "rm -f ~/.local/bin/crew && cp crew ~/.local/bin/"
 
 [tasks.clean]
 description = "Clean build artifacts"
