@@ -19,7 +19,7 @@ func newManagerCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "manager <name>",
+		Use:   "manager [name]",
 		Short: "Launch a manager agent",
 		Long: `Launch a manager agent for task orchestration.
 
@@ -29,15 +29,23 @@ but delegate actual code implementation to worker agents.
 The manager agent is launched in the current directory (not a worktree)
 and has access to all crew commands for task management.
 
+If no name is specified, the default manager is used.
+
 Examples:
   # Launch the default manager
-  crew manager default
+  crew manager
+
+  # Launch a specific manager
+  crew manager my-manager
 
   # Launch with a specific model
-  crew manager default --model opus`,
-		Args: cobra.ExactArgs(1),
+  crew manager --model opus`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			managerName := args[0]
+			managerName := domain.DefaultManagerName
+			if len(args) > 0 {
+				managerName = args[0]
+			}
 
 			// Execute use case
 			uc := c.StartManagerUseCase()

@@ -43,11 +43,17 @@ func TestNewDefaultConfig(t *testing.T) {
 	if cfg.Log.Level != DefaultLogLevel {
 		t.Errorf("Log.Level = %q, want %q", cfg.Log.Level, DefaultLogLevel)
 	}
-	if cfg.WorkersConfig.Default != DefaultWorkerName {
-		t.Errorf("WorkersConfig.Default = %q, want %q", cfg.WorkersConfig.Default, DefaultWorkerName)
-	}
 	if cfg.Workers == nil {
 		t.Error("Workers should not be nil")
+	}
+	// Check default worker exists
+	defaultWorker, ok := cfg.Workers[DefaultWorkerName]
+	if !ok {
+		t.Error("expected default worker to be configured")
+	} else {
+		if defaultWorker.Agent != DefaultWorkerAgent {
+			t.Errorf("default worker agent = %q, want %q", defaultWorker.Agent, DefaultWorkerAgent)
+		}
 	}
 	// Check WorkersConfig has default system prompt
 	if cfg.WorkersConfig.SystemPrompt != DefaultSystemPrompt {
@@ -58,8 +64,8 @@ func TestNewDefaultConfig(t *testing.T) {
 	}
 	// Check builtin workers are configured from BuiltinAgents
 	for name, builtin := range BuiltinAgents {
-		worker, ok := cfg.Workers[name]
-		if !ok {
+		worker, exists := cfg.Workers[name]
+		if !exists {
 			t.Errorf("expected %s worker to be configured", name)
 			continue
 		}
@@ -85,16 +91,24 @@ func TestNewDefaultConfig(t *testing.T) {
 	}
 
 	// Check default manager
-	manager, ok := cfg.Managers["default"]
+	manager, ok := cfg.Managers[DefaultManagerName]
 	if !ok {
 		t.Error("expected default manager to be configured")
 	} else {
-		if manager.Agent != "opencode" {
-			t.Errorf("default manager agent = %q, want %q", manager.Agent, "opencode")
+		if manager.Agent != DefaultManagerAgent {
+			t.Errorf("default manager agent = %q, want %q", manager.Agent, DefaultManagerAgent)
 		}
 		if manager.Description != "Default manager agent" {
 			t.Errorf("default manager description = %q, want %q", manager.Description, "Default manager agent")
 		}
+	}
+
+	// Check ManagersConfig has default system prompt
+	if cfg.ManagersConfig.SystemPrompt != DefaultManagerSystemPrompt {
+		t.Errorf("ManagersConfig.SystemPrompt = %q, want %q", cfg.ManagersConfig.SystemPrompt, DefaultManagerSystemPrompt)
+	}
+	if cfg.ManagersConfig.Prompt != "" {
+		t.Errorf("ManagersConfig.Prompt = %q, want empty", cfg.ManagersConfig.Prompt)
 	}
 }
 

@@ -92,12 +92,20 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		Model:    model,
 	}
 
-	// Build the system prompt (simple instruction to check help-manager)
-	systemPrompt := managerSystemPrompt
-	defaultPrompt := cfg.WorkersConfig.Prompt
+	// Build the system prompt with priority: manager > managers config > default
+	systemPrompt := manager.SystemPrompt
+	if systemPrompt == "" {
+		systemPrompt = cfg.ManagersConfig.SystemPrompt
+	}
+
+	// Build the user prompt with priority: manager > managers config
+	userPrompt := manager.Prompt
+	if userPrompt == "" {
+		userPrompt = cfg.ManagersConfig.Prompt
+	}
 
 	// Render command and prompt
-	result, err := worker.RenderCommand(cmdData, `"$PROMPT"`, systemPrompt, defaultPrompt)
+	result, err := worker.RenderCommand(cmdData, `"$PROMPT"`, systemPrompt, userPrompt)
 	if err != nil {
 		return nil, fmt.Errorf("render command: %w", err)
 	}
@@ -139,17 +147,6 @@ func (uc *StartManager) resolveWorkerFromManager(manager domain.Manager, cfg *do
 
 	return domain.Worker{}, "", fmt.Errorf("agent %q not found", manager.Agent)
 }
-
-// managerSystemPrompt is the default system prompt for manager agents.
-// It instructs the agent to check crew --help-manager for detailed usage.
-const managerSystemPrompt = `You are a Manager agent for git-crew.
-
-IMPORTANT: Run 'crew --help-manager' for detailed usage instructions.
-
-Your role is to:
-- Support users with task management
-- Create, monitor, and manage tasks using crew commands
-- Delegate code implementation to worker agents (do not edit files directly)`
 
 // GetCommand returns the executable path and arguments for the manager command.
 // This is a convenience method for callers that need to exec the command.

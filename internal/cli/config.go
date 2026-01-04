@@ -75,7 +75,6 @@ Use --ignore-global or --ignore-repo to exclude specific sources for debugging.`
 func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
 	// [workers] section
 	_, _ = fmt.Fprintln(w, "[workers]")
-	_, _ = fmt.Fprintf(w, "default = %q\n", cfg.WorkersConfig.Default)
 	if cfg.WorkersConfig.Prompt != "" {
 		_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(cfg.WorkersConfig.Prompt))
 	}
@@ -105,6 +104,38 @@ func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
 		}
 		if worker.Prompt != "" {
 			_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(worker.Prompt))
+		}
+		_, _ = fmt.Fprintln(w)
+	}
+
+	// [managers] section
+	_, _ = fmt.Fprintln(w, "[managers]")
+	if cfg.ManagersConfig.Prompt != "" {
+		_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(cfg.ManagersConfig.Prompt))
+	}
+	_, _ = fmt.Fprintln(w)
+
+	// [managers.<name>] sections - sorted for consistent output
+	managerNames := make([]string, 0, len(cfg.Managers))
+	for name := range cfg.Managers {
+		managerNames = append(managerNames, name)
+	}
+	sort.Strings(managerNames)
+
+	for _, name := range managerNames {
+		manager := cfg.Managers[name]
+		_, _ = fmt.Fprintf(w, "[managers.%s]\n", name)
+		if manager.Agent != "" {
+			_, _ = fmt.Fprintf(w, "agent = %q\n", manager.Agent)
+		}
+		if manager.Model != "" {
+			_, _ = fmt.Fprintf(w, "model = %q\n", manager.Model)
+		}
+		if manager.Args != "" {
+			_, _ = fmt.Fprintf(w, "args = %q\n", manager.Args)
+		}
+		if manager.Prompt != "" {
+			_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(manager.Prompt))
 		}
 		_, _ = fmt.Fprintln(w)
 	}

@@ -347,35 +347,6 @@ func TestStartTask_Execute_SessionAlreadyRunning(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrSessionRunning)
 }
 
-func TestStartTask_Execute_NoAgent(t *testing.T) {
-	crewDir := t.TempDir()
-
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Test task",
-		Status:     domain.StatusTodo,
-		BaseBranch: "main",
-	}
-	sessions := testutil.NewMockSessionManager()
-	worktrees := testutil.NewMockWorktreeManager()
-	configLoader := testutil.NewMockConfigLoader()
-	// No default_agent in config
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-
-	repoRoot := t.TempDir()
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
-
-	// Execute without agent
-	_, err := uc.Execute(context.Background(), StartTaskInput{
-		TaskID: 1,
-		Agent:  "",
-	})
-
-	// Assert
-	assert.ErrorIs(t, err, domain.ErrNoAgent)
-}
-
 func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
@@ -392,7 +363,7 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.WorkersConfig.Default = "opencode" // default from [workers] section
+	// default worker is already set up by NewMockConfigLoader (workers.default)
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
@@ -407,11 +378,11 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "crew-1", out.SessionName)
 
-	// Verify task uses default agent
+	// Verify task uses default worker name
 	task := repo.Tasks[1]
-	assert.Equal(t, "opencode", task.Agent)
+	assert.Equal(t, domain.DefaultWorkerName, task.Agent)
 
-	// Verify script uses default agent
+	// Verify script uses the underlying agent command (opencode)
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
 	assert.Contains(t, string(scriptContent), "opencode")

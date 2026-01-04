@@ -91,13 +91,10 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, fmt.Errorf("load config: %w", loadErr)
 	}
 
-	// Resolve agent from input or config
+	// Resolve agent from input or default
 	agent := in.Agent
 	if agent == "" {
-		agent = cfg.WorkersConfig.Default
-	}
-	if agent == "" {
-		return nil, domain.ErrNoAgent
+		agent = domain.DefaultWorkerName
 	}
 
 	// Get agent configuration
@@ -217,19 +214,31 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) resolv
 			DefaultModel: "",
 		}
 
-		// Check for agent reference in worker
-		if worker.Agent != "" {
-			if agentDef, ok := cfg.Agents[worker.Agent]; ok {
-				result.WorktreeSetupScript = agentDef.WorktreeSetupScript
-				result.ExcludePatterns = agentDef.ExcludePatterns
-				if result.DefaultModel == "" {
-					result.DefaultModel = agentDef.DefaultModel
-				}
+		// Check for agent reference in worker - inherit fields from Agent
+		agentRef := worker.Agent
+		if agentRef == "" {
+			agentRef = agent // Use worker name as agent reference if not specified
+		}
+
+		// Try to inherit from config Agent first
+		if agentDef, ok := cfg.Agents[agentRef]; ok {
+			result.WorktreeSetupScript = agentDef.WorktreeSetupScript
+			result.ExcludePatterns = agentDef.ExcludePatterns
+			result.DefaultModel = agentDef.DefaultModel
+			// Inherit command fields if not set in worker
+			if result.Worker.CommandTemplate == "" {
+				result.Worker.CommandTemplate = agentDef.CommandTemplate
+			}
+			if result.Worker.Command == "" {
+				result.Worker.Command = agentDef.Command
+			}
+			if result.Worker.SystemArgs == "" {
+				result.Worker.SystemArgs = agentDef.SystemArgs
 			}
 		}
 
 		// Check for built-in agent defaults
-		if builtin, ok := domain.BuiltinAgents[agent]; ok {
+		if builtin, ok := domain.BuiltinAgents[agentRef]; ok {
 			if result.DefaultModel == "" {
 				result.DefaultModel = builtin.DefaultModel
 			}
@@ -239,6 +248,16 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) resolv
 			}
 			if len(result.ExcludePatterns) == 0 {
 				result.ExcludePatterns = builtin.ExcludePatterns
+			}
+			// Inherit command fields from builtin if not set
+			if result.Worker.CommandTemplate == "" {
+				result.Worker.CommandTemplate = builtin.CommandTemplate
+			}
+			if result.Worker.Command == "" {
+				result.Worker.Command = builtin.Command
+			}
+			if result.Worker.SystemArgs == "" {
+				result.Worker.SystemArgs = builtin.SystemArgs
 			}
 		}
 

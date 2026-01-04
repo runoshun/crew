@@ -442,14 +442,10 @@ type MockConfigLoader struct {
 	RepoErr      error
 }
 
-// NewMockConfigLoader creates a new MockConfigLoader with default empty config.
+// NewMockConfigLoader creates a new MockConfigLoader with default config.
 func NewMockConfigLoader() *MockConfigLoader {
 	return &MockConfigLoader{
-		Config: &domain.Config{
-			Agents:   make(map[string]domain.Agent),
-			Workers:  make(map[string]domain.Worker),
-			Managers: make(map[string]domain.Manager),
-		},
+		Config: domain.NewDefaultConfig(),
 	}
 }
 
