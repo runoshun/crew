@@ -12,7 +12,7 @@ Support users with git-crew task management. Delegate code implementation to wor
 Run for complete workflow and command reference:
 
 ```bash
-crew help --help-manager
+crew --help-manager
 ```
 
 ## Constraints
