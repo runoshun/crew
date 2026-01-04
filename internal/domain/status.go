@@ -7,6 +7,7 @@ const (
 	StatusTodo       Status = "todo"        // Created, awaiting start
 	StatusInProgress Status = "in_progress" // Agent working
 	StatusInReview   Status = "in_review"   // Work complete, awaiting review
+	StatusNeedsInput Status = "needs_input" // Agent is waiting for user input
 	StatusError      Status = "error"       // Session terminated abnormally
 	StatusDone       Status = "done"        // Merge complete
 	StatusClosed     Status = "closed"      // Discarded without merge
@@ -19,6 +20,7 @@ func AllStatuses() []Status {
 		StatusTodo,
 		StatusInProgress,
 		StatusInReview,
+		StatusNeedsInput,
 		StatusStopped,
 		StatusError,
 		StatusDone,
@@ -29,8 +31,9 @@ func AllStatuses() []Status {
 // transitions defines the allowed status transitions.
 var transitions = map[Status][]Status{
 	StatusTodo:       {StatusInProgress, StatusClosed},
-	StatusInProgress: {StatusInReview, StatusStopped, StatusError, StatusClosed},
+	StatusInProgress: {StatusInReview, StatusNeedsInput, StatusStopped, StatusError, StatusClosed},
 	StatusInReview:   {StatusInProgress, StatusDone, StatusClosed},
+	StatusNeedsInput: {StatusInProgress, StatusClosed},
 	StatusStopped:    {StatusInProgress, StatusClosed},
 	StatusError:      {StatusInProgress, StatusClosed},
 	StatusDone:       {StatusClosed},
@@ -70,6 +73,8 @@ func (s Status) Display() string {
 		return "In Progress"
 	case StatusInReview:
 		return "In Review"
+	case StatusNeedsInput:
+		return "Needs Input"
 	case StatusStopped:
 		return "Stopped"
 	case StatusError:
@@ -86,7 +91,7 @@ func (s Status) Display() string {
 // IsValid returns true if the status is a known valid value.
 func (s Status) IsValid() bool {
 	switch s {
-	case StatusTodo, StatusInProgress, StatusInReview, StatusStopped, StatusError, StatusDone, StatusClosed:
+	case StatusTodo, StatusInProgress, StatusInReview, StatusNeedsInput, StatusStopped, StatusError, StatusDone, StatusClosed:
 		return true
 	default:
 		return false

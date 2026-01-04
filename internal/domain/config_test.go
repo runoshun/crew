@@ -56,8 +56,8 @@ func TestNewDefaultConfig(t *testing.T) {
 	if cfg.WorkersConfig.Prompt != "" {
 		t.Errorf("WorkersConfig.Prompt = %q, want empty", cfg.WorkersConfig.Prompt)
 	}
-	// Check builtin workers are configured from BuiltinWorkers
-	for name, builtin := range BuiltinWorkers {
+	// Check builtin workers are configured from BuiltinAgents
+	for name, builtin := range BuiltinAgents {
 		worker, ok := cfg.Workers[name]
 		if !ok {
 			t.Errorf("expected %s worker to be configured", name)
@@ -88,7 +88,7 @@ func TestNewDefaultConfig(t *testing.T) {
 func TestAgent_RenderCommand(t *testing.T) {
 	tests := []struct {
 		name                string
-		agent               WorkerAgent
+		agent               Worker
 		data                CommandData
 		promptOverride      string
 		defaultSystemPrompt string
@@ -98,7 +98,7 @@ func TestAgent_RenderCommand(t *testing.T) {
 	}{
 		{
 			name: "claude style with shell variable",
-			agent: WorkerAgent{
+			agent: Worker{
 				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 				Command:         "claude",
 				SystemArgs:      "--permission-mode acceptEdits",
@@ -113,7 +113,7 @@ func TestAgent_RenderCommand(t *testing.T) {
 		},
 		{
 			name: "opencode style with -p flag",
-			agent: WorkerAgent{
+			agent: Worker{
 				CommandTemplate: "{{.Command}} {{.Args}} -p {{.Prompt}}",
 				Command:         "opencode",
 				Args:            "-m gpt-4",
@@ -127,7 +127,7 @@ func TestAgent_RenderCommand(t *testing.T) {
 		},
 		{
 			name: "with GitDir in SystemArgs",
-			agent: WorkerAgent{
+			agent: Worker{
 				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 				Command:         "claude",
 				SystemArgs:      "--add-dir {{.GitDir}}",
@@ -146,7 +146,7 @@ func TestAgent_RenderCommand(t *testing.T) {
 		},
 		{
 			name: "worker-specific prompt overrides default",
-			agent: WorkerAgent{
+			agent: Worker{
 				CommandTemplate: "{{.Command}} {{.Prompt}}",
 				Command:         "agent",
 				SystemPrompt:    "Sys: {{.TaskID}}",
@@ -180,8 +180,8 @@ func TestAgent_RenderCommand(t *testing.T) {
 	}
 }
 
-func TestWorkerAgent_RenderCommand_InvalidTemplate(t *testing.T) {
-	agent := WorkerAgent{
+func TestWorker_RenderCommand_InvalidTemplate(t *testing.T) {
+	agent := Worker{
 		CommandTemplate: "{{.Invalid",
 		Command:         "test",
 	}
@@ -191,8 +191,8 @@ func TestWorkerAgent_RenderCommand_InvalidTemplate(t *testing.T) {
 	}
 }
 
-func TestWorkerAgent_RenderCommand_InvalidSystemArgsTemplate(t *testing.T) {
-	agent := WorkerAgent{
+func TestWorker_RenderCommand_InvalidSystemArgsTemplate(t *testing.T) {
+	agent := Worker{
 		CommandTemplate: "{{.Command}} {{.SystemArgs}}",
 		Command:         "test",
 		SystemArgs:      "{{.Invalid",
@@ -203,8 +203,8 @@ func TestWorkerAgent_RenderCommand_InvalidSystemArgsTemplate(t *testing.T) {
 	}
 }
 
-func TestWorkerAgent_RenderCommand_InvalidPromptTemplate(t *testing.T) {
-	agent := WorkerAgent{
+func TestWorker_RenderCommand_InvalidPromptTemplate(t *testing.T) {
+	agent := Worker{
 		CommandTemplate: "{{.Command}} {{.Prompt}}",
 		Command:         "test",
 		Prompt:          "{{.Invalid",
@@ -218,13 +218,13 @@ func TestWorkerAgent_RenderCommand_InvalidPromptTemplate(t *testing.T) {
 func TestAgent_RenderCommand_WithModel(t *testing.T) {
 	tests := []struct {
 		name        string
-		agent       WorkerAgent
+		agent       Worker
 		data        CommandData
 		wantCommand string
 	}{
 		{
 			name: "claude with model in SystemArgs",
-			agent: WorkerAgent{
+			agent: Worker{
 				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 				Command:         "claude",
 				SystemArgs:      "--model {{.Model}}",
@@ -235,7 +235,7 @@ func TestAgent_RenderCommand_WithModel(t *testing.T) {
 		},
 		{
 			name: "opencode with model in SystemArgs",
-			agent: WorkerAgent{
+			agent: Worker{
 				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
 				Command:         "opencode",
 				SystemArgs:      "-m {{.Model}}",
@@ -246,7 +246,7 @@ func TestAgent_RenderCommand_WithModel(t *testing.T) {
 		},
 		{
 			name: "model with empty value in SystemArgs",
-			agent: WorkerAgent{
+			agent: Worker{
 				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Prompt}}",
 				Command:         "agent",
 				SystemArgs:      "--model {{.Model}}",
@@ -256,7 +256,7 @@ func TestAgent_RenderCommand_WithModel(t *testing.T) {
 		},
 		{
 			name: "user Args not affected by model",
-			agent: WorkerAgent{
+			agent: Worker{
 				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 				Command:         "claude",
 				SystemArgs:      "--model {{.Model}}",
@@ -297,7 +297,7 @@ func TestRenderConfigTemplate(t *testing.T) {
 	if !strings.Contains(content, "# system_prompt = "+formattedSysPrompt) {
 		t.Errorf("expected system prompt to be embedded in template")
 	}
-	for name, builtin := range BuiltinWorkers {
+	for name, builtin := range BuiltinAgents {
 		if builtin.DefaultArgs != "" && !strings.Contains(content, builtin.DefaultArgs) {
 			t.Errorf("expected %s args %q to be embedded in template", name, builtin.DefaultArgs)
 		}
@@ -318,13 +318,13 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 	tests := []struct {
 		name    string
 		config  *Config
-		want    map[string]WorkerAgent
+		want    map[string]Worker
 		wantErr error
 	}{
 		{
 			name: "simple inheritance",
 			config: &Config{
-				Workers: map[string]WorkerAgent{
+				Workers: map[string]Worker{
 					"base": {
 						CommandTemplate: "{{.Command}} {{.Args}}",
 						Command:         "base-cmd",
@@ -336,7 +336,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]WorkerAgent{
+			want: map[string]Worker{
 				"base": {
 					CommandTemplate: "{{.Command}} {{.Args}}",
 					Command:         "base-cmd",
@@ -353,7 +353,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "partial override",
 			config: &Config{
-				Workers: map[string]WorkerAgent{
+				Workers: map[string]Worker{
 					"base": {
 						CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
 						Command:         "base-cmd",
@@ -369,7 +369,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]WorkerAgent{
+			want: map[string]Worker{
 				"base": {
 					CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
 					Command:         "base-cmd",
@@ -392,7 +392,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "model inheritance fallback",
 			config: &Config{
-				Workers: map[string]WorkerAgent{
+				Workers: map[string]Worker{
 					"base": {
 						CommandTemplate: "{{.Command}}",
 						Command:         "base",
@@ -403,7 +403,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]WorkerAgent{
+			want: map[string]Worker{
 				"base": {
 					CommandTemplate: "{{.Command}}",
 					Command:         "base",
@@ -420,7 +420,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "multi-level inheritance",
 			config: &Config{
-				Workers: map[string]WorkerAgent{
+				Workers: map[string]Worker{
 					"base": {
 						CommandTemplate: "{{.Command}} {{.Args}}",
 						Command:         "base-cmd",
@@ -436,7 +436,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]WorkerAgent{
+			want: map[string]Worker{
 				"base": {
 					CommandTemplate: "{{.Command}} {{.Args}}",
 					Command:         "base-cmd",
@@ -458,7 +458,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "no inheritance",
 			config: &Config{
-				Workers: map[string]WorkerAgent{
+				Workers: map[string]Worker{
 					"worker1": {
 						CommandTemplate: "{{.Command}}",
 						Command:         "cmd1",
@@ -469,7 +469,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]WorkerAgent{
+			want: map[string]Worker{
 				"worker1": {
 					CommandTemplate: "{{.Command}}",
 					Command:         "cmd1",
@@ -484,7 +484,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "circular dependency - direct",
 			config: &Config{
-				Workers: map[string]WorkerAgent{
+				Workers: map[string]Worker{
 					"a": {
 						Inherit: "b",
 					},
@@ -498,7 +498,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "circular dependency - indirect",
 			config: &Config{
-				Workers: map[string]WorkerAgent{
+				Workers: map[string]Worker{
 					"a": {
 						Inherit: "b",
 					},
@@ -515,7 +515,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "parent not found",
 			config: &Config{
-				Workers: map[string]WorkerAgent{
+				Workers: map[string]Worker{
 					"child": {
 						Inherit: "nonexistent",
 					},

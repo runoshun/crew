@@ -446,7 +446,9 @@ type MockConfigLoader struct {
 func NewMockConfigLoader() *MockConfigLoader {
 	return &MockConfigLoader{
 		Config: &domain.Config{
-			Workers: make(map[string]domain.WorkerAgent),
+			Agents:   make(map[string]domain.Agent),
+			Workers:  make(map[string]domain.Worker),
+			Managers: make(map[string]domain.Manager),
 		},
 	}
 }

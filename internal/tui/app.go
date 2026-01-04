@@ -446,7 +446,7 @@ func (m *Model) updateAgents() {
 
 	// Built-in agents with their commands
 	m.builtinAgents = []string{}
-	for name, builtin := range domain.BuiltinWorkers {
+	for name, builtin := range domain.BuiltinAgents {
 		m.builtinAgents = append(m.builtinAgents, name)
 		m.agentCommands[name] = builtin.Command
 	}
@@ -454,7 +454,7 @@ func (m *Model) updateAgents() {
 	// Custom agents from config (exclude built-ins)
 	m.customAgents = []string{}
 	for name, worker := range m.config.Workers {
-		if _, isBuiltin := domain.BuiltinWorkers[name]; !isBuiltin {
+		if _, isBuiltin := domain.BuiltinAgents[name]; !isBuiltin {
 			m.customAgents = append(m.customAgents, name)
 			m.agentCommands[name] = worker.Command
 		}

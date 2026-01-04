@@ -28,7 +28,7 @@ func TestShowConfig_Execute(t *testing.T) {
 		loader := testutil.NewMockConfigLoader()
 		loader.Config = &domain.Config{
 			WorkersConfig: domain.WorkersConfig{Default: "claude"},
-			Workers:       make(map[string]domain.WorkerAgent),
+			Workers:       make(map[string]domain.Worker),
 		}
 
 		uc := usecase.NewShowConfig(manager, loader)

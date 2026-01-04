@@ -170,14 +170,14 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 // generateScript creates the task script with embedded prompt.
 // Returns the path to the generated script.
-func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config, model string) (string, error) {
+func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, worker domain.Worker, cfg *domain.Config, model string) (string, error) {
 	scriptsDir := filepath.Join(uc.crewDir, "scripts")
 	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
 		return "", fmt.Errorf("create scripts directory: %w", err)
 	}
 
 	// Build command and prompt using RenderCommand
-	script, err := uc.buildScript(task, worktreePath, workerAgent, cfg, model)
+	script, err := uc.buildScript(task, worktreePath, worker, cfg, model)
 	if err != nil {
 		return "", fmt.Errorf("build script: %w", err)
 	}
@@ -192,22 +192,23 @@ func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, work
 	return scriptPath, nil
 }
 
-// resolveWorkerAgent resolves the WorkerAgent configuration for the given agent name.
-// Returns the WorkerAgent and the default model for that agent.
-func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) (domain.WorkerAgent, string) {
+// resolveWorkerAgent resolves the Worker configuration for the given agent name.
+// Returns the Worker and the default model for that agent.
+func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) (domain.Worker, string) {
 	// Check if agent is configured in config
-	if workerAgent, ok := cfg.Workers[agent]; ok {
-		// For user-configured agents, check if there's a built-in default model
+	if worker, ok := cfg.Workers[agent]; ok {
+		// For user-configured workers, check if there's a built-in default model
 		defaultModel := ""
-		if builtin, ok := domain.BuiltinWorkers[agent]; ok {
+		if builtin, ok := domain.BuiltinAgents[agent]; ok {
 			defaultModel = builtin.DefaultModel
 		}
-		return workerAgent, defaultModel
+		return worker, defaultModel
 	}
 
 	// Check if it's a built-in agent
-	if builtin, ok := domain.BuiltinWorkers[agent]; ok {
-		return domain.WorkerAgent{
+	if builtin, ok := domain.BuiltinAgents[agent]; ok {
+		return domain.Worker{
+			Agent:           agent,
 			CommandTemplate: builtin.CommandTemplate,
 			Command:         builtin.Command,
 			SystemArgs:      builtin.SystemArgs,
@@ -216,7 +217,7 @@ func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) (domai
 	}
 
 	// Unknown agent - use the agent name as-is (custom agent)
-	return domain.WorkerAgent{
+	return domain.Worker{
 		CommandTemplate: "{{.Command}} {{.Prompt}}",
 		Command:         agent,
 	}, ""
@@ -232,7 +233,7 @@ type scriptTemplateData struct {
 }
 
 // buildScript constructs the task script with embedded prompt and session-ended callback.
-func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerAgent domain.WorkerAgent, cfg *domain.Config, model string) (string, error) {
+func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, worker domain.Worker, cfg *domain.Config, model string) (string, error) {
 	// Find crew binary path (for _session-ended callback)
 	crewBin, err := os.Executable()
 	if err != nil {
@@ -261,9 +262,9 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, workerA
 	}
 	defaultPrompt := cfg.WorkersConfig.Prompt
 
-	// Render command and prompt using WorkerAgent.RenderCommand
+	// Render command and prompt using Worker.RenderCommand
 	// Pass shell variable reference as promptOverride - will be expanded at runtime
-	result, err := workerAgent.RenderCommand(cmdData, `"$PROMPT"`, defaultSystemPrompt, defaultPrompt)
+	result, err := worker.RenderCommand(cmdData, `"$PROMPT"`, defaultSystemPrompt, defaultPrompt)
 	if err != nil {
 		return "", fmt.Errorf("render agent command: %w", err)
 	}

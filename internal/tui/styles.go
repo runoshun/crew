@@ -376,6 +376,8 @@ func (s Styles) StatusStyle(status domain.Status) lipgloss.Style {
 		return s.StatusInProgress
 	case domain.StatusInReview:
 		return s.StatusInReview
+	case domain.StatusNeedsInput:
+		return s.StatusInProgress // Use InProgress style for NeedsInput
 	case domain.StatusStopped:
 		return s.StatusStopped
 	case domain.StatusError:
@@ -398,6 +400,8 @@ func (s Styles) StatusStyleSelected(status domain.Status) lipgloss.Style {
 		return s.StatusInProgressSelected
 	case domain.StatusInReview:
 		return s.StatusInReviewSelected
+	case domain.StatusNeedsInput:
+		return s.StatusInProgressSelected // Use InProgress style for NeedsInput
 	case domain.StatusStopped:
 		return s.StatusStoppedSelected
 	case domain.StatusError:
@@ -420,6 +424,8 @@ func StatusText(status domain.Status) string {
 		return "InPrg"
 	case domain.StatusInReview:
 		return "Revw"
+	case domain.StatusNeedsInput:
+		return "Input"
 	case domain.StatusStopped:
 		return "Stop"
 	case domain.StatusError:
@@ -442,6 +448,8 @@ func StatusIcon(status domain.Status) string {
 		return "➜"
 	case domain.StatusInReview:
 		return "◎"
+	case domain.StatusNeedsInput:
+		return "?"
 	case domain.StatusStopped:
 		return "⏸"
 	case domain.StatusError:
