@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -29,6 +30,56 @@ func NewClient(repoRoot, worktreeDir string) *Client {
 
 // Ensure Client implements domain.WorktreeManager interface.
 var _ domain.WorktreeManager = (*Client)(nil)
+
+// SetupWorktree performs post-creation setup tasks (file copying and command execution).
+// This should be called after Create to apply worktree customization.
+func (c *Client) SetupWorktree(wtPath string, config *domain.WorktreeConfig) error {
+	if config == nil {
+		return nil
+	}
+
+	// Copy files/directories (with CoW support)
+	for _, item := range config.Copy {
+		src := filepath.Join(c.repoRoot, item)
+		dst := filepath.Join(wtPath, item)
+
+		if err := c.copyWithCoW(src, dst); err != nil {
+			return fmt.Errorf("copy %s: %w", item, err)
+		}
+	}
+
+	// Execute setup command
+	if config.SetupCommand != "" {
+		// G204: Setup command is from config file (trusted source)
+		cmd := exec.Command("sh", "-c", config.SetupCommand) //nolint:gosec // Command from config file
+		cmd.Dir = wtPath
+
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("setup command failed: %w: %s", err, string(out))
+		}
+	}
+
+	return nil
+}
+
+// copyWithCoW copies a file or directory using Copy-on-Write if available.
+// Falls back to regular copy if CoW is not supported.
+func (c *Client) copyWithCoW(src, dst string) error {
+	// Try CoW copy first (cp --reflink=auto)
+	cmd := exec.Command("cp", "--reflink=auto", "-r", src, dst)
+	if err := cmd.Run(); err != nil {
+		// If CoW fails, we might need to create parent directories
+		if err := os.MkdirAll(filepath.Dir(dst), 0750); err != nil {
+			return fmt.Errorf("create parent directory: %w", err)
+		}
+		// Retry
+		cmd = exec.Command("cp", "--reflink=auto", "-r", src, dst)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("copy failed: %w", err)
+		}
+	}
+	return nil
+}
 
 // Create creates a new worktree for the given branch.
 // If the branch doesn't exist, it creates a new branch from baseBranch.

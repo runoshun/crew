@@ -382,3 +382,84 @@ func TestClient_Create_OrphanedWorktree(t *testing.T) {
 	_, err = os.Stat(path2)
 	assert.NoError(t, err)
 }
+
+func TestClient_SetupWorktree_CopyFiles(t *testing.T) {
+	// Setup test repo
+	repoRoot, worktreeDir, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	// Create test files in main repo
+	testFile := filepath.Join(repoRoot, "test.txt")
+	require.NoError(t, os.WriteFile(testFile, []byte("test content"), 0644))
+
+	testDir := filepath.Join(repoRoot, "testdir")
+	require.NoError(t, os.MkdirAll(testDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(testDir, "file.txt"), []byte("file content"), 0644))
+
+	// Create client and worktree
+	client := NewClient(repoRoot, worktreeDir)
+	branch := "crew-1"
+	wtPath, err := client.Create(branch, "main")
+	require.NoError(t, err)
+
+	// Setup worktree with copy config
+	config := &domain.WorktreeConfig{
+		Copy: []string{"test.txt", "testdir"},
+	}
+
+	err = client.SetupWorktree(wtPath, config)
+	require.NoError(t, err)
+
+	// Verify files were copied
+	copiedFile := filepath.Join(wtPath, "test.txt")
+	assert.FileExists(t, copiedFile)
+	content, err := os.ReadFile(copiedFile)
+	require.NoError(t, err)
+	assert.Equal(t, "test content", string(content))
+
+	copiedDir := filepath.Join(wtPath, "testdir", "file.txt")
+	assert.FileExists(t, copiedDir)
+}
+
+func TestClient_SetupWorktree_SetupCommand(t *testing.T) {
+	// Setup test repo
+	repoRoot, worktreeDir, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	// Create client and worktree
+	client := NewClient(repoRoot, worktreeDir)
+	branch := "crew-1"
+	wtPath, err := client.Create(branch, "main")
+	require.NoError(t, err)
+
+	// Setup worktree with setup command
+	config := &domain.WorktreeConfig{
+		SetupCommand: "echo 'test' > setup_test.txt",
+	}
+
+	err = client.SetupWorktree(wtPath, config)
+	require.NoError(t, err)
+
+	// Verify command was executed
+	testFile := filepath.Join(wtPath, "setup_test.txt")
+	assert.FileExists(t, testFile)
+	content, err := os.ReadFile(testFile)
+	require.NoError(t, err)
+	assert.Equal(t, "test\n", string(content))
+}
+
+func TestClient_SetupWorktree_NilConfig(t *testing.T) {
+	// Setup test repo
+	repoRoot, worktreeDir, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	// Create client and worktree
+	client := NewClient(repoRoot, worktreeDir)
+	branch := "crew-1"
+	wtPath, err := client.Create(branch, "main")
+	require.NoError(t, err)
+
+	// Setup with nil config should not error
+	err = client.SetupWorktree(wtPath, nil)
+	assert.NoError(t, err)
+}
