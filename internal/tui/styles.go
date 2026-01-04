@@ -90,6 +90,8 @@ type Styles struct {
 	TaskDescSelected   lipgloss.Style
 	TaskAgent          lipgloss.Style
 	TaskAgentSelected  lipgloss.Style
+	TaskLabel          lipgloss.Style
+	TaskLabelSelected  lipgloss.Style
 	CursorNormal       lipgloss.Style
 	CursorSelected     lipgloss.Style
 
@@ -214,6 +216,15 @@ func DefaultStyles() Styles {
 			Foreground(Colors.Secondary).
 			Italic(true).
 			MarginLeft(1),
+
+		TaskLabel: lipgloss.NewStyle().
+			Foreground(Colors.Secondary).
+			MarginRight(1),
+
+		TaskLabelSelected: lipgloss.NewStyle().
+			Foreground(Colors.Secondary).
+			Bold(true).
+			MarginRight(1),
 
 		CursorNormal: lipgloss.NewStyle().
 			Foreground(Colors.Background). // Hide cursor in normal mode (matches bg)

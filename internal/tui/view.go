@@ -651,6 +651,18 @@ func (m *Model) viewDetailPanel() string {
 		return panelStyle.Render(strings.Join(contentLines, "\n"))
 	}
 
+	// Labels (if present)
+	if len(task.Labels) > 0 {
+		var labelsBuilder strings.Builder
+		for _, l := range task.Labels {
+			labelsBuilder.WriteString("[" + l + "] ")
+		}
+		labelsLine := labelStyle.Render("Labels") + m.styles.TaskLabel.Render(labelsBuilder.String())
+		if !addLines(labelsLine) {
+			return panelStyle.Render(strings.Join(contentLines, "\n"))
+		}
+	}
+
 	// Agent (if present)
 	if task.Agent != "" {
 		agentLine := labelStyle.Render("Agent") + valueStyle.Render(task.Agent)
