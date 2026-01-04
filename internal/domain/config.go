@@ -303,8 +303,13 @@ func NewDefaultConfig() *Config {
 			SystemPrompt: DefaultSystemPrompt,
 			Prompt:       "",
 		},
-		Workers:  workers,
-		Managers: make(map[string]Manager),
+		Workers: workers,
+		Managers: map[string]Manager{
+			"default": {
+				Agent:       "opencode",
+				Description: "Default manager agent",
+			},
+		},
 		Log: LogConfig{
 			Level: DefaultLogLevel,
 		},
