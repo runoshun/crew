@@ -40,8 +40,13 @@ func NewHelpTemplateData(cfg *domain.Config) HelpTemplateData {
 	for name, w := range cfg.Workers {
 		model := w.Model
 		if model == "" {
-			if builtin, ok := domain.BuiltinAgents[name]; ok {
-				model = builtin.DefaultModel
+			// Get default model from Agent definition
+			agentRef := w.Agent
+			if agentRef == "" {
+				agentRef = name
+			}
+			if agentDef, ok := cfg.Agents[agentRef]; ok {
+				model = agentDef.DefaultModel
 			}
 		}
 		workers = append(workers, WorkerInfo{

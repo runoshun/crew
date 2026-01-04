@@ -1,6 +1,6 @@
 package domain
 
-var opencodeAgentConfig = BuiltinAgent{
+var opencodeAgentConfig = builtinAgent{
 	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
 	Command:           "opencode",
 	WorkerSystemArgs:  "-m {{.Model}}",

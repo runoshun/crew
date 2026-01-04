@@ -444,17 +444,17 @@ func (m *Model) updateAgents() {
 	// Build agent command previews
 	m.agentCommands = make(map[string]string)
 
-	// Built-in agents with their commands
+	// Agents defined in cfg.Agents are considered "builtin" (registered in NewDefaultConfig)
 	m.builtinAgents = []string{}
-	for name, builtin := range domain.BuiltinAgents {
+	for name, agentDef := range m.config.Agents {
 		m.builtinAgents = append(m.builtinAgents, name)
-		m.agentCommands[name] = builtin.Command
+		m.agentCommands[name] = agentDef.Command
 	}
 
-	// Custom agents from config (exclude built-ins)
+	// Workers not in Agents are "custom" (user-defined workers)
 	m.customAgents = []string{}
 	for name, worker := range m.config.Workers {
-		if _, isBuiltin := domain.BuiltinAgents[name]; !isBuiltin {
+		if _, isBuiltin := m.config.Agents[name]; !isBuiltin {
 			m.customAgents = append(m.customAgents, name)
 			m.agentCommands[name] = worker.Command
 		}

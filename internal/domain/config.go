@@ -248,9 +248,10 @@ Your role is to:
 - Create, monitor, and manage tasks using crew commands
 - Delegate code implementation to worker agents (do not edit files directly)`
 
-// BuiltinAgent defines a built-in agent configuration.
+// builtinAgent defines a built-in agent configuration (internal use only).
 // SystemArgs is role-specific: Workers and Managers have different system arguments.
-type BuiltinAgent struct {
+// Access builtin configurations through NewDefaultConfig(), not directly.
+type builtinAgent struct {
 	CommandTemplate     string   // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
 	Command             string   // Base command (e.g., "claude")
 	WorkerSystemArgs    string   // System arguments for Workers - NOT overridable by user config
@@ -262,8 +263,9 @@ type BuiltinAgent struct {
 	ExcludePatterns     []string // Patterns to add to .git/info/exclude for this agent
 }
 
-// BuiltinAgents contains preset configurations for known agents.
-var BuiltinAgents = map[string]BuiltinAgent{
+// builtinAgents contains preset configurations for known agents.
+// This is private; access builtin configurations through NewDefaultConfig().
+var builtinAgents = map[string]builtinAgent{
 	"claude":   claudeAgentConfig,
 	"opencode": opencodeAgentConfig,
 }
@@ -297,10 +299,13 @@ func GlobalConfigPath(configHome string) string {
 }
 
 // NewDefaultConfig returns a Config with default values.
+// All builtin agents are registered as Agents, Workers, and Managers with appropriate defaults.
 func NewDefaultConfig() *Config {
 	agents := make(map[string]Agent)
 	workers := make(map[string]Worker)
-	for name, builtin := range BuiltinAgents {
+	managers := make(map[string]Manager)
+
+	for name, builtin := range builtinAgents {
 		agents[name] = Agent{
 			Command:             builtin.Command,
 			CommandTemplate:     builtin.CommandTemplate,
@@ -309,7 +314,7 @@ func NewDefaultConfig() *Config {
 			WorktreeSetupScript: builtin.WorktreeSetupScript,
 			ExcludePatterns:     builtin.ExcludePatterns,
 		}
-		// Also create builtin workers with role-specific SystemArgs
+		// Create builtin workers with role-specific SystemArgs
 		workers[name] = Worker{
 			Agent:           name,
 			CommandTemplate: builtin.CommandTemplate,
@@ -318,11 +323,23 @@ func NewDefaultConfig() *Config {
 			Args:            builtin.DefaultArgs,
 			Description:     builtin.Description,
 		}
+		// Create builtin managers with role-specific SystemArgs
+		managers[name] = Manager{
+			Agent:       name,
+			SystemArgs:  builtin.ManagerSystemArgs,
+			Description: builtin.Description,
+		}
 	}
+
 	// Create default worker (references default agent)
 	workers[DefaultWorkerName] = Worker{
 		Agent:       DefaultWorkerAgent,
 		Description: "Default worker agent",
+	}
+	// Create default manager (references default agent)
+	managers[DefaultManagerName] = Manager{
+		Agent:       DefaultManagerAgent,
+		Description: "Default manager agent",
 	}
 
 	return &Config{
@@ -336,12 +353,7 @@ func NewDefaultConfig() *Config {
 			SystemPrompt: DefaultManagerSystemPrompt,
 			Prompt:       "",
 		},
-		Managers: map[string]Manager{
-			DefaultManagerName: {
-				Agent:       DefaultManagerAgent,
-				Description: "Default manager agent",
-			},
-		},
+		Managers: managers,
 		Log: LogConfig{
 			Level: DefaultLogLevel,
 		},

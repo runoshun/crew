@@ -118,46 +118,48 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 
 // resolveWorkerFromManager resolves a Worker configuration from a Manager's Agent reference.
 // Returns the Worker, default model, and any error.
-// Note: For Managers, we use ManagerSystemArgs instead of WorkerSystemArgs.
+// Note: For Managers, we use Manager.SystemArgs (set from ManagerSystemArgs in NewDefaultConfig).
+// All information is obtained from cfg - no direct access to builtinAgents.
 func (uc *StartManager) resolveWorkerFromManager(manager domain.Manager, cfg *domain.Config) (domain.Worker, string, error) {
 	// Manager must have an Agent reference
 	if manager.Agent == "" {
 		return domain.Worker{}, "", fmt.Errorf("manager has no agent reference")
 	}
 
-	// Check if the Agent is a Worker name (for sharing command settings)
-	if worker, ok := cfg.Workers[manager.Agent]; ok {
+	agentRef := manager.Agent
+
+	// First, try to get SystemArgs from a Manager with the same name as the Agent reference
+	// This allows inheriting ManagerSystemArgs from builtin managers
+	systemArgs := manager.SystemArgs
+	if systemArgs == "" {
+		if refManager, ok := cfg.Managers[agentRef]; ok {
+			systemArgs = refManager.SystemArgs
+		}
+	}
+
+	// Check if the Agent is defined as a Worker (for command settings)
+	if worker, ok := cfg.Workers[agentRef]; ok {
 		defaultModel := ""
-		// Use Manager's SystemArgs if set, otherwise get from builtin
-		systemArgs := manager.SystemArgs
-		if systemArgs == "" {
-			if builtin, ok := domain.BuiltinAgents[manager.Agent]; ok {
-				defaultModel = builtin.DefaultModel
-				systemArgs = builtin.ManagerSystemArgs
-			}
+		// Get default model from Agent definition
+		if agentDef, ok := cfg.Agents[agentRef]; ok {
+			defaultModel = agentDef.DefaultModel
 		}
 		// Override worker's SystemArgs with manager-specific one
 		worker.SystemArgs = systemArgs
 		return worker, defaultModel, nil
 	}
 
-	// Check if the Agent is a builtin agent
-	if builtin, ok := domain.BuiltinAgents[manager.Agent]; ok {
-		// Use Manager's SystemArgs if set, otherwise use builtin ManagerSystemArgs
-		systemArgs := manager.SystemArgs
-		if systemArgs == "" {
-			systemArgs = builtin.ManagerSystemArgs
-		}
+	// Check if the Agent is defined in Agents
+	if agentDef, ok := cfg.Agents[agentRef]; ok {
 		return domain.Worker{
-			Agent:           manager.Agent,
-			CommandTemplate: builtin.CommandTemplate,
-			Command:         builtin.Command,
+			Agent:           agentRef,
+			CommandTemplate: agentDef.CommandTemplate,
+			Command:         agentDef.Command,
 			SystemArgs:      systemArgs,
-			Args:            builtin.DefaultArgs,
-		}, builtin.DefaultModel, nil
+		}, agentDef.DefaultModel, nil
 	}
 
-	return domain.Worker{}, "", fmt.Errorf("agent %q not found", manager.Agent)
+	return domain.Worker{}, "", fmt.Errorf("agent %q not found", agentRef)
 }
 
 // GetCommand returns the executable path and arguments for the manager command.

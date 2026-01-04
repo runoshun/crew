@@ -1,6 +1,6 @@
 package domain
 
-var claudeAgentConfig = BuiltinAgent{
+var claudeAgentConfig = builtinAgent{
 	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 	Command:           "claude",
 	WorkerSystemArgs:  "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,

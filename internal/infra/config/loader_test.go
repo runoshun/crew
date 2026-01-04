@@ -142,16 +142,21 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 	defaultWorker, ok := cfg.Workers[domain.DefaultWorkerName]
 	assert.True(t, ok, "default worker should exist")
 	assert.Equal(t, domain.DefaultWorkerAgent, defaultWorker.Agent)
-	// Builtin workers should have values from BuiltinWorkers
-	for name, builtin := range domain.BuiltinAgents {
-		worker := cfg.Workers[name]
-		assert.Equal(t, builtin.CommandTemplate, worker.CommandTemplate)
-		assert.Equal(t, builtin.Command, worker.Command)
-		assert.Equal(t, builtin.WorkerSystemArgs, worker.SystemArgs)
-		assert.Equal(t, builtin.DefaultArgs, worker.Args)
+
+	// Get expected values from NewDefaultConfig
+	defaultCfg := domain.NewDefaultConfig()
+
+	// Builtin workers (those with corresponding Agent) should match NewDefaultConfig
+	for name, expectedAgent := range defaultCfg.Agents {
+		expectedWorker := defaultCfg.Workers[name]
+		actualWorker := cfg.Workers[name]
+		assert.Equal(t, expectedAgent.CommandTemplate, actualWorker.CommandTemplate)
+		assert.Equal(t, expectedAgent.Command, actualWorker.Command)
+		assert.Equal(t, expectedWorker.SystemArgs, actualWorker.SystemArgs)
+		assert.Equal(t, expectedWorker.Args, actualWorker.Args)
 		// Worker.SystemPrompt and Worker.Prompt are empty; falls back to WorkersConfig
-		assert.Empty(t, worker.SystemPrompt)
-		assert.Empty(t, worker.Prompt)
+		assert.Empty(t, actualWorker.SystemPrompt)
+		assert.Empty(t, actualWorker.Prompt)
 	}
 }
 
@@ -299,7 +304,8 @@ args = "--model repo"
 	// Verify: only repo config is used
 	assert.Equal(t, "--model repo", cfg.Workers["claude"].Args)
 	// opencode worker should only have builtin defaults, not the global config args
-	assert.Equal(t, domain.BuiltinAgents["opencode"].DefaultArgs, cfg.Workers["opencode"].Args)
+	defaultCfg := domain.NewDefaultConfig()
+	assert.Equal(t, defaultCfg.Workers["opencode"].Args, cfg.Workers["opencode"].Args)
 }
 
 func TestLoader_LoadWithOptions_IgnoreRepo(t *testing.T) {
@@ -331,7 +337,8 @@ args = "--model repo-model"
 	// Verify: only global config is used
 	assert.Equal(t, "-m gpt-4", cfg.Workers["opencode"].Args)
 	// claude worker should only have builtin defaults
-	assert.Equal(t, domain.BuiltinAgents["claude"].DefaultArgs, cfg.Workers["claude"].Args)
+	defaultCfg := domain.NewDefaultConfig()
+	assert.Equal(t, defaultCfg.Workers["claude"].Args, cfg.Workers["claude"].Args)
 }
 
 func TestLoader_LoadWithOptions_IgnoreBoth(t *testing.T) {

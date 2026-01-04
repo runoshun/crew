@@ -62,31 +62,51 @@ func TestNewDefaultConfig(t *testing.T) {
 	if cfg.WorkersConfig.Prompt != "" {
 		t.Errorf("WorkersConfig.Prompt = %q, want empty", cfg.WorkersConfig.Prompt)
 	}
-	// Check builtin workers are configured from BuiltinAgents
-	for name, builtin := range BuiltinAgents {
-		worker, exists := cfg.Workers[name]
-		if !exists {
+	// Check builtin agents, workers, and managers are configured
+	for name, builtin := range builtinAgents {
+		// Check Agent
+		agent, agentExists := cfg.Agents[name]
+		if !agentExists {
+			t.Errorf("expected %s agent to be configured", name)
+		} else {
+			if agent.CommandTemplate != builtin.CommandTemplate {
+				t.Errorf("%s agent.CommandTemplate = %q, want %q", name, agent.CommandTemplate, builtin.CommandTemplate)
+			}
+			if agent.Command != builtin.Command {
+				t.Errorf("%s agent.Command = %q, want %q", name, agent.Command, builtin.Command)
+			}
+		}
+
+		// Check Worker
+		worker, workerExists := cfg.Workers[name]
+		if !workerExists {
 			t.Errorf("expected %s worker to be configured", name)
 			continue
 		}
 		if worker.CommandTemplate != builtin.CommandTemplate {
-			t.Errorf("%s.CommandTemplate = %q, want %q", name, worker.CommandTemplate, builtin.CommandTemplate)
+			t.Errorf("%s worker.CommandTemplate = %q, want %q", name, worker.CommandTemplate, builtin.CommandTemplate)
 		}
 		if worker.Command != builtin.Command {
-			t.Errorf("%s.Command = %q, want %q", name, worker.Command, builtin.Command)
+			t.Errorf("%s worker.Command = %q, want %q", name, worker.Command, builtin.Command)
 		}
 		if worker.SystemArgs != builtin.WorkerSystemArgs {
-			t.Errorf("%s.SystemArgs = %q, want %q", name, worker.SystemArgs, builtin.WorkerSystemArgs)
+			t.Errorf("%s worker.SystemArgs = %q, want %q", name, worker.SystemArgs, builtin.WorkerSystemArgs)
 		}
 		if worker.Args != builtin.DefaultArgs {
-			t.Errorf("%s.Args = %q, want %q", name, worker.Args, builtin.DefaultArgs)
+			t.Errorf("%s worker.Args = %q, want %q", name, worker.Args, builtin.DefaultArgs)
 		}
-		if worker.Model != "" {
-			t.Errorf("%s.Model = %q, want empty (falls back to builtin default)", name, worker.Model)
+
+		// Check Manager
+		manager, managerExists := cfg.Managers[name]
+		if !managerExists {
+			t.Errorf("expected %s manager to be configured", name)
+			continue
 		}
-		// Worker.Prompt is empty; defaults come from WorkersConfig.Prompt
-		if worker.Prompt != "" {
-			t.Errorf("%s.Prompt = %q, want empty (falls back to WorkersConfig.Prompt)", name, worker.Prompt)
+		if manager.Agent != name {
+			t.Errorf("%s manager.Agent = %q, want %q", name, manager.Agent, name)
+		}
+		if manager.SystemArgs != builtin.ManagerSystemArgs {
+			t.Errorf("%s manager.SystemArgs = %q, want %q", name, manager.SystemArgs, builtin.ManagerSystemArgs)
 		}
 	}
 
@@ -324,7 +344,7 @@ func TestRenderConfigTemplate(t *testing.T) {
 	if !strings.Contains(content, "# system_prompt = "+formattedSysPrompt) {
 		t.Errorf("expected system prompt to be embedded in template")
 	}
-	for name, builtin := range BuiltinAgents {
+	for name, builtin := range builtinAgents {
 		if builtin.DefaultArgs != "" && !strings.Contains(content, builtin.DefaultArgs) {
 			t.Errorf("expected %s args %q to be embedded in template", name, builtin.DefaultArgs)
 		}
