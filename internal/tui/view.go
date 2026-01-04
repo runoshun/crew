@@ -673,7 +673,7 @@ func (m *Model) viewDetailPanel() string {
 		}
 	}
 
-	// Description (may wrap to multiple lines)
+	// Description (split into lines and add line-by-line)
 	if task.Description != "" {
 		descLabelStyle := lipgloss.NewStyle().
 			Foreground(Colors.Muted).
@@ -681,8 +681,22 @@ func (m *Model) viewDetailPanel() string {
 		descStyle := lipgloss.NewStyle().
 			Foreground(Colors.DescSelected).
 			Width(panelWidth - 4)
-		if !addLines("", descLabelStyle.Render("Description"), descStyle.Render(task.Description)) {
+
+		// Add label and empty line first
+		if !addLines("", descLabelStyle.Render("Description")) {
 			return panelStyle.Render(strings.Join(contentLines, "\n"))
+		}
+
+		// Render description with width constraint to get wrapped text
+		renderedDesc := descStyle.Render(task.Description)
+		// Split by newlines (lipgloss wraps text with \n)
+		descLines := strings.Split(renderedDesc, "\n")
+
+		// Add each line individually (will stop early if height limit reached)
+		for _, line := range descLines {
+			if !addLines(line) {
+				return panelStyle.Render(strings.Join(contentLines, "\n"))
+			}
 		}
 	}
 
