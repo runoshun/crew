@@ -157,6 +157,10 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	tuiCmd := newTUICommand(c)
 	tuiCmd.GroupID = groupTask
 
+	// Manager command
+	managerCmd := newManagerCommand(c)
+	managerCmd.GroupID = groupSession
+
 	// Snapshot commands
 	snapshotCmd := newSnapshotCmd(c)
 
@@ -187,6 +191,7 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 		mergeCmd,
 		pruneCmd,
 		tuiCmd,
+		managerCmd,
 		snapshotCmd,
 		newSyncCmd(c),
 		sessionEndedCmd,

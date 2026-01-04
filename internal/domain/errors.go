@@ -25,4 +25,5 @@ var (
 	ErrCircularInheritance   = errors.New("circular inheritance detected in worker configuration")
 	ErrInheritParentNotFound = errors.New("inherit parent worker not found")
 	ErrCommentNotFound       = errors.New("comment not found")
+	ErrManagerNotFound       = errors.New("manager not found")
 )

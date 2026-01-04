@@ -73,6 +73,11 @@ func WorktreePath(worktreeDir string, taskID int) string {
 	return filepath.Join(worktreeDir, fmt.Sprintf("%d", taskID))
 }
 
+// ManagerScriptPath returns the path to the manager script.
+func ManagerScriptPath(crewDir string) string {
+	return filepath.Join(crewDir, "scripts", "manager.sh")
+}
+
 // branchPattern matches crew branch names: crew-<id> or crew-<id>-gh-<issue>
 var branchPattern = regexp.MustCompile(`^crew-(\d+)(?:-gh-\d+)?$`)
 
