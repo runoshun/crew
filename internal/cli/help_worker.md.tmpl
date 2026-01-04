@@ -1,6 +1,14 @@
 # git-crew Worker Guide
 
-Guide for worker agents executing tasks in worktrees.
+## IMPORTANT: Follow This Workflow
+
+1. **Read task**: `crew show` - Understand the requirements
+2. **Implement**: Make changes following the task description  
+3. **Test**: `mise run ci` - Ensure all tests pass
+4. **Commit**: `git add && git commit`
+5. **Complete**: `crew complete` - Mark task as done
+
+DO NOT skip any steps. Run CI before completing.
 
 ---
 
