@@ -132,6 +132,21 @@ crew start <id> opencode
 
 ---
 
+## アクション待ち監視
+
+マネージャーがユーザーのアクションを待機するための簡単なワンライナー集。
+
+```bash
+# needs_input または in_review が出るまで待機（5分タイムアウト）
+timeout 5m sh -c 'while ! crew list | grep -qE "needs_input|in_review"; do sleep 5; done' && echo "Action needed"
+
+# 通知付き（Linux の notify-send を使用）
+timeout 5m sh -c 'while ! crew list | grep -qE "needs_input|in_review"; do sleep 5; done' && notify-send "crew: Action needed"
+
+# 継続監視（10秒間隔で表示を更新）
+watch -n 10 'crew list | grep -E "needs_input|in_review"'
+```
+
 ## Available Commands
 
 ### Task Management
