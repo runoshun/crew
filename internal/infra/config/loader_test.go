@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/infra/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -141,7 +142,7 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 	// Default worker should exist
 	defaultWorker, ok := cfg.Workers[domain.DefaultWorkerName]
 	assert.True(t, ok, "default worker should exist")
-	assert.Equal(t, domain.DefaultWorkerAgent, defaultWorker.Agent)
+	assert.Equal(t, builtin.DefaultWorkerAgent, defaultWorker.Agent)
 
 	// Get expected values from NewDefaultConfig
 	defaultCfg := domain.NewDefaultConfig()

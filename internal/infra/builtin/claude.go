@@ -1,6 +1,7 @@
-package domain
+package builtin
 
-var claudeAgentConfig = builtinAgent{
+// claudeAgent contains the built-in configuration for the Claude CLI.
+var claudeAgent = agentConfig{
 	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 	Command:           "claude",
 	WorkerSystemArgs:  "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,

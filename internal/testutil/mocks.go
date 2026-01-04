@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/infra/builtin"
 )
 
 // MockClock is a test double for domain.Clock.
@@ -443,9 +444,12 @@ type MockConfigLoader struct {
 }
 
 // NewMockConfigLoader creates a new MockConfigLoader with default config.
+// It also registers builtin agents to match the real ConfigLoader behavior.
 func NewMockConfigLoader() *MockConfigLoader {
+	cfg := domain.NewDefaultConfig()
+	builtin.Register(cfg)
 	return &MockConfigLoader{
-		Config: domain.NewDefaultConfig(),
+		Config: cfg,
 	}
 }
 
