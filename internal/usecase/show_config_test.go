@@ -27,8 +27,11 @@ func TestShowConfig_Execute(t *testing.T) {
 
 		loader := testutil.NewMockConfigLoader()
 		loader.Config = &domain.Config{
-			WorkersConfig: domain.WorkersConfig{Default: "claude"},
-			Workers:       make(map[string]domain.Worker),
+			WorkersConfig: domain.WorkersConfig{},
+			Workers: map[string]domain.Worker{
+				"claude": {Agent: "claude"},
+			},
+			Managers: make(map[string]domain.Manager),
 		}
 
 		uc := usecase.NewShowConfig(manager, loader)
@@ -42,7 +45,6 @@ func TestShowConfig_Execute(t *testing.T) {
 		assert.Equal(t, "[log]\nlevel = \"debug\"", out.GlobalConfig.Content)
 		assert.True(t, out.GlobalConfig.Exists)
 		assert.NotNil(t, out.EffectiveConfig)
-		assert.Equal(t, "claude", out.EffectiveConfig.WorkersConfig.Default)
 	})
 
 	t.Run("handles non-existent files", func(t *testing.T) {

@@ -91,13 +91,10 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, fmt.Errorf("load config: %w", loadErr)
 	}
 
-	// Resolve agent from input or config
+	// Resolve agent from input or default
 	agent := in.Agent
 	if agent == "" {
-		agent = cfg.WorkersConfig.Default
-	}
-	if agent == "" {
-		return nil, domain.ErrNoAgent
+		agent = domain.DefaultWorkerName
 	}
 
 	// Get agent configuration
@@ -209,55 +206,49 @@ type resolvedWorkerResult struct {
 
 // resolveWorkerAgent resolves the Worker configuration for the given agent name.
 // Returns the Worker, default model, and agent-specific settings (SetupScript, ExcludePatterns).
+// All information is obtained from cfg (Workers and Agents maps) - no direct access to builtinAgents.
 func (uc *StartTask) resolveWorkerAgent(agent string, cfg *domain.Config) resolvedWorkerResult {
-	// Check if agent is configured in config
+	// Check if agent is configured as a Worker
 	if worker, ok := cfg.Workers[agent]; ok {
 		result := resolvedWorkerResult{
 			Worker:       worker,
 			DefaultModel: "",
 		}
 
-		// Check for agent reference in worker
-		if worker.Agent != "" {
-			if agentDef, ok := cfg.Agents[worker.Agent]; ok {
-				result.WorktreeSetupScript = agentDef.WorktreeSetupScript
-				result.ExcludePatterns = agentDef.ExcludePatterns
-				if result.DefaultModel == "" {
-					result.DefaultModel = agentDef.DefaultModel
-				}
-			}
+		// Check for agent reference in worker - inherit fields from Agent
+		agentRef := worker.Agent
+		if agentRef == "" {
+			agentRef = agent // Use worker name as agent reference if not specified
 		}
 
-		// Check for built-in agent defaults
-		if builtin, ok := domain.BuiltinAgents[agent]; ok {
-			if result.DefaultModel == "" {
-				result.DefaultModel = builtin.DefaultModel
+		// Inherit from Agent definition
+		if agentDef, ok := cfg.Agents[agentRef]; ok {
+			result.WorktreeSetupScript = agentDef.WorktreeSetupScript
+			result.ExcludePatterns = agentDef.ExcludePatterns
+			result.DefaultModel = agentDef.DefaultModel
+			// Inherit command fields if not set in worker
+			if result.Worker.CommandTemplate == "" {
+				result.Worker.CommandTemplate = agentDef.CommandTemplate
 			}
-			// Use built-in setup script/patterns if not set from config Agent
-			if result.WorktreeSetupScript == "" {
-				result.WorktreeSetupScript = builtin.WorktreeSetupScript
-			}
-			if len(result.ExcludePatterns) == 0 {
-				result.ExcludePatterns = builtin.ExcludePatterns
+			if result.Worker.Command == "" {
+				result.Worker.Command = agentDef.Command
 			}
 		}
 
 		return result
 	}
 
-	// Check if it's a built-in agent
-	if builtin, ok := domain.BuiltinAgents[agent]; ok {
+	// Check if it's defined as an Agent (but not as a Worker)
+	if agentDef, ok := cfg.Agents[agent]; ok {
 		return resolvedWorkerResult{
 			Worker: domain.Worker{
 				Agent:           agent,
-				CommandTemplate: builtin.CommandTemplate,
-				Command:         builtin.Command,
-				SystemArgs:      builtin.SystemArgs,
-				Args:            builtin.DefaultArgs,
+				CommandTemplate: agentDef.CommandTemplate,
+				Command:         agentDef.Command,
 			},
-			DefaultModel:        builtin.DefaultModel,
-			WorktreeSetupScript: builtin.WorktreeSetupScript,
-			ExcludePatterns:     builtin.ExcludePatterns,
+			DefaultModel:        agentDef.DefaultModel,
+			WorktreeSetupScript: agentDef.WorktreeSetupScript,
+			ExcludePatterns:     agentDef.ExcludePatterns,
 		}
 	}
 

@@ -1,12 +1,14 @@
 package domain
 
-var opencodeAgentConfig = BuiltinAgent{
-	CommandTemplate:     "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
-	Command:             "opencode",
-	SystemArgs:          "-m {{.Model}}",
-	DefaultArgs:         "",
-	DefaultModel:        "anthropic/claude-opus-4-5",
-	Description:         "General purpose coding agent via opencode CLI",
+var opencodeAgentConfig = builtinAgent{
+	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
+	Command:           "opencode",
+	WorkerSystemArgs:  "-m {{.Model}}",
+	ManagerSystemArgs: "-m {{.Model}}",
+	DefaultArgs:       "",
+	DefaultModel:      "anthropic/claude-opus-4-5",
+	Description:       "General purpose coding agent via opencode CLI",
+	// WorktreeSetupScript and ExcludePatterns are Worker-only (Managers don't use worktrees)
 	WorktreeSetupScript: opencodeSetupScript,
 	ExcludePatterns:     []string{".opencode/plugin/crew-hooks.ts"},
 }

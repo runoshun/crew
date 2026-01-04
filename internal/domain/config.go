@@ -10,16 +10,17 @@ import (
 
 // Config represents the application configuration.
 type Config struct {
-	Agents        map[string]Agent   // Agent definitions from [agents.<name>]
-	WorkersConfig WorkersConfig      // Common [workers] settings (including default)
-	Workers       map[string]Worker  // Per-worker settings [workers.<name>]
-	Managers      map[string]Manager // Manager definitions from [managers.<name>]
-	Complete      CompleteConfig     // [complete] settings
-	Diff          DiffConfig         // [diff] settings
-	Log           LogConfig          // [log] settings
-	Tasks         TasksConfig        // [tasks] settings
-	Worktree      WorktreeConfig     // [worktree] settings
-	Warnings      []string           // [warning] Unknown keys or other issues
+	Agents         map[string]Agent   // Agent definitions from [agents.<name>]
+	WorkersConfig  WorkersConfig      // Common [workers] settings
+	Workers        map[string]Worker  // Per-worker settings [workers.<name>]
+	ManagersConfig ManagersConfig     // Common [managers] settings
+	Managers       map[string]Manager // Manager definitions from [managers.<name>]
+	Complete       CompleteConfig     // [complete] settings
+	Diff           DiffConfig         // [diff] settings
+	Log            LogConfig          // [log] settings
+	Tasks          TasksConfig        // [tasks] settings
+	Worktree       WorktreeConfig     // [worktree] settings
+	Warnings       []string           // [warning] Unknown keys or other issues
 }
 
 // TasksConfig holds settings for task storage from [tasks] section.
@@ -31,17 +32,22 @@ type TasksConfig struct {
 
 // WorkersConfig holds common settings for all workers from [workers] section.
 type WorkersConfig struct {
-	Default      string // Default worker name (e.g., "claude")
 	SystemPrompt string // Default system prompt for all workers
 	Prompt       string // Default prompt for all workers (can be overridden per worker)
 }
 
+// ManagersConfig holds common settings for all managers from [managers] section.
+type ManagersConfig struct {
+	SystemPrompt string // Default system prompt for all managers
+	Prompt       string // Default prompt for all managers (can be overridden per manager)
+}
+
 // Agent defines a base agent configuration that Workers and Managers can reference.
 // Agents define the core command execution pattern without being tied to a specific role.
+// Note: SystemArgs is NOT defined here; it's a role-specific (Worker/Manager) concern.
 type Agent struct {
 	Command             string   // Base command (e.g., "claude", "opencode")
 	CommandTemplate     string   // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
-	SystemArgs          string   // System arguments required for crew operation (auto-applied)
 	DefaultModel        string   // Default model for this agent
 	Description         string   // Description of the agent's purpose
 	WorktreeSetupScript string   // Script to run after worktree creation (template-expanded)
@@ -66,10 +72,13 @@ type Worker struct {
 // Manager holds configuration for manager agents from [managers.<name>] sections.
 // Managers are read-only orchestration agents that can create and monitor tasks.
 type Manager struct {
-	Agent       string // Name of the Agent to inherit from (optional)
-	Model       string // Model override for this manager
-	Args        string // Additional arguments for this manager
-	Description string // Description of the manager's purpose
+	Agent        string // Name of the Agent to inherit from (optional)
+	Model        string // Model override for this manager
+	SystemArgs   string // System arguments required for crew operation (auto-applied)
+	Args         string // Additional arguments for this manager
+	SystemPrompt string // System prompt template for this manager
+	Prompt       string // Prompt template for this manager
+	Description  string // Description of the manager's purpose
 }
 
 // CommandData holds data for rendering agent commands and prompts.
@@ -216,8 +225,11 @@ type WorktreeConfig struct {
 
 // Default configuration values.
 const (
-	DefaultLogLevel   = "info"
-	DefaultWorkerName = "claude"
+	DefaultLogLevel     = "info"
+	DefaultWorkerName   = "default"  // Name of the default worker (looked up in Workers map)
+	DefaultManagerName  = "default"  // Name of the default manager (looked up in Managers map)
+	DefaultWorkerAgent  = "opencode" // Agent used by the default worker
+	DefaultManagerAgent = "opencode" // Agent used by the default manager
 )
 
 // DefaultSystemPrompt is the default system prompt template for workers.
@@ -226,11 +238,24 @@ const DefaultSystemPrompt = `You are working on Task #{{.TaskID}}.
 
 IMPORTANT: First run 'crew --help-worker' and follow the workflow instructions exactly.`
 
-// BuiltinAgent defines a built-in agent configuration.
-type BuiltinAgent struct {
+// DefaultManagerSystemPrompt is the default system prompt template for managers.
+const DefaultManagerSystemPrompt = `You are a Manager agent for git-crew.
+
+IMPORTANT: Run 'crew --help-manager' for detailed usage instructions.
+
+Your role is to:
+- Support users with task management
+- Create, monitor, and manage tasks using crew commands
+- Delegate code implementation to worker agents (do not edit files directly)`
+
+// builtinAgent defines a built-in agent configuration (internal use only).
+// SystemArgs is role-specific: Workers and Managers have different system arguments.
+// Access builtin configurations through NewDefaultConfig(), not directly.
+type builtinAgent struct {
 	CommandTemplate     string   // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
 	Command             string   // Base command (e.g., "claude")
-	SystemArgs          string   // System arguments (model, permissions) - NOT overridable by user config
+	WorkerSystemArgs    string   // System arguments for Workers - NOT overridable by user config
+	ManagerSystemArgs   string   // System arguments for Managers - NOT overridable by user config
 	DefaultArgs         string   // Default user-customizable arguments (overridable in config.toml)
 	DefaultModel        string   // Default model name for this agent
 	Description         string   // Description of the agent's purpose
@@ -238,8 +263,9 @@ type BuiltinAgent struct {
 	ExcludePatterns     []string // Patterns to add to .git/info/exclude for this agent
 }
 
-// BuiltinAgents contains preset configurations for known agents.
-var BuiltinAgents = map[string]BuiltinAgent{
+// builtinAgents contains preset configurations for known agents.
+// This is private; access builtin configurations through NewDefaultConfig().
+var builtinAgents = map[string]builtinAgent{
 	"claude":   claudeAgentConfig,
 	"opencode": opencodeAgentConfig,
 }
@@ -273,43 +299,61 @@ func GlobalConfigPath(configHome string) string {
 }
 
 // NewDefaultConfig returns a Config with default values.
+// All builtin agents are registered as Agents, Workers, and Managers with appropriate defaults.
 func NewDefaultConfig() *Config {
 	agents := make(map[string]Agent)
 	workers := make(map[string]Worker)
-	for name, builtin := range BuiltinAgents {
+	managers := make(map[string]Manager)
+
+	for name, builtin := range builtinAgents {
 		agents[name] = Agent{
 			Command:             builtin.Command,
 			CommandTemplate:     builtin.CommandTemplate,
-			SystemArgs:          builtin.SystemArgs,
 			DefaultModel:        builtin.DefaultModel,
 			Description:         builtin.Description,
 			WorktreeSetupScript: builtin.WorktreeSetupScript,
 			ExcludePatterns:     builtin.ExcludePatterns,
 		}
+		// Create builtin workers with role-specific SystemArgs
 		workers[name] = Worker{
 			Agent:           name,
 			CommandTemplate: builtin.CommandTemplate,
 			Command:         builtin.Command,
-			SystemArgs:      builtin.SystemArgs,
+			SystemArgs:      builtin.WorkerSystemArgs,
 			Args:            builtin.DefaultArgs,
 			Description:     builtin.Description,
-			// SystemPrompt/Prompt are empty; falls back to WorkersConfig
+		}
+		// Create builtin managers with role-specific SystemArgs
+		managers[name] = Manager{
+			Agent:       name,
+			SystemArgs:  builtin.ManagerSystemArgs,
+			Description: builtin.Description,
 		}
 	}
+
+	// Create default worker (references default agent)
+	workers[DefaultWorkerName] = Worker{
+		Agent:       DefaultWorkerAgent,
+		Description: "Default worker agent",
+	}
+	// Create default manager (references default agent)
+	managers[DefaultManagerName] = Manager{
+		Agent:       DefaultManagerAgent,
+		Description: "Default manager agent",
+	}
+
 	return &Config{
 		Agents: agents,
 		WorkersConfig: WorkersConfig{
-			Default:      DefaultWorkerName,
 			SystemPrompt: DefaultSystemPrompt,
 			Prompt:       "",
 		},
 		Workers: workers,
-		Managers: map[string]Manager{
-			"default": {
-				Agent:       "opencode",
-				Description: "Default manager agent",
-			},
+		ManagersConfig: ManagersConfig{
+			SystemPrompt: DefaultManagerSystemPrompt,
+			Prompt:       "",
 		},
+		Managers: managers,
 		Log: LogConfig{
 			Level: DefaultLogLevel,
 		},
@@ -326,12 +370,13 @@ func RenderConfigTemplate() (string, error) {
 	cfg := NewDefaultConfig()
 
 	data := map[string]any{
-		"DefaultWorker":       cfg.WorkersConfig.Default,
-		"WorkersSystemPrompt": formatPromptForTemplate(cfg.WorkersConfig.SystemPrompt),
-		"WorkersPrompt":       formatPromptForTemplate(cfg.WorkersConfig.Prompt),
-		"LogLevel":            cfg.Log.Level,
-		"ClaudeArgs":          cfg.Workers["claude"].Args,
-		"OpencodeArgs":        cfg.Workers["opencode"].Args,
+		"WorkersSystemPrompt":  formatPromptForTemplate(cfg.WorkersConfig.SystemPrompt),
+		"WorkersPrompt":        formatPromptForTemplate(cfg.WorkersConfig.Prompt),
+		"ManagersSystemPrompt": formatPromptForTemplate(cfg.ManagersConfig.SystemPrompt),
+		"ManagersPrompt":       formatPromptForTemplate(cfg.ManagersConfig.Prompt),
+		"LogLevel":             cfg.Log.Level,
+		"ClaudeArgs":           cfg.Workers["claude"].Args,
+		"OpencodeArgs":         cfg.Workers["opencode"].Args,
 	}
 
 	tmpl, err := template.New("config").Delims("<<", ">>").Parse(configTemplate)

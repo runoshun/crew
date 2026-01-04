@@ -92,12 +92,20 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		Model:    model,
 	}
 
-	// Build the system prompt (simple instruction to check help-manager)
-	systemPrompt := managerSystemPrompt
-	defaultPrompt := cfg.WorkersConfig.Prompt
+	// Build the system prompt with priority: manager > managers config > default
+	systemPrompt := manager.SystemPrompt
+	if systemPrompt == "" {
+		systemPrompt = cfg.ManagersConfig.SystemPrompt
+	}
+
+	// Build the user prompt with priority: manager > managers config
+	userPrompt := manager.Prompt
+	if userPrompt == "" {
+		userPrompt = cfg.ManagersConfig.Prompt
+	}
 
 	// Render command and prompt
-	result, err := worker.RenderCommand(cmdData, `"$PROMPT"`, systemPrompt, defaultPrompt)
+	result, err := worker.RenderCommand(cmdData, `"$PROMPT"`, systemPrompt, userPrompt)
 	if err != nil {
 		return nil, fmt.Errorf("render command: %w", err)
 	}
@@ -110,46 +118,49 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 
 // resolveWorkerFromManager resolves a Worker configuration from a Manager's Agent reference.
 // Returns the Worker, default model, and any error.
+// Note: For Managers, we use Manager.SystemArgs (set from ManagerSystemArgs in NewDefaultConfig).
+// All information is obtained from cfg - no direct access to builtinAgents.
 func (uc *StartManager) resolveWorkerFromManager(manager domain.Manager, cfg *domain.Config) (domain.Worker, string, error) {
 	// Manager must have an Agent reference
 	if manager.Agent == "" {
 		return domain.Worker{}, "", fmt.Errorf("manager has no agent reference")
 	}
 
-	// Check if the Agent is a Worker name
-	if worker, ok := cfg.Workers[manager.Agent]; ok {
-		defaultModel := ""
-		// Check for builtin defaults
-		if builtin, ok := domain.BuiltinAgents[manager.Agent]; ok {
-			defaultModel = builtin.DefaultModel
+	agentRef := manager.Agent
+
+	// First, try to get SystemArgs from a Manager with the same name as the Agent reference
+	// This allows inheriting ManagerSystemArgs from builtin managers
+	systemArgs := manager.SystemArgs
+	if systemArgs == "" {
+		if refManager, ok := cfg.Managers[agentRef]; ok {
+			systemArgs = refManager.SystemArgs
 		}
+	}
+
+	// Check if the Agent is defined as a Worker (for command settings)
+	if worker, ok := cfg.Workers[agentRef]; ok {
+		defaultModel := ""
+		// Get default model from Agent definition
+		if agentDef, ok := cfg.Agents[agentRef]; ok {
+			defaultModel = agentDef.DefaultModel
+		}
+		// Override worker's SystemArgs with manager-specific one
+		worker.SystemArgs = systemArgs
 		return worker, defaultModel, nil
 	}
 
-	// Check if the Agent is a builtin agent
-	if builtin, ok := domain.BuiltinAgents[manager.Agent]; ok {
+	// Check if the Agent is defined in Agents
+	if agentDef, ok := cfg.Agents[agentRef]; ok {
 		return domain.Worker{
-			Agent:           manager.Agent,
-			CommandTemplate: builtin.CommandTemplate,
-			Command:         builtin.Command,
-			SystemArgs:      builtin.SystemArgs,
-			Args:            builtin.DefaultArgs,
-		}, builtin.DefaultModel, nil
+			Agent:           agentRef,
+			CommandTemplate: agentDef.CommandTemplate,
+			Command:         agentDef.Command,
+			SystemArgs:      systemArgs,
+		}, agentDef.DefaultModel, nil
 	}
 
-	return domain.Worker{}, "", fmt.Errorf("agent %q not found", manager.Agent)
+	return domain.Worker{}, "", fmt.Errorf("agent %q not found", agentRef)
 }
-
-// managerSystemPrompt is the default system prompt for manager agents.
-// It instructs the agent to check crew --help-manager for detailed usage.
-const managerSystemPrompt = `You are a Manager agent for git-crew.
-
-IMPORTANT: Run 'crew --help-manager' for detailed usage instructions.
-
-Your role is to:
-- Support users with task management
-- Create, monitor, and manage tasks using crew commands
-- Delegate code implementation to worker agents (do not edit files directly)`
 
 // GetCommand returns the executable path and arguments for the manager command.
 // This is a convenience method for callers that need to exec the command.

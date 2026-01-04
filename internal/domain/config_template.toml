@@ -1,68 +1,91 @@
 # git-crew configuration
 
-## Workers configuration
-# [workers]
+[workers]
+## Workers are task execution agents that reference an Agent or define their own command.
 # default = "<<.DefaultWorker>>"  # Default worker to use when starting tasks
 # system_prompt = <<.WorkersSystemPrompt>> # System prompt (automatically set by crew)
 # prompt = <<.WorkersPrompt>>               # User custom instructions (added after system_prompt)
 
 ## Built-in worker customization
-## - args: user-customizable arguments (e.g., logging verbosity)
-## - model: default model name for this worker (overrides built-in default)
-## - system_prompt: override the common system prompt for this worker
-## - prompt: override the common prompt for this worker
-## - system_args: auto-applied for crew operation (rarely need to change)
-## - command: base command to run
-## - command_template: how to assemble the full command
-##   Available: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
+## - agent: Name of the agent to use (builtin: claude, opencode)
+## - model: Model name override (takes precedence over agent's default_model)
+## - system_args: System arguments for crew operation (rarely need to change)
+## - args: User-customizable arguments
+## - system_prompt: Override the common system prompt for this worker
+## - prompt: Override the common prompt for this worker
 
 # [workers.claude]
+# agent = "claude"
 # args = "<<.ClaudeArgs>>"
+# model = "opus"
+# description = "General-purpose ClaudeCode worker (Model: Opus)"
 
 # [workers.opencode]
+# agent = "opencode"
 # args = "<<.OpencodeArgs>>"
 # model = "anthropic/claude-opus-4-5"
+# description = "Gneral-purpose OpenCode worker (Model: Claude Opus 4.5)"
 
-## Custom worker example
+## Custom worker example (using custom agent)
 # [workers.my-worker]
-# command_template = "{{.Command}} {{.Args}} {{.Prompt}}"
-# command = "my-custom-agent"
-# args = "--task"
-# prompt = "Complete the task and run 'crew complete'"
+# agent = "my-agent"
+# model = "my-model-large"
+# args = "--verbose"
 
-## Worker inheritance example
-## You can inherit from another worker and override specific fields.
-## Useful for creating model variants with different settings.
-# [workers.claude-hard]
-# inherit = "claude"  # Inherit all settings from the "claude" worker
-# model = "anthropic/claude-opus-4"
-#
-# [workers.claude-easy]
-# inherit = "claude"
-# model = "anthropic/claude-haiku"
+[managers.default]
+## Manager configuration
+## Managers are read-only agents for task orchestration.
+## They can create and monitor tasks but delegate code to workers.
+# agent = "opencode"   # Agent to use (builtin: claude, opencode)
+# model = ""           # Model override (optional)
+# system_args = ""     # System arguments (optional, defaults to builtin ManagerSystemArgs)
+# args = ""            # Additional arguments (optional)
 
+[complete]
 ## CI gate on completion
-# [complete]
 # command = "mise run ci"
 
+
+[diff]
 ## Diff display settings
 ## - command: Shell command to display diff. Supports template variables:
 ##   - {{.BaseBranch}}: Task's base branch (e.g., "main")
 ##   - {{.Args}}: Additional arguments passed to the diff command
 ##   The command runs from the worktree directory.
 ## - tui_command: Command for TUI diff display (optional)
-# [diff]
 # command = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}}{{end}}"
 # tui_command = "git diff --color {{.BaseBranch}}...HEAD | less -R"
+
+## Custom Agent CLI configuration
+## Agents define the core command execution pattern for AI tools.
+## Built-in agents: claude, opencode
+##
+## Note: system_args is defined in Workers/Managers, not in Agents.
+##       Agents only define command structure; Workers/Managers add role-specific args.
+##
+## Fields:
+## - command: Base command to execute (e.g., "claude", "opencode")
+## - command_template: How to assemble the full command
+##   Available variables: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
+## - default_model: Default model for this agent
+## - description: Description of the agent's purpose
+## - worktree_setup_script: Script to run after worktree creation (template-expanded)
+##   Available variables: {{.Worktree}}, {{.TaskID}}, {{.Branch}}, etc.
+## - exclude_patterns: Patterns to add to .git/info/exclude for this agent
+
+## Custom agent example
+# [agents.my-agent]
+# command = "my-custom-agent"
+# command_template = "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}"
+# default_model = "my-model"
+# description = "My custom AI agent"
+# worktree_setup_script = """
+# #!/bin/bash
+# cd {{.Worktree}}
+# echo "Setting up worktree for task {{.TaskID}}"
+# """
+# exclude_patterns = [".my-agent-cache/"]
 
 ## Log settings
 # [log]
 # level = "<<.LogLevel>>"  # debug, info, warn, error
-
-## Manager configuration
-## Managers are read-only agents for task orchestration.
-## They can create and monitor tasks but delegate code to workers.
-# [managers.default]
-# agent = "opencode"  # Agent to use (builtin: claude, opencode)
-# model = ""          # Model override (optional)
-# args = ""           # Additional arguments (optional)
