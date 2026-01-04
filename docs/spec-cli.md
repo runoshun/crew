@@ -228,7 +228,7 @@ Edit task information.
 **Optional Arguments** (at least one required):
 - `--title`: New title
 - `--body`: New description
-- `--status`: New status (`todo`, `in_progress`, `in_review`, `done`, `closed`, `error`)
+- `--status`: New status (`todo`, `in_progress`, `in_review`, `stopped`, `done`, `closed`, `error`)
 - `--labels`: Replace all labels (comma-separated, e.g., `bug,urgent`)
 - `--add-label`: Labels to add (can specify multiple)
 - `--rm-label`: Labels to remove (can specify multiple)
@@ -806,6 +806,7 @@ See [TUI Specification](#tui-specification) for details.
 |--------|-------------|
 | `todo` | Created, awaiting start |
 | `in_progress` | Agent working |
+| `stopped` | Session intentionally stopped |
 | `in_review` | Work complete, awaiting review |
 | `error` | Session terminated abnormally |
 | `done` | Merge complete |
