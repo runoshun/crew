@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -127,6 +128,16 @@ func (c *Client) Stop(sessionName string) error {
 			// syscall.Kill with negative pid sends signal to all processes in the group
 			// We ignore ESRCH (no such process) as the process may have already exited
 			_ = syscall.Kill(-pid, syscall.SIGTERM)
+
+			// Wait for processes to terminate (max 5 seconds)
+			for i := 0; i < 50; i++ {
+				time.Sleep(100 * time.Millisecond)
+				// Check if process still exists
+				// syscall.Kill with 0 signal checks for existence
+				if err := syscall.Kill(pid, 0); err != nil {
+					break // Process terminated
+				}
+			}
 		}
 	}
 	// If list-panes fails, we still try to kill the session
