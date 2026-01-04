@@ -18,11 +18,13 @@ func newPruneCommand(c *app.Container) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "prune",
-		Short: "Cleanup completed tasks and orphan resources",
-		Long: `Prune removes tasks and their associated resources (branches, worktrees).
-By default, it only removes 'closed' tasks.
-Use --all to also remove 'done' (completed) tasks.
-It also cleans up orphan crew branches and worktrees.`,
+		Short: "Cleanup branches and worktrees for completed tasks",
+		Long: `Prune removes branches and worktrees for completed tasks.
+By default, it only removes resources for 'closed' tasks.
+Use --all to also remove resources for 'done' (merged) tasks.
+It also cleans up orphan crew branches and worktrees.
+
+Note: Tasks themselves are NOT deleted, only their branches and worktrees.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			uc := c.PruneTasksUseCase()
 
@@ -47,18 +49,12 @@ It also cleans up orphan crew branches and worktrees.`,
 				return err
 			}
 
-			if len(preview.DeletedTasks) == 0 && len(preview.DeletedBranches) == 0 && len(preview.DeletedWorktrees) == 0 {
+			if len(preview.DeletedBranches) == 0 && len(preview.DeletedWorktrees) == 0 {
 				fmt.Println("Nothing to prune.")
 				return nil
 			}
 
 			// Display what will be pruned
-			if len(preview.DeletedTasks) > 0 {
-				fmt.Println("Tasks to be deleted:")
-				for _, t := range preview.DeletedTasks {
-					fmt.Printf("  - #%d %s (%s)\n", t.ID, t.Title, t.Status)
-				}
-			}
 			if len(preview.DeletedBranches) > 0 {
 				fmt.Println("Branches to be deleted:")
 				for _, b := range preview.DeletedBranches {
@@ -109,7 +105,7 @@ It also cleans up orphan crew branches and worktrees.`,
 			}
 
 			// Summarize results
-			deletedCount := len(out.DeletedTasks) + len(out.DeletedBranches) + len(out.DeletedWorktrees)
+			deletedCount := len(out.DeletedBranches) + len(out.DeletedWorktrees)
 			fmt.Printf("Successfully pruned %d items.\n", deletedCount)
 
 			return nil
