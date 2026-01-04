@@ -58,3 +58,11 @@
 ## Log settings
 # [log]
 # level = "<<.LogLevel>>"  # debug, info, warn, error
+
+## Manager configuration
+## Managers are read-only agents for task orchestration.
+## They can create and monitor tasks but delegate code to workers.
+# [managers.default]
+# agent = "opencode"  # Agent to use (builtin: claude, opencode)
+# model = ""          # Model override (optional)
+# args = ""           # Additional arguments (optional)

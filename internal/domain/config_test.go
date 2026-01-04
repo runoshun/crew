@@ -83,6 +83,19 @@ func TestNewDefaultConfig(t *testing.T) {
 			t.Errorf("%s.Prompt = %q, want empty (falls back to WorkersConfig.Prompt)", name, worker.Prompt)
 		}
 	}
+
+	// Check default manager
+	manager, ok := cfg.Managers["default"]
+	if !ok {
+		t.Error("expected default manager to be configured")
+	} else {
+		if manager.Agent != "opencode" {
+			t.Errorf("default manager agent = %q, want %q", manager.Agent, "opencode")
+		}
+		if manager.Description != "Default manager agent" {
+			t.Errorf("default manager description = %q, want %q", manager.Description, "Default manager agent")
+		}
+	}
 }
 
 func TestAgent_RenderCommand(t *testing.T) {
@@ -311,6 +324,14 @@ func TestRenderConfigTemplate(t *testing.T) {
 	// Check header is present
 	if !strings.Contains(content, "# git-crew configuration") {
 		t.Error("expected header to be present")
+	}
+
+	// Check manager section is present
+	if !strings.Contains(content, "## Manager configuration") {
+		t.Error("expected manager configuration section to be present")
+	}
+	if !strings.Contains(content, "[managers.default]") {
+		t.Error("expected [managers.default] to be present in template")
 	}
 }
 
