@@ -28,8 +28,9 @@ type TasksConfig struct {
 
 // WorkersConfig holds common settings for all workers from [workers] section.
 type WorkersConfig struct {
-	Default string // Default worker name (e.g., "claude")
-	Prompt  string // Default prompt for all workers (can be overridden per worker)
+	Default      string // Default worker name (e.g., "claude")
+	SystemPrompt string // Default system prompt for all workers
+	Prompt       string // Default prompt for all workers (can be overridden per worker)
 }
 
 // WorkerAgent holds per-worker configuration from [workers.<name>] sections.
@@ -40,6 +41,7 @@ type WorkerAgent struct {
 	SystemArgs      string // System arguments required for crew operation (auto-applied)
 	Args            string // User-customizable arguments (e.g., model selection)
 	Model           string // Default model for this worker (overrides builtin default)
+	SystemPrompt    string // System prompt template for this worker
 	Prompt          string // Prompt template for this worker
 }
 
@@ -73,13 +75,14 @@ type RenderCommandResult struct {
 // RenderCommand renders the full command string and prompt content for this agent.
 // It performs three-phase template expansion:
 // 1. Expand SystemArgs and Args with CommandData (for GitDir, RepoRoot, TaskID, etc.)
-// 2. Expand Prompt template with CommandData to generate prompt content
+// 2. Expand SystemPrompt and Prompt templates with CommandData to generate prompt content
 // 3. Expand CommandTemplate with Command, expanded SystemArgs/Args, and shell variable reference
 //
 // The promptOverride parameter is the shell variable reference (e.g., `"$PROMPT"`) that will be
 // embedded in the command and expanded at runtime to the actual prompt content.
+// The defaultSystemPrompt is used when WorkerAgent.SystemPrompt is empty.
 // The defaultPrompt is used when WorkerAgent.Prompt is empty.
-func (a *WorkerAgent) RenderCommand(data CommandData, promptOverride, defaultPrompt string) (RenderCommandResult, error) {
+func (a *WorkerAgent) RenderCommand(data CommandData, promptOverride, defaultSystemPrompt, defaultPrompt string) (RenderCommandResult, error) {
 	// Phase 1: Expand SystemArgs and Args
 	systemArgs, err := expandString(a.SystemArgs, data)
 	if err != nil {
@@ -90,14 +93,33 @@ func (a *WorkerAgent) RenderCommand(data CommandData, promptOverride, defaultPro
 		return RenderCommandResult{}, err
 	}
 
-	// Phase 2: Expand Prompt template to generate prompt content
-	promptTemplate := a.Prompt
-	if promptTemplate == "" {
-		promptTemplate = defaultPrompt
+	// Phase 2: Expand Prompt templates to generate prompt content
+	sysPromptTemplate := a.SystemPrompt
+	if sysPromptTemplate == "" {
+		sysPromptTemplate = defaultSystemPrompt
 	}
-	promptContent, err := expandString(promptTemplate, data)
+	sysPromptContent, err := expandString(sysPromptTemplate, data)
 	if err != nil {
 		return RenderCommandResult{}, err
+	}
+
+	userPromptTemplate := a.Prompt
+	if userPromptTemplate == "" {
+		userPromptTemplate = defaultPrompt
+	}
+	userPromptContent, err := expandString(userPromptTemplate, data)
+	if err != nil {
+		return RenderCommandResult{}, err
+	}
+
+	// Combine SystemPrompt and Prompt
+	var promptContent string
+	if sysPromptContent != "" && userPromptContent != "" {
+		promptContent = sysPromptContent + "\n\n" + userPromptContent
+	} else if sysPromptContent != "" {
+		promptContent = sysPromptContent
+	} else {
+		promptContent = userPromptContent
 	}
 
 	// Phase 3: Expand CommandTemplate
@@ -165,13 +187,9 @@ const (
 	DefaultWorkerName = "claude"
 )
 
-// DefaultWorkerPrompt is the default prompt template for workers.
+// DefaultSystemPrompt is the default system prompt template for workers.
 // It uses Go template syntax with CommandData fields.
-// Kept minimal - detailed workflow is in 'crew help --help-worker'.
-const DefaultWorkerPrompt = `You are working on Task #{{.TaskID}}.
-
-Run 'crew help --help-worker' for workflow guide.
-`
+const DefaultSystemPrompt = `You are working on Task #{{.TaskID}}. Run 'crew help --help-worker'.`
 
 // BuiltinWorker defines a built-in worker configuration.
 type BuiltinWorker struct {
@@ -250,13 +268,14 @@ func NewDefaultConfig() *Config {
 			Command:         builtin.Command,
 			SystemArgs:      builtin.SystemArgs,
 			Args:            builtin.DefaultArgs,
-			// Prompt is empty; falls back to WorkersConfig.Prompt
+			// SystemPrompt/Prompt are empty; falls back to WorkersConfig
 		}
 	}
 	return &Config{
 		WorkersConfig: WorkersConfig{
-			Default: DefaultWorkerName,
-			Prompt:  DefaultWorkerPrompt,
+			Default:      DefaultWorkerName,
+			SystemPrompt: DefaultSystemPrompt,
+			Prompt:       "",
 		},
 		Workers: workers,
 		Log: LogConfig{
@@ -275,12 +294,13 @@ func RenderConfigTemplate() (string, error) {
 	cfg := NewDefaultConfig()
 
 	data := map[string]any{
-		"DefaultWorker": cfg.WorkersConfig.Default,
-		"WorkersPrompt": formatPromptForTemplate(cfg.WorkersConfig.Prompt),
-		"LogLevel":      cfg.Log.Level,
-		"ClaudeArgs":    cfg.Workers["claude"].Args,
-		"OpencodeArgs":  cfg.Workers["opencode"].Args,
-		"CodexArgs":     cfg.Workers["codex"].Args,
+		"DefaultWorker":       cfg.WorkersConfig.Default,
+		"WorkersSystemPrompt": formatPromptForTemplate(cfg.WorkersConfig.SystemPrompt),
+		"WorkersPrompt":       formatPromptForTemplate(cfg.WorkersConfig.Prompt),
+		"LogLevel":            cfg.Log.Level,
+		"ClaudeArgs":          cfg.Workers["claude"].Args,
+		"OpencodeArgs":        cfg.Workers["opencode"].Args,
+		"CodexArgs":           cfg.Workers["codex"].Args,
 	}
 
 	tmpl, err := template.New("config").Delims("<<", ">>").Parse(configTemplate)
@@ -388,6 +408,9 @@ func (c *Config) resolveWorker(name string, visited, resolving map[string]bool) 
 	}
 	if worker.Args != "" {
 		resolved.Args = worker.Args
+	}
+	if worker.SystemPrompt != "" {
+		resolved.SystemPrompt = worker.SystemPrompt
 	}
 	if worker.Prompt != "" {
 		resolved.Prompt = worker.Prompt

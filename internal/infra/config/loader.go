@@ -179,6 +179,7 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 			if m, ok := value.(map[string]any); ok {
 				wc := parseWorkersSection(m)
 				res.WorkersConfig.Default = wc.Default
+				res.WorkersConfig.SystemPrompt = wc.SystemPrompt
 				res.WorkersConfig.Prompt = wc.Prompt
 				for name, def := range wc.Defs {
 					res.Workers[name] = domain.WorkerAgent{
@@ -187,6 +188,7 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						Command:         def.Command,
 						SystemArgs:      def.SystemArgs,
 						Args:            def.Args,
+						SystemPrompt:    def.SystemPrompt,
 						Prompt:          def.Prompt,
 						Model:           def.Model,
 					}
@@ -274,10 +276,11 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 
 // workersConfig holds the parsed [workers] section.
 type workersConfig struct {
-	Defs     map[string]workerDef // Per-worker definitions from [workers.<name>]
-	Default  string               // Default worker name from [workers].default
-	Prompt   string               // Common prompt from [workers].prompt
-	Unknowns []string             // Unknown keys in [workers]
+	Defs         map[string]workerDef // Per-worker definitions from [workers.<name>]
+	Default      string               // Default worker name from [workers].default
+	SystemPrompt string               // Common system prompt from [workers].system_prompt
+	Prompt       string               // Common prompt from [workers].prompt
+	Unknowns     []string             // Unknown keys in [workers]
 }
 
 type workerDef struct {
@@ -287,6 +290,7 @@ type workerDef struct {
 	Command         string
 	SystemArgs      string
 	Args            string
+	SystemPrompt    string
 	Prompt          string
 	Model           string
 }
@@ -302,6 +306,10 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 		case "default":
 			if s, ok := value.(string); ok {
 				result.Default = s
+			}
+		case "system_prompt":
+			if s, ok := value.(string); ok {
+				result.SystemPrompt = s
 			}
 		case "prompt":
 			if s, ok := value.(string); ok {
@@ -334,6 +342,10 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 					case "args":
 						if s, ok := v.(string); ok {
 							def.Args = s
+						}
+					case "system_prompt":
+						if s, ok := v.(string); ok {
+							def.SystemPrompt = s
 						}
 					case "prompt":
 						if s, ok := v.(string); ok {
@@ -381,6 +393,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	if override.WorkersConfig.Default != "" {
 		result.WorkersConfig.Default = override.WorkersConfig.Default
 	}
+	if override.WorkersConfig.SystemPrompt != "" {
+		result.WorkersConfig.SystemPrompt = override.WorkersConfig.SystemPrompt
+	}
 	if override.WorkersConfig.Prompt != "" {
 		result.WorkersConfig.Prompt = override.WorkersConfig.Prompt
 	}
@@ -423,6 +438,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		}
 		if overrideWorker.Args != "" {
 			baseWorker.Args = overrideWorker.Args
+		}
+		if overrideWorker.SystemPrompt != "" {
+			baseWorker.SystemPrompt = overrideWorker.SystemPrompt
 		}
 		if overrideWorker.Prompt != "" {
 			baseWorker.Prompt = overrideWorker.Prompt
