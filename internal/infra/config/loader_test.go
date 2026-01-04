@@ -148,8 +148,10 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 	// Verify: default config is returned (values from domain constants)
 	assert.Equal(t, domain.DefaultWorkerName, cfg.WorkersConfig.Default)
 	assert.Equal(t, domain.DefaultLogLevel, cfg.Log.Level)
-	// Default prompt comes from WorkersConfig, not individual workers
-	assert.Equal(t, domain.DefaultWorkerPrompt, cfg.WorkersConfig.Prompt)
+	// Default system prompt comes from WorkersConfig
+	assert.Equal(t, domain.DefaultSystemPrompt, cfg.WorkersConfig.SystemPrompt)
+	// Default prompt comes from WorkersConfig, which should be empty by default
+	assert.Empty(t, cfg.WorkersConfig.Prompt)
 	// Builtin workers should have values from BuiltinWorkers
 	for name, builtin := range domain.BuiltinWorkers {
 		worker := cfg.Workers[name]
@@ -157,7 +159,8 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 		assert.Equal(t, builtin.Command, worker.Command)
 		assert.Equal(t, builtin.SystemArgs, worker.SystemArgs)
 		assert.Equal(t, builtin.DefaultArgs, worker.Args)
-		// Worker.Prompt is empty; falls back to WorkersConfig.Prompt
+		// Worker.SystemPrompt and Worker.Prompt are empty; falls back to WorkersConfig
+		assert.Empty(t, worker.SystemPrompt)
 		assert.Empty(t, worker.Prompt)
 	}
 }

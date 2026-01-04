@@ -336,6 +336,53 @@ detached
 	assert.Equal(t, "", worktrees[0].Branch) // No branch for detached HEAD
 }
 
+func TestClient_Create_OrphanedWorktree(t *testing.T) {
+	// This tests the scenario where:
+	// 1. A worktree was created
+	// 2. The worktree directory was manually deleted (or by external tool)
+	// 3. Git still has the worktree registered
+	// 4. Attempting to create a new worktree for the same branch should auto-recover
+
+	repoRoot, worktreeDir, cleanup := setupTestRepo(t)
+	defer cleanup()
+
+	client := NewClient(repoRoot, worktreeDir)
+
+	// Create a worktree
+	path, err := client.Create("crew-1", "main")
+	require.NoError(t, err)
+	expectedPath := filepath.Join(worktreeDir, "1")
+	assert.Equal(t, expectedPath, path)
+
+	// Verify it exists
+	exists, err := client.Exists("crew-1")
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	// Simulate orphaned worktree: manually remove the directory
+	// but leave git's worktree registration intact
+	err = os.RemoveAll(path)
+	require.NoError(t, err)
+
+	// Verify directory is gone but still registered
+	_, err = os.Stat(path)
+	assert.True(t, os.IsNotExist(err))
+
+	// Try to create worktree again - should auto-recover via prune
+	path2, err := client.Create("crew-1", "main")
+	require.NoError(t, err, "Create should auto-recover from orphaned worktree")
+	assert.Equal(t, expectedPath, path2)
+
+	// Verify worktree is functional
+	exists, err = client.Exists("crew-1")
+	require.NoError(t, err)
+	assert.True(t, exists)
+
+	// Verify directory exists
+	_, err = os.Stat(path2)
+	assert.NoError(t, err)
+}
+
 func TestClient_SetupWorktree_CopyFiles(t *testing.T) {
 	// Setup test repo
 	repoRoot, worktreeDir, cleanup := setupTestRepo(t)
