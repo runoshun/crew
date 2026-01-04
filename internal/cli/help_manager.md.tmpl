@@ -181,6 +181,16 @@ watch -n 10 'crew list | grep -E "needs_input|in_review"'
 
 ---
 
+## Available Workers
+
+| Worker | Model | Description |
+|--------|-------|-------------|
+{{- range .Workers }}
+| {{ .Name }} | {{ .Model }} | {{ .Description }} |
+{{- end }}
+
+---
+
 ## Constraints
 
 - Do not edit files directly (read-only mode)

@@ -58,11 +58,18 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 			if fullWorker && fullManager {
 				return errors.New("cannot use both --help-worker and --help-manager")
 			}
+
+			var helpData HelpTemplateData
+			if fullWorker || fullManager {
+				cfg, _ := c.ConfigLoader.Load()
+				helpData = NewHelpTemplateData(cfg)
+			}
+
 			if fullWorker {
-				return RenderWorkerHelp(cmd.OutOrStdout(), HelpTemplateData{})
+				return RenderWorkerHelp(cmd.OutOrStdout(), helpData)
 			}
 			if fullManager {
-				return RenderManagerHelp(cmd.OutOrStdout(), HelpTemplateData{})
+				return RenderManagerHelp(cmd.OutOrStdout(), helpData)
 			}
 			// Default: show standard help
 			return cmd.Help()

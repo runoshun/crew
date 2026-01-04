@@ -4,7 +4,10 @@ import (
 	"bytes"
 	_ "embed"
 	"io"
+	"sort"
 	"text/template"
+
+	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
 // Embedded help templates.
@@ -15,10 +18,47 @@ var helpWorkerTmpl string
 //go:embed help_manager.md.tmpl
 var helpManagerTmpl string
 
+// WorkerInfo holds information about a worker for help display.
+type WorkerInfo struct {
+	Name        string
+	Model       string
+	Description string
+}
+
 // HelpTemplateData holds data for rendering help templates.
-// Currently empty as templates don't use template variables,
-// but kept for future extensibility.
-type HelpTemplateData struct{}
+type HelpTemplateData struct {
+	Workers []WorkerInfo
+}
+
+// NewHelpTemplateData creates HelpTemplateData from config.
+func NewHelpTemplateData(cfg *domain.Config) HelpTemplateData {
+	if cfg == nil {
+		return HelpTemplateData{}
+	}
+
+	workers := make([]WorkerInfo, 0, len(cfg.Workers))
+	for name, w := range cfg.Workers {
+		model := w.Model
+		if model == "" {
+			if builtin, ok := domain.BuiltinWorkers[name]; ok {
+				model = builtin.DefaultModel
+			}
+		}
+		workers = append(workers, WorkerInfo{
+			Name:        name,
+			Model:       model,
+			Description: w.Description,
+		})
+	}
+
+	sort.Slice(workers, func(i, j int) bool {
+		return workers[i].Name < workers[j].Name
+	})
+
+	return HelpTemplateData{
+		Workers: workers,
+	}
+}
 
 // RenderWorkerHelp renders the worker help template.
 func RenderWorkerHelp(w io.Writer, data HelpTemplateData) error {
