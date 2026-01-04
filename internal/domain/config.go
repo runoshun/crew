@@ -196,7 +196,7 @@ const (
 
 // DefaultSystemPrompt is the default system prompt template for workers.
 // It uses Go template syntax with CommandData fields.
-const DefaultSystemPrompt = `You are working on Task #{{.TaskID}}. Run 'crew help --help-worker'.`
+const DefaultSystemPrompt = `You are working on Task #{{.TaskID}}. Run 'crew --help-worker'.`
 
 // BuiltinWorker defines a built-in worker configuration.
 type BuiltinWorker struct {

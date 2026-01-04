@@ -49,7 +49,7 @@ func TestGenSkill_Execute(t *testing.T) {
 
 		// Verify content contains key sections
 		assert.Contains(t, string(content), "# Crew Manager Skill")
-		assert.Contains(t, string(content), "crew help --help-manager")
+		assert.Contains(t, string(content), "crew --help-manager")
 		assert.Contains(t, string(content), "## Constraints")
 	}
 }
