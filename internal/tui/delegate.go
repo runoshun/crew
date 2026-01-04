@@ -64,7 +64,15 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	statusIcon := StatusIcon(task.Status)
 	statusText := fmt.Sprintf("%-5s", StatusText(task.Status))
 
-	prefixWidth := 19
+	// Labels
+	var labelsStr string
+	if len(task.Labels) > 0 {
+		for _, l := range task.Labels {
+			labelsStr += "[" + l + "] "
+		}
+	}
+
+	prefixWidth := 19 + runewidth.StringWidth(labelsStr)
 	listWidth := m.Width()
 	maxTitleLen := listWidth - prefixWidth - 2
 	if maxTitleLen < 10 {
@@ -83,14 +91,24 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		iconPart := d.styles.StatusStyle(task.Status).Bold(true).Render(statusIcon)
 		textPart := d.styles.StatusStyle(task.Status).Bold(true).Render(statusText)
 		titlePart := d.styles.TaskTitle.Bold(true).Render(title)
-		line = "  " + indicator + " " + idPart + "  " + iconPart + " " + textPart + "  " + titlePart
+
+		line = "  " + indicator + " " + idPart + "  " + iconPart + " " + textPart + "  "
+		if labelsStr != "" {
+			line += d.styles.TaskLabelSelected.Render(labelsStr)
+		}
+		line += titlePart
 	} else {
 		indicator := d.styles.SelectionIndicator.Render(indicatorChar)
 		idPart := d.styles.TaskID.Render(idStr)
 		iconPart := d.styles.StatusStyle(task.Status).Render(statusIcon)
 		textPart := d.styles.StatusStyle(task.Status).Render(statusText)
 		titlePart := d.styles.TaskTitle.Render(title)
-		line = "  " + indicator + " " + idPart + "  " + iconPart + " " + textPart + "  " + titlePart
+
+		line = "  " + indicator + " " + idPart + "  " + iconPart + " " + textPart + "  "
+		if labelsStr != "" {
+			line += d.styles.TaskLabel.Render(labelsStr)
+		}
+		line += titlePart
 	}
 	lineWidth := runewidth.StringWidth(line)
 	if lineWidth < listWidth {
