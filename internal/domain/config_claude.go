@@ -40,7 +40,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
         "hooks": [
           {
             "type": "command",
-            "command": "crew edit {{.TaskID}} --status needs_input"
+            "command": "crew show {{.TaskID}} | grep -q '^Status: in_complete' || crew edit {{.TaskID}} --status needs_input"
           }
         ]
       }
