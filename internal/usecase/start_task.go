@@ -16,9 +16,10 @@ import (
 // StartTaskInput contains the parameters for starting a task.
 // Fields are ordered to minimize memory padding.
 type StartTaskInput struct {
-	Agent  string // Agent name (required in MVP)
-	Model  string // Model name override (optional, uses agent's default if empty)
-	TaskID int    // Task ID to start
+	Agent    string // Agent name (required in MVP)
+	Model    string // Model name override (optional, uses agent's default if empty)
+	TaskID   int    // Task ID to start
+	Continue bool   // Continue from previous session (adds agent-specific continue args)
 }
 
 // StartTaskOutput contains the result of starting a task.
@@ -134,7 +135,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	}
 
 	// Generate prompt and script files
-	scriptPath, err := uc.generateScript(task, wtPath, resolved.Worker, cfg, model)
+	scriptPath, err := uc.generateScript(task, wtPath, resolved.Worker, cfg, model, in.Continue)
 	if err != nil {
 		_ = uc.worktrees.Remove(branch)
 		return nil, fmt.Errorf("generate script: %w", err)
@@ -174,14 +175,14 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 // generateScript creates the task script with embedded prompt.
 // Returns the path to the generated script.
-func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, worker domain.Worker, cfg *domain.Config, model string) (string, error) {
+func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, worker domain.Worker, cfg *domain.Config, model string, continueFlag bool) (string, error) {
 	scriptsDir := filepath.Join(uc.crewDir, "scripts")
 	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
 		return "", fmt.Errorf("create scripts directory: %w", err)
 	}
 
 	// Build command and prompt using RenderCommand
-	script, err := uc.buildScript(task, worktreePath, worker, cfg, model)
+	script, err := uc.buildScript(task, worktreePath, worker, cfg, model, continueFlag)
 	if err != nil {
 		return "", fmt.Errorf("build script: %w", err)
 	}
@@ -271,7 +272,7 @@ type scriptTemplateData struct {
 }
 
 // buildScript constructs the task script with embedded prompt and session-ended callback.
-func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, worker domain.Worker, cfg *domain.Config, model string) (string, error) {
+func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, worker domain.Worker, cfg *domain.Config, model string, continueFlag bool) (string, error) {
 	// Find crew binary path (for _session-ended callback)
 	crewBin, err := os.Executable()
 	if err != nil {
@@ -291,6 +292,7 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, worker 
 		Issue:       task.Issue,
 		TaskID:      task.ID,
 		Model:       model,
+		Continue:    continueFlag,
 	}
 
 	// Determine default prompts: use config's WorkersConfig settings

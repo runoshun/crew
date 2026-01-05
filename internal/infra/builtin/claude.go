@@ -2,7 +2,7 @@ package builtin
 
 // claudeAgent contains the built-in configuration for the Claude CLI.
 var claudeAgent = agentConfig{
-	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
 	Command:           "claude",
 	WorkerSystemArgs:  "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,
 	ManagerSystemArgs: "--model {{.Model}} --permission-mode bypassPermissions",

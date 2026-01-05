@@ -45,14 +45,14 @@ func TestParseBranchTaskID(t *testing.T) {
 func TestBranchName(t *testing.T) {
 	tests := []struct {
 		name   string
+		want   string
 		taskID int
 		issue  int
-		want   string
 	}{
-		{"without issue", 1, 0, "crew-1"},
-		{"without issue larger ID", 42, 0, "crew-42"},
-		{"with issue", 1, 123, "crew-1-gh-123"},
-		{"with issue larger numbers", 42, 456, "crew-42-gh-456"},
+		{name: "without issue", taskID: 1, issue: 0, want: "crew-1"},
+		{name: "without issue larger ID", taskID: 42, issue: 0, want: "crew-42"},
+		{name: "with issue", taskID: 1, issue: 123, want: "crew-1-gh-123"},
+		{name: "with issue larger numbers", taskID: 42, issue: 456, want: "crew-42-gh-456"},
 	}
 
 	for _, tt := range tests {
@@ -67,12 +67,12 @@ func TestBranchName(t *testing.T) {
 
 func TestSessionName(t *testing.T) {
 	tests := []struct {
-		taskID int
 		want   string
+		taskID int
 	}{
-		{1, "crew-1"},
-		{42, "crew-42"},
-		{999, "crew-999"},
+		{taskID: 1, want: "crew-1"},
+		{taskID: 42, want: "crew-42"},
+		{taskID: 999, want: "crew-999"},
 	}
 
 	for _, tt := range tests {

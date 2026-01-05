@@ -69,7 +69,8 @@ Examples:
 // newStartCommand creates the start command for starting a task.
 func newStartCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		model string
+		model        string
+		continueFlag bool
 	}
 
 	cmd := &cobra.Command{
@@ -93,7 +94,11 @@ Examples:
 
   # Start task with a specific model
   git crew start 1 claude --model sonnet
-  git crew start 1 opencode -m gpt-4o`,
+  git crew start 1 opencode -m gpt-4o
+
+  # Continue a stopped task
+  git crew start 1 --continue
+  git crew start 1 -c`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -111,9 +116,10 @@ Examples:
 			// Execute use case
 			uc := c.StartTaskUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.StartTaskInput{
-				TaskID: taskID,
-				Agent:  agent,
-				Model:  opts.model,
+				TaskID:   taskID,
+				Agent:    agent,
+				Model:    opts.model,
+				Continue: opts.continueFlag,
 			})
 			if err != nil {
 				return err
@@ -126,6 +132,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
+	cmd.Flags().BoolVarP(&opts.continueFlag, "continue", "c", false, "Continue from previous session")
 
 	return cmd
 }
