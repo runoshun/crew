@@ -28,9 +28,7 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
   return {
 		event: async ({ event }) => {
 			if (event.type === "session.idle" || event.type === "permission.updated") {
-				if (result.exitCode !== 0) {
-					await ` + "$`crew show {{.TaskID}} | grep -q \"^Status: in_complete\" || crew edit {{.TaskID}} --status needs_input`" + `;
-				}
+				await ` + "$`crew show {{.TaskID}} | grep -q \"^Status: in_complete\" || crew edit {{.TaskID}} --status needs_input`" + `;
 			}
 		}
   }
