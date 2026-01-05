@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	overlay "github.com/rmhubbert/bubbletea-overlay"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
@@ -97,13 +98,13 @@ func (m *Model) View() string {
 	return m.styles.App.Render(base)
 }
 
-func (m *Model) overlayDialog(_, dialog string) string {
-	return lipgloss.Place(
-		m.width-appPadding,
-		m.height-2,
-		lipgloss.Center,
-		lipgloss.Center,
+func (m *Model) overlayDialog(base, dialog string) string {
+	return overlay.Composite(
 		dialog,
+		base,
+		overlay.Center,
+		overlay.Center,
+		0, 0,
 	)
 }
 
@@ -480,7 +481,7 @@ func (m *Model) viewHelp() string {
 				{"/", "Filter"},
 				{"o", "Sort"},
 				{"v", "Details"},
-				{"a", "Toggle all"},
+				{"A", "Toggle all"},
 			},
 		},
 		{
@@ -491,7 +492,7 @@ func (m *Model) viewHelp() string {
 			}{
 				{"s", "Start"},
 				{"S", "Stop"},
-				{"A", "Attach"},
+				{"a", "Attach"},
 				{"n", "New Task"},
 				{"d", "Delete"},
 				{"c", "Close"},
