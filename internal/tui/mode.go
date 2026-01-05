@@ -5,16 +5,17 @@ package tui
 type Mode int
 
 const (
-	ModeNormal     Mode = iota // Default navigation mode
-	ModeFilter                 // Text filtering mode
-	ModeConfirm                // Confirmation dialog mode
-	ModeInputTitle             // Title input mode (for new task) - deprecated, use ModeNewTask
-	ModeInputDesc              // Description input mode (for new task) - deprecated, use ModeNewTask
-	ModeNewTask                // New task form mode (title, desc, parent)
-	ModeStart                  // Agent picker mode
-	ModeHelp                   // Help overlay mode
-	ModeDetail                 // Task detail view mode
-	ModeExec                   // Execute command mode
+	ModeNormal       Mode = iota // Default navigation mode
+	ModeFilter                   // Text filtering mode
+	ModeConfirm                  // Confirmation dialog mode
+	ModeInputTitle               // Title input mode (for new task) - deprecated, use ModeNewTask
+	ModeInputDesc                // Description input mode (for new task) - deprecated, use ModeNewTask
+	ModeNewTask                  // New task form mode (title, desc, parent)
+	ModeStart                    // Agent picker mode
+	ModeHelp                     // Help overlay mode
+	ModeDetail                   // Task detail view mode
+	ModeChangeStatus             // Status change mode
+	ModeExec                     // Execute command mode
 )
 
 // String returns the string representation of the mode.
@@ -38,6 +39,8 @@ func (m Mode) String() string {
 		return "help"
 	case ModeDetail:
 		return "detail"
+	case ModeChangeStatus:
+		return "change_status"
 	case ModeExec:
 		return "exec"
 	default:
@@ -61,7 +64,7 @@ func (m Mode) IsInputMode() bool {
 	switch m {
 	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec:
 		return true
-	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeDetail:
+	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeDetail, ModeChangeStatus:
 		return false
 	}
 	return false

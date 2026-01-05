@@ -87,6 +87,8 @@ func (m *Model) View() string {
 		dialog = m.viewHelp()
 	case ModeDetail:
 		dialog = m.viewDetail()
+	case ModeChangeStatus:
+		dialog = m.viewStatusPicker()
 	case ModeExec:
 		dialog = m.viewExecDialog()
 	}
@@ -435,7 +437,11 @@ func (m *Model) viewFooter() string {
 			m.styles.FooterKey.Render("q") + " quit"
 	case ModeFilter:
 		content = "enter apply · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeDetail, ModeExec:
+	case ModeChangeStatus:
+		content = "enter select · esc cancel"
+	case ModeExec:
+		content = "enter execute · esc cancel"
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeDetail:
 		return ""
 	default:
 		return ""
@@ -493,7 +499,9 @@ func (m *Model) viewHelp() string {
 				{"s", "Start"},
 				{"S", "Stop"},
 				{"a", "Attach"},
+				{"x", "Execute"},
 				{"n", "New Task"},
+				{"e", "Change Status"},
 				{"d", "Delete"},
 				{"c", "Close"},
 			},
@@ -546,6 +554,73 @@ func (m *Model) viewDetail() string {
 		ds.key.Render("esc") + ds.muted.Render(" back"))
 
 	return m.dialogStyle().Render(m.detailViewport.View() + "\n\n" + footer)
+}
+
+func (m *Model) viewStatusPicker() string {
+	task := m.SelectedTask()
+	if task == nil {
+		return ""
+	}
+
+	ds := m.newDialogStyles()
+	baseStyle := lipgloss.NewStyle().Background(ds.bg)
+
+	title := ds.renderLine(ds.label.Render("Change Status"))
+	taskLine := ds.renderLine(ds.text.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+	currentLine := ds.renderLine(ds.muted.Render("Current: ") + m.styles.StatusStyle(task.Status).Background(ds.bg).Render(string(task.Status)))
+	selectLabel := ds.renderLine(ds.label.Render("Select new status:"))
+
+	transitions := m.getStatusTransitions(task.Status)
+	var statusRows []string
+
+	if len(transitions) == 0 {
+		statusRows = append(statusRows, ds.renderLine(ds.muted.Render("  No transitions available")))
+	} else {
+		hasForced := false
+		for i, status := range transitions {
+			isNormal := task.Status.CanTransitionTo(status)
+			if !isNormal && !hasForced {
+				// Add separator before forced transitions with centered (force)
+				label := " (force) "
+				totalWidth := ds.width - 4
+				sideWidth := (totalWidth - len(label)) / 2
+				if sideWidth < 0 {
+					sideWidth = 0
+				}
+				sep := strings.Repeat("─", sideWidth)
+				fill := ""
+				if sideWidth*2+len(label) < totalWidth {
+					fill = " "
+				}
+				separatorLine := ds.muted.Render("  " + sep + label + sep + fill)
+				statusRows = append(statusRows, ds.renderLine(separatorLine))
+				hasForced = true
+			}
+
+			selected := i == m.statusCursor
+			cursor := " "
+			cursorStyle := ds.label.Foreground(Colors.Primary)
+			style := ds.text
+			if selected {
+				cursor = "▸"
+				style = ds.label
+			}
+
+			displayText := string(status)
+			row := ds.renderLine(baseStyle.Render("  ") + cursorStyle.Render(cursor) + baseStyle.Render(" ") + style.Render(displayText))
+			statusRows = append(statusRows, row)
+		}
+	}
+
+	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" select · ") +
+		ds.key.Render("esc") + ds.text.Render(" cancel"))
+
+	lines := []string{title, ds.emptyLine(), taskLine, currentLine, ds.emptyLine(), selectLabel}
+	lines = append(lines, statusRows...)
+	lines = append(lines, ds.emptyLine(), hint)
+
+	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return m.dialogStyle().Render(content)
 }
 
 func (m *Model) viewExecDialog() string {

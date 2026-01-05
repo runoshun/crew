@@ -60,6 +60,14 @@ type MsgTaskMerged struct {
 
 func (MsgTaskMerged) sealed() {}
 
+// MsgTaskStatusUpdated is sent when a task status is updated.
+type MsgTaskStatusUpdated struct {
+	Status domain.Status
+	TaskID int
+}
+
+func (MsgTaskStatusUpdated) sealed() {}
+
 // MsgTaskCopied is sent when a task is copied.
 type MsgTaskCopied struct {
 	OriginalID int
