@@ -14,6 +14,7 @@ type NewTaskInput struct {
 	ParentID    *int     // Parent task ID (optional, nil = root task)
 	Title       string   // Task title (required)
 	Description string   // Task description (optional)
+	BaseBranch  string   // Base branch (optional, empty = use default)
 	Labels      []string // Labels (optional)
 	Issue       int      // Linked GitHub issue number (0 = not linked)
 }
@@ -63,6 +64,10 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 
 	// Create task
 	now := uc.clock.Now()
+	baseBranch := in.BaseBranch
+	if baseBranch == "" {
+		baseBranch = "main"
+	}
 	task := &domain.Task{
 		ID:          id,
 		ParentID:    in.ParentID,
@@ -72,7 +77,7 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 		Created:     now,
 		Issue:       in.Issue,
 		Labels:      in.Labels,
-		BaseBranch:  "main", // Default base branch
+		BaseBranch:  baseBranch,
 	}
 
 	// Save task
