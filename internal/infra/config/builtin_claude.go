@@ -45,7 +45,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
         "hooks": [
           {
             "type": "command",
-            "command": "crew show {{.TaskID}} | grep -q '^Status: in_complete' || crew edit {{.TaskID}} --status needs_input"
+            "command": "crew show {{.TaskID}} | grep -q '^Status: in_review' || crew edit {{.TaskID}} --status needs_input"
           }
         ]
       }
@@ -55,7 +55,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
         "hooks": [
           {
             "type": "command",
-            "command": "crew show {{.TaskID}} | grep -q '^Status: needs_input' || crew edit {{.TaskID}} --status in_progress"
+            "command": "crew edit {{.TaskID}} --status in_progress"
           }
         ]
       }
