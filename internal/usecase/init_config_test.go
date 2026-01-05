@@ -18,10 +18,12 @@ func TestInitConfig_Execute(t *testing.T) {
 			Path:   "/test/.git/crew/config.toml",
 			Exists: false,
 		}
+		cfg := domain.NewDefaultConfig()
 
 		uc := usecase.NewInitConfig(manager)
 		out, err := uc.Execute(context.Background(), usecase.InitConfigInput{
 			Global: false,
+			Config: cfg,
 		})
 
 		require.NoError(t, err)
@@ -36,10 +38,12 @@ func TestInitConfig_Execute(t *testing.T) {
 			Path:   "/home/test/.config/git-crew/config.toml",
 			Exists: false,
 		}
+		cfg := domain.NewDefaultConfig()
 
 		uc := usecase.NewInitConfig(manager)
 		out, err := uc.Execute(context.Background(), usecase.InitConfigInput{
 			Global: true,
+			Config: cfg,
 		})
 
 		require.NoError(t, err)
@@ -55,10 +59,12 @@ func TestInitConfig_Execute(t *testing.T) {
 			Exists: true,
 		}
 		manager.InitRepoErr = domain.ErrConfigExists
+		cfg := domain.NewDefaultConfig()
 
 		uc := usecase.NewInitConfig(manager)
 		_, err := uc.Execute(context.Background(), usecase.InitConfigInput{
 			Global: false,
+			Config: cfg,
 		})
 
 		require.Error(t, err)
@@ -72,10 +78,12 @@ func TestInitConfig_Execute(t *testing.T) {
 			Exists: true,
 		}
 		manager.InitGlobalErr = domain.ErrConfigExists
+		cfg := domain.NewDefaultConfig()
 
 		uc := usecase.NewInitConfig(manager)
 		_, err := uc.Execute(context.Background(), usecase.InitConfigInput{
 			Global: true,
+			Config: cfg,
 		})
 
 		require.Error(t, err)

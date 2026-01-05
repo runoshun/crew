@@ -191,9 +191,16 @@ With --global, creates the global configuration file at ~/.config/crew/config.to
 Error conditions:
 - Target file already exists: error`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Load config to get registered builtins for template generation
+			cfg, err := c.ConfigLoader.Load()
+			if err != nil {
+				return err
+			}
+
 			uc := c.InitConfigUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.InitConfigInput{
 				Global: global,
+				Config: cfg,
 			})
 			if err != nil {
 				return err

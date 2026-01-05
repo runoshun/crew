@@ -70,13 +70,15 @@ func (m *Manager) getConfigInfo(path string) domain.ConfigInfo {
 }
 
 // InitRepoConfig creates a repository config file with default template.
-func (m *Manager) InitRepoConfig() error {
+// The cfg parameter should have builtin agents registered (via builtin.Register).
+func (m *Manager) InitRepoConfig(cfg *domain.Config) error {
 	path := filepath.Join(m.crewDir, domain.ConfigFileName)
-	return m.initConfig(path)
+	return m.initConfig(path, cfg)
 }
 
 // InitGlobalConfig creates a global config file with default template.
-func (m *Manager) InitGlobalConfig() error {
+// The cfg parameter should have builtin agents registered (via builtin.Register).
+func (m *Manager) InitGlobalConfig(cfg *domain.Config) error {
 	if m.globalConfDir == "" {
 		return errors.New("global config directory not available")
 	}
@@ -87,21 +89,18 @@ func (m *Manager) InitGlobalConfig() error {
 		return err
 	}
 
-	return m.initConfig(path)
+	return m.initConfig(path, cfg)
 }
 
 // initConfig creates a config file with default template.
-func (m *Manager) initConfig(path string) error {
+func (m *Manager) initConfig(path string, cfg *domain.Config) error {
 	// Check if file already exists
 	if _, err := os.Stat(path); err == nil {
 		return domain.ErrConfigExists
 	}
 
-	// Render template with default values
-	content, err := domain.RenderConfigTemplate()
-	if err != nil {
-		return err
-	}
+	// Render template dynamically from the registered config
+	content := domain.RenderConfigTemplate(cfg)
 
 	return os.WriteFile(path, []byte(content), 0600)
 }

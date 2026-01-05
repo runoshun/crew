@@ -9,7 +9,8 @@ import (
 
 // InitConfigInput contains the input for the InitConfig use case.
 type InitConfigInput struct {
-	Global bool // If true, initialize global config; otherwise repository config
+	Config *domain.Config // Config with builtin agents registered (for template generation)
+	Global bool           // If true, initialize global config; otherwise repository config
 }
 
 // InitConfigOutput contains the output of the InitConfig use case.
@@ -37,11 +38,11 @@ func (uc *InitConfig) Execute(_ context.Context, in InitConfigInput) (*InitConfi
 	if in.Global {
 		info := uc.configManager.GetGlobalConfigInfo()
 		path = info.Path
-		err = uc.configManager.InitGlobalConfig()
+		err = uc.configManager.InitGlobalConfig(in.Config)
 	} else {
 		info := uc.configManager.GetRepoConfigInfo()
 		path = info.Path
-		err = uc.configManager.InitRepoConfig()
+		err = uc.configManager.InitRepoConfig(in.Config)
 	}
 
 	if err != nil {
