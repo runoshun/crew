@@ -5,18 +5,17 @@ const (
 	claudeAllowedToolsForManager = `--allowedTools='Bash(crew:*)'`
 )
 
-// claudeAgent contains the built-in configuration for the Claude CLI.
-var claudeAgent = agentConfig{
-	Command:           "claude",
-	CommandTemplate:   "{{.Command}} --model {{.Model}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
-	WorkerSystemArgs:  "--permission-mode acceptEdits " + claudeAllowedToolsForWorker,
-	ManagerSystemArgs: claudeAllowedToolsForManager,
-	DefaultArgs:       "",
-	DefaultModel:      "opus",
-	Description:       "Claude model via Anthropic CLI",
-	// WorktreeSetupScript and ExcludePatterns are Worker-only (Managers don't use worktrees)
-	WorktreeSetupScript: claudeSetupScript,
-	ExcludePatterns:     []string{".claude/crew-plugin/"},
+// claudeAgents contains the built-in configuration for the Claude CLI.
+var claudeAgents = builtinAgentSet{
+	Worker: builtinAgentDef{
+		CommandTemplate:   "claude --model {{.Model}} --permission-mode acceptEdits " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
+		DefaultModel:      "opus",
+		Description:       "Claude model via Anthropic CLI",
+		WorkerSetupScript: claudeSetupScript,
+	},
+	Manager: builtinAgentDef{
+		Description: "Claude manager agent for task orchestration",
+	},
 }
 
 const claudeSetupScript = `#!/bin/bash
@@ -54,4 +53,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
   }
 }
 EOF
+
+# Add exclude pattern to git
+echo ".claude/crew-plugin/" >> .git/info/exclude
 `

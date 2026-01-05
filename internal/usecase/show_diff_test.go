@@ -109,7 +109,7 @@ func TestShowDiff_Execute_WithConfiguredCommand(t *testing.T) {
 		Diff: domain.DiffConfig{
 			Command: "git diff origin/main...HEAD{{if .Args}} {{.Args}}{{end}} | delta",
 		},
-		Workers: make(map[string]domain.Worker),
+		Agents: make(map[string]domain.Agent),
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -283,7 +283,7 @@ func TestShowDiff_Execute_InvalidTemplate(t *testing.T) {
 		Diff: domain.DiffConfig{
 			Command: "{{.Invalid}", // Invalid template
 		},
-		Workers: make(map[string]domain.Worker),
+		Agents: make(map[string]domain.Agent),
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -430,7 +430,7 @@ func TestShowDiff_Execute_UseTUICommand(t *testing.T) {
 			Command:    "git diff main...HEAD | delta",
 			TUICommand: "git diff --color main...HEAD | less -R",
 		},
-		Workers: make(map[string]domain.Worker),
+		Agents: make(map[string]domain.Agent),
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -476,7 +476,7 @@ func TestShowDiff_Execute_UseTUICommandFallbackToCommand(t *testing.T) {
 			Command:    "git diff main...HEAD | delta",
 			TUICommand: "", // Empty TUICommand
 		},
-		Workers: make(map[string]domain.Worker),
+		Agents: make(map[string]domain.Agent),
 	}
 
 	var stdout, stderr bytes.Buffer
@@ -521,7 +521,7 @@ func TestShowDiff_Execute_UseTUICommandFalse(t *testing.T) {
 			Command:    "git diff main...HEAD | delta",
 			TUICommand: "git diff --color main...HEAD | less -R",
 		},
-		Workers: make(map[string]domain.Worker),
+		Agents: make(map[string]domain.Agent),
 	}
 
 	var stdout, stderr bytes.Buffer

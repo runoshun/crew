@@ -77,8 +77,8 @@ func TestManager_InitRepoConfig(t *testing.T) {
 	t.Run("creates config file", func(t *testing.T) {
 		crewDir := t.TempDir()
 		cfg := domain.NewDefaultConfig()
-		cfg.Workers["test-worker"] = domain.Worker{
-			Agent:       "test-agent",
+		cfg.Agents["test-worker"] = domain.Agent{
+			Role:        domain.RoleWorker,
 			Description: "Test worker",
 		}
 
@@ -91,10 +91,10 @@ func TestManager_InitRepoConfig(t *testing.T) {
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "git-crew configuration")
-		assert.Contains(t, string(content), "[workers]")
-		assert.Contains(t, string(content), "default = ")
-		// Verify dynamic content from registered workers
-		assert.Contains(t, string(content), "[workers.test-worker]")
+		assert.Contains(t, string(content), "[agents]")
+		assert.Contains(t, string(content), "default_worker = ")
+		// Verify dynamic content from registered agents
+		assert.Contains(t, string(content), "[agents.test-worker]")
 	})
 
 	t.Run("returns error if file already exists", func(t *testing.T) {

@@ -10,68 +10,63 @@ func TestRegister(t *testing.T) {
 	cfg := domain.NewDefaultConfig()
 	Register(cfg)
 
-	// Check that builtin agents are registered
-	expectedAgents := []string{"claude", "opencode"}
-	for _, name := range expectedAgents {
+	// Check that builtin worker agents are registered
+	expectedWorkers := []string{"claude", "opencode"}
+	for _, name := range expectedWorkers {
 		agent, ok := cfg.Agents[name]
 		if !ok {
-			t.Errorf("expected agent %q to be registered", name)
+			t.Errorf("expected worker agent %q to be registered", name)
 			continue
-		}
-		if agent.Command == "" {
-			t.Errorf("agent %q should have a Command", name)
 		}
 		if agent.CommandTemplate == "" {
 			t.Errorf("agent %q should have a CommandTemplate", name)
 		}
+		if agent.Role != domain.RoleWorker {
+			t.Errorf("agent %q should have Role=worker, got %q", name, agent.Role)
+		}
 	}
 
-	// Check that builtin workers are registered
-	for _, name := range expectedAgents {
-		worker, ok := cfg.Workers[name]
+	// Check that builtin manager agents are registered
+	expectedManagers := []string{"claude-manager", "opencode-manager"}
+	for _, name := range expectedManagers {
+		agent, ok := cfg.Agents[name]
 		if !ok {
-			t.Errorf("expected worker %q to be registered", name)
+			t.Errorf("expected manager agent %q to be registered", name)
 			continue
 		}
-		if worker.Agent != name {
-			t.Errorf("worker %q should reference agent %q, got %q", name, name, worker.Agent)
+		if agent.Role != domain.RoleManager {
+			t.Errorf("agent %q should have Role=manager, got %q", name, agent.Role)
 		}
-		// Note: SystemArgs may be empty - model is now in CommandTemplate directly
+		if !agent.Hidden {
+			t.Errorf("manager agent %q should be hidden by default", name)
+		}
 	}
 
-	// Check that builtin managers are registered
-	for _, name := range expectedAgents {
-		manager, ok := cfg.Managers[name]
-		if !ok {
-			t.Errorf("expected manager %q to be registered", name)
-			continue
-		}
-		if manager.Agent != name {
-			t.Errorf("manager %q should reference agent %q, got %q", name, name, manager.Agent)
-		}
+	// Check default agents are set
+	if cfg.AgentsConfig.DefaultWorker != "opencode" {
+		t.Errorf("DefaultWorker = %q, want %q", cfg.AgentsConfig.DefaultWorker, "opencode")
+	}
+	if cfg.AgentsConfig.DefaultManager != "opencode-manager" {
+		t.Errorf("DefaultManager = %q, want %q", cfg.AgentsConfig.DefaultManager, "opencode-manager")
 	}
 }
 
 func TestBuiltinAgentConfigs(t *testing.T) {
 	// Verify claude agent config
-	if claudeAgent.Command != "claude" {
-		t.Errorf("claude agent command = %q, want %q", claudeAgent.Command, "claude")
+	claudeSet := claudeAgents
+	if claudeSet.Worker.DefaultModel != "opus" {
+		t.Errorf("claude agent default model = %q, want %q", claudeSet.Worker.DefaultModel, "opus")
 	}
-	if claudeAgent.DefaultModel != "opus" {
-		t.Errorf("claude agent default model = %q, want %q", claudeAgent.DefaultModel, "opus")
-	}
-	if len(claudeAgent.ExcludePatterns) == 0 {
-		t.Error("claude agent should have exclude patterns")
+	if claudeSet.Worker.WorkerSetupScript == "" {
+		t.Error("claude agent should have worker setup script")
 	}
 
 	// Verify opencode agent config
-	if opencodeAgent.Command != "opencode" {
-		t.Errorf("opencode agent command = %q, want %q", opencodeAgent.Command, "opencode")
+	opencodeSet := opencodeAgents
+	if opencodeSet.Worker.DefaultModel != "anthropic/claude-opus-4-5" {
+		t.Errorf("opencode agent default model = %q, want %q", opencodeSet.Worker.DefaultModel, "anthropic/claude-opus-4-5")
 	}
-	if opencodeAgent.DefaultModel != "anthropic/claude-opus-4-5" {
-		t.Errorf("opencode agent default model = %q, want %q", opencodeAgent.DefaultModel, "anthropic/claude-opus-4-5")
-	}
-	if len(opencodeAgent.ExcludePatterns) == 0 {
-		t.Error("opencode agent should have exclude patterns")
+	if opencodeSet.Worker.WorkerSetupScript == "" {
+		t.Error("opencode agent should have worker setup script")
 	}
 }

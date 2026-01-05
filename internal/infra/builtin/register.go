@@ -4,53 +4,58 @@ package builtin
 
 import "github.com/runoshun/git-crew/v2/internal/domain"
 
-// agentConfig defines a built-in agent configuration (internal use only).
-// SystemArgs is role-specific: Workers and Managers have different system arguments.
-type agentConfig struct {
-	CommandTemplate     string
-	Command             string
-	WorkerSystemArgs    string
-	ManagerSystemArgs   string
-	DefaultArgs         string
-	DefaultModel        string
-	Description         string
-	WorktreeSetupScript string
-	ExcludePatterns     []string
+// builtinAgentDef defines a built-in agent configuration (internal use only).
+// Each CLI tool (claude, opencode) has a base configuration and role-specific variants.
+type builtinAgentDef struct {
+	// Base configuration
+	CommandTemplate string // Full command template
+	DefaultModel    string // Default model for this agent
+	Description     string // Description of the agent
+
+	// Worker-specific
+	WorkerSetupScript string // Setup script for workers (includes exclude patterns)
+
+	// Manager-specific (hidden by default)
+}
+
+// builtinAgentSet contains all agent variants for a CLI tool.
+type builtinAgentSet struct {
+	Worker  builtinAgentDef
+	Manager builtinAgentDef
 }
 
 // builtinAgents contains preset configurations for known agents.
-var builtinAgents = map[string]agentConfig{
-	"claude":   claudeAgent,
-	"opencode": opencodeAgent,
+var builtinAgents = map[string]builtinAgentSet{
+	"claude":   claudeAgents,
+	"opencode": opencodeAgents,
 }
 
-// Register adds all built-in agents, workers, and managers to the given config.
+// Register adds all built-in agents to the given config.
 // This should be called after NewDefaultConfig() and before merging user config.
+// Creates worker agents (e.g., "claude", "opencode") and manager agents (e.g., "claude-manager", "opencode-manager").
 func Register(cfg *domain.Config) {
-	for name, builtin := range builtinAgents {
+	for name, agentSet := range builtinAgents {
+		// Register worker agent
 		cfg.Agents[name] = domain.Agent{
-			Command:             builtin.Command,
-			CommandTemplate:     builtin.CommandTemplate,
-			DefaultModel:        builtin.DefaultModel,
-			Description:         builtin.Description,
-			WorktreeSetupScript: builtin.WorktreeSetupScript,
-			ExcludePatterns:     builtin.ExcludePatterns,
+			CommandTemplate: agentSet.Worker.CommandTemplate,
+			Role:            domain.RoleWorker,
+			SystemPrompt:    domain.DefaultSystemPrompt,
+			DefaultModel:    agentSet.Worker.DefaultModel,
+			Description:     agentSet.Worker.Description,
+			SetupScript:     agentSet.Worker.WorkerSetupScript,
 		}
-		// Create builtin workers with role-specific SystemArgs
-		cfg.Workers[name] = domain.Worker{
-			Agent:           name,
-			CommandTemplate: builtin.CommandTemplate,
-			Command:         builtin.Command,
-			SystemArgs:      builtin.WorkerSystemArgs,
-			Args:            builtin.DefaultArgs,
-			Description:     builtin.Description,
-		}
-		// Create builtin managers with role-specific SystemArgs
-		cfg.Managers[name] = domain.Manager{
-			Agent:       name,
-			SystemArgs:  builtin.ManagerSystemArgs,
-			Description: builtin.Description,
+
+		// Register manager agent (hidden by default)
+		managerName := name + "-manager"
+		cfg.Agents[managerName] = domain.Agent{
+			Inherit:      name,
+			Role:         domain.RoleManager,
+			SystemPrompt: domain.DefaultManagerSystemPrompt,
+			Description:  agentSet.Manager.Description,
 		}
 	}
 
+	// Set default worker and manager
+	cfg.AgentsConfig.DefaultWorker = "opencode"
+	cfg.AgentsConfig.DefaultManager = "opencode-manager"
 }

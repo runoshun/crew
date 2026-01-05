@@ -31,28 +31,22 @@ type HelpTemplateData struct {
 }
 
 // NewHelpTemplateData creates HelpTemplateData from config.
+// Only shows agents with role=worker that are not hidden.
 func NewHelpTemplateData(cfg *domain.Config) HelpTemplateData {
 	if cfg == nil {
 		return HelpTemplateData{}
 	}
 
-	workers := make([]WorkerInfo, 0, len(cfg.Workers))
-	for name, w := range cfg.Workers {
-		model := w.Model
-		if model == "" {
-			// Get default model from Agent definition
-			agentRef := w.Agent
-			if agentRef == "" {
-				agentRef = name
-			}
-			if agentDef, ok := cfg.Agents[agentRef]; ok {
-				model = agentDef.DefaultModel
-			}
+	workers := make([]WorkerInfo, 0, len(cfg.Agents))
+	for name, agent := range cfg.Agents {
+		// Skip hidden agents and non-worker roles
+		if agent.Hidden || (agent.Role != "" && agent.Role != domain.RoleWorker) {
+			continue
 		}
 		workers = append(workers, WorkerInfo{
 			Name:        name,
-			Model:       model,
-			Description: w.Description,
+			Model:       agent.DefaultModel,
+			Description: agent.Description,
 		})
 	}
 

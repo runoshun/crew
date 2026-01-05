@@ -6,6 +6,7 @@ import (
 	"io"
 	"os/exec"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -436,6 +437,7 @@ func (m *Model) copyTask(taskID int) tea.Cmd {
 }
 
 // updateAgents updates the agent lists from config.
+// Agents with role=worker and hidden=false are shown in the TUI.
 func (m *Model) updateAgents() {
 	if m.config == nil {
 		return
@@ -444,26 +446,29 @@ func (m *Model) updateAgents() {
 	// Build agent command previews
 	m.agentCommands = make(map[string]string)
 
-	// Agents defined in cfg.Agents are considered "builtin" (registered in NewDefaultConfig)
+	// Filter agents: only show worker-role agents that are not hidden
 	m.builtinAgents = []string{}
-	for name, agentDef := range m.config.Agents {
-		m.builtinAgents = append(m.builtinAgents, name)
-		m.agentCommands[name] = agentDef.Command
-	}
-
-	// Workers not in Agents are "custom" (user-defined workers)
 	m.customAgents = []string{}
-	for name, worker := range m.config.Workers {
-		if _, isBuiltin := m.config.Agents[name]; !isBuiltin {
-			m.customAgents = append(m.customAgents, name)
-			m.agentCommands[name] = worker.Command
+	for name, agentDef := range m.config.Agents {
+		// Skip hidden agents and non-worker roles
+		if agentDef.Hidden || (agentDef.Role != "" && agentDef.Role != domain.RoleWorker) {
+			continue
+		}
+		m.builtinAgents = append(m.builtinAgents, name)
+		// Extract command from command template (simplified - first word)
+		cmdTemplate := agentDef.CommandTemplate
+		if cmdTemplate != "" {
+			parts := strings.Fields(cmdTemplate)
+			if len(parts) > 0 {
+				m.agentCommands[name] = parts[0]
+			}
 		}
 	}
 
 	// Set cursor to default agent
 	allAgents := m.allAgents()
 	for i, a := range allAgents {
-		if a == m.config.WorkersConfig.Default {
+		if a == m.config.AgentsConfig.DefaultWorker {
 			m.agentCursor = i
 			break
 		}

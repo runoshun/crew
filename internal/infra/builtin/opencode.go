@@ -1,17 +1,16 @@
 package builtin
 
-// opencodeAgent contains the built-in configuration for the OpenCode CLI.
-var opencodeAgent = agentConfig{
-	Command:           "opencode",
-	CommandTemplate:   "{{.Command}} -m {{.Model}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
-	WorkerSystemArgs:  "",
-	ManagerSystemArgs: "",
-	DefaultArgs:       "",
-	DefaultModel:      "anthropic/claude-opus-4-5",
-	Description:       "General purpose coding agent via opencode CLI",
-	// WorktreeSetupScript and ExcludePatterns are Worker-only (Managers don't use worktrees)
-	WorktreeSetupScript: opencodeSetupScript,
-	ExcludePatterns:     []string{".opencode/plugin/crew-hooks.ts"},
+// opencodeAgents contains the built-in configuration for the OpenCode CLI.
+var opencodeAgents = builtinAgentSet{
+	Worker: builtinAgentDef{
+		CommandTemplate:   "opencode -m {{.Model}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
+		DefaultModel:      "anthropic/claude-opus-4-5",
+		Description:       "General purpose coding agent via opencode CLI",
+		WorkerSetupScript: opencodeSetupScript,
+	},
+	Manager: builtinAgentDef{
+		Description: "OpenCode manager agent for task orchestration",
+	},
 }
 
 const opencodeSetupScript = `#!/bin/bash
@@ -34,4 +33,7 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
   }
 }
 EOF
+
+# Add exclude pattern to git
+echo ".opencode/plugin/crew-hooks.ts" >> .git/info/exclude
 `
