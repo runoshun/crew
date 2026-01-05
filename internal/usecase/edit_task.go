@@ -15,11 +15,13 @@ type EditTaskInput struct {
 	Title        *string        // New title (nil = no change)
 	Description  *string        // New description (nil = no change)
 	Status       *domain.Status // New status (nil = no change)
+	EditorText   string         // Markdown text from editor (only used when EditorEdit is true)
 	Labels       []string       // Labels to set (replaces all existing labels, nil = no change)
 	AddLabels    []string       // Labels to add
 	RemoveLabels []string       // Labels to remove
 	TaskID       int            // Task ID to edit (required)
 	LabelsSet    bool           // True if Labels was explicitly set (to distinguish nil from empty)
+	EditorEdit   bool           // True if editing via editor (title/description from markdown)
 }
 
 // EditTaskOutput contains the result of editing a task.
@@ -41,6 +43,11 @@ func NewEditTask(tasks domain.TaskRepository) *EditTask {
 
 // Execute edits a task with the given input.
 func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutput, error) {
+	// Handle editor mode
+	if in.EditorEdit {
+		return uc.executeEditorMode(in)
+	}
+
 	// Validate that at least one field is being updated
 	if in.Title == nil && in.Description == nil && in.Status == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
 		return nil, domain.ErrNoFieldsToUpdate
@@ -96,6 +103,30 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 		}
 	} else if len(in.AddLabels) > 0 || len(in.RemoveLabels) > 0 {
 		task.Labels = updateLabels(task.Labels, in.AddLabels, in.RemoveLabels)
+	}
+
+	// Save updated task
+	if err := uc.tasks.Save(task); err != nil {
+		return nil, fmt.Errorf("save task: %w", err)
+	}
+
+	return &EditTaskOutput{Task: task}, nil
+}
+
+// executeEditorMode handles editing a task via editor (markdown format).
+func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error) {
+	// Get existing task
+	task, err := uc.tasks.Get(in.TaskID)
+	if err != nil {
+		return nil, fmt.Errorf("get task: %w", err)
+	}
+	if task == nil {
+		return nil, domain.ErrTaskNotFound
+	}
+
+	// Parse markdown content
+	if err := task.FromMarkdown(in.EditorText); err != nil {
+		return nil, fmt.Errorf("failed to parse markdown: %w", err)
 	}
 
 	// Save updated task
