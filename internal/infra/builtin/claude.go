@@ -49,7 +49,17 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
           }
         ]
       }
-    ]
+    ],
+	  "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew show {{.TaskID}} | grep -q '^Status: needs_input' || crew edit {{.TaskID}} --status in_progress"
+          }
+        ]
+      }
+		]
   }
 }
 EOF
