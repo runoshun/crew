@@ -43,6 +43,13 @@
 # system_args = ""     # System arguments (optional, defaults to builtin ManagerSystemArgs)
 # args = ""            # Additional arguments (optional)
 
+[worktree]
+## Worktree initialization settings (applied to all workers)
+## - setup_command: Command to run after worktree creation
+## - copy: Files/directories to copy from main repo (uses CoW if available)
+# setup_command = ""
+# copy = []
+
 [complete]
 ## CI gate on completion
 # command = "mise run ci"
