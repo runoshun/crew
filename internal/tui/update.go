@@ -19,9 +19,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help.Width = msg.Width
-		m.taskList.SetSize(m.listWidth(), msg.Height-8)
-		// Update detail panel viewport size
-		m.updateDetailPanelViewport()
+		// Update all layout-dependent sizes
+		m.updateLayoutSizes()
 		return m, nil
 
 	case MsgTasksLoaded:
@@ -282,7 +281,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If detail panel is visible (wide screen), toggle focus instead of dialog
 		if m.showDetailPanel() {
 			m.detailFocused = true
-			m.updateDetailPanelViewport()
+			m.updateLayoutSizes() // Update both taskList and viewport sizes
 			return m, m.loadComments(task.ID)
 		}
 		// Fall back to dialog mode for narrow screens
@@ -635,13 +634,15 @@ func (m *Model) handleDetailPanelFocused(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
 
-	// Exit focus: v, Esc, q, h, left arrow
+	// Exit focus: v, Esc, h, left arrow
 	case key.Matches(msg, m.keys.Detail), key.Matches(msg, m.keys.Escape):
 		m.detailFocused = false
+		m.updateLayoutSizes() // Restore taskList width
 		return m, nil
 
 	case msg.String() == "h", msg.String() == "left":
 		m.detailFocused = false
+		m.updateLayoutSizes() // Restore taskList width
 		return m, nil
 
 	// Scroll: j/k, up/down

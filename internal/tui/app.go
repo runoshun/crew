@@ -218,6 +218,13 @@ func (m *Model) updateDetailPanelViewport() {
 	m.detailPanelViewport.SetContent(m.detailPanelContent(panelWidth))
 }
 
+// updateLayoutSizes updates all layout-dependent sizes (taskList, viewport).
+// Call this when detailFocused changes or window size changes.
+func (m *Model) updateLayoutSizes() {
+	m.taskList.SetSize(m.listWidth(), m.height-8)
+	m.updateDetailPanelViewport()
+}
+
 func (m *Model) dialogWidth() int {
 	width := m.width - 16
 	if width < 50 {
