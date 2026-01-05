@@ -79,13 +79,15 @@ type Worker struct {
 // Manager holds configuration for manager agents from [managers.<name>] sections.
 // Managers are read-only orchestration agents that can create and monitor tasks.
 type Manager struct {
-	Agent        string // Name of the Agent to inherit from (optional)
-	Model        string // Model override for this manager
-	SystemArgs   string // System arguments required for crew operation (auto-applied)
-	Args         string // Additional arguments for this manager
-	SystemPrompt string // System prompt template for this manager
-	Prompt       string // Prompt template for this manager
-	Description  string // Description of the manager's purpose
+	Agent           string // Name of the Agent to inherit from (optional)
+	CommandTemplate string // Template for assembling the command (inherited from Agent if empty)
+	Command         string // Base command (inherited from Agent if empty)
+	Model           string // Model override for this manager
+	SystemArgs      string // System arguments required for crew operation (auto-applied)
+	Args            string // Additional arguments for this manager
+	SystemPrompt    string // System prompt template for this manager
+	Prompt          string // Prompt template for this manager
+	Description     string // Description of the manager's purpose
 }
 
 // CommandData holds data for rendering agent commands and prompts.
@@ -179,6 +181,77 @@ func (w *Worker) RenderCommand(data CommandData, promptOverride, defaultSystemPr
 	}
 
 	tmpl, err := template.New("cmd").Parse(w.CommandTemplate)
+	if err != nil {
+		return RenderCommandResult{}, err
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, cmdData); err != nil {
+		return RenderCommandResult{}, err
+	}
+
+	return RenderCommandResult{
+		Command: buf.String(),
+		Prompt:  promptContent,
+	}, nil
+}
+
+// RenderCommand renders the full command string and prompt content for this manager.
+// It performs the same three-phase template expansion as Worker.RenderCommand.
+// The promptOverride parameter is the shell variable reference (e.g., `"$PROMPT"`).
+// The defaultSystemPrompt is used when Manager.SystemPrompt is empty.
+// The defaultPrompt is used when Manager.Prompt is empty.
+func (m *Manager) RenderCommand(data CommandData, promptOverride, defaultSystemPrompt, defaultPrompt string) (RenderCommandResult, error) {
+	// Phase 1: Expand SystemArgs and Args
+	systemArgs, err := expandString(m.SystemArgs, data)
+	if err != nil {
+		return RenderCommandResult{}, err
+	}
+	args, err := expandString(m.Args, data)
+	if err != nil {
+		return RenderCommandResult{}, err
+	}
+
+	// Phase 2: Expand Prompt templates to generate prompt content
+	sysPromptTemplate := m.SystemPrompt
+	if sysPromptTemplate == "" {
+		sysPromptTemplate = defaultSystemPrompt
+	}
+	sysPromptContent, err := expandString(sysPromptTemplate, data)
+	if err != nil {
+		return RenderCommandResult{}, err
+	}
+
+	userPromptTemplate := m.Prompt
+	if userPromptTemplate == "" {
+		userPromptTemplate = defaultPrompt
+	}
+	userPromptContent, err := expandString(userPromptTemplate, data)
+	if err != nil {
+		return RenderCommandResult{}, err
+	}
+
+	// Combine SystemPrompt and Prompt
+	var promptContent string
+	if sysPromptContent != "" && userPromptContent != "" {
+		promptContent = sysPromptContent + "\n\n" + userPromptContent
+	} else if sysPromptContent != "" {
+		promptContent = sysPromptContent
+	} else {
+		promptContent = userPromptContent
+	}
+
+	// Phase 3: Expand CommandTemplate
+	cmdData := map[string]any{
+		"Command":    m.Command,
+		"SystemArgs": systemArgs,
+		"Args":       args,
+		"Prompt":     promptOverride,
+		"Continue":   data.Continue,
+		"Model":      data.Model,
+	}
+
+	tmpl, err := template.New("cmd").Parse(m.CommandTemplate)
 	if err != nil {
 		return RenderCommandResult{}, err
 	}
