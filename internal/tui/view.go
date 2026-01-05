@@ -690,18 +690,15 @@ func (m *Model) viewDetailPanel() string {
 		descLabelStyle := lipgloss.NewStyle().
 			Foreground(Colors.Muted).
 			Bold(true)
-		descStyle := lipgloss.NewStyle().
-			Foreground(Colors.DescSelected).
-			Width(panelWidth - 4)
 
 		// Add label and empty line first
 		if !addLines("", descLabelStyle.Render("Description")) {
 			return panelStyle.Render(strings.Join(contentLines, "\n"))
 		}
 
-		// Render description with width constraint to get wrapped text
-		renderedDesc := descStyle.Render(task.Description)
-		// Split by newlines (lipgloss wraps text with \n)
+		// Render description with markdown
+		renderedDesc := m.styles.RenderMarkdown(task.Description, panelWidth-4)
+		// Split by newlines (glamour wraps text with \n)
 		descLines := strings.Split(renderedDesc, "\n")
 
 		// Add each line individually (will stop early if height limit reached)

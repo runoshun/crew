@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"strings"
+
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -472,4 +475,22 @@ func StatusIcon(status domain.Status) string {
 	default:
 		return "?"
 	}
+}
+
+// RenderMarkdown renders markdown text with the given width.
+func (s Styles) RenderMarkdown(text string, width int) string {
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dark"),
+		glamour.WithWordWrap(width),
+	)
+	if err != nil {
+		return text
+	}
+
+	out, err := r.Render(text)
+	if err != nil {
+		return text
+	}
+
+	return strings.TrimSpace(out)
 }
