@@ -29,6 +29,7 @@ var Colors = struct {
 	Todo        lipgloss.Color
 	InProgress  lipgloss.Color
 	InReview    lipgloss.Color
+	NeedsInput  lipgloss.Color
 	Stopped     lipgloss.Color
 	StatusError lipgloss.Color
 	Done        lipgloss.Color
@@ -58,6 +59,7 @@ var Colors = struct {
 	Todo:        lipgloss.Color("#89B4FA"), // Blue (pending)
 	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow (active work)
 	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
+	NeedsInput:  lipgloss.Color("#94E2D5"), // Teal (waiting for input)
 	Stopped:     lipgloss.Color("#FAB387"), // Peach/Orange
 	StatusError: lipgloss.Color("#F38BA8"), // Red
 	Done:        lipgloss.Color("#A6E3A1"), // Green
@@ -103,6 +105,7 @@ type Styles struct {
 	StatusTodo       lipgloss.Style
 	StatusInProgress lipgloss.Style
 	StatusInReview   lipgloss.Style
+	StatusNeedsInput lipgloss.Style
 	StatusStopped    lipgloss.Style
 	StatusError      lipgloss.Style
 	StatusDone       lipgloss.Style
@@ -112,6 +115,7 @@ type Styles struct {
 	StatusTodoSelected       lipgloss.Style
 	StatusInProgressSelected lipgloss.Style
 	StatusInReviewSelected   lipgloss.Style
+	StatusNeedsInputSelected lipgloss.Style
 	StatusStoppedSelected    lipgloss.Style
 	StatusErrorSelected      lipgloss.Style
 	StatusDoneSelected       lipgloss.Style
@@ -252,6 +256,9 @@ func DefaultStyles() Styles {
 		StatusInReview: lipgloss.NewStyle().
 			Foreground(Colors.InReview),
 
+		StatusNeedsInput: lipgloss.NewStyle().
+			Foreground(Colors.NeedsInput),
+
 		StatusStopped: lipgloss.NewStyle().
 			Foreground(Colors.Stopped),
 
@@ -275,6 +282,10 @@ func DefaultStyles() Styles {
 
 		StatusInReviewSelected: lipgloss.NewStyle().
 			Foreground(Colors.InReview).
+			Bold(true),
+
+		StatusNeedsInputSelected: lipgloss.NewStyle().
+			Foreground(Colors.NeedsInput).
 			Bold(true),
 
 		StatusStoppedSelected: lipgloss.NewStyle().
@@ -377,7 +388,7 @@ func (s Styles) StatusStyle(status domain.Status) lipgloss.Style {
 	case domain.StatusInReview:
 		return s.StatusInReview
 	case domain.StatusNeedsInput:
-		return s.StatusInProgress // Use InProgress style for NeedsInput
+		return s.StatusNeedsInput
 	case domain.StatusStopped:
 		return s.StatusStopped
 	case domain.StatusError:
@@ -401,7 +412,7 @@ func (s Styles) StatusStyleSelected(status domain.Status) lipgloss.Style {
 	case domain.StatusInReview:
 		return s.StatusInReviewSelected
 	case domain.StatusNeedsInput:
-		return s.StatusInProgressSelected // Use InProgress style for NeedsInput
+		return s.StatusNeedsInputSelected
 	case domain.StatusStopped:
 		return s.StatusStoppedSelected
 	case domain.StatusError:

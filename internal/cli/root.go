@@ -94,9 +94,6 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	configCmd := newConfigCommand(c)
 	configCmd.GroupID = groupSetup
 
-	genCmd := newGenCommand(c)
-	genCmd.GroupID = groupSetup
-
 	// Task management commands
 	newCmd := newNewCommand(c)
 	newCmd.GroupID = groupTask
@@ -171,7 +168,6 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	root.AddCommand(
 		initCmd,
 		configCmd,
-		genCmd,
 		newCmd,
 		listCmd,
 		showCmd,
