@@ -62,8 +62,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("S", "stop"),
 		),
 		Attach: key.NewBinding(
-			key.WithKeys("A"),
-			key.WithHelp("A", "attach"),
+			key.WithKeys("a"),
+			key.WithHelp("a", "attach"),
 		),
 		New: key.NewBinding(
 			key.WithKeys("n"),
@@ -110,8 +110,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("v", "detail"),
 		),
 		ToggleShowAll: key.NewBinding(
-			key.WithKeys("a"),
-			key.WithHelp("a", "toggle all"),
+			key.WithKeys("A"),
+			key.WithHelp("A", "toggle all"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),
