@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -14,6 +15,7 @@ var Colors = struct {
 	// Base colors
 	Primary    lipgloss.Color
 	Secondary  lipgloss.Color
+	Surface    lipgloss.Color
 	Muted      lipgloss.Color
 	Subtle     lipgloss.Color // New: Even more muted for unobtrusive elements
 	Error      lipgloss.Color
@@ -45,6 +47,7 @@ var Colors = struct {
 	// Modern Dark Palette (Catppuccin-inspired - Modern Soft Variant)
 	Primary:    lipgloss.Color("#89B4FA"), // Blue
 	Secondary:  lipgloss.Color("#CBA6F7"), // Mauve
+	Surface:    lipgloss.Color("#313244"), // Surface0
 	Muted:      lipgloss.Color("#A6ADC8"), // Subtext1
 	Subtle:     lipgloss.Color("#585B70"), // Surface2
 	Error:      lipgloss.Color("#F38BA8"), // Red
@@ -499,7 +502,7 @@ func StatusIcon(status domain.Status) string {
 // RenderMarkdown renders markdown text with the given width.
 func (s Styles) RenderMarkdown(text string, width int) string {
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
+		glamour.WithStyles(s.markdownStyle()),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
@@ -512,4 +515,74 @@ func (s Styles) RenderMarkdown(text string, width int) string {
 	}
 
 	return strings.TrimSpace(out)
+}
+
+func (s Styles) markdownStyle() ansi.StyleConfig {
+	return ansi.StyleConfig{
+		Document: ansi.StyleBlock{
+			StylePrimitive: ansi.StylePrimitive{
+				BackgroundColor: stringPtr(string(Colors.Background)),
+				Color:           stringPtr(string(Colors.TitleNormal)),
+			},
+		},
+		Heading: ansi.StyleBlock{
+			StylePrimitive: ansi.StylePrimitive{
+				Color: stringPtr(string(Colors.Primary)),
+				Bold:  boolPtr(true),
+			},
+		},
+		Code: ansi.StyleBlock{
+			StylePrimitive: ansi.StylePrimitive{
+				Color:           stringPtr(string(Colors.TitleSelected)),
+				BackgroundColor: stringPtr(string(Colors.Surface)),
+			},
+		},
+		CodeBlock: ansi.StyleCodeBlock{
+			StyleBlock: ansi.StyleBlock{
+				StylePrimitive: ansi.StylePrimitive{
+					BackgroundColor: stringPtr(string(Colors.Surface)),
+				},
+			},
+		},
+		Link: ansi.StylePrimitive{
+			Color:     stringPtr(string(Colors.Primary)),
+			Underline: boolPtr(true),
+		},
+		LinkText: ansi.StylePrimitive{
+			Color: stringPtr(string(Colors.Primary)),
+			Bold:  boolPtr(true),
+		},
+		List: ansi.StyleList{
+			StyleBlock: ansi.StyleBlock{
+				StylePrimitive: ansi.StylePrimitive{
+					Color: stringPtr(string(Colors.TitleNormal)),
+				},
+			},
+		},
+		Item: ansi.StylePrimitive{
+			Color: stringPtr(string(Colors.TitleNormal)),
+		},
+		BlockQuote: ansi.StyleBlock{
+			StylePrimitive: ansi.StylePrimitive{
+				Color: stringPtr(string(Colors.Muted)),
+			},
+		},
+		HorizontalRule: ansi.StylePrimitive{
+			Color: stringPtr(string(Colors.GroupLine)),
+		},
+		Strong: ansi.StylePrimitive{
+			Bold: boolPtr(true),
+		},
+		Emph: ansi.StylePrimitive{
+			Italic: boolPtr(true),
+		},
+	}
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
