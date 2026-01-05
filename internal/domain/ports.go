@@ -241,12 +241,14 @@ type ConfigManager interface {
 	GetGlobalConfigInfo() ConfigInfo
 
 	// InitRepoConfig creates a repository config file with default template.
+	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
-	InitRepoConfig() error
+	InitRepoConfig(cfg *Config) error
 
 	// InitGlobalConfig creates a global config file with default template.
+	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
-	InitGlobalConfig() error
+	InitGlobalConfig(cfg *Config) error
 }
 
 // Clock provides time operations for testability.

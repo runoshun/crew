@@ -76,9 +76,14 @@ func TestManager_GetGlobalConfigInfo(t *testing.T) {
 func TestManager_InitRepoConfig(t *testing.T) {
 	t.Run("creates config file", func(t *testing.T) {
 		crewDir := t.TempDir()
+		cfg := domain.NewDefaultConfig()
+		cfg.Workers["test-worker"] = domain.Worker{
+			Agent:       "test-agent",
+			Description: "Test worker",
+		}
 
 		manager := NewManagerWithGlobalDir(crewDir, "")
-		err := manager.InitRepoConfig()
+		err := manager.InitRepoConfig(cfg)
 
 		require.NoError(t, err)
 
@@ -88,15 +93,18 @@ func TestManager_InitRepoConfig(t *testing.T) {
 		assert.Contains(t, string(content), "git-crew configuration")
 		assert.Contains(t, string(content), "[workers]")
 		assert.Contains(t, string(content), "default = ")
+		// Verify dynamic content from registered workers
+		assert.Contains(t, string(content), "[workers.test-worker]")
 	})
 
 	t.Run("returns error if file already exists", func(t *testing.T) {
 		crewDir := t.TempDir()
 		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte("existing"), 0644)
 		require.NoError(t, err)
+		cfg := domain.NewDefaultConfig()
 
 		manager := NewManagerWithGlobalDir(crewDir, "")
-		err = manager.InitRepoConfig()
+		err = manager.InitRepoConfig(cfg)
 
 		assert.Error(t, err)
 	})
@@ -106,9 +114,10 @@ func TestManager_InitGlobalConfig(t *testing.T) {
 	t.Run("creates config file and parent directory", func(t *testing.T) {
 		tempDir := t.TempDir()
 		globalDir := filepath.Join(tempDir, "git-crew") // This doesn't exist yet
+		cfg := domain.NewDefaultConfig()
 
 		manager := NewManagerWithGlobalDir("", globalDir)
-		err := manager.InitGlobalConfig()
+		err := manager.InitGlobalConfig(cfg)
 
 		require.NoError(t, err)
 
@@ -122,16 +131,18 @@ func TestManager_InitGlobalConfig(t *testing.T) {
 		globalDir := t.TempDir()
 		err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte("existing"), 0644)
 		require.NoError(t, err)
+		cfg := domain.NewDefaultConfig()
 
 		manager := NewManagerWithGlobalDir("", globalDir)
-		err = manager.InitGlobalConfig()
+		err = manager.InitGlobalConfig(cfg)
 
 		assert.Error(t, err)
 	})
 
 	t.Run("returns error if global dir is empty", func(t *testing.T) {
+		cfg := domain.NewDefaultConfig()
 		manager := NewManagerWithGlobalDir("", "")
-		err := manager.InitGlobalConfig()
+		err := manager.InitGlobalConfig(cfg)
 
 		assert.Error(t, err)
 	})

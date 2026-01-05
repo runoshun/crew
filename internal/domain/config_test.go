@@ -278,10 +278,15 @@ func TestAgent_RenderCommand_WithModel(t *testing.T) {
 }
 
 func TestRenderConfigTemplate(t *testing.T) {
-	content, err := RenderConfigTemplate()
-	if err != nil {
-		t.Fatalf("RenderConfigTemplate() error = %v", err)
+	// Create a config with some workers to test dynamic generation
+	cfg := NewDefaultConfig()
+	cfg.Workers["test-worker"] = Worker{
+		Agent:       "test-agent",
+		Args:        "--test-args",
+		Description: "Test worker description",
 	}
+
+	content := RenderConfigTemplate(cfg)
 
 	// Check that default values from constants are embedded
 	if !strings.Contains(content, DefaultLogLevel) {
@@ -311,6 +316,14 @@ func TestRenderConfigTemplate(t *testing.T) {
 	}
 	if !strings.Contains(content, "[managers.default]") {
 		t.Error("expected [managers.default] to be present in template")
+	}
+
+	// Check that dynamically registered worker is included
+	if !strings.Contains(content, "[workers.test-worker]") {
+		t.Error("expected [workers.test-worker] to be present in template")
+	}
+	if !strings.Contains(content, `agent = "test-agent"`) {
+		t.Error("expected test worker agent to be present in template")
 	}
 }
 

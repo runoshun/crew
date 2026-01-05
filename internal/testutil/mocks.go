@@ -535,13 +535,13 @@ func (m *MockConfigManager) GetGlobalConfigInfo() domain.ConfigInfo {
 }
 
 // InitRepoConfig records the call and returns configured error.
-func (m *MockConfigManager) InitRepoConfig() error {
+func (m *MockConfigManager) InitRepoConfig(_ *domain.Config) error {
 	m.InitRepoCalled = true
 	return m.InitRepoErr
 }
 
 // InitGlobalConfig records the call and returns configured error.
-func (m *MockConfigManager) InitGlobalConfig() error {
+func (m *MockConfigManager) InitGlobalConfig(_ *domain.Config) error {
 	m.InitGlobalCalled = true
 	return m.InitGlobalErr
 }
