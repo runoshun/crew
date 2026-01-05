@@ -102,6 +102,11 @@ func (m *Model) overlayDialog(_, dialog string) string {
 }
 
 func (m *Model) viewMain() string {
+	// On narrow screen with detail focused, show only the detail panel
+	if !m.showListPane() {
+		return m.viewDetailPanel()
+	}
+
 	var leftPane strings.Builder
 
 	leftPane.WriteString(m.viewHeader())
@@ -543,21 +548,30 @@ func (m *Model) showDetailPanel() bool {
 	return m.width >= MinWidthForDetailPanel
 }
 
+// showListPane returns whether the list pane should be shown.
+// On narrow screens with detail focused, hide the list entirely.
+func (m *Model) showListPane() bool {
+	if m.detailFocused && m.width < MinWidthForDetailPanel {
+		return false
+	}
+	return true
+}
+
 func (m *Model) detailPanelWidth() int {
 	if !m.showDetailPanel() {
 		return 0
 	}
 
-	// Determine ratio based on focus state and screen width
+	// On narrow screen + focused: use full width (list is hidden)
+	if m.detailFocused && m.width < MinWidthForDetailPanel {
+		return m.contentWidth()
+	}
+
+	// Determine ratio based on focus state
 	var ratio float64
 	if m.detailFocused {
-		if m.width >= MinWidthForDetailPanel {
-			// Wide screen + focused: 70%
-			ratio = 0.7
-		} else {
-			// Narrow screen + focused: 90% (almost full width)
-			ratio = 0.9
-		}
+		// Wide screen + focused: 70%
+		ratio = 0.7
 	} else {
 		// Not focused (only possible on wide screens): 40%
 		ratio = 0.4
@@ -683,19 +697,25 @@ func (m *Model) viewDetailPanel() string {
 		panelHeight = 10
 	}
 
-	// Change border color based on focus state
-	borderColor := Colors.GroupLine
-	if m.detailFocused {
-		borderColor = Colors.Primary
-	}
+	// On narrow screen (full width mode), no left border needed
+	fullWidthMode := !m.showListPane()
 
 	panelStyle := lipgloss.NewStyle().
 		Width(panelWidth).
-		Height(panelHeight).
-		PaddingLeft(GutterWidth).
-		BorderLeft(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(borderColor)
+		Height(panelHeight)
+
+	if !fullWidthMode {
+		// Change border color based on focus state
+		borderColor := Colors.GroupLine
+		if m.detailFocused {
+			borderColor = Colors.Primary
+		}
+		panelStyle = panelStyle.
+			PaddingLeft(GutterWidth).
+			BorderLeft(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(borderColor)
+	}
 
 	task := m.SelectedTask()
 	if task == nil {
