@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -307,9 +308,16 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		Short: "Edit task information",
 		Long: `Edit an existing task's title, description, status, or labels.
 
-At least one of --title, --body, --status, --labels, --add-label, or --rm-label must be specified.
+If no flags are provided, the task is opened in the user's $EDITOR for editing
+title and description using a Markdown format with frontmatter.
+
+If any flags are provided (--title, --body, --status, --labels, --add-label, --rm-label),
+the task is updated directly without opening an editor.
 
 Examples:
+  # Open task in editor
+  git crew edit 1
+
   # Change task title
   git crew edit 1 --title "New task title"
 
@@ -341,6 +349,20 @@ Examples:
 				return fmt.Errorf("invalid task ID: %w", err)
 			}
 
+			// Check if any flags are provided
+			hasFlags := cmd.Flags().Changed("title") ||
+				cmd.Flags().Changed("body") ||
+				cmd.Flags().Changed("status") ||
+				cmd.Flags().Changed("labels") ||
+				len(opts.AddLabels) > 0 ||
+				len(opts.RemoveLabels) > 0
+
+			if !hasFlags {
+				// Editor mode: open task in editor
+				return editTaskWithEditor(cmd, c, taskID)
+			}
+
+			// Flag mode: update task directly
 			// Build input
 			input := usecase.EditTaskInput{
 				TaskID:       taskID,
@@ -387,6 +409,71 @@ Examples:
 	cmd.Flags().StringArrayVar(&opts.RemoveLabels, "rm-label", nil, "Labels to remove (can specify multiple)")
 
 	return cmd
+}
+
+// editTaskWithEditor opens the task in an editor for editing.
+func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error {
+	// Get current task
+	showUC := c.ShowTaskUseCase()
+	showOut, err := showUC.Execute(cmd.Context(), usecase.ShowTaskInput{
+		TaskID: taskID,
+	})
+	if err != nil {
+		return err
+	}
+
+	task := showOut.Task
+
+	// Create temporary file with task content
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("crew-task-%d-*.md", taskID))
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	// Write task as markdown
+	markdown := task.ToMarkdown()
+	if _, writeErr := tmpFile.WriteString(markdown); writeErr != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to write temp file: %w", writeErr)
+	}
+	if closeErr := tmpFile.Close(); closeErr != nil {
+		return fmt.Errorf("failed to close temp file: %w", closeErr)
+	}
+
+	// Open editor
+	if editorErr := openEditor(tmpPath); editorErr != nil {
+		return editorErr
+	}
+
+	// Read edited content
+	editedContent, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to read edited file: %w", err)
+	}
+
+	// Check if content changed
+	if string(editedContent) == markdown {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No changes made")
+		return nil
+	}
+
+	// Update task with edited content
+	input := usecase.EditTaskInput{
+		TaskID:     taskID,
+		EditorEdit: true,
+		EditorText: string(editedContent),
+	}
+
+	uc := c.EditTaskUseCase()
+	out, err := uc.Execute(cmd.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated task #%d: %s\n", out.Task.ID, out.Task.Title)
+	return nil
 }
 
 // newCpCommand creates the cp command for copying tasks.

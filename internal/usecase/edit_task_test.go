@@ -610,3 +610,137 @@ func TestEditTask_Execute_StatusTransitions(t *testing.T) {
 		})
 	}
 }
+
+func TestEditTask_Execute_EditorMode_UpdateTitleAndDescription(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Original Title",
+		Description: "Original description",
+		Status:      domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode
+	markdown := `---
+title: Updated Title
+---
+
+Updated description text`
+
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "Updated Title", out.Task.Title)
+	assert.Equal(t, "Updated description text", out.Task.Description)
+}
+
+func TestEditTask_Execute_EditorMode_EmptyDescription(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Original Title",
+		Description: "Original description",
+		Status:      domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode (empty description)
+	markdown := `---
+title: Title Only
+---
+
+`
+
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "Title Only", out.Task.Title)
+	assert.Equal(t, "", out.Task.Description)
+}
+
+func TestEditTask_Execute_EditorMode_InvalidFrontmatter(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Original Title",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with invalid frontmatter
+	markdown := `title: No frontmatter delimiters
+
+Description`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "frontmatter")
+}
+
+func TestEditTask_Execute_EditorMode_MissingTitle(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Original Title",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with missing title in frontmatter
+	markdown := `---
+---
+
+Description only`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrEmptyTitle)
+}
+
+func TestEditTask_Execute_EditorMode_TaskNotFound(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	uc := NewEditTask(repo)
+
+	// Execute for non-existent task
+	markdown := `---
+title: Test
+---
+
+Description`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     999,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
+}
