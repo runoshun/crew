@@ -269,6 +269,10 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.loadComments(task.ID)
 		}
 		return m, nil
+
+	case key.Matches(msg, m.keys.ToggleShowAll):
+		m.showAll = !m.showAll
+		return m, m.loadTasks()
 	}
 
 	return m, nil

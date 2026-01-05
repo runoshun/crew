@@ -88,6 +88,7 @@ func newListCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		Labels   []string
 		ParentID int
+		All      bool
 	}
 
 	cmd := &cobra.Command{
@@ -95,14 +96,21 @@ func newListCommand(c *app.Container) *cobra.Command {
 		Short: "List tasks",
 		Long: `Display a list of tasks.
 
+By default, tasks with terminal status (closed/done) are hidden.
+Use --all to show all tasks including closed and done tasks.
+
 Output format is tab-separated with columns:
   ID, PARENT, STATUS, AGENT, LABELS, [ELAPSED], TITLE
 
 ELAPSED is only shown for tasks with status 'in_progress'.
 
 Examples:
-  # List all tasks
+  # List active tasks (default: exclude closed/done)
   git crew list
+
+  # List all tasks including closed/done
+  git crew list --all
+  git crew list -a
 
   # List only sub-tasks of task #1
   git crew list --parent 1
@@ -112,7 +120,8 @@ Examples:
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Build input
 			input := usecase.ListTasksInput{
-				Labels: opts.Labels,
+				Labels:          opts.Labels,
+				IncludeTerminal: opts.All,
 			}
 
 			// Set parent ID if specified
@@ -136,6 +145,7 @@ Examples:
 	// Optional flags
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Show only children of this task")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Filter by labels (AND condition)")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all tasks including closed/done")
 
 	return cmd
 }

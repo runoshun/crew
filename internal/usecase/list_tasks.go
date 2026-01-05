@@ -8,8 +8,9 @@ import (
 
 // ListTasksInput contains the parameters for listing tasks.
 type ListTasksInput struct {
-	ParentID *int     // Filter by parent task ID (nil = all tasks)
-	Labels   []string // Filter by labels (AND condition)
+	ParentID        *int     // Filter by parent task ID (nil = all tasks)
+	Labels          []string // Filter by labels (AND condition)
+	IncludeTerminal bool     // Include terminal status tasks (closed/done)
 }
 
 // ListTasksOutput contains the result of listing tasks.
@@ -41,5 +42,21 @@ func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOu
 		return nil, err
 	}
 
+	// Filter out terminal status tasks if not requested
+	if !in.IncludeTerminal {
+		tasks = filterActiveOnly(tasks)
+	}
+
 	return &ListTasksOutput{Tasks: tasks}, nil
+}
+
+// filterActiveOnly removes tasks with terminal status (closed/done).
+func filterActiveOnly(tasks []*domain.Task) []*domain.Task {
+	var result []*domain.Task
+	for _, t := range tasks {
+		if t.Status != domain.StatusClosed && t.Status != domain.StatusDone {
+			result = append(result, t)
+		}
+	}
+	return result
 }
