@@ -28,7 +28,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateTaskList()
 		// Load comments for selected task if detail panel is visible
 		task := m.SelectedTask()
-		if task != nil && (m.showDetailPanel() || m.mode == ModeDetail) {
+		if task != nil && m.showDetailPanel() {
 			return m, m.loadComments(task.ID)
 		}
 		return m, nil
@@ -109,11 +109,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgCommentsLoaded:
 		m.comments = msg.Comments
-		// Update viewport content if in detail mode (dialog)
-		if m.mode == ModeDetail {
-			width := m.dialogWidth() - 4
-			m.detailViewport.SetContent(m.detailContent(width))
-		}
 		// Update detail panel viewport if showing
 		if m.showDetailPanel() {
 			m.updateDetailPanelViewport()
@@ -148,8 +143,6 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleStartMode(msg)
 	case ModeHelp:
 		return m.handleHelpMode(msg)
-	case ModeDetail:
-		return m.handleDetailMode(msg)
 	}
 
 	return m, nil
@@ -171,9 +164,9 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.taskList, cmd = m.taskList.Update(msg)
 		newTask := m.SelectedTask()
-		// If task changed and we're showing detail panel or detail view, load comments
+		// If task changed and we're showing detail panel, load comments
 		if prevTask != newTask && newTask != nil {
-			if m.showDetailPanel() || m.mode == ModeDetail {
+			if m.showDetailPanel() {
 				// Update viewport content immediately, comments will update async
 				m.updateDetailPanelViewport()
 				return m, tea.Batch(cmd, m.loadComments(newTask.ID))
@@ -278,15 +271,9 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if task == nil {
 			return m, nil
 		}
-		// If detail panel is visible (wide screen), toggle focus instead of dialog
-		if m.showDetailPanel() {
-			m.detailFocused = true
-			m.updateLayoutSizes() // Update both taskList and viewport sizes
-			return m, m.loadComments(task.ID)
-		}
-		// Fall back to dialog mode for narrow screens
-		m.initDetailViewport()
-		m.mode = ModeDetail
+		// Always use right pane focus mode (works on both wide and narrow screens)
+		m.detailFocused = true
+		m.updateLayoutSizes() // Update both taskList and viewport sizes
 		return m, m.loadComments(task.ID)
 
 	case key.Matches(msg, m.keys.ToggleShowAll):
@@ -324,8 +311,9 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 
 	case domain.StatusDone, domain.StatusClosed:
 		// Show detail view for terminal states
-		m.mode = ModeDetail
-		return m, nil
+		m.detailFocused = true
+		m.updateLayoutSizes()
+		return m, m.loadComments(task.ID)
 	}
 
 	return m, nil
@@ -610,22 +598,6 @@ func (m *Model) handleHelpMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
-}
-
-// handleDetailMode handles keys in detail mode (dialog).
-func (m *Model) handleDetailMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, m.keys.Escape), key.Matches(msg, m.keys.Detail):
-		m.mode = ModeNormal
-		return m, nil
-
-	case key.Matches(msg, m.keys.Quit):
-		return m, tea.Quit
-	}
-
-	var cmd tea.Cmd
-	m.detailViewport, cmd = m.detailViewport.Update(msg)
-	return m, cmd
 }
 
 // handleDetailPanelFocused handles keys when detail panel is focused (right pane).

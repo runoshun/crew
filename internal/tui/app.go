@@ -14,7 +14,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
@@ -42,8 +41,7 @@ type Model struct {
 	styles              Styles
 	help                help.Model
 	taskList            list.Model
-	detailViewport      viewport.Model // For ModeDetail dialog (existing)
-	detailPanelViewport viewport.Model // For right pane detail panel (new)
+	detailPanelViewport viewport.Model // For right pane detail panel
 
 	// Input state (large structs)
 	titleInput  textinput.Model
@@ -192,17 +190,6 @@ func (m *Model) updateTaskList() {
 	m.taskList.SetItems(items)
 }
 
-func (m *Model) initDetailViewport() {
-	width := m.dialogWidth() - 4
-	height := m.height - 12
-	if height < 10 {
-		height = 10
-	}
-	m.detailViewport = viewport.New(width, height)
-	m.detailViewport.Style = lipgloss.NewStyle().Background(Colors.Background)
-	m.detailViewport.SetContent(m.detailContent(width))
-}
-
 // updateDetailPanelViewport updates the viewport size and content for the right pane.
 func (m *Model) updateDetailPanelViewport() {
 	if !m.showDetailPanel() {
@@ -234,79 +221,6 @@ func (m *Model) dialogWidth() int {
 		width = 80
 	}
 	return width
-}
-
-func (m *Model) detailContent(width int) string {
-	task := m.SelectedTask()
-	if task == nil {
-		return "No task selected"
-	}
-
-	lineStyle := lipgloss.NewStyle().
-		Width(width).
-		Background(Colors.Background)
-
-	wrapStyle := lipgloss.NewStyle().
-		Width(width).
-		Background(Colors.Background)
-
-	var lines []string
-
-	lines = append(lines, lineStyle.Render(m.styles.DetailTitle.Background(Colors.Background).Render(fmt.Sprintf("Task #%d", task.ID))))
-	lines = append(lines, wrapStyle.Render(m.styles.TaskTitleSelected.Background(Colors.Background).Render(task.Title)))
-	lines = append(lines, lineStyle.Render(""))
-
-	lines = append(lines, lineStyle.Render(
-		m.styles.DetailLabel.Background(Colors.Background).Render("Status")+
-			m.styles.StatusStyle(task.Status).Background(Colors.Background).Render(string(task.Status))))
-
-	if task.Agent != "" {
-		lines = append(lines, lineStyle.Render(
-			m.styles.DetailLabel.Background(Colors.Background).Render("Agent")+
-				m.styles.DetailValue.Background(Colors.Background).Render(task.Agent)))
-	}
-
-	if task.Session != "" {
-		lines = append(lines, lineStyle.Render(
-			m.styles.DetailLabel.Background(Colors.Background).Render("Session")+
-				m.styles.DetailValue.Background(Colors.Background).Render(task.Session)))
-	}
-
-	lines = append(lines, lineStyle.Render(
-		m.styles.DetailLabel.Background(Colors.Background).Render("Created")+
-			m.styles.DetailValue.Background(Colors.Background).Render(task.Created.Format("2006-01-02 15:04"))))
-
-	if !task.Started.IsZero() {
-		lines = append(lines, lineStyle.Render(
-			m.styles.DetailLabel.Background(Colors.Background).Render("Started")+
-				m.styles.DetailValue.Background(Colors.Background).Render(task.Started.Format("2006-01-02 15:04"))))
-	}
-
-	if task.Description != "" {
-		lines = append(lines, lineStyle.Render(""))
-		lines = append(lines, lineStyle.Render(m.styles.DetailLabel.Background(Colors.Background).Render("Description")))
-		lines = append(lines, m.styles.RenderMarkdown(task.Description, width))
-	}
-
-	if len(m.comments) > 0 {
-		lines = append(lines, lineStyle.Render(""))
-		lines = append(lines, lineStyle.Render(m.styles.DetailLabel.Background(Colors.Background).Render("Comments")))
-		for _, comment := range m.comments {
-			timeStr := comment.Time.Format("2006-01-02 15:04")
-			commentLine := m.styles.DetailValue.Background(Colors.Background).Render("["+timeStr+"] ") +
-				m.styles.DetailDesc.Background(Colors.Background).Width(width).Render(comment.Text)
-			lines = append(lines, wrapStyle.Render(commentLine))
-		}
-	}
-
-	result := ""
-	for i, line := range lines {
-		result += line
-		if i < len(lines)-1 {
-			result += "\n"
-		}
-	}
-	return result
 }
 
 var statusPriority = map[domain.Status]int{

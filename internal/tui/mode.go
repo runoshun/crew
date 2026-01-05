@@ -13,7 +13,6 @@ const (
 	ModeNewTask                // New task form mode (title, desc, parent)
 	ModeStart                  // Agent picker mode
 	ModeHelp                   // Help overlay mode
-	ModeDetail                 // Task detail view mode
 )
 
 // String returns the string representation of the mode.
@@ -35,8 +34,6 @@ func (m Mode) String() string {
 		return "start"
 	case ModeHelp:
 		return "help"
-	case ModeDetail:
-		return "detail"
 	default:
 		return "unknown"
 	}
@@ -58,7 +55,7 @@ func (m Mode) IsInputMode() bool {
 	switch m {
 	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask:
 		return true
-	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeDetail:
+	case ModeNormal, ModeConfirm, ModeStart, ModeHelp:
 		return false
 	}
 	return false

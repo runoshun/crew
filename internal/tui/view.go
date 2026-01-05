@@ -82,8 +82,6 @@ func (m *Model) View() string {
 		dialog = m.viewAgentPicker()
 	case ModeHelp:
 		dialog = m.viewHelp()
-	case ModeDetail:
-		dialog = m.viewDetail()
 	}
 
 	if dialog != "" {
@@ -431,7 +429,7 @@ func (m *Model) viewFooter() string {
 			m.styles.FooterKey.Render("q") + " quit"
 	case ModeFilter:
 		content = "enter apply · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeDetail:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp:
 		return ""
 	default:
 		return ""
@@ -537,15 +535,11 @@ func (m *Model) viewHelp() string {
 	return m.dialogStyle().Render(lipgloss.JoinVertical(lipgloss.Left, title, ds.emptyLine(), ds.renderLine(content), hint))
 }
 
-func (m *Model) viewDetail() string {
-	ds := m.newDialogStyles()
-	footer := ds.renderLine(ds.key.Render("↑↓") + ds.muted.Render(" scroll  ") +
-		ds.key.Render("esc") + ds.muted.Render(" back"))
-
-	return m.dialogStyle().Render(m.detailViewport.View() + "\n\n" + footer)
-}
-
 func (m *Model) showDetailPanel() bool {
+	// Always show detail panel when focused, even on narrow screens
+	if m.detailFocused {
+		return true
+	}
 	return m.width >= MinWidthForDetailPanel
 }
 
@@ -553,13 +547,22 @@ func (m *Model) detailPanelWidth() int {
 	if !m.showDetailPanel() {
 		return 0
 	}
-	// When focused, expand to 70% of screen width; otherwise 40%
+
+	// Determine ratio based on focus state and screen width
 	var ratio float64
 	if m.detailFocused {
-		ratio = 0.7
+		if m.width >= MinWidthForDetailPanel {
+			// Wide screen + focused: 70%
+			ratio = 0.7
+		} else {
+			// Narrow screen + focused: 90% (almost full width)
+			ratio = 0.9
+		}
 	} else {
+		// Not focused (only possible on wide screens): 40%
 		ratio = 0.4
 	}
+
 	w := int(float64(m.width) * ratio)
 	if w < MinDetailPanelWidth {
 		w = MinDetailPanelWidth
