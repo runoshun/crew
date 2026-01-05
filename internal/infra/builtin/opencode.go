@@ -2,7 +2,7 @@ package builtin
 
 // opencodeAgent contains the built-in configuration for the OpenCode CLI.
 var opencodeAgent = agentConfig{
-	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
+	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
 	Command:           "opencode",
 	WorkerSystemArgs:  "-m {{.Model}}",
 	ManagerSystemArgs: "-m {{.Model}}",

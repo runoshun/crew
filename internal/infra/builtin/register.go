@@ -7,15 +7,15 @@ import "github.com/runoshun/git-crew/v2/internal/domain"
 // agentConfig defines a built-in agent configuration (internal use only).
 // SystemArgs is role-specific: Workers and Managers have different system arguments.
 type agentConfig struct {
-	CommandTemplate     string   // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
-	Command             string   // Base command (e.g., "claude")
-	WorkerSystemArgs    string   // System arguments for Workers - NOT overridable by user config
-	ManagerSystemArgs   string   // System arguments for Managers - NOT overridable by user config
-	DefaultArgs         string   // Default user-customizable arguments (overridable in config.toml)
-	DefaultModel        string   // Default model name for this agent
-	Description         string   // Description of the agent's purpose
-	WorktreeSetupScript string   // Script to run after worktree creation (template-expanded)
-	ExcludePatterns     []string // Patterns to add to .git/info/exclude for this agent
+	CommandTemplate     string
+	Command             string
+	WorkerSystemArgs    string
+	ManagerSystemArgs   string
+	DefaultArgs         string
+	DefaultModel        string
+	Description         string
+	WorktreeSetupScript string
+	ExcludePatterns     []string
 }
 
 // builtinAgents contains preset configurations for known agents.

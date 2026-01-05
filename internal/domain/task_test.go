@@ -53,8 +53,8 @@ func TestTask_FromMarkdown(t *testing.T) {
 		markdown    string
 		wantTitle   string
 		wantDesc    string
-		wantErr     bool
 		errContains string
+		wantErr     bool
 	}{
 		{
 			name: "valid markdown with title and description",

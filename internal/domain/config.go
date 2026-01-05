@@ -50,12 +50,12 @@ type ManagersConfig struct {
 // Agents define the core command execution pattern without being tied to a specific role.
 // Note: SystemArgs is NOT defined here; it's a role-specific (Worker/Manager) concern.
 type Agent struct {
-	Command             string   // Base command (e.g., "claude", "opencode")
-	CommandTemplate     string   // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
-	DefaultModel        string   // Default model for this agent
-	Description         string   // Description of the agent's purpose
-	WorktreeSetupScript string   // Script to run after worktree creation (template-expanded)
-	ExcludePatterns     []string // Patterns to add to .git/info/exclude for this agent
+	Command             string
+	CommandTemplate     string
+	DefaultModel        string
+	Description         string
+	WorktreeSetupScript string
+	ExcludePatterns     []string
 }
 
 // Worker holds per-worker configuration from [workers.<name>] sections.
@@ -104,6 +104,9 @@ type CommandData struct {
 	// Integer fields grouped together for alignment
 	Issue  int // GitHub issue number (0 if not linked)
 	TaskID int
+
+	// Boolean fields
+	Continue bool // --continue flag was specified
 }
 
 // RenderCommandResult holds the results of RenderCommand.
@@ -163,11 +166,12 @@ func (w *Worker) RenderCommand(data CommandData, promptOverride, defaultSystemPr
 	}
 
 	// Phase 3: Expand CommandTemplate
-	cmdData := map[string]string{
+	cmdData := map[string]any{
 		"Command":    w.Command,
 		"SystemArgs": systemArgs,
 		"Args":       args,
 		"Prompt":     promptOverride,
+		"Continue":   data.Continue,
 	}
 
 	tmpl, err := template.New("cmd").Parse(w.CommandTemplate)

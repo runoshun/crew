@@ -84,14 +84,14 @@ func TestNewDefaultConfig(t *testing.T) {
 
 func TestAgent_RenderCommand(t *testing.T) {
 	tests := []struct {
-		name                string
 		agent               Worker
-		data                CommandData
+		name                string
 		promptOverride      string
 		defaultSystemPrompt string
 		defaultPrompt       string
 		wantCommand         string
 		wantPrompt          string
+		data                CommandData
 	}{
 		{
 			name: "claude style with shell variable",
@@ -214,10 +214,10 @@ func TestWorker_RenderCommand_InvalidPromptTemplate(t *testing.T) {
 
 func TestAgent_RenderCommand_WithModel(t *testing.T) {
 	tests := []struct {
-		name        string
 		agent       Worker
-		data        CommandData
+		name        string
 		wantCommand string
+		data        CommandData
 	}{
 		{
 			name: "claude with model in SystemArgs",
@@ -261,6 +261,72 @@ func TestAgent_RenderCommand_WithModel(t *testing.T) {
 			},
 			data:        CommandData{TaskID: 1, Model: "opus"},
 			wantCommand: `claude --model opus --custom-flag "$PROMPT"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := tt.agent.RenderCommand(tt.data, `"$PROMPT"`, "sys", "default prompt")
+			if err != nil {
+				t.Fatalf("RenderCommand() error = %v", err)
+			}
+			if result.Command != tt.wantCommand {
+				t.Errorf("RenderCommand().Command = %q, want %q", result.Command, tt.wantCommand)
+			}
+		})
+	}
+}
+
+func TestWorker_RenderCommand_WithContinue(t *testing.T) {
+	tests := []struct {
+		agent       Worker
+		name        string
+		wantCommand string
+		data        CommandData
+	}{
+		{
+			name: "continue flag enabled with -c",
+			agent: Worker{
+				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
+				Command:         "claude",
+				SystemArgs:      "--model {{.Model}}",
+				Args:            "--verbose",
+			},
+			data:        CommandData{TaskID: 1, Model: "sonnet", Continue: true},
+			wantCommand: `claude --model sonnet --verbose -c "$PROMPT"`,
+		},
+		{
+			name: "continue flag disabled",
+			agent: Worker{
+				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
+				Command:         "claude",
+				SystemArgs:      "--model {{.Model}}",
+				Args:            "--verbose",
+			},
+			data:        CommandData{TaskID: 1, Model: "sonnet", Continue: false},
+			wantCommand: `claude --model sonnet --verbose "$PROMPT"`,
+		},
+		{
+			name: "continue flag with opencode style",
+			agent: Worker{
+				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
+				Command:         "opencode",
+				SystemArgs:      "-m {{.Model}}",
+				Args:            "",
+			},
+			data:        CommandData{TaskID: 1, Model: "gpt-4o", Continue: true},
+			wantCommand: `opencode -m gpt-4o  -c --prompt "$PROMPT"`,
+		},
+		{
+			name: "continue without -c in template",
+			agent: Worker{
+				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+				Command:         "agent",
+				SystemArgs:      "--model {{.Model}}",
+				Args:            "",
+			},
+			data:        CommandData{TaskID: 1, Model: "model", Continue: true},
+			wantCommand: `agent --model model  "$PROMPT"`,
 		},
 	}
 
@@ -329,10 +395,10 @@ func TestRenderConfigTemplate(t *testing.T) {
 
 func TestConfig_ResolveInheritance(t *testing.T) {
 	tests := []struct {
-		name    string
+		wantErr error
 		config  *Config
 		want    map[string]Worker
-		wantErr error
+		name    string
 	}{
 		{
 			name: "simple inheritance",
