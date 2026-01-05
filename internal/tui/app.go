@@ -61,6 +61,7 @@ type Model struct {
 	confirmTaskID    int
 	agentCursor      int
 	startFocusCustom bool
+	showAll          bool
 }
 
 // New creates a new TUI Model with the given container.
@@ -135,7 +136,9 @@ func (m *Model) tick() tea.Cmd {
 // loadTasks returns a command that loads tasks from the repository.
 func (m *Model) loadTasks() tea.Cmd {
 	return func() tea.Msg {
-		out, err := m.container.ListTasksUseCase().Execute(context.Background(), usecase.ListTasksInput{})
+		out, err := m.container.ListTasksUseCase().Execute(context.Background(), usecase.ListTasksInput{
+			IncludeTerminal: m.showAll,
+		})
 		if err != nil {
 			return MsgError{Err: err}
 		}

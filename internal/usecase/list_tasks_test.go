@@ -33,12 +33,46 @@ func TestListTasks_Execute_AllTasks(t *testing.T) {
 
 	uc := NewListTasks(repo)
 
-	// Execute
-	out, err := uc.Execute(context.Background(), ListTasksInput{})
+	// Execute with IncludeTerminal = true
+	out, err := uc.Execute(context.Background(), ListTasksInput{
+		IncludeTerminal: true,
+	})
 
 	// Assert
 	require.NoError(t, err)
 	require.Len(t, out.Tasks, 3)
+}
+
+func TestListTasks_Execute_ExcludeTerminal(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Active Task",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Done Task",
+		Status: domain.StatusDone,
+	}
+	repo.Tasks[3] = &domain.Task{
+		ID:     3,
+		Title:  "Closed Task",
+		Status: domain.StatusClosed,
+	}
+
+	uc := NewListTasks(repo)
+
+	// Execute with IncludeTerminal = false (default)
+	out, err := uc.Execute(context.Background(), ListTasksInput{
+		IncludeTerminal: false,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.Len(t, out.Tasks, 1) // Only active task
+	assert.Equal(t, 1, out.Tasks[0].ID)
 }
 
 func TestListTasks_Execute_Empty(t *testing.T) {
@@ -176,8 +210,10 @@ func TestListTasks_Execute_PreservesTaskData(t *testing.T) {
 
 	uc := NewListTasks(repo)
 
-	// Execute
-	out, err := uc.Execute(context.Background(), ListTasksInput{})
+	// Execute with IncludeTerminal = true to get all tasks
+	out, err := uc.Execute(context.Background(), ListTasksInput{
+		IncludeTerminal: true,
+	})
 
 	// Assert
 	require.NoError(t, err)

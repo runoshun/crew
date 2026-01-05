@@ -25,11 +25,12 @@ type KeyMap struct {
 	PR    key.Binding // Create PR (future)
 
 	// View
-	Refresh key.Binding // Refresh task list
-	Filter  key.Binding // Enter filter mode
-	Sort    key.Binding // Toggle sort mode
-	Help    key.Binding // Show help
-	Detail  key.Binding // Toggle detail view
+	Refresh       key.Binding // Refresh task list
+	Filter        key.Binding // Enter filter mode
+	Sort          key.Binding // Toggle sort mode
+	Help          key.Binding // Show help
+	Detail        key.Binding // Toggle detail view
+	ToggleShowAll key.Binding // Toggle show all (including closed/done)
 
 	// General
 	Quit    key.Binding // Quit application
@@ -61,8 +62,8 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("S", "stop"),
 		),
 		Attach: key.NewBinding(
-			key.WithKeys("a"),
-			key.WithHelp("a", "attach"),
+			key.WithKeys("A"),
+			key.WithHelp("A", "attach"),
 		),
 		New: key.NewBinding(
 			key.WithKeys("n"),
@@ -107,6 +108,10 @@ func DefaultKeyMap() KeyMap {
 		Detail: key.NewBinding(
 			key.WithKeys("v"),
 			key.WithHelp("v", "detail"),
+		),
+		ToggleShowAll: key.NewBinding(
+			key.WithKeys("a"),
+			key.WithHelp("a", "toggle all"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),

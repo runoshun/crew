@@ -158,8 +158,16 @@ func (m *Model) viewHeader() string {
 	visibleCount := len(m.taskList.Items())
 	totalCount := len(m.tasks)
 
+	// Add filter indicator
+	filterLabel := ""
+	if m.showAll {
+		filterLabel = "[all] · "
+	} else {
+		filterLabel = "[active] · "
+	}
+
 	sortLabel := "by " + m.sortMode.String()
-	countText := fmt.Sprintf("%s · %d/%d", sortLabel, visibleCount, totalCount)
+	countText := fmt.Sprintf("%s%s · %d/%d", filterLabel, sortLabel, visibleCount, totalCount)
 	rightText := lipgloss.NewStyle().Foreground(Colors.Muted).Render(countText)
 
 	leftLen := lipgloss.Width(title)
@@ -468,6 +476,7 @@ func (m *Model) viewHelp() string {
 				{"/", "Filter"},
 				{"o", "Sort"},
 				{"v", "Details"},
+				{"a", "Toggle all"},
 			},
 		},
 		{
@@ -478,7 +487,7 @@ func (m *Model) viewHelp() string {
 			}{
 				{"s", "Start"},
 				{"S", "Stop"},
-				{"a", "Attach"},
+				{"A", "Attach"},
 				{"n", "New Task"},
 				{"d", "Delete"},
 				{"c", "Close"},
