@@ -476,7 +476,7 @@ func (m *Model) viewHelp() string {
 				{"/", "Filter"},
 				{"o", "Sort"},
 				{"v", "Details"},
-				{"a", "Toggle all"},
+				{"A", "Toggle all"},
 			},
 		},
 		{
@@ -487,7 +487,7 @@ func (m *Model) viewHelp() string {
 			}{
 				{"s", "Start"},
 				{"S", "Stop"},
-				{"A", "Attach"},
+				{"a", "Attach"},
 				{"n", "New Task"},
 				{"d", "Delete"},
 				{"c", "Close"},
