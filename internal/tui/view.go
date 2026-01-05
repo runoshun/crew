@@ -178,7 +178,8 @@ func (m *Model) viewHeader() string {
 	}
 
 	content := title + strings.Repeat(" ", spacing) + rightText
-	return m.styles.Header.Render(content)
+	// Set width dynamically to match list width
+	return m.styles.Header.Width(contentWidth).Render(content)
 }
 
 func (m *Model) viewTaskList() string {
@@ -447,7 +448,8 @@ func (m *Model) viewFooter() string {
 	}
 
 	fullContent := content + strings.Repeat(" ", spacing) + pagination
-	return m.styles.Footer.Render(fullContent)
+	// Set width dynamically to match list width
+	return m.styles.Footer.Width(contentWidth).Render(fullContent)
 }
 
 func (m *Model) viewHelp() string {
