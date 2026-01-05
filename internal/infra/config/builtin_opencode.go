@@ -1,4 +1,4 @@
-package builtin
+package config
 
 // opencodeAgents contains the built-in configuration for the OpenCode CLI.
 var opencodeAgents = builtinAgentSet{

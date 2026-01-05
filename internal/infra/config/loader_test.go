@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
-	"github.com/runoshun/git-crew/v2/internal/infra/builtin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -126,7 +125,7 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 
 	// Get expected config by creating default and registering builtins
 	expectedCfg := domain.NewDefaultConfig()
-	builtin.Register(expectedCfg)
+	Register(expectedCfg)
 
 	// Verify: default config is returned (values from domain constants)
 	assert.Equal(t, domain.DefaultLogLevel, cfg.Log.Level)
@@ -284,7 +283,7 @@ args = "--model repo"
 	assert.Equal(t, "--model repo", cfg.Agents["claude"].Args)
 	// opencode agent should only have builtin defaults, not the global config args
 	defaultCfg := domain.NewDefaultConfig()
-	builtin.Register(defaultCfg)
+	Register(defaultCfg)
 	assert.Equal(t, defaultCfg.Agents["opencode"].Args, cfg.Agents["opencode"].Args)
 }
 
@@ -318,7 +317,7 @@ args = "--model repo-model"
 	assert.Equal(t, "-m gpt-4", cfg.Agents["opencode"].Args)
 	// claude agent should only have builtin defaults
 	defaultCfg := domain.NewDefaultConfig()
-	builtin.Register(defaultCfg)
+	Register(defaultCfg)
 	assert.Equal(t, defaultCfg.Agents["claude"].Args, cfg.Agents["claude"].Args)
 }
 
@@ -349,7 +348,7 @@ args = "--model repo"
 
 	// Get expected config by creating default and registering builtins
 	expectedCfg := domain.NewDefaultConfig()
-	builtin.Register(expectedCfg)
+	Register(expectedCfg)
 
 	// Builtin agents should exist (derived from expectedCfg)
 	for name := range expectedCfg.Agents {

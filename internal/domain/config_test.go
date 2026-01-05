@@ -45,7 +45,7 @@ func TestNewDefaultConfig(t *testing.T) {
 		t.Errorf("Log.Level = %q, want %q", cfg.Log.Level, DefaultLogLevel)
 	}
 
-	// Check maps are initialized but empty (builtin agents are registered by infra/builtin)
+	// Check maps are initialized but empty (builtin agents are registered by infra/config)
 	if cfg.Agents == nil {
 		t.Error("Agents should not be nil")
 	}

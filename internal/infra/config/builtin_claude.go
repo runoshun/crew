@@ -1,4 +1,4 @@
-package builtin
+package config
 
 const (
 	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show) Bash(crew edit:*)'`
