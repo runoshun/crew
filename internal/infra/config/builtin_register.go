@@ -1,6 +1,5 @@
-// Package builtin provides built-in agent configurations for known CLI tools.
-// This package is responsible for CLI-specific details that domain should not know about.
-package builtin
+// Package config provides configuration loading and built-in agent definitions.
+package config
 
 import "github.com/runoshun/git-crew/v2/internal/domain"
 
@@ -52,6 +51,7 @@ func Register(cfg *domain.Config) {
 			Role:         domain.RoleManager,
 			SystemPrompt: domain.DefaultManagerSystemPrompt,
 			Description:  agentSet.Manager.Description,
+			Hidden:       true,
 		}
 	}
 

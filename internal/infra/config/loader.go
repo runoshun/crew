@@ -10,7 +10,6 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/runoshun/git-crew/v2/internal/domain"
-	"github.com/runoshun/git-crew/v2/internal/infra/builtin"
 )
 
 // Ensure Loader implements domain.ConfigLoader.
@@ -70,7 +69,7 @@ func (l *Loader) Load() (*domain.Config, error) {
 
 	// Start with default config and register builtin agents
 	base := domain.NewDefaultConfig()
-	builtin.Register(base)
+	Register(base)
 
 	// If both don't exist, return default config
 	if global == nil && repo == nil {
@@ -131,7 +130,7 @@ func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config,
 
 	// Start with default config and register builtin agents
 	base := domain.NewDefaultConfig()
-	builtin.Register(base)
+	Register(base)
 
 	// If both don't exist or are ignored, return default config
 	if global == nil && repo == nil {
