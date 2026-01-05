@@ -132,6 +132,21 @@ crew start <id> opencode
 
 ---
 
+## Task Status
+
+| Status | Description |
+|--------|-------------|
+| `todo` | Created, awaiting start |
+| `in_progress` | Agent is working |
+| `needs_input` | Agent is waiting for user input |
+| `in_review` | Work complete, awaiting review |
+| `stopped` | Manually stopped |
+| `error` | Session terminated abnormally |
+| `done` | Merge complete |
+| `closed` | Discarded without merge |
+
+---
+
 ## アクション待ち監視
 
 マネージャーがユーザーのアクションを待機するための簡単なワンライナー集。
