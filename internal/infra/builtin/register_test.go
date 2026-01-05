@@ -53,24 +53,14 @@ func TestRegister(t *testing.T) {
 		}
 	}
 
-	// Check default worker
-	defaultWorker, ok := cfg.Workers[domain.DefaultWorkerName]
-	if !ok {
-		t.Error("expected default worker to be registered")
-	} else {
-		if defaultWorker.Agent != DefaultWorkerAgent {
-			t.Errorf("default worker agent = %q, want %q", defaultWorker.Agent, DefaultWorkerAgent)
-		}
+	// Verify that no "default" worker is registered (users should use workers.default = "opencode" instead)
+	if _, ok := cfg.Workers[domain.DefaultWorkerName]; ok {
+		t.Error("default worker should NOT be registered (use workers.default = \"opencode\" instead)")
 	}
 
-	// Check default manager
-	defaultManager, ok := cfg.Managers[domain.DefaultManagerName]
-	if !ok {
-		t.Error("expected default manager to be registered")
-	} else {
-		if defaultManager.Agent != DefaultManagerAgent {
-			t.Errorf("default manager agent = %q, want %q", defaultManager.Agent, DefaultManagerAgent)
-		}
+	// Verify that no "default" manager is registered
+	if _, ok := cfg.Managers[domain.DefaultManagerName]; ok {
+		t.Error("default manager should NOT be registered")
 	}
 }
 

@@ -363,7 +363,12 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
-	// default worker is already set up by NewMockConfigLoader (workers.default)
+	// Manually add "default" worker that references opencode
+	// (simulates user config: [workers.default] agent = "opencode")
+	configLoader.Config.Workers[domain.DefaultWorkerName] = domain.Worker{
+		Agent:       "opencode",
+		Description: "Default worker referencing opencode",
+	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
@@ -371,7 +376,7 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	// Execute without specifying agent
 	out, err := uc.Execute(context.Background(), StartTaskInput{
 		TaskID: 1,
-		Agent:  "", // No agent specified
+		Agent:  "", // No agent specified - falls back to "default"
 	})
 
 	// Assert
@@ -382,7 +387,7 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	task := repo.Tasks[1]
 	assert.Equal(t, domain.DefaultWorkerName, task.Agent)
 
-	// Verify script uses the underlying agent command (opencode)
+	// Verify script uses the underlying agent command (opencode) from the referenced agent
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
 	assert.Contains(t, string(scriptContent), "opencode")

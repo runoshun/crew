@@ -330,10 +330,6 @@ func RenderConfigTemplate(cfg *Config) string {
 	workerNames := sortedMapKeys(cfg.Workers)
 	for _, name := range workerNames {
 		worker := cfg.Workers[name]
-		// Skip the default worker (it just references another worker)
-		if name == DefaultWorkerName {
-			continue
-		}
 		buf.WriteString(fmt.Sprintf("# [workers.%s]\n", name))
 		if worker.Agent != "" {
 			buf.WriteString(fmt.Sprintf("# agent = %q\n", worker.Agent))
@@ -367,11 +363,20 @@ func RenderConfigTemplate(cfg *Config) string {
 	buf.WriteString("# args = \"\"            # Additional arguments (optional)\n")
 	buf.WriteString("\n")
 
+	// Worktree section
+	buf.WriteString("[worktree]\n")
+	buf.WriteString("## Worktree initialization settings (applied to all workers)\n")
+	buf.WriteString("## - setup_command: Command to run after worktree creation\n")
+	buf.WriteString("## - copy: Files/directories to copy from main repo (uses CoW if available)\n")
+	buf.WriteString("# setup_command = \"\"\n")
+	buf.WriteString("# copy = []\n")
+	buf.WriteString("\n")
+
 	// Complete section
 	buf.WriteString("[complete]\n")
 	buf.WriteString("## CI gate on completion\n")
 	buf.WriteString("# command = \"mise run ci\"\n")
-	buf.WriteString("\n\n")
+	buf.WriteString("\n")
 
 	// Diff section
 	buf.WriteString("[diff]\n")
