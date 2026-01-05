@@ -225,11 +225,9 @@ type WorktreeConfig struct {
 
 // Default configuration values.
 const (
-	DefaultLogLevel     = "info"
-	DefaultWorkerName   = "default"  // Name of the default worker (looked up in Workers map)
-	DefaultManagerName  = "default"  // Name of the default manager (looked up in Managers map)
-	DefaultWorkerAgent  = "opencode" // Agent used by the default worker
-	DefaultManagerAgent = "opencode" // Agent used by the default manager
+	DefaultLogLevel    = "info"
+	DefaultWorkerName  = "default" // Name of the default worker (looked up in Workers map)
+	DefaultManagerName = "default" // Name of the default manager (looked up in Managers map)
 )
 
 // DefaultSystemPrompt is the default system prompt template for workers.
@@ -247,28 +245,6 @@ Your role is to:
 - Support users with task management
 - Create, monitor, and manage tasks using crew commands
 - Delegate code implementation to worker agents (do not edit files directly)`
-
-// builtinAgent defines a built-in agent configuration (internal use only).
-// SystemArgs is role-specific: Workers and Managers have different system arguments.
-// Access builtin configurations through NewDefaultConfig(), not directly.
-type builtinAgent struct {
-	CommandTemplate     string   // Template: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
-	Command             string   // Base command (e.g., "claude")
-	WorkerSystemArgs    string   // System arguments for Workers - NOT overridable by user config
-	ManagerSystemArgs   string   // System arguments for Managers - NOT overridable by user config
-	DefaultArgs         string   // Default user-customizable arguments (overridable in config.toml)
-	DefaultModel        string   // Default model name for this agent
-	Description         string   // Description of the agent's purpose
-	WorktreeSetupScript string   // Script to run after worktree creation (template-expanded)
-	ExcludePatterns     []string // Patterns to add to .git/info/exclude for this agent
-}
-
-// builtinAgents contains preset configurations for known agents.
-// This is private; access builtin configurations through NewDefaultConfig().
-var builtinAgents = map[string]builtinAgent{
-	"claude":   claudeAgentConfig,
-	"opencode": opencodeAgentConfig,
-}
 
 // Directory and file names for git-crew.
 const (
@@ -299,61 +275,22 @@ func GlobalConfigPath(configHome string) string {
 }
 
 // NewDefaultConfig returns a Config with default values.
-// All builtin agents are registered as Agents, Workers, and Managers with appropriate defaults.
+// This returns empty maps for Agents, Workers, and Managers.
+// Builtin agents should be registered by calling builtin.Register(cfg)
+// in the infra layer before merging user config.
 func NewDefaultConfig() *Config {
-	agents := make(map[string]Agent)
-	workers := make(map[string]Worker)
-	managers := make(map[string]Manager)
-
-	for name, builtin := range builtinAgents {
-		agents[name] = Agent{
-			Command:             builtin.Command,
-			CommandTemplate:     builtin.CommandTemplate,
-			DefaultModel:        builtin.DefaultModel,
-			Description:         builtin.Description,
-			WorktreeSetupScript: builtin.WorktreeSetupScript,
-			ExcludePatterns:     builtin.ExcludePatterns,
-		}
-		// Create builtin workers with role-specific SystemArgs
-		workers[name] = Worker{
-			Agent:           name,
-			CommandTemplate: builtin.CommandTemplate,
-			Command:         builtin.Command,
-			SystemArgs:      builtin.WorkerSystemArgs,
-			Args:            builtin.DefaultArgs,
-			Description:     builtin.Description,
-		}
-		// Create builtin managers with role-specific SystemArgs
-		managers[name] = Manager{
-			Agent:       name,
-			SystemArgs:  builtin.ManagerSystemArgs,
-			Description: builtin.Description,
-		}
-	}
-
-	// Create default worker (references default agent)
-	workers[DefaultWorkerName] = Worker{
-		Agent:       DefaultWorkerAgent,
-		Description: "Default worker agent",
-	}
-	// Create default manager (references default agent)
-	managers[DefaultManagerName] = Manager{
-		Agent:       DefaultManagerAgent,
-		Description: "Default manager agent",
-	}
-
 	return &Config{
-		Agents: agents,
+		Agents: make(map[string]Agent),
 		WorkersConfig: WorkersConfig{
 			SystemPrompt: DefaultSystemPrompt,
 			Prompt:       "",
 		},
-		Workers: workers,
+		Workers: make(map[string]Worker),
 		ManagersConfig: ManagersConfig{
 			SystemPrompt: DefaultManagerSystemPrompt,
 			Prompt:       "",
 		},
-		Managers: managers,
+		Managers: make(map[string]Manager),
 		Log: LogConfig{
 			Level: DefaultLogLevel,
 		},
@@ -366,6 +303,8 @@ func NewDefaultConfig() *Config {
 var configTemplate string
 
 // RenderConfigTemplate renders the config template with default values.
+// Note: ClaudeArgs and OpencodeArgs are empty strings since builtin agents
+// are now registered in the infra/builtin package, not in domain.
 func RenderConfigTemplate() (string, error) {
 	cfg := NewDefaultConfig()
 
@@ -375,8 +314,8 @@ func RenderConfigTemplate() (string, error) {
 		"ManagersSystemPrompt": formatPromptForTemplate(cfg.ManagersConfig.SystemPrompt),
 		"ManagersPrompt":       formatPromptForTemplate(cfg.ManagersConfig.Prompt),
 		"LogLevel":             cfg.Log.Level,
-		"ClaudeArgs":           cfg.Workers["claude"].Args,
-		"OpencodeArgs":         cfg.Workers["opencode"].Args,
+		"ClaudeArgs":           "", // Builtin default (empty)
+		"OpencodeArgs":         "", // Builtin default (empty)
 	}
 
 	tmpl, err := template.New("config").Delims("<<", ">>").Parse(configTemplate)

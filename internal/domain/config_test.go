@@ -40,87 +40,37 @@ func TestGlobalConfigPath(t *testing.T) {
 func TestNewDefaultConfig(t *testing.T) {
 	cfg := NewDefaultConfig()
 
+	// Check Log level
 	if cfg.Log.Level != DefaultLogLevel {
 		t.Errorf("Log.Level = %q, want %q", cfg.Log.Level, DefaultLogLevel)
+	}
+
+	// Check maps are initialized but empty (builtin agents are registered by infra/builtin)
+	if cfg.Agents == nil {
+		t.Error("Agents should not be nil")
+	}
+	if len(cfg.Agents) != 0 {
+		t.Errorf("Agents should be empty, got %d entries", len(cfg.Agents))
 	}
 	if cfg.Workers == nil {
 		t.Error("Workers should not be nil")
 	}
-	// Check default worker exists
-	defaultWorker, ok := cfg.Workers[DefaultWorkerName]
-	if !ok {
-		t.Error("expected default worker to be configured")
-	} else {
-		if defaultWorker.Agent != DefaultWorkerAgent {
-			t.Errorf("default worker agent = %q, want %q", defaultWorker.Agent, DefaultWorkerAgent)
-		}
+	if len(cfg.Workers) != 0 {
+		t.Errorf("Workers should be empty, got %d entries", len(cfg.Workers))
 	}
+	if cfg.Managers == nil {
+		t.Error("Managers should not be nil")
+	}
+	if len(cfg.Managers) != 0 {
+		t.Errorf("Managers should be empty, got %d entries", len(cfg.Managers))
+	}
+
 	// Check WorkersConfig has default system prompt
 	if cfg.WorkersConfig.SystemPrompt != DefaultSystemPrompt {
 		t.Errorf("WorkersConfig.SystemPrompt = %q, want %q", cfg.WorkersConfig.SystemPrompt, DefaultSystemPrompt)
 	}
 	if cfg.WorkersConfig.Prompt != "" {
 		t.Errorf("WorkersConfig.Prompt = %q, want empty", cfg.WorkersConfig.Prompt)
-	}
-	// Check builtin agents, workers, and managers are configured
-	for name, builtin := range builtinAgents {
-		// Check Agent
-		agent, agentExists := cfg.Agents[name]
-		if !agentExists {
-			t.Errorf("expected %s agent to be configured", name)
-		} else {
-			if agent.CommandTemplate != builtin.CommandTemplate {
-				t.Errorf("%s agent.CommandTemplate = %q, want %q", name, agent.CommandTemplate, builtin.CommandTemplate)
-			}
-			if agent.Command != builtin.Command {
-				t.Errorf("%s agent.Command = %q, want %q", name, agent.Command, builtin.Command)
-			}
-		}
-
-		// Check Worker
-		worker, workerExists := cfg.Workers[name]
-		if !workerExists {
-			t.Errorf("expected %s worker to be configured", name)
-			continue
-		}
-		if worker.CommandTemplate != builtin.CommandTemplate {
-			t.Errorf("%s worker.CommandTemplate = %q, want %q", name, worker.CommandTemplate, builtin.CommandTemplate)
-		}
-		if worker.Command != builtin.Command {
-			t.Errorf("%s worker.Command = %q, want %q", name, worker.Command, builtin.Command)
-		}
-		if worker.SystemArgs != builtin.WorkerSystemArgs {
-			t.Errorf("%s worker.SystemArgs = %q, want %q", name, worker.SystemArgs, builtin.WorkerSystemArgs)
-		}
-		if worker.Args != builtin.DefaultArgs {
-			t.Errorf("%s worker.Args = %q, want %q", name, worker.Args, builtin.DefaultArgs)
-		}
-
-		// Check Manager
-		manager, managerExists := cfg.Managers[name]
-		if !managerExists {
-			t.Errorf("expected %s manager to be configured", name)
-			continue
-		}
-		if manager.Agent != name {
-			t.Errorf("%s manager.Agent = %q, want %q", name, manager.Agent, name)
-		}
-		if manager.SystemArgs != builtin.ManagerSystemArgs {
-			t.Errorf("%s manager.SystemArgs = %q, want %q", name, manager.SystemArgs, builtin.ManagerSystemArgs)
-		}
-	}
-
-	// Check default manager
-	manager, ok := cfg.Managers[DefaultManagerName]
-	if !ok {
-		t.Error("expected default manager to be configured")
-	} else {
-		if manager.Agent != DefaultManagerAgent {
-			t.Errorf("default manager agent = %q, want %q", manager.Agent, DefaultManagerAgent)
-		}
-		if manager.Description != "Default manager agent" {
-			t.Errorf("default manager description = %q, want %q", manager.Description, "Default manager agent")
-		}
 	}
 
 	// Check ManagersConfig has default system prompt
@@ -343,11 +293,6 @@ func TestRenderConfigTemplate(t *testing.T) {
 	formattedSysPrompt := formatPromptForTemplate(DefaultSystemPrompt)
 	if !strings.Contains(content, "# system_prompt = "+formattedSysPrompt) {
 		t.Errorf("expected system prompt to be embedded in template")
-	}
-	for name, builtin := range builtinAgents {
-		if builtin.DefaultArgs != "" && !strings.Contains(content, builtin.DefaultArgs) {
-			t.Errorf("expected %s args %q to be embedded in template", name, builtin.DefaultArgs)
-		}
 	}
 
 	// Check that Go template syntax for command_template is preserved
