@@ -534,7 +534,7 @@ func (s Styles) markdownStyle() ansi.StyleConfig {
 			},
 		},
 		CodeBlock: ansi.StyleCodeBlock{
-			Theme: "dark",
+			Theme: "dracula",
 		},
 		Table: ansi.StyleTable{
 			StyleBlock: ansi.StyleBlock{
