@@ -43,17 +43,57 @@ Task data is stored in Git refs under `refs/crew/` namespace. This enables shari
 
 git-crew is designed to work with any AI coding CLI (Claude Code, OpenCode, Codex, etc.). Each CLI has different invocation patterns, argument formats, and environment requirements.
 
-The **Agent** abstraction handles these differences:
+### Agent, Worker, Manager
 
-- **Command & Args**: How to invoke the CLI and pass prompts
-- **SetupScript**: Per-worktree initialization (e.g., creating `.claude/` settings)
+The system uses three distinct concepts:
+
+#### **Agent**: Base AI CLI Configuration
+
+An **Agent** defines the core command execution pattern for an AI tool, independent of its role. Agents are reusable templates that specify:
+
+- **Command**: Base executable name (e.g., `"claude"`, `"opencode"`)
+- **CommandTemplate**: How to assemble arguments (e.g., `"{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}"`)
+- **DefaultModel**: Default model for this agent (e.g., `"sonnet"`, `"gpt-4o"`)
+- **SetupScript**: Per-worktree initialization script (e.g., creating `.claude/` settings)
 - **ExcludePatterns**: Files to hide from git status (e.g., `.opencode/`)
 
-**Workers** and **Managers** reference an Agent and add role-specific configuration (prompts, model overrides). This separation allows:
+Agents are defined in the `[agents.<name>]` configuration section and do **not** include role-specific settings like `system_args` or prompts.
 
-1. Define CLI-specific setup once per Agent
-2. Create multiple Workers with different prompts/models using the same Agent
-3. Switch between AI tools without changing task workflows
+#### **Worker**: Task Execution Agent
+
+A **Worker** is a task execution agent that performs actual code implementation. Workers:
+
+- Reference an Agent (or define their own command)
+- Add role-specific configuration (`system_args`, `system_prompt`, `prompt`)
+- Run in isolated worktrees with full read-write access
+- Can be customized per task using `--worker` flag
+
+Workers are configured in `[workers.<name>]` sections and automatically inherit from their Agent's settings. Multiple workers can share the same Agent with different prompts or models.
+
+#### **Manager**: Task Orchestration Agent
+
+A **Manager** is a read-only orchestration agent that:
+
+- Creates, monitors, and manages tasks using crew commands
+- Delegates code implementation to Workers (does not edit files directly)
+- Runs in the repository root (not a worktree)
+- Has access to all crew commands for task management
+
+Managers are configured in `[managers.<name>]` sections and also reference Agents for their base configuration.
+
+### Separation of Concerns
+
+This three-tier design provides clear separation:
+
+1. **Agents** - Define CLI-specific setup once (command, setup script, exclusions)
+2. **Workers/Managers** - Add role-specific configuration (prompts, args, model overrides)
+3. **Tasks** - Reference Workers for execution
+
+This allows you to:
+- Define CLI-specific setup once per Agent
+- Create multiple Workers with different prompts/models using the same Agent
+- Create multiple Managers with different orchestration styles
+- Switch between AI tools without changing task workflows
 
 ---
 
@@ -64,9 +104,107 @@ Configuration is loaded from (in priority order):
 2. User config: `~/.config/git-crew/config.toml`
 3. Built-in defaults
 
+### Configuration Example
+
+```toml
+# Common worker settings
+[workers]
+system_prompt = """
+You are working on Task #{{.TaskID}}.
+
+IMPORTANT: First run 'crew --help-worker' and follow the workflow instructions exactly.
+"""
+prompt = ""  # User custom instructions (optional)
+
+# Default worker (references another worker)
+[workers.default]
+agent = "opencode"
+model = "sonnet"
+
+# Custom worker with different settings
+[workers.reviewer]
+agent = "claude"
+model = "opus"
+prompt = "Focus on code quality and best practices."
+
+# Manager configuration
+[managers.default]
+agent = "opencode"
+model = "opus"
+
+# Custom agent definition
+[agents.my-agent]
+command = "my-custom-cli"
+command_template = "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}"
+default_model = "default"
+description = "My custom AI agent"
+worktree_setup_script = """
+#!/bin/bash
+cd {{.Worktree}}
+echo "Setting up worktree for task {{.TaskID}}"
+"""
+exclude_patterns = [".my-agent-cache/"]
+
+# CI gate on completion
+[complete]
+command = "mise run ci"
+
+# Diff display
+[diff]
+command = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}}{{end}}"
+
+# Logging
+[log]
+level = "info"
+```
+
 ---
 
-## 5. Naming Conventions
+## 5. Worktree Setup and Exclusions
+
+### Worktree Setup Script
+
+Agents can define a `worktree_setup_script` that runs automatically after worktree creation. This script is useful for:
+
+- Creating agent-specific configuration files (e.g., `.claude/`, `.opencode/`)
+- Copying or linking shared resources
+- Setting up agent-specific environment
+
+The script is template-expanded with the following variables:
+- `{{.Worktree}}` - Worktree path
+- `{{.TaskID}}` - Task ID
+- `{{.Branch}}` - Branch name
+- `{{.GitDir}}` - .git directory path
+- `{{.RepoRoot}}` - Repository root path
+
+**Example:**
+```bash
+#!/bin/bash
+cd {{.Worktree}}
+mkdir -p .opencode/skill
+echo "Worktree setup complete for task {{.TaskID}}"
+```
+
+### Exclude Patterns
+
+Agents can define `exclude_patterns` to automatically hide agent-specific files from git status. These patterns are added to `.git/info/exclude` in the worktree.
+
+This prevents clutter from:
+- Agent cache directories (e.g., `.opencode/`, `.claude/cache/`)
+- Temporary agent files
+- Agent-specific build artifacts
+
+**Example:**
+```toml
+[agents.opencode]
+exclude_patterns = [".opencode/", ".codex/"]
+```
+
+These exclusions are applied automatically when starting a task with the agent, ensuring a clean git status output without polluting the repository's `.gitignore`.
+
+---
+
+## 6. Naming Conventions
 
 ### Resource Naming
 
@@ -100,7 +238,7 @@ Configuration is loaded from (in priority order):
 
 ---
 
-## 6. Dependencies
+## 7. Dependencies
 
 | Tool | Purpose | Required |
 |------|---------|----------|
