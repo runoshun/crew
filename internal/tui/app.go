@@ -258,7 +258,7 @@ func (m *Model) detailContent(width int) string {
 	if task.Description != "" {
 		lines = append(lines, lineStyle.Render(""))
 		lines = append(lines, lineStyle.Render(m.styles.DetailLabel.Background(Colors.Background).Render("Description")))
-		lines = append(lines, wrapStyle.Render(m.styles.DetailDesc.Background(Colors.Background).Width(width).Render(task.Description)))
+		lines = append(lines, m.styles.RenderMarkdown(task.Description, width))
 	}
 
 	if len(m.comments) > 0 {
