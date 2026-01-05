@@ -556,10 +556,11 @@ func (m *Model) viewStatusPicker() string {
 	}
 
 	ds := m.newDialogStyles()
+	baseStyle := lipgloss.NewStyle().Background(ds.bg)
 
 	title := ds.renderLine(ds.label.Render("Change Status"))
 	taskLine := ds.renderLine(ds.text.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
-	currentLine := ds.renderLine(ds.muted.Render("Current: ") + m.styles.StatusStyle(task.Status).Render(string(task.Status)))
+	currentLine := ds.renderLine(ds.muted.Render("Current: ") + m.styles.StatusStyle(task.Status).Background(ds.bg).Render(string(task.Status)))
 	selectLabel := ds.renderLine(ds.label.Render("Select new status:"))
 
 	transitions := m.getStatusTransitions(task.Status)
@@ -572,13 +573,26 @@ func (m *Model) viewStatusPicker() string {
 		for i, status := range transitions {
 			isNormal := task.Status.CanTransitionTo(status)
 			if !isNormal && !hasForced {
-				// Add separator before forced transitions
-				statusRows = append(statusRows, ds.renderLine(ds.muted.Render("  ──────────────────────── (force)")))
+				// Add separator before forced transitions with centered (force)
+				label := " (force) "
+				totalWidth := ds.width - 4
+				sideWidth := (totalWidth - len(label)) / 2
+				if sideWidth < 0 {
+					sideWidth = 0
+				}
+				sep := strings.Repeat("─", sideWidth)
+				fill := ""
+				if sideWidth*2+len(label) < totalWidth {
+					fill = " "
+				}
+				separatorLine := ds.muted.Render("  " + sep + label + sep + fill)
+				statusRows = append(statusRows, ds.renderLine(separatorLine))
 				hasForced = true
 			}
 
 			selected := i == m.statusCursor
 			cursor := " "
+			cursorStyle := ds.label.Foreground(Colors.Primary)
 			style := ds.text
 			if selected {
 				cursor = "▸"
@@ -586,7 +600,7 @@ func (m *Model) viewStatusPicker() string {
 			}
 
 			displayText := string(status)
-			row := ds.renderLine(fmt.Sprintf("  %s %s", ds.label.Foreground(Colors.Primary).Render(cursor), style.Render(displayText)))
+			row := ds.renderLine(baseStyle.Render("  ") + cursorStyle.Render(cursor) + baseStyle.Render(" ") + style.Render(displayText))
 			statusRows = append(statusRows, row)
 		}
 	}
