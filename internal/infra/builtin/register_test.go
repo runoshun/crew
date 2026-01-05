@@ -36,9 +36,7 @@ func TestRegister(t *testing.T) {
 		if worker.Agent != name {
 			t.Errorf("worker %q should reference agent %q, got %q", name, name, worker.Agent)
 		}
-		if worker.SystemArgs == "" {
-			t.Errorf("worker %q should have SystemArgs", name)
-		}
+		// Note: SystemArgs may be empty - model is now in CommandTemplate directly
 	}
 
 	// Check that builtin managers are registered
@@ -51,16 +49,6 @@ func TestRegister(t *testing.T) {
 		if manager.Agent != name {
 			t.Errorf("manager %q should reference agent %q, got %q", name, name, manager.Agent)
 		}
-	}
-
-	// Verify that no "default" worker is registered (users should use workers.default = "opencode" instead)
-	if _, ok := cfg.Workers[domain.DefaultWorkerName]; ok {
-		t.Error("default worker should NOT be registered (use workers.default = \"opencode\" instead)")
-	}
-
-	// Verify that no "default" manager is registered
-	if _, ok := cfg.Managers[domain.DefaultManagerName]; ok {
-		t.Error("default manager should NOT be registered")
 	}
 }
 

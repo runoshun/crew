@@ -53,9 +53,13 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 	}
 
 	// Resolve manager by name
-	manager, ok := cfg.Managers[in.Name]
+	name := in.Name
+	if name == "" {
+		name = cfg.ManagersConfig.Default
+	}
+	manager, ok := cfg.Managers[name]
 	if !ok {
-		return nil, fmt.Errorf("manager %q: %w", in.Name, domain.ErrManagerNotFound)
+		return nil, fmt.Errorf("manager %q: %w", name, domain.ErrManagerNotFound)
 	}
 
 	// Resolve the Worker from the Manager's Agent reference

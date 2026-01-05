@@ -463,7 +463,7 @@ func (m *Model) updateAgents() {
 	// Set cursor to default agent
 	allAgents := m.allAgents()
 	for i, a := range allAgents {
-		if a == domain.DefaultWorkerName {
+		if a == m.config.WorkersConfig.Default {
 			m.agentCursor = i
 			break
 		}

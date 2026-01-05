@@ -42,7 +42,7 @@ Examples:
   crew manager --model opus`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			managerName := domain.DefaultManagerName
+			managerName := ""
 			if len(args) > 0 {
 				managerName = args[0]
 			}
@@ -73,7 +73,7 @@ Examples:
 func executeManagerScript(out *usecase.StartManagerOutput, crewDir string) error {
 	// Create scripts directory if it doesn't exist
 	scriptsDir := filepath.Join(crewDir, "scripts")
-	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
+	if err := os.MkdirAll(scriptsDir, 0o750); err != nil {
 		return fmt.Errorf("create scripts directory: %w", err)
 	}
 
@@ -85,7 +85,7 @@ func executeManagerScript(out *usecase.StartManagerOutput, crewDir string) error
 	}
 
 	// G306: We intentionally use 0700 because this is an executable script
-	if err := os.WriteFile(scriptPath, []byte(script), 0700); err != nil { //nolint:gosec // executable script requires execute permission
+	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil { //nolint:gosec // executable script requires execute permission
 		return fmt.Errorf("write script file: %w", err)
 	}
 

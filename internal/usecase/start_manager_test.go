@@ -89,9 +89,8 @@ func TestStartManager_Execute_WithModelOverride(t *testing.T) {
 		Model: "config-model",
 	}
 	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+		CommandTemplate: "{{.Command}} --model {{.Model}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 		Command:         "claude",
-		SystemArgs:      "--model {{.Model}}",
 	}
 
 	uc := NewStartManager(configLoader, repoRoot, gitDir)
@@ -119,9 +118,8 @@ func TestStartManager_Execute_WithConfigModel(t *testing.T) {
 		Model: "config-model",
 	}
 	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
+		CommandTemplate: "{{.Command}} --model {{.Model}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
 		Command:         "claude",
-		SystemArgs:      "--model {{.Model}}",
 	}
 
 	uc := NewStartManager(configLoader, repoRoot, gitDir)

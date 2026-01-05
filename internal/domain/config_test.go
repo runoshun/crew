@@ -358,9 +358,6 @@ func TestRenderConfigTemplate(t *testing.T) {
 	if !strings.Contains(content, DefaultLogLevel) {
 		t.Errorf("expected log level %q to be embedded in template", DefaultLogLevel)
 	}
-	if !strings.Contains(content, DefaultWorkerName) {
-		t.Errorf("expected default_worker %q to be embedded in template", DefaultWorkerName)
-	}
 	formattedSysPrompt := formatPromptForTemplate(DefaultSystemPrompt)
 	if !strings.Contains(content, "# system_prompt = "+formattedSysPrompt) {
 		t.Errorf("expected system prompt to be embedded in template")

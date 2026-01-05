@@ -1,11 +1,16 @@
 package builtin
 
+const (
+	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show) Bash(crew edit:*)'`
+	claudeAllowedToolsForManager = `--allowedTools='Bash(crew:*)'`
+)
+
 // claudeAgent contains the built-in configuration for the Claude CLI.
 var claudeAgent = agentConfig{
-	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
 	Command:           "claude",
-	WorkerSystemArgs:  "--model {{.Model}} --permission-mode acceptEdits " + claudeAllowedTools,
-	ManagerSystemArgs: "--model {{.Model}} --permission-mode bypassPermissions",
+	CommandTemplate:   "{{.Command}} --model {{.Model}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
+	WorkerSystemArgs:  "--permission-mode acceptEdits " + claudeAllowedToolsForWorker,
+	ManagerSystemArgs: claudeAllowedToolsForManager,
 	DefaultArgs:       "",
 	DefaultModel:      "opus",
 	Description:       "Claude model via Anthropic CLI",
@@ -13,8 +18,6 @@ var claudeAgent = agentConfig{
 	WorktreeSetupScript: claudeSetupScript,
 	ExcludePatterns:     []string{".claude/crew-plugin/"},
 }
-
-const claudeAllowedTools = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show) Bash(crew edit:*)'`
 
 const claudeSetupScript = `#!/bin/bash
 cd {{.Worktree}}

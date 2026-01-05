@@ -95,7 +95,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	// Resolve agent from input or default
 	agent := in.Agent
 	if agent == "" {
-		agent = domain.DefaultWorkerName
+		agent = cfg.WorkersConfig.Default
 	}
 
 	// Get agent configuration

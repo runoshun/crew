@@ -30,7 +30,7 @@ command = "mise run ci"
 [log]
 level = "debug"
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load config
@@ -58,7 +58,7 @@ func TestLoader_Load_GlobalConfigOnly(t *testing.T) {
 args = "-m gpt-4"
 model = "github-copilot/gpt-4"
 `
-	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load config
@@ -93,7 +93,7 @@ command = "go test ./..."
 [log]
 level = "info"
 `
-	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
 	require.NoError(t, err)
 
 	// Write repo config (overrides some values)
@@ -105,7 +105,7 @@ model = "repo-claude-model"
 [complete]
 command = "mise run ci"
 `
-	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load config
@@ -144,10 +144,6 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 	// Default prompt comes from WorkersConfig, which should be empty by default
 	assert.Empty(t, cfg.WorkersConfig.Prompt)
 
-	// No "default" worker is registered - users should use workers.default = "opencode"
-	_, ok := cfg.Workers[domain.DefaultWorkerName]
-	assert.False(t, ok, "default worker should NOT be registered")
-
 	// Builtin workers should be registered (derived from expectedCfg)
 	for name, expectedWorker := range expectedCfg.Workers {
 		actualWorker, exists := cfg.Workers[name]
@@ -167,7 +163,7 @@ func TestLoader_LoadGlobal(t *testing.T) {
 [workers.opencode]
 args = "-m custom"
 `
-	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load global config
@@ -202,7 +198,7 @@ func TestLoader_Load_InvalidTOML(t *testing.T) {
 	invalidConfig := `
 this is not valid toml [[[
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(invalidConfig), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(invalidConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load config
@@ -224,7 +220,7 @@ func TestLoader_Load_CustomWorkerCommand(t *testing.T) {
 [workers.my-worker]
 command = 'my-custom-agent --task "{{.Title}}"'
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
 	require.NoError(t, err)
 
 	// Load config
@@ -246,7 +242,7 @@ func TestLoader_LoadRepo(t *testing.T) {
 [workers.claude]
 args = "--model claude-sonnet"
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load repo config
@@ -282,7 +278,7 @@ func TestLoader_LoadWithOptions_IgnoreGlobal(t *testing.T) {
 [workers.opencode]
 args = "-m gpt-4"
 `
-	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
 	require.NoError(t, err)
 
 	// Write repo config
@@ -290,7 +286,7 @@ args = "-m gpt-4"
 [workers.claude]
 args = "--model repo"
 `
-	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load with IgnoreGlobal
@@ -315,7 +311,7 @@ func TestLoader_LoadWithOptions_IgnoreRepo(t *testing.T) {
 [workers.opencode]
 args = "-m gpt-4"
 `
-	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
 	require.NoError(t, err)
 
 	// Write repo config
@@ -323,7 +319,7 @@ args = "-m gpt-4"
 [workers.claude]
 args = "--model repo-model"
 `
-	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load with IgnoreRepo
@@ -348,14 +344,14 @@ func TestLoader_LoadWithOptions_IgnoreBoth(t *testing.T) {
 [workers.opencode]
 args = "-m global"
 `
-	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0644)
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
 	require.NoError(t, err)
 
 	repoConfig := `
 [workers.claude]
 args = "--model repo"
 `
-	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load with both ignored
@@ -366,11 +362,6 @@ args = "--model repo"
 	// Get expected config by creating default and registering builtins
 	expectedCfg := domain.NewDefaultConfig()
 	builtin.Register(expectedCfg)
-
-	// Verify: only defaults are used
-	// "default" worker should NOT be registered
-	_, ok := cfg.Workers[domain.DefaultWorkerName]
-	assert.False(t, ok, "default worker should NOT be registered")
 
 	// Builtin workers should exist (derived from expectedCfg)
 	for name := range expectedCfg.Workers {
@@ -409,7 +400,7 @@ unknown_diff_key = "value"
 [log]
 unknown_log_key = "value"
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
 	require.NoError(t, err)
 
 	// Load config
@@ -441,7 +432,7 @@ func TestLoader_Load_WorktreeConfig(t *testing.T) {
 setup_command = "mise install && npm install"
 copy = ["node_modules", ".env.local"]
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load config
@@ -464,7 +455,7 @@ func TestLoader_Load_WorktreeConfig_Empty(t *testing.T) {
 [workers.claude]
 args = "--model test"
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load config
@@ -496,7 +487,7 @@ system_prompt = "Custom system prompt"
 prompt = "Custom user prompt"
 description = "Custom manager"
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0644)
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load config

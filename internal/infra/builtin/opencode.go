@@ -2,10 +2,10 @@ package builtin
 
 // opencodeAgent contains the built-in configuration for the OpenCode CLI.
 var opencodeAgent = agentConfig{
-	CommandTemplate:   "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
 	Command:           "opencode",
-	WorkerSystemArgs:  "-m {{.Model}}",
-	ManagerSystemArgs: "-m {{.Model}}",
+	CommandTemplate:   "{{.Command}} -m {{.Model}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
+	WorkerSystemArgs:  "",
+	ManagerSystemArgs: "",
 	DefaultArgs:       "",
 	DefaultModel:      "anthropic/claude-opus-4-5",
 	Description:       "General purpose coding agent via opencode CLI",

@@ -28,11 +28,6 @@
 <<- end>>
 
 <<end>>
-## Custom worker example (using custom agent)
-# [workers.my-worker]
-# agent = "my-agent"
-# model = "my-model-large"
-# args = "--verbose"
 
 [managers.default]
 ## Manager configuration
@@ -40,8 +35,8 @@
 ## They can create and monitor tasks but delegate code to workers.
 # agent = "opencode"   # Agent to use (builtin: claude, opencode)
 # model = ""           # Model override (optional)
-# system_args = ""     # System arguments (optional, defaults to builtin ManagerSystemArgs)
 # args = ""            # Additional arguments (optional)
+# system_args = ""     # System arguments (optional, should normally not be changed)
 
 [worktree]
 ## Worktree initialization settings (applied to all workers)
@@ -54,26 +49,25 @@
 ## CI gate on completion
 # command = "mise run ci"
 
-
 [diff]
 ## Diff display settings
 ## - command: Shell command to display diff. Supports template variables:
 ##   - {{.BaseBranch}}: Task's base branch (e.g., "main")
 ##   - {{.Args}}: Additional arguments passed to the diff command
-##   The command runs from the worktree directory.
+##     The command runs from the worktree directory.
 ## - tui_command: Command for TUI diff display (optional)
 # command = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}}{{end}}"
 # tui_command = "git diff --color {{.BaseBranch}}...HEAD | less -R"
 
+[log]
+## Log settings
+# level = "<<.LogLevel>>"  # debug, info, warn, error
+
+# ----------------------------------------------------------------------------
 ## Custom Agent CLI configuration
-## Agents define the core command execution pattern for AI tools.
-## Built-in agents: claude, opencode
-##
-## Note: system_args is defined in Workers/Managers, not in Agents.
-##       Agents only define command structure; Workers/Managers add role-specific args.
+## You can add Custom AI Agent CLI
 ##
 ## Fields:
-## - command: Base command to execute (e.g., "claude", "opencode")
 ## - command_template: How to assemble the full command
 ##   Available variables: {{.Command}}, {{.SystemArgs}}, {{.Args}}, {{.Prompt}}
 ## - default_model: Default model for this agent
@@ -95,6 +89,3 @@
 # """
 # exclude_patterns = [".my-agent-cache/"]
 
-## Log settings
-# [log]
-# level = "<<.LogLevel>>"  # debug, info, warn, error

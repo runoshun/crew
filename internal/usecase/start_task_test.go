@@ -86,7 +86,7 @@ func TestStartTask_Execute_WithAgentSetup(t *testing.T) {
 
 	// Create .git/info directory for exclude patterns
 	gitInfoDir := filepath.Join(repoRoot, ".git", "info")
-	require.NoError(t, os.MkdirAll(gitInfoDir, 0755))
+	require.NoError(t, os.MkdirAll(gitInfoDir, 0o755))
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -142,9 +142,9 @@ func TestStartTask_Execute_ExcludePatternsNoDuplicate(t *testing.T) {
 
 	// Create .git/info directory with existing exclude pattern
 	gitInfoDir := filepath.Join(repoRoot, ".git", "info")
-	require.NoError(t, os.MkdirAll(gitInfoDir, 0755))
+	require.NoError(t, os.MkdirAll(gitInfoDir, 0o755))
 	excludePath := filepath.Join(gitInfoDir, "exclude")
-	require.NoError(t, os.WriteFile(excludePath, []byte(".existing-pattern/\n"), 0644))
+	require.NoError(t, os.WriteFile(excludePath, []byte(".existing-pattern/\n"), 0o644))
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -363,11 +363,14 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
-	// Manually add "default" worker that references opencode
-	// (simulates user config: [workers.default] agent = "opencode")
-	configLoader.Config.Workers[domain.DefaultWorkerName] = domain.Worker{
-		Agent:       "opencode",
-		Description: "Default worker referencing opencode",
+	// Set default worker to "opencode"
+	configLoader.Config.WorkersConfig.Default = "opencode"
+	// Add opencode worker
+	configLoader.Config.Workers["opencode"] = domain.Worker{
+		Agent:           "opencode",
+		Command:         "opencode",
+		CommandTemplate: "{{.Command}} -m {{.Model}} {{.Args}} --prompt {{.Prompt}}",
+		Description:     "Default worker referencing opencode",
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
@@ -385,7 +388,7 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 
 	// Verify task uses default worker name
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.DefaultWorkerName, task.Agent)
+	assert.Equal(t, "opencode", task.Agent)
 
 	// Verify script uses the underlying agent command (opencode) from the referenced agent
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
@@ -628,17 +631,17 @@ func TestStartTask_ScriptGeneration(t *testing.T) {
 	// Verify script is executable (mode 0700)
 	info, err := os.Stat(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0700), info.Mode().Perm(), "script should have 0700 permissions")
+	assert.Equal(t, os.FileMode(0o700), info.Mode().Perm(), "script should have 0700 permissions")
 }
 
 func TestStartTask_CleanupScript(t *testing.T) {
 	crewDir := t.TempDir()
 	scriptsDir := filepath.Join(crewDir, "scripts")
-	require.NoError(t, os.MkdirAll(scriptsDir, 0755))
+	require.NoError(t, os.MkdirAll(scriptsDir, 0o755))
 
 	// Create dummy file
 	scriptPath := domain.ScriptPath(crewDir, 1)
-	require.NoError(t, os.WriteFile(scriptPath, []byte("test"), 0755))
+	require.NoError(t, os.WriteFile(scriptPath, []byte("test"), 0o755))
 
 	// Create use case
 	uc := NewStartTask(nil, nil, nil, nil, nil, crewDir, "")

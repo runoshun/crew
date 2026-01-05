@@ -37,12 +37,14 @@ type TasksConfig struct {
 
 // WorkersConfig holds common settings for all workers from [workers] section.
 type WorkersConfig struct {
+	Default      string // Default worker name
 	SystemPrompt string // Default system prompt for all workers
 	Prompt       string // Default prompt for all workers (can be overridden per worker)
 }
 
 // ManagersConfig holds common settings for all managers from [managers] section.
 type ManagersConfig struct {
+	Default      string // Default manager name
 	SystemPrompt string // Default system prompt for all managers
 	Prompt       string // Default prompt for all managers (can be overridden per manager)
 }
@@ -173,6 +175,7 @@ func (w *Worker) RenderCommand(data CommandData, promptOverride, defaultSystemPr
 		"Args":       args,
 		"Prompt":     promptOverride,
 		"Continue":   data.Continue,
+		"Model":      data.Model,
 	}
 
 	tmpl, err := template.New("cmd").Parse(w.CommandTemplate)
@@ -234,9 +237,7 @@ type WorktreeConfig struct {
 
 // Default configuration values.
 const (
-	DefaultLogLevel    = "info"
-	DefaultWorkerName  = "default" // Name of the default worker (looked up in Workers map)
-	DefaultManagerName = "default" // Name of the default manager (looked up in Managers map)
+	DefaultLogLevel = "info"
 )
 
 // DefaultSystemPrompt is the default system prompt template for workers.
@@ -330,11 +331,9 @@ func RenderConfigTemplate(cfg *Config) string {
 	// Prepare worker data (sorted for deterministic output)
 	workerNames := sortedMapKeys(cfg.Workers)
 	workers := make([]workerTemplateData, 0, len(workerNames))
+	firstWorkerName := ""
 	for _, name := range workerNames {
-		// Skip the default worker (it just references another worker)
-		if name == DefaultWorkerName {
-			continue
-		}
+		firstWorkerName = name
 		worker := cfg.Workers[name]
 		workers = append(workers, workerTemplateData{
 			Name:        name,
@@ -345,7 +344,7 @@ func RenderConfigTemplate(cfg *Config) string {
 	}
 
 	data := templateData{
-		DefaultWorkerName:     DefaultWorkerName,
+		DefaultWorkerName:     firstWorkerName,
 		DefaultSystemPrompt:   cfg.WorkersConfig.SystemPrompt,
 		FormattedSystemPrompt: formatPromptForTemplate(cfg.WorkersConfig.SystemPrompt),
 		Workers:               workers,

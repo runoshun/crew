@@ -24,12 +24,6 @@ var builtinAgents = map[string]agentConfig{
 	"opencode": opencodeAgent,
 }
 
-// Default agent names for workers and managers.
-const (
-	DefaultWorkerAgent  = "opencode" // Agent used by the default worker
-	DefaultManagerAgent = "opencode" // Agent used by the default manager
-)
-
 // Register adds all built-in agents, workers, and managers to the given config.
 // This should be called after NewDefaultConfig() and before merging user config.
 func Register(cfg *domain.Config) {
