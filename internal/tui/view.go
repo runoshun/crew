@@ -2,10 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	overlay "github.com/rmhubbert/bubbletea-overlay"
+	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
 const (
@@ -87,6 +89,8 @@ func (m *Model) View() string {
 		dialog = m.viewDetail()
 	case ModeChangeStatus:
 		dialog = m.viewStatusPicker()
+	case ModeExec:
+		dialog = m.viewExecDialog()
 	}
 
 	if dialog != "" {
@@ -435,6 +439,8 @@ func (m *Model) viewFooter() string {
 		content = "enter apply · esc cancel"
 	case ModeChangeStatus:
 		content = "enter select · esc cancel"
+	case ModeExec:
+		content = "enter execute · esc cancel"
 	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeDetail:
 		return ""
 	default:
@@ -493,6 +499,7 @@ func (m *Model) viewHelp() string {
 				{"s", "Start"},
 				{"S", "Stop"},
 				{"a", "Attach"},
+				{"x", "Execute"},
 				{"n", "New Task"},
 				{"e", "Change Status"},
 				{"d", "Delete"},
@@ -613,6 +620,45 @@ func (m *Model) viewStatusPicker() string {
 	lines = append(lines, ds.emptyLine(), hint)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return m.dialogStyle().Render(content)
+}
+
+func (m *Model) viewExecDialog() string {
+	task := m.SelectedTask()
+	if task == nil {
+		return ""
+	}
+
+	ds := m.newDialogStyles()
+	title := ds.renderLine(ds.label.Render("Execute Command"))
+	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+
+	branch := domain.BranchName(task.ID, task.Issue)
+	wtPath, _ := m.container.Worktrees.Resolve(branch)
+	// Make path relative to repo root if possible for better display
+	displayPath := wtPath
+	if rel, err := filepath.Rel(m.container.Config.RepoRoot, wtPath); err == nil {
+		displayPath = rel
+	}
+	wtLine := ds.renderLine(ds.muted.Render("Worktree: " + displayPath))
+
+	label := ds.renderLine(ds.label.Render("Command"))
+	input := ds.renderLine(m.execInput.View())
+	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" execute  ") +
+		ds.key.Render("esc") + ds.text.Render(" cancel"))
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		ds.emptyLine(),
+		taskLine,
+		wtLine,
+		ds.emptyLine(),
+		label,
+		input,
+		ds.emptyLine(),
+		hint,
+	)
+
 	return m.dialogStyle().Render(content)
 }
 

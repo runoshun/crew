@@ -15,6 +15,7 @@ const (
 	ModeHelp                     // Help overlay mode
 	ModeDetail                   // Task detail view mode
 	ModeChangeStatus             // Status change mode
+	ModeExec                     // Execute command mode
 )
 
 // String returns the string representation of the mode.
@@ -40,6 +41,8 @@ func (m Mode) String() string {
 		return "detail"
 	case ModeChangeStatus:
 		return "change_status"
+	case ModeExec:
+		return "exec"
 	default:
 		return "unknown"
 	}
@@ -59,7 +62,7 @@ const (
 // IsInputMode returns true if the mode accepts text input.
 func (m Mode) IsInputMode() bool {
 	switch m {
-	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask:
+	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec:
 		return true
 	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeDetail, ModeChangeStatus:
 		return false
