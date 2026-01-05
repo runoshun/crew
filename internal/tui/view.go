@@ -84,6 +84,8 @@ func (m *Model) View() string {
 		dialog = m.viewHelp()
 	case ModeDetail:
 		dialog = m.viewDetail()
+	case ModeChangeStatus:
+		dialog = m.viewStatusPicker()
 	}
 
 	if dialog != "" {
@@ -430,6 +432,8 @@ func (m *Model) viewFooter() string {
 			m.styles.FooterKey.Render("q") + " quit"
 	case ModeFilter:
 		content = "enter apply · esc cancel"
+	case ModeChangeStatus:
+		content = "enter select · esc cancel"
 	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeDetail:
 		return ""
 	default:
@@ -489,6 +493,7 @@ func (m *Model) viewHelp() string {
 				{"S", "Stop"},
 				{"A", "Attach"},
 				{"n", "New Task"},
+				{"e", "Change Status"},
 				{"d", "Delete"},
 				{"c", "Close"},
 			},
@@ -541,6 +546,49 @@ func (m *Model) viewDetail() string {
 		ds.key.Render("esc") + ds.muted.Render(" back"))
 
 	return m.dialogStyle().Render(m.detailViewport.View() + "\n\n" + footer)
+}
+
+func (m *Model) viewStatusPicker() string {
+	task := m.SelectedTask()
+	if task == nil {
+		return ""
+	}
+
+	ds := m.newDialogStyles()
+
+	title := ds.renderLine(ds.label.Render("Change Status"))
+	taskLine := ds.renderLine(ds.text.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+	currentLine := ds.renderLine(ds.muted.Render("Current: ") + m.styles.StatusStyle(task.Status).Render(string(task.Status)))
+	selectLabel := ds.renderLine(ds.label.Render("Select new status:"))
+
+	allowed := m.allowedStatusTransitions(task.Status)
+	var statusRows []string
+
+	if len(allowed) == 0 {
+		statusRows = append(statusRows, ds.renderLine(ds.muted.Render("  No transitions allowed from current status")))
+	} else {
+		for i, status := range allowed {
+			selected := i == m.statusCursor
+			cursor := " "
+			style := ds.text
+			if selected {
+				cursor = "▸"
+				style = ds.label
+			}
+			row := ds.renderLine(fmt.Sprintf("  %s %s", ds.label.Foreground(Colors.Primary).Render(cursor), style.Render(string(status))))
+			statusRows = append(statusRows, row)
+		}
+	}
+
+	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" select · ") +
+		ds.key.Render("esc") + ds.text.Render(" cancel"))
+
+	lines := []string{title, ds.emptyLine(), taskLine, currentLine, ds.emptyLine(), selectLabel}
+	lines = append(lines, statusRows...)
+	lines = append(lines, ds.emptyLine(), hint)
+
+	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return m.dialogStyle().Render(content)
 }
 
 func (m *Model) showDetailPanel() bool {

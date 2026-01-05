@@ -60,6 +60,7 @@ type Model struct {
 	height           int
 	confirmTaskID    int
 	agentCursor      int
+	statusCursor     int
 	startFocusCustom bool
 	showAll          bool
 }
@@ -436,6 +437,23 @@ func (m *Model) copyTask(taskID int) tea.Cmd {
 			return MsgError{Err: err}
 		}
 		return MsgTaskCopied{OriginalID: taskID, NewID: out.TaskID}
+	}
+}
+
+// updateStatus returns a command that updates the status of a task.
+func (m *Model) updateStatus(taskID int, status domain.Status) tea.Cmd {
+	return func() tea.Msg {
+		_, err := m.container.EditTaskUseCase().Execute(
+			context.Background(),
+			usecase.EditTaskInput{
+				TaskID: taskID,
+				Status: &status,
+			},
+		)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgTaskStatusUpdated{TaskID: taskID, Status: status}
 	}
 }
 

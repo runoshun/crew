@@ -68,6 +68,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.confirmAction = ConfirmNone
 		return m, m.loadTasks()
 
+	case MsgTaskStatusUpdated:
+		m.mode = ModeNormal
+		return m, m.loadTasks()
+
 	case MsgTaskCopied:
 		return m, m.loadTasks()
 
@@ -145,6 +149,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleHelpMode(msg)
 	case ModeDetail:
 		return m.handleDetailMode(msg)
+	case ModeChangeStatus:
+		return m.handleEditStatusMode(msg)
 	}
 
 	return m, nil
@@ -222,6 +228,15 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeConfirm
 		m.confirmAction = ConfirmDelete
 		m.confirmTaskID = task.ID
+		return m, nil
+
+	case key.Matches(msg, m.keys.EditStatus):
+		task := m.SelectedTask()
+		if task == nil {
+			return m, nil
+		}
+		m.mode = ModeChangeStatus
+		m.statusCursor = 0
 		return m, nil
 
 	case key.Matches(msg, m.keys.Merge):
@@ -607,4 +622,54 @@ func (m *Model) handleDetailMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.detailViewport, cmd = m.detailViewport.Update(msg)
 	return m, cmd
+}
+
+// handleEditStatusMode handles keys in status change mode.
+func (m *Model) handleEditStatusMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	task := m.SelectedTask()
+	if task == nil {
+		m.mode = ModeNormal
+		return m, nil
+	}
+
+	allowed := m.allowedStatusTransitions(task.Status)
+
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		if m.statusCursor > 0 {
+			m.statusCursor--
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		if m.statusCursor < len(allowed)-1 {
+			m.statusCursor++
+		}
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		if len(allowed) == 0 {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		newStatus := allowed[m.statusCursor]
+		return m, m.updateStatus(task.ID, newStatus)
+	}
+
+	return m, nil
+}
+
+func (m *Model) allowedStatusTransitions(current domain.Status) []domain.Status {
+	all := domain.AllStatuses()
+	var allowed []domain.Status
+	for _, s := range all {
+		if current.CanTransitionTo(s) {
+			allowed = append(allowed, s)
+		}
+	}
+	return allowed
 }

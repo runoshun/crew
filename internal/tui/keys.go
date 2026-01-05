@@ -15,9 +15,10 @@ type KeyMap struct {
 	Attach key.Binding // Attach to session
 
 	// Task management
-	New    key.Binding // Create new task
-	Copy   key.Binding // Copy task
-	Delete key.Binding // Delete task
+	New        key.Binding // Create new task
+	Copy       key.Binding // Copy task
+	Delete     key.Binding // Delete task
+	EditStatus key.Binding // Change task status
 
 	// Workflow
 	Merge key.Binding // Merge task
@@ -76,6 +77,10 @@ func DefaultKeyMap() KeyMap {
 		Delete: key.NewBinding(
 			key.WithKeys("d"),
 			key.WithHelp("d", "delete"),
+		),
+		EditStatus: key.NewBinding(
+			key.WithKeys("e"),
+			key.WithHelp("e", "change status"),
 		),
 		Merge: key.NewBinding(
 			key.WithKeys("m"),
@@ -138,7 +143,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter},                         // Navigation
 		{k.Start, k.Stop, k.Attach},                     // Session
-		{k.New, k.Copy, k.Delete},                       // Task management
+		{k.New, k.Copy, k.Delete, k.EditStatus},         // Task management
 		{k.Merge, k.Close},                              // Workflow
 		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
 	}
