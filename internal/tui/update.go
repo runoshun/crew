@@ -20,7 +20,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help.Width = msg.Width
-		m.taskList.SetSize(m.listWidth(), msg.Height-8)
+		// Update all layout-dependent sizes
+		m.updateLayoutSizes()
 		return m, nil
 
 	case MsgTasksLoaded:
@@ -28,7 +29,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateTaskList()
 		// Load comments for selected task if detail panel is visible
 		task := m.SelectedTask()
-		if task != nil && (m.showDetailPanel() || m.mode == ModeDetail) {
+		if task != nil && m.showDetailPanel() {
 			return m, m.loadComments(task.ID)
 		}
 		return m, nil
@@ -109,10 +110,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgCommentsLoaded:
 		m.comments = msg.Comments
-		// Update viewport content if in detail mode
-		if m.mode == ModeDetail {
-			width := m.dialogWidth() - 4
-			m.detailViewport.SetContent(m.detailContent(width))
+		// Update detail panel viewport if showing
+		if m.showDetailPanel() {
+			m.updateDetailPanelViewport()
 		}
 		return m, nil
 	}
@@ -144,8 +144,6 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleStartMode(msg)
 	case ModeHelp:
 		return m.handleHelpMode(msg)
-	case ModeDetail:
-		return m.handleDetailMode(msg)
 	case ModeExec:
 		return m.handleExecMode(msg)
 	}
@@ -155,6 +153,11 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleNormalMode handles keys in normal mode.
 func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// When detail panel is focused, handle scrolling keys
+	if m.detailFocused {
+		return m.handleDetailPanelFocused(msg)
+	}
+
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
@@ -164,9 +167,11 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.taskList, cmd = m.taskList.Update(msg)
 		newTask := m.SelectedTask()
-		// If task changed and we're showing detail panel or detail view, load comments
+		// If task changed and we're showing detail panel, load comments
 		if prevTask != newTask && newTask != nil {
-			if m.showDetailPanel() || m.mode == ModeDetail {
+			if m.showDetailPanel() {
+				// Update viewport content immediately, comments will update async
+				m.updateDetailPanelViewport()
 				return m, tea.Batch(cmd, m.loadComments(newTask.ID))
 			}
 		}
@@ -281,12 +286,13 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Detail):
 		task := m.SelectedTask()
-		if task != nil {
-			m.initDetailViewport()
-			m.mode = ModeDetail
-			return m, m.loadComments(task.ID)
+		if task == nil {
+			return m, nil
 		}
-		return m, nil
+		// Always use right pane focus mode (works on both wide and narrow screens)
+		m.detailFocused = true
+		m.updateLayoutSizes() // Update both taskList and viewport sizes
+		return m, m.loadComments(task.ID)
 
 	case key.Matches(msg, m.keys.ToggleShowAll):
 		m.showAll = !m.showAll
@@ -323,8 +329,9 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 
 	case domain.StatusDone, domain.StatusClosed:
 		// Show detail view for terminal states
-		m.mode = ModeDetail
-		return m, nil
+		m.detailFocused = true
+		m.updateLayoutSizes()
+		return m, m.loadComments(task.ID)
 	}
 
 	return m, nil
@@ -611,19 +618,33 @@ func (m *Model) handleHelpMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleDetailMode handles keys in detail mode.
-func (m *Model) handleDetailMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// handleDetailPanelFocused handles keys when detail panel is focused (right pane).
+func (m *Model) handleDetailPanelFocused(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, m.keys.Escape), key.Matches(msg, m.keys.Detail):
-		m.mode = ModeNormal
-		return m, nil
-
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
+
+	// Exit focus: v, Esc, h, left arrow
+	case key.Matches(msg, m.keys.Detail), key.Matches(msg, m.keys.Escape):
+		m.detailFocused = false
+		m.updateLayoutSizes() // Restore taskList width
+		return m, nil
+
+	case msg.String() == "h", msg.String() == "left":
+		m.detailFocused = false
+		m.updateLayoutSizes() // Restore taskList width
+		return m, nil
+
+	// Scroll: j/k, up/down
+	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down):
+		var cmd tea.Cmd
+		m.detailPanelViewport, cmd = m.detailPanelViewport.Update(msg)
+		return m, cmd
 	}
 
+	// Forward other keys to viewport for page up/down etc.
 	var cmd tea.Cmd
-	m.detailViewport, cmd = m.detailViewport.Update(msg)
+	m.detailPanelViewport, cmd = m.detailPanelViewport.Update(msg)
 	return m, cmd
 }
 
