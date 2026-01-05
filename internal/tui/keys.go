@@ -13,6 +13,7 @@ type KeyMap struct {
 	Start  key.Binding // Start task with agent
 	Stop   key.Binding // Stop running session
 	Attach key.Binding // Attach to session
+	Exec   key.Binding // Execute command
 
 	// Task management
 	New    key.Binding // Create new task
@@ -64,6 +65,10 @@ func DefaultKeyMap() KeyMap {
 		Attach: key.NewBinding(
 			key.WithKeys("A"),
 			key.WithHelp("A", "attach"),
+		),
+		Exec: key.NewBinding(
+			key.WithKeys("x"),
+			key.WithHelp("x", "execute"),
 		),
 		New: key.NewBinding(
 			key.WithKeys("n"),
@@ -137,7 +142,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter},                         // Navigation
-		{k.Start, k.Stop, k.Attach},                     // Session
+		{k.Start, k.Stop, k.Attach, k.Exec},             // Session
 		{k.New, k.Copy, k.Delete},                       // Task management
 		{k.Merge, k.Close},                              // Workflow
 		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
