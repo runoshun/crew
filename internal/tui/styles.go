@@ -26,14 +26,15 @@ var Colors = struct {
 	KeyText       lipgloss.Color
 
 	// Status colors
-	Todo        lipgloss.Color
-	InProgress  lipgloss.Color
-	InReview    lipgloss.Color
-	NeedsInput  lipgloss.Color
-	Stopped     lipgloss.Color
-	StatusError lipgloss.Color
-	Done        lipgloss.Color
-	Closed      lipgloss.Color
+	Todo         lipgloss.Color
+	InProgress   lipgloss.Color
+	InReview     lipgloss.Color
+	NeedsInput   lipgloss.Color
+	NeedsChanges lipgloss.Color
+	Stopped      lipgloss.Color
+	StatusError  lipgloss.Color
+	Done         lipgloss.Color
+	Closed       lipgloss.Color
 
 	// Group header
 	GroupLine lipgloss.Color
@@ -56,14 +57,15 @@ var Colors = struct {
 	KeyText:       lipgloss.Color("#B4BEFE"), // Lavender (for keys)
 
 	// Status colors
-	Todo:        lipgloss.Color("#89B4FA"), // Blue (pending)
-	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow (active work)
-	InReview:    lipgloss.Color("#CBA6F7"), // Mauve
-	NeedsInput:  lipgloss.Color("#94E2D5"), // Teal (waiting for input)
-	Stopped:     lipgloss.Color("#FAB387"), // Peach/Orange
-	StatusError: lipgloss.Color("#F38BA8"), // Red
-	Done:        lipgloss.Color("#A6E3A1"), // Green
-	Closed:      lipgloss.Color("#6C7086"), // Overlay0
+	Todo:         lipgloss.Color("#89B4FA"), // Blue (pending)
+	InProgress:   lipgloss.Color("#F9E2AF"), // Yellow (active work)
+	InReview:     lipgloss.Color("#CBA6F7"), // Mauve
+	NeedsInput:   lipgloss.Color("#94E2D5"), // Teal (waiting for input)
+	NeedsChanges: lipgloss.Color("#FAB387"), // Peach/Orange (needs revision)
+	Stopped:      lipgloss.Color("#FAB387"), // Peach/Orange
+	StatusError:  lipgloss.Color("#F38BA8"), // Red
+	Done:         lipgloss.Color("#A6E3A1"), // Green
+	Closed:       lipgloss.Color("#6C7086"), // Overlay0
 
 	// Group header / UI Elements
 	GroupLine: lipgloss.Color("#313244"), // Surface0
@@ -102,24 +104,26 @@ type Styles struct {
 	GroupHeaderLabel lipgloss.Style
 
 	// Status badges (normal)
-	StatusTodo       lipgloss.Style
-	StatusInProgress lipgloss.Style
-	StatusInReview   lipgloss.Style
-	StatusNeedsInput lipgloss.Style
-	StatusStopped    lipgloss.Style
-	StatusError      lipgloss.Style
-	StatusDone       lipgloss.Style
-	StatusClosed     lipgloss.Style
+	StatusTodo         lipgloss.Style
+	StatusInProgress   lipgloss.Style
+	StatusInReview     lipgloss.Style
+	StatusNeedsInput   lipgloss.Style
+	StatusNeedsChanges lipgloss.Style
+	StatusStopped      lipgloss.Style
+	StatusError        lipgloss.Style
+	StatusDone         lipgloss.Style
+	StatusClosed       lipgloss.Style
 
 	// Status badges (selected - brighter)
-	StatusTodoSelected       lipgloss.Style
-	StatusInProgressSelected lipgloss.Style
-	StatusInReviewSelected   lipgloss.Style
-	StatusNeedsInputSelected lipgloss.Style
-	StatusStoppedSelected    lipgloss.Style
-	StatusErrorSelected      lipgloss.Style
-	StatusDoneSelected       lipgloss.Style
-	StatusClosedSelected     lipgloss.Style
+	StatusTodoSelected         lipgloss.Style
+	StatusInProgressSelected   lipgloss.Style
+	StatusInReviewSelected     lipgloss.Style
+	StatusNeedsInputSelected   lipgloss.Style
+	StatusNeedsChangesSelected lipgloss.Style
+	StatusStoppedSelected      lipgloss.Style
+	StatusErrorSelected        lipgloss.Style
+	StatusDoneSelected         lipgloss.Style
+	StatusClosedSelected       lipgloss.Style
 
 	// Help
 	Help     lipgloss.Style
@@ -259,6 +263,9 @@ func DefaultStyles() Styles {
 		StatusNeedsInput: lipgloss.NewStyle().
 			Foreground(Colors.NeedsInput),
 
+		StatusNeedsChanges: lipgloss.NewStyle().
+			Foreground(Colors.NeedsChanges),
+
 		StatusStopped: lipgloss.NewStyle().
 			Foreground(Colors.Stopped),
 
@@ -286,6 +293,10 @@ func DefaultStyles() Styles {
 
 		StatusNeedsInputSelected: lipgloss.NewStyle().
 			Foreground(Colors.NeedsInput).
+			Bold(true),
+
+		StatusNeedsChangesSelected: lipgloss.NewStyle().
+			Foreground(Colors.NeedsChanges).
 			Bold(true),
 
 		StatusStoppedSelected: lipgloss.NewStyle().
@@ -389,6 +400,8 @@ func (s Styles) StatusStyle(status domain.Status) lipgloss.Style {
 		return s.StatusInReview
 	case domain.StatusNeedsInput:
 		return s.StatusNeedsInput
+	case domain.StatusNeedsChanges:
+		return s.StatusNeedsChanges
 	case domain.StatusStopped:
 		return s.StatusStopped
 	case domain.StatusError:
@@ -413,6 +426,8 @@ func (s Styles) StatusStyleSelected(status domain.Status) lipgloss.Style {
 		return s.StatusInReviewSelected
 	case domain.StatusNeedsInput:
 		return s.StatusNeedsInputSelected
+	case domain.StatusNeedsChanges:
+		return s.StatusNeedsChangesSelected
 	case domain.StatusStopped:
 		return s.StatusStoppedSelected
 	case domain.StatusError:
@@ -437,6 +452,8 @@ func StatusText(status domain.Status) string {
 		return "Revw"
 	case domain.StatusNeedsInput:
 		return "Input"
+	case domain.StatusNeedsChanges:
+		return "NeedChg"
 	case domain.StatusStopped:
 		return "Stop"
 	case domain.StatusError:
@@ -461,6 +478,8 @@ func StatusIcon(status domain.Status) string {
 		return "◎"
 	case domain.StatusNeedsInput:
 		return "?"
+	case domain.StatusNeedsChanges:
+		return "↻"
 	case domain.StatusStopped:
 		return "⏸"
 	case domain.StatusError:
