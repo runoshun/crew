@@ -632,7 +632,7 @@ func (m *Model) handleEditStatusMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	allowed := m.allowedStatusTransitions(task.Status)
+	transitions := m.getStatusTransitions(task.Status)
 
 	switch {
 	case key.Matches(msg, m.keys.Escape):
@@ -646,30 +646,36 @@ func (m *Model) handleEditStatusMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Down):
-		if m.statusCursor < len(allowed)-1 {
+		if m.statusCursor < len(transitions)-1 {
 			m.statusCursor++
 		}
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
-		if len(allowed) == 0 {
+		if len(transitions) == 0 {
 			m.mode = ModeNormal
 			return m, nil
 		}
-		newStatus := allowed[m.statusCursor]
+		newStatus := transitions[m.statusCursor]
 		return m, m.updateStatus(task.ID, newStatus)
 	}
 
 	return m, nil
 }
 
-func (m *Model) allowedStatusTransitions(current domain.Status) []domain.Status {
+func (m *Model) getStatusTransitions(current domain.Status) []domain.Status {
 	all := domain.AllStatuses()
-	var allowed []domain.Status
+	var normal []domain.Status
+	var forced []domain.Status
 	for _, s := range all {
+		if s == current {
+			continue
+		}
 		if current.CanTransitionTo(s) {
-			allowed = append(allowed, s)
+			normal = append(normal, s)
+		} else {
+			forced = append(forced, s)
 		}
 	}
-	return allowed
+	return append(normal, forced...)
 }

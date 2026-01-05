@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
 
 const (
@@ -95,13 +96,13 @@ func (m *Model) View() string {
 	return m.styles.App.Render(base)
 }
 
-func (m *Model) overlayDialog(_, dialog string) string {
-	return lipgloss.Place(
-		m.width-appPadding,
-		m.height-2,
-		lipgloss.Center,
-		lipgloss.Center,
+func (m *Model) overlayDialog(base, dialog string) string {
+	return overlay.Composite(
 		dialog,
+		base,
+		overlay.Center,
+		overlay.Center,
+		0, 0,
 	)
 }
 
@@ -480,7 +481,7 @@ func (m *Model) viewHelp() string {
 				{"/", "Filter"},
 				{"o", "Sort"},
 				{"v", "Details"},
-				{"a", "Toggle all"},
+				{"A", "Toggle all"},
 			},
 		},
 		{
@@ -491,7 +492,7 @@ func (m *Model) viewHelp() string {
 			}{
 				{"s", "Start"},
 				{"S", "Stop"},
-				{"A", "Attach"},
+				{"a", "Attach"},
 				{"n", "New Task"},
 				{"e", "Change Status"},
 				{"d", "Delete"},
@@ -561,13 +562,21 @@ func (m *Model) viewStatusPicker() string {
 	currentLine := ds.renderLine(ds.muted.Render("Current: ") + m.styles.StatusStyle(task.Status).Render(string(task.Status)))
 	selectLabel := ds.renderLine(ds.label.Render("Select new status:"))
 
-	allowed := m.allowedStatusTransitions(task.Status)
+	transitions := m.getStatusTransitions(task.Status)
 	var statusRows []string
 
-	if len(allowed) == 0 {
-		statusRows = append(statusRows, ds.renderLine(ds.muted.Render("  No transitions allowed from current status")))
+	if len(transitions) == 0 {
+		statusRows = append(statusRows, ds.renderLine(ds.muted.Render("  No transitions available")))
 	} else {
-		for i, status := range allowed {
+		hasForced := false
+		for i, status := range transitions {
+			isNormal := task.Status.CanTransitionTo(status)
+			if !isNormal && !hasForced {
+				// Add separator before forced transitions
+				statusRows = append(statusRows, ds.renderLine(ds.muted.Render("  ──────────────────────── (force)")))
+				hasForced = true
+			}
+
 			selected := i == m.statusCursor
 			cursor := " "
 			style := ds.text
@@ -575,7 +584,9 @@ func (m *Model) viewStatusPicker() string {
 				cursor = "▸"
 				style = ds.label
 			}
-			row := ds.renderLine(fmt.Sprintf("  %s %s", ds.label.Foreground(Colors.Primary).Render(cursor), style.Render(string(status))))
+
+			displayText := string(status)
+			row := ds.renderLine(fmt.Sprintf("  %s %s", ds.label.Foreground(Colors.Primary).Render(cursor), style.Render(displayText)))
 			statusRows = append(statusRows, row)
 		}
 	}
