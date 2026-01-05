@@ -15,7 +15,6 @@ var Colors = struct {
 	// Base colors
 	Primary    lipgloss.Color
 	Secondary  lipgloss.Color
-	Surface    lipgloss.Color
 	Muted      lipgloss.Color
 	Subtle     lipgloss.Color // New: Even more muted for unobtrusive elements
 	Error      lipgloss.Color
@@ -47,7 +46,6 @@ var Colors = struct {
 	// Modern Dark Palette (Catppuccin-inspired - Modern Soft Variant)
 	Primary:    lipgloss.Color("#89B4FA"), // Blue
 	Secondary:  lipgloss.Color("#CBA6F7"), // Mauve
-	Surface:    lipgloss.Color("#313244"), // Surface0
 	Muted:      lipgloss.Color("#A6ADC8"), // Subtext1
 	Subtle:     lipgloss.Color("#585B70"), // Surface2
 	Error:      lipgloss.Color("#F38BA8"), // Red
@@ -521,8 +519,7 @@ func (s Styles) markdownStyle() ansi.StyleConfig {
 	return ansi.StyleConfig{
 		Document: ansi.StyleBlock{
 			StylePrimitive: ansi.StylePrimitive{
-				BackgroundColor: stringPtr(string(Colors.Background)),
-				Color:           stringPtr(string(Colors.TitleNormal)),
+				Color: stringPtr(string(Colors.TitleNormal)),
 			},
 		},
 		Heading: ansi.StyleBlock{
@@ -533,14 +530,16 @@ func (s Styles) markdownStyle() ansi.StyleConfig {
 		},
 		Code: ansi.StyleBlock{
 			StylePrimitive: ansi.StylePrimitive{
-				Color:           stringPtr(string(Colors.TitleSelected)),
-				BackgroundColor: stringPtr(string(Colors.Surface)),
+				Color: stringPtr(string(Colors.TitleSelected)),
 			},
 		},
 		CodeBlock: ansi.StyleCodeBlock{
+			Theme: "dark",
+		},
+		Table: ansi.StyleTable{
 			StyleBlock: ansi.StyleBlock{
 				StylePrimitive: ansi.StylePrimitive{
-					BackgroundColor: stringPtr(string(Colors.Surface)),
+					Color: stringPtr(string(Colors.TitleNormal)),
 				},
 			},
 		},
