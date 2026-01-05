@@ -444,10 +444,12 @@ type MockConfigLoader struct {
 }
 
 // NewMockConfigLoader creates a new MockConfigLoader with default config.
-// It also registers builtin agents to match the real ConfigLoader behavior.
+// It also registers builtin agents and resolves inheritance to match the real ConfigLoader behavior.
 func NewMockConfigLoader() *MockConfigLoader {
 	cfg := domain.NewDefaultConfig()
 	builtin.Register(cfg)
+	// Resolve inheritance like the real loader does
+	_ = cfg.ResolveInheritance()
 	return &MockConfigLoader{
 		Config: cfg,
 	}

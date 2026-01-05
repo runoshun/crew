@@ -172,9 +172,7 @@ func (l *Loader) loadFile(path string) (*domain.Config, error) {
 // convertRawToDomainConfig converts the raw map to domain config and collects warnings.
 func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 	res := &domain.Config{
-		Agents:   make(map[string]domain.Agent),
-		Workers:  make(map[string]domain.Worker),
-		Managers: make(map[string]domain.Manager),
+		Agents: make(map[string]domain.Agent),
 	}
 	var warnings []string
 
@@ -183,14 +181,25 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 		case "agents":
 			if m, ok := value.(map[string]any); ok {
 				ac := parseAgentsSection(m)
+				// Handle top-level agents config (default_worker, default_manager)
+				if ac.DefaultWorker != "" {
+					res.AgentsConfig.DefaultWorker = ac.DefaultWorker
+				}
+				if ac.DefaultManager != "" {
+					res.AgentsConfig.DefaultManager = ac.DefaultManager
+				}
 				for name, def := range ac.Defs {
 					res.Agents[name] = domain.Agent{
-						Command:             def.Command,
-						CommandTemplate:     def.CommandTemplate,
-						DefaultModel:        def.DefaultModel,
-						Description:         def.Description,
-						WorktreeSetupScript: def.WorktreeSetupScript,
-						ExcludePatterns:     def.ExcludePatterns,
+						Inherit:         def.Inherit,
+						CommandTemplate: def.CommandTemplate,
+						Role:            domain.Role(def.Role),
+						SystemPrompt:    def.SystemPrompt,
+						Prompt:          def.Prompt,
+						Args:            def.Args,
+						DefaultModel:    def.DefaultModel,
+						Description:     def.Description,
+						SetupScript:     def.SetupScript,
+						Hidden:          def.Hidden,
 					}
 					for k := range def.Extra {
 						warnings = append(warnings, fmt.Sprintf("unknown key in [agents.%s]: %s", name, k))
@@ -198,56 +207,6 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 				}
 				for _, k := range ac.Unknowns {
 					warnings = append(warnings, fmt.Sprintf("unknown key in [agents]: %s", k))
-				}
-			}
-		case "workers":
-			if m, ok := value.(map[string]any); ok {
-				wc := parseWorkersSection(m)
-				res.WorkersConfig.SystemPrompt = wc.SystemPrompt
-				res.WorkersConfig.Prompt = wc.Prompt
-				for name, def := range wc.Defs {
-					res.Workers[name] = domain.Worker{
-						Agent:           def.Agent,
-						Inherit:         def.Inherit,
-						CommandTemplate: def.CommandTemplate,
-						Command:         def.Command,
-						SystemArgs:      def.SystemArgs,
-						Args:            def.Args,
-						SystemPrompt:    def.SystemPrompt,
-						Prompt:          def.Prompt,
-						Model:           def.Model,
-						Description:     def.Description,
-					}
-
-					for k := range def.Extra {
-						warnings = append(warnings, fmt.Sprintf("unknown key in [workers.%s]: %s", name, k))
-					}
-				}
-				for _, k := range wc.Unknowns {
-					warnings = append(warnings, fmt.Sprintf("unknown key in [workers]: %s", k))
-				}
-			}
-		case "managers":
-			if m, ok := value.(map[string]any); ok {
-				mc := parseManagersSection(m)
-				res.ManagersConfig.SystemPrompt = mc.SystemPrompt
-				res.ManagersConfig.Prompt = mc.Prompt
-				for name, def := range mc.Defs {
-					res.Managers[name] = domain.Manager{
-						Agent:        def.Agent,
-						Model:        def.Model,
-						SystemArgs:   def.SystemArgs,
-						Args:         def.Args,
-						SystemPrompt: def.SystemPrompt,
-						Prompt:       def.Prompt,
-						Description:  def.Description,
-					}
-					for k := range def.Extra {
-						warnings = append(warnings, fmt.Sprintf("unknown key in [managers.%s]: %s", name, k))
-					}
-				}
-				for _, k := range mc.Unknowns {
-					warnings = append(warnings, fmt.Sprintf("unknown key in [managers]: %s", k))
 				}
 			}
 		case "complete":
@@ -345,42 +304,26 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 	return res
 }
 
-// workersConfig holds the parsed [workers] section.
-type workersConfig struct {
-	Defs         map[string]workerDef // Per-worker definitions from [workers.<name>]
-	SystemPrompt string               // Common system prompt from [workers].system_prompt
-	Prompt       string               // Common prompt from [workers].prompt
-	Unknowns     []string             // Unknown keys in [workers]
-}
-
-type workerDef struct {
-	Extra           map[string]any
-	Agent           string
-	Inherit         string
-	CommandTemplate string
-	Command         string
-	SystemArgs      string
-	Args            string
-	SystemPrompt    string
-	Prompt          string
-	Model           string
-	Description     string
-}
-
 // agentsConfig holds the parsed [agents] section.
 type agentsConfig struct {
-	Defs     map[string]agentDef // Per-agent definitions from [agents.<name>]
-	Unknowns []string            // Unknown keys in [agents]
+	Defs           map[string]agentDef // Per-agent definitions from [agents.<name>]
+	DefaultWorker  string              // Default worker agent name
+	DefaultManager string              // Default manager agent name
+	Unknowns       []string            // Unknown keys in [agents]
 }
 
 type agentDef struct {
-	Extra               map[string]any
-	Command             string
-	CommandTemplate     string
-	DefaultModel        string
-	Description         string
-	WorktreeSetupScript string
-	ExcludePatterns     []string
+	Extra           map[string]any
+	Inherit         string
+	CommandTemplate string
+	Role            string
+	SystemPrompt    string
+	Prompt          string
+	Args            string
+	DefaultModel    string
+	Description     string
+	SetupScript     string
+	Hidden          bool
 }
 
 // parseAgentsSection parses the raw agents map into structured agentsConfig.
@@ -390,83 +333,22 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 	}
 
 	for key, value := range raw {
-		if subMap, ok := value.(map[string]any); ok {
-			def := agentDef{
-				Extra: make(map[string]any),
-			}
-			for k, v := range subMap {
-				switch k {
-				case "command":
-					if s, ok := v.(string); ok {
-						def.Command = s
-					}
-				case "command_template":
-					if s, ok := v.(string); ok {
-						def.CommandTemplate = s
-					}
-				case "default_model":
-					if s, ok := v.(string); ok {
-						def.DefaultModel = s
-					}
-				case "description":
-					if s, ok := v.(string); ok {
-						def.Description = s
-					}
-				case "worktree_setup_script":
-					if s, ok := v.(string); ok {
-						def.WorktreeSetupScript = s
-					}
-				case "exclude_patterns":
-					if arr, ok := v.([]any); ok {
-						for _, item := range arr {
-							if s, ok := item.(string); ok {
-								def.ExcludePatterns = append(def.ExcludePatterns, s)
-							}
-						}
-					}
-				default:
-					def.Extra[k] = v
-				}
-			}
-			result.Defs[key] = def
-		} else {
-			result.Unknowns = append(result.Unknowns, key)
-		}
-	}
-
-	return result
-}
-
-// parseWorkersSection parses the raw workers map into structured workersConfig.
-func parseWorkersSection(raw map[string]any) workersConfig {
-	result := workersConfig{
-		Defs: make(map[string]workerDef),
-	}
-
-	for key, value := range raw {
 		switch key {
-		case "default":
-			// Deprecated: default field is ignored, use workers.default instead
-		case "system_prompt":
+		case "default_worker":
 			if s, ok := value.(string); ok {
-				result.SystemPrompt = s
+				result.DefaultWorker = s
 			}
-		case "prompt":
+		case "default_manager":
 			if s, ok := value.(string); ok {
-				result.Prompt = s
+				result.DefaultManager = s
 			}
 		default:
-			// Treat as worker definition
 			if subMap, ok := value.(map[string]any); ok {
-				def := workerDef{
+				def := agentDef{
 					Extra: make(map[string]any),
 				}
 				for k, v := range subMap {
 					switch k {
-					case "agent":
-						if s, ok := v.(string); ok {
-							def.Agent = s
-						}
 					case "inherit":
 						if s, ok := v.(string); ok {
 							def.Inherit = s
@@ -475,17 +357,9 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 						if s, ok := v.(string); ok {
 							def.CommandTemplate = s
 						}
-					case "command":
+					case "role":
 						if s, ok := v.(string); ok {
-							def.Command = s
-						}
-					case "system_args":
-						if s, ok := v.(string); ok {
-							def.SystemArgs = s
-						}
-					case "args":
-						if s, ok := v.(string); ok {
-							def.Args = s
+							def.Role = s
 						}
 					case "system_prompt":
 						if s, ok := v.(string); ok {
@@ -495,97 +369,25 @@ func parseWorkersSection(raw map[string]any) workersConfig {
 						if s, ok := v.(string); ok {
 							def.Prompt = s
 						}
-					case "model":
-						if s, ok := v.(string); ok {
-							def.Model = s
-						}
-					case "description":
-						if s, ok := v.(string); ok {
-							def.Description = s
-						}
-					default:
-						def.Extra[k] = v
-					}
-				}
-				result.Defs[key] = def
-			} else {
-				result.Unknowns = append(result.Unknowns, key)
-			}
-		}
-	}
-
-	return result
-}
-
-// managersConfig holds the parsed [managers] section.
-type managersConfig struct {
-	Defs         map[string]managerDef // Per-manager definitions from [managers.<name>]
-	SystemPrompt string                // Common system prompt from [managers].system_prompt
-	Prompt       string                // Common prompt from [managers].prompt
-	Unknowns     []string              // Unknown keys in [managers]
-}
-
-type managerDef struct {
-	Extra        map[string]any
-	Agent        string
-	Model        string
-	SystemArgs   string
-	Args         string
-	SystemPrompt string
-	Prompt       string
-	Description  string
-}
-
-// parseManagersSection parses the raw managers map into structured managersConfig.
-func parseManagersSection(raw map[string]any) managersConfig {
-	result := managersConfig{
-		Defs: make(map[string]managerDef),
-	}
-
-	for key, value := range raw {
-		switch key {
-		case "system_prompt":
-			if s, ok := value.(string); ok {
-				result.SystemPrompt = s
-			}
-		case "prompt":
-			if s, ok := value.(string); ok {
-				result.Prompt = s
-			}
-		default:
-			if subMap, ok := value.(map[string]any); ok {
-				def := managerDef{
-					Extra: make(map[string]any),
-				}
-				for k, v := range subMap {
-					switch k {
-					case "agent":
-						if s, ok := v.(string); ok {
-							def.Agent = s
-						}
-					case "model":
-						if s, ok := v.(string); ok {
-							def.Model = s
-						}
-					case "system_args":
-						if s, ok := v.(string); ok {
-							def.SystemArgs = s
-						}
 					case "args":
 						if s, ok := v.(string); ok {
 							def.Args = s
 						}
-					case "system_prompt":
+					case "default_model":
 						if s, ok := v.(string); ok {
-							def.SystemPrompt = s
-						}
-					case "prompt":
-						if s, ok := v.(string); ok {
-							def.Prompt = s
+							def.DefaultModel = s
 						}
 					case "description":
 						if s, ok := v.(string); ok {
 							def.Description = s
+						}
+					case "setup_script":
+						if s, ok := v.(string); ok {
+							def.SetupScript = s
+						}
+					case "hidden":
+						if b, ok := v.(bool); ok {
+							def.Hidden = b
 						}
 					default:
 						def.Extra[k] = v
@@ -604,17 +406,14 @@ func parseManagersSection(raw map[string]any) managersConfig {
 // mergeConfigs merges two configs, with override taking precedence.
 func mergeConfigs(base, override *domain.Config) *domain.Config {
 	result := &domain.Config{
-		Agents:         make(map[string]domain.Agent),
-		WorkersConfig:  base.WorkersConfig,
-		Workers:        make(map[string]domain.Worker),
-		ManagersConfig: base.ManagersConfig,
-		Managers:       make(map[string]domain.Manager),
-		Complete:       base.Complete,
-		Diff:           base.Diff,
-		Log:            base.Log,
-		Tasks:          base.Tasks,
-		Worktree:       base.Worktree,
-		Warnings:       append([]string{}, base.Warnings...),
+		Agents:       make(map[string]domain.Agent),
+		AgentsConfig: base.AgentsConfig,
+		Complete:     base.Complete,
+		Diff:         base.Diff,
+		Log:          base.Log,
+		Tasks:        base.Tasks,
+		Worktree:     base.Worktree,
+		Warnings:     append([]string{}, base.Warnings...),
 	}
 
 	// Add override warnings
@@ -625,31 +424,15 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		result.Agents[name] = agent
 	}
 
-	// Copy base workers
-	for name, worker := range base.Workers {
-		result.Workers[name] = worker
+	// Override with override config (AgentsConfig)
+	if override.AgentsConfig.DefaultWorker != "" {
+		result.AgentsConfig.DefaultWorker = override.AgentsConfig.DefaultWorker
+	}
+	if override.AgentsConfig.DefaultManager != "" {
+		result.AgentsConfig.DefaultManager = override.AgentsConfig.DefaultManager
 	}
 
-	// Copy base managers
-	for name, manager := range base.Managers {
-		result.Managers[name] = manager
-	}
-
-	// Override with override config (WorkersConfig)
-	if override.WorkersConfig.SystemPrompt != "" {
-		result.WorkersConfig.SystemPrompt = override.WorkersConfig.SystemPrompt
-	}
-	if override.WorkersConfig.Prompt != "" {
-		result.WorkersConfig.Prompt = override.WorkersConfig.Prompt
-	}
-
-	// Override with override config (ManagersConfig)
-	if override.ManagersConfig.SystemPrompt != "" {
-		result.ManagersConfig.SystemPrompt = override.ManagersConfig.SystemPrompt
-	}
-	if override.ManagersConfig.Prompt != "" {
-		result.ManagersConfig.Prompt = override.ManagersConfig.Prompt
-	}
+	// Override other sections
 	if override.Complete.Command != "" {
 		result.Complete.Command = override.Complete.Command
 	}
@@ -679,14 +462,25 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 
 	// Merge agents: override individual fields, not entire agent
-	// Note: SystemArgs is NOT in Agent; it's role-specific (Worker/Manager)
 	for name, overrideAgent := range override.Agents {
 		baseAgent := result.Agents[name]
-		if overrideAgent.Command != "" {
-			baseAgent.Command = overrideAgent.Command
+		if overrideAgent.Inherit != "" {
+			baseAgent.Inherit = overrideAgent.Inherit
 		}
 		if overrideAgent.CommandTemplate != "" {
 			baseAgent.CommandTemplate = overrideAgent.CommandTemplate
+		}
+		if overrideAgent.Role != "" {
+			baseAgent.Role = overrideAgent.Role
+		}
+		if overrideAgent.SystemPrompt != "" {
+			baseAgent.SystemPrompt = overrideAgent.SystemPrompt
+		}
+		if overrideAgent.Prompt != "" {
+			baseAgent.Prompt = overrideAgent.Prompt
+		}
+		if overrideAgent.Args != "" {
+			baseAgent.Args = overrideAgent.Args
 		}
 		if overrideAgent.DefaultModel != "" {
 			baseAgent.DefaultModel = overrideAgent.DefaultModel
@@ -694,76 +488,13 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		if overrideAgent.Description != "" {
 			baseAgent.Description = overrideAgent.Description
 		}
-		if overrideAgent.WorktreeSetupScript != "" {
-			baseAgent.WorktreeSetupScript = overrideAgent.WorktreeSetupScript
+		if overrideAgent.SetupScript != "" {
+			baseAgent.SetupScript = overrideAgent.SetupScript
 		}
-		if len(overrideAgent.ExcludePatterns) > 0 {
-			baseAgent.ExcludePatterns = overrideAgent.ExcludePatterns
+		if overrideAgent.Hidden {
+			baseAgent.Hidden = overrideAgent.Hidden
 		}
 		result.Agents[name] = baseAgent
-	}
-
-	// Merge workers: override individual fields, not entire worker
-	for name, overrideWorker := range override.Workers {
-		baseWorker := result.Workers[name]
-		if overrideWorker.Agent != "" {
-			baseWorker.Agent = overrideWorker.Agent
-		}
-		if overrideWorker.Inherit != "" {
-			baseWorker.Inherit = overrideWorker.Inherit
-		}
-		if overrideWorker.CommandTemplate != "" {
-			baseWorker.CommandTemplate = overrideWorker.CommandTemplate
-		}
-		if overrideWorker.Command != "" {
-			baseWorker.Command = overrideWorker.Command
-		}
-		if overrideWorker.SystemArgs != "" {
-			baseWorker.SystemArgs = overrideWorker.SystemArgs
-		}
-		if overrideWorker.Args != "" {
-			baseWorker.Args = overrideWorker.Args
-		}
-		if overrideWorker.SystemPrompt != "" {
-			baseWorker.SystemPrompt = overrideWorker.SystemPrompt
-		}
-		if overrideWorker.Prompt != "" {
-			baseWorker.Prompt = overrideWorker.Prompt
-		}
-		if overrideWorker.Model != "" {
-			baseWorker.Model = overrideWorker.Model
-		}
-		if overrideWorker.Description != "" {
-			baseWorker.Description = overrideWorker.Description
-		}
-		result.Workers[name] = baseWorker
-	}
-
-	// Merge managers: override individual fields, not entire manager
-	for name, overrideManager := range override.Managers {
-		baseManager := result.Managers[name]
-		if overrideManager.Agent != "" {
-			baseManager.Agent = overrideManager.Agent
-		}
-		if overrideManager.Model != "" {
-			baseManager.Model = overrideManager.Model
-		}
-		if overrideManager.SystemArgs != "" {
-			baseManager.SystemArgs = overrideManager.SystemArgs
-		}
-		if overrideManager.Args != "" {
-			baseManager.Args = overrideManager.Args
-		}
-		if overrideManager.SystemPrompt != "" {
-			baseManager.SystemPrompt = overrideManager.SystemPrompt
-		}
-		if overrideManager.Prompt != "" {
-			baseManager.Prompt = overrideManager.Prompt
-		}
-		if overrideManager.Description != "" {
-			baseManager.Description = overrideManager.Description
-		}
-		result.Managers[name] = baseManager
 	}
 
 	return result

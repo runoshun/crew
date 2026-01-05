@@ -15,22 +15,13 @@ func TestStartManager_Execute_Success(t *testing.T) {
 	gitDir := repoRoot + "/.git"
 
 	configLoader := testutil.NewMockConfigLoader()
-	// Configure a manager with claude as the agent
-	configLoader.Config.Managers["default"] = domain.Manager{
-		Agent: "claude",
-	}
-	// Use default workers from config
-	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-		Command:         "claude",
-		SystemArgs:      "--model {{.Model}}",
-	}
+	// Use builtin claude-manager agent (already resolved by NewMockConfigLoader)
 
 	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
-		Name: "default",
+		Name: "claude-manager",
 	})
 
 	// Assert
@@ -57,7 +48,7 @@ func TestStartManager_Execute_ManagerNotFound(t *testing.T) {
 	})
 
 	// Assert
-	assert.ErrorIs(t, err, domain.ErrManagerNotFound)
+	assert.ErrorIs(t, err, domain.ErrAgentNotFound)
 }
 
 func TestStartManager_Execute_ConfigLoadError(t *testing.T) {
@@ -84,20 +75,19 @@ func TestStartManager_Execute_WithModelOverride(t *testing.T) {
 	gitDir := repoRoot + "/.git"
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Managers["default"] = domain.Manager{
-		Agent: "claude",
-		Model: "config-model",
-	}
-	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} --model {{.Model}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-		Command:         "claude",
+	// Configure a custom manager agent (fully resolved, no inheritance)
+	configLoader.Config.Agents["custom-manager"] = domain.Agent{
+		Role:            domain.RoleManager,
+		CommandTemplate: "claude --model {{.Model}} {{.Args}} {{.Prompt}}",
+		DefaultModel:    "config-model",
+		SystemPrompt:    domain.DefaultManagerSystemPrompt,
 	}
 
 	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute with model override
 	out, err := uc.Execute(context.Background(), StartManagerInput{
-		Name:  "default",
+		Name:  "custom-manager",
 		Model: "sonnet",
 	})
 
@@ -113,20 +103,19 @@ func TestStartManager_Execute_WithConfigModel(t *testing.T) {
 	gitDir := repoRoot + "/.git"
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Managers["default"] = domain.Manager{
-		Agent: "claude",
-		Model: "config-model",
-	}
-	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} --model {{.Model}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-		Command:         "claude",
+	// Configure a custom manager agent (fully resolved, no inheritance)
+	configLoader.Config.Agents["custom-manager"] = domain.Agent{
+		Role:            domain.RoleManager,
+		CommandTemplate: "claude --model {{.Model}} {{.Args}} {{.Prompt}}",
+		DefaultModel:    "config-model",
+		SystemPrompt:    domain.DefaultManagerSystemPrompt,
 	}
 
 	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute without model override
 	out, err := uc.Execute(context.Background(), StartManagerInput{
-		Name: "default",
+		Name: "custom-manager",
 	})
 
 	// Assert
@@ -139,27 +128,24 @@ func TestStartManager_Execute_WithManagerArgs(t *testing.T) {
 	gitDir := repoRoot + "/.git"
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Managers["default"] = domain.Manager{
-		Agent: "claude",
-		Args:  "--extra-flag",
-	}
-	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} {{.Args}} {{.Prompt}}",
-		Command:         "claude",
-		Args:            "--base-flag",
+	// Configure a custom manager agent (fully resolved, no inheritance)
+	configLoader.Config.Agents["custom-manager"] = domain.Agent{
+		Role:            domain.RoleManager,
+		CommandTemplate: "claude {{.Args}} {{.Prompt}}",
+		Args:            "--extra-flag",
+		SystemPrompt:    domain.DefaultManagerSystemPrompt,
 	}
 
 	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
-		Name: "default",
+		Name: "custom-manager",
 	})
 
 	// Assert
 	require.NoError(t, err)
-	// Both flags should be present
-	assert.Contains(t, out.Command, "--base-flag")
+	// Manager args should be present
 	assert.Contains(t, out.Command, "--extra-flag")
 }
 
@@ -168,17 +154,13 @@ func TestStartManager_Execute_WithBuiltinAgent(t *testing.T) {
 	gitDir := repoRoot + "/.git"
 
 	configLoader := testutil.NewMockConfigLoader()
-	// Manager references a builtin agent (not in config.Workers)
-	configLoader.Config.Managers["default"] = domain.Manager{
-		Agent: "opencode",
-	}
-	// No workers configured - should fall back to builtin
+	// Use builtin manager agent (opencode-manager)
 
 	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
-		Name: "default",
+		Name: "opencode-manager",
 	})
 
 	// Assert
@@ -186,48 +168,23 @@ func TestStartManager_Execute_WithBuiltinAgent(t *testing.T) {
 	assert.Contains(t, out.Command, "opencode")
 }
 
-func TestStartManager_Execute_NoAgentReference(t *testing.T) {
+func TestStartManager_Execute_DefaultManager(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
 
 	configLoader := testutil.NewMockConfigLoader()
-	// Manager with no agent reference
-	configLoader.Config.Managers["default"] = domain.Manager{
-		// Agent is empty
-	}
+	// Default manager is set to "opencode-manager" by builtin.Register
 
 	uc := NewStartManager(configLoader, repoRoot, gitDir)
 
-	// Execute
-	_, err := uc.Execute(context.Background(), StartManagerInput{
-		Name: "default",
+	// Execute with empty name (should use default)
+	out, err := uc.Execute(context.Background(), StartManagerInput{
+		Name: "", // Empty - should use default
 	})
 
 	// Assert
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no agent reference")
-}
-
-func TestStartManager_Execute_AgentNotFound(t *testing.T) {
-	repoRoot := t.TempDir()
-	gitDir := repoRoot + "/.git"
-
-	configLoader := testutil.NewMockConfigLoader()
-	// Manager references an unknown agent
-	configLoader.Config.Managers["default"] = domain.Manager{
-		Agent: "unknown-agent",
-	}
-
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
-
-	// Execute
-	_, err := uc.Execute(context.Background(), StartManagerInput{
-		Name: "default",
-	})
-
-	// Assert
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	require.NoError(t, err)
+	assert.Contains(t, out.Command, "opencode")
 }
 
 func TestStartManagerOutput_GetCommand(t *testing.T) {

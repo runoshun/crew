@@ -15,17 +15,14 @@ var configTemplateContent string
 
 // Config represents the application configuration.
 type Config struct {
-	Agents         map[string]Agent   // Agent definitions from [agents.<name>]
-	WorkersConfig  WorkersConfig      // Common [workers] settings
-	Workers        map[string]Worker  // Per-worker settings [workers.<name>]
-	ManagersConfig ManagersConfig     // Common [managers] settings
-	Managers       map[string]Manager // Manager definitions from [managers.<name>]
-	Complete       CompleteConfig     // [complete] settings
-	Diff           DiffConfig         // [diff] settings
-	Log            LogConfig          // [log] settings
-	Tasks          TasksConfig        // [tasks] settings
-	Worktree       WorktreeConfig     // [worktree] settings
-	Warnings       []string           // [warning] Unknown keys or other issues
+	Agents       map[string]Agent // Agent definitions from [agents.<name>]
+	AgentsConfig AgentsConfig     // Common [agents] settings
+	Complete     CompleteConfig   // [complete] settings
+	Diff         DiffConfig       // [diff] settings
+	Log          LogConfig        // [log] settings
+	Tasks        TasksConfig      // [tasks] settings
+	Worktree     WorktreeConfig   // [worktree] settings
+	Warnings     []string         // [warning] Unknown keys or other issues
 }
 
 // TasksConfig holds settings for task storage from [tasks] section.
@@ -35,59 +32,46 @@ type TasksConfig struct {
 	Encrypt   bool   // Enable encryption for task data (default: false)
 }
 
-// WorkersConfig holds common settings for all workers from [workers] section.
-type WorkersConfig struct {
-	Default      string // Default worker name
-	SystemPrompt string // Default system prompt for all workers
-	Prompt       string // Default prompt for all workers (can be overridden per worker)
+// AgentsConfig holds common settings for all agents from [agents] section.
+type AgentsConfig struct {
+	DefaultWorker  string // Default worker agent name
+	DefaultManager string // Default manager agent name
 }
 
-// ManagersConfig holds common settings for all managers from [managers] section.
-type ManagersConfig struct {
-	Default      string // Default manager name
-	SystemPrompt string // Default system prompt for all managers
-	Prompt       string // Default prompt for all managers (can be overridden per manager)
-}
+// Role represents the role of an agent.
+type Role string
 
-// Agent defines a base agent configuration that Workers and Managers can reference.
-// Agents define the core command execution pattern without being tied to a specific role.
-// Note: SystemArgs is NOT defined here; it's a role-specific (Worker/Manager) concern.
+// Valid roles for agents.
+const (
+	RoleWorker   Role = "worker"
+	RoleReviewer Role = "reviewer"
+	RoleManager  Role = "manager"
+)
+
+// Agent defines a unified agent configuration that can serve as worker, reviewer, or manager.
+// This replaces the previous separate Worker and Manager types.
 type Agent struct {
-	Command             string
-	CommandTemplate     string
-	DefaultModel        string
-	Description         string
-	WorktreeSetupScript string
-	ExcludePatterns     []string
-}
+	// Inheritance
+	Inherit string // Name of agent to inherit from (optional)
 
-// Worker holds per-worker configuration from [workers.<name>] sections.
-// Workers are task execution agents that can reference an Agent for base settings.
-type Worker struct {
-	Agent           string // Name of the Agent to inherit from (optional)
-	Inherit         string // Name of worker to inherit from (optional, for worker-to-worker inheritance)
-	CommandTemplate string // Template for assembling the command (e.g., "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}")
-	Command         string // Base command (e.g., "claude", "opencode")
-	SystemArgs      string // System arguments required for crew operation (auto-applied)
-	Args            string // User-customizable arguments (e.g., model selection)
-	Model           string // Default model for this worker (overrides builtin default)
-	SystemPrompt    string // System prompt template for this worker
-	Prompt          string // Prompt template for this worker
-	Description     string // Description of the worker's purpose
-}
+	// Command execution
+	CommandTemplate string // Full command template (e.g., "opencode -m {{.Model}} {{.Args}} --prompt {{.Prompt}}")
 
-// Manager holds configuration for manager agents from [managers.<name>] sections.
-// Managers are read-only orchestration agents that can create and monitor tasks.
-type Manager struct {
-	Agent           string // Name of the Agent to inherit from (optional)
-	CommandTemplate string // Template for assembling the command (inherited from Agent if empty)
-	Command         string // Base command (inherited from Agent if empty)
-	Model           string // Model override for this manager
-	SystemArgs      string // System arguments required for crew operation (auto-applied)
-	Args            string // Additional arguments for this manager
-	SystemPrompt    string // System prompt template for this manager
-	Prompt          string // Prompt template for this manager
-	Description     string // Description of the manager's purpose
+	// Role configuration
+	Role         Role   // Role: worker, reviewer, manager
+	SystemPrompt string // System prompt template
+	Prompt       string // User prompt template
+	Args         string // Additional arguments
+
+	// Agent metadata
+	DefaultModel string // Default model for this agent
+	Description  string // Description of the agent's purpose
+
+	// Worktree setup (for workers/reviewers)
+	SetupScript string // Setup script (replaces worktree_setup_script and exclude_patterns)
+
+	// Visibility
+	Hidden bool // Hide from TUI agent list
 }
 
 // CommandData holds data for rendering agent commands and prompts.
@@ -120,29 +104,24 @@ type RenderCommandResult struct {
 	Prompt  string // The prompt content to be stored in PROMPT shell variable
 }
 
-// RenderCommand renders the full command string and prompt content for this worker.
-// It performs three-phase template expansion:
-// 1. Expand SystemArgs and Args with CommandData (for GitDir, RepoRoot, TaskID, etc.)
-// 2. Expand SystemPrompt and Prompt templates with CommandData to generate prompt content
-// 3. Expand CommandTemplate with Command, expanded SystemArgs/Args, and shell variable reference
+// RenderCommand renders the full command string and prompt content for this agent.
+// It performs two-phase template expansion:
+// 1. Expand SystemPrompt and Prompt templates with CommandData to generate prompt content
+// 2. Expand CommandTemplate with Args, Model, Continue, and shell variable reference
 //
 // The promptOverride parameter is the shell variable reference (e.g., `"$PROMPT"`) that will be
 // embedded in the command and expanded at runtime to the actual prompt content.
-// The defaultSystemPrompt is used when Worker.SystemPrompt is empty.
-// The defaultPrompt is used when Worker.Prompt is empty.
-func (w *Worker) RenderCommand(data CommandData, promptOverride, defaultSystemPrompt, defaultPrompt string) (RenderCommandResult, error) {
-	// Phase 1: Expand SystemArgs and Args
-	systemArgs, err := expandString(w.SystemArgs, data)
-	if err != nil {
-		return RenderCommandResult{}, err
-	}
-	args, err := expandString(w.Args, data)
+// The defaultSystemPrompt is used when Agent.SystemPrompt is empty.
+// The defaultPrompt is used when Agent.Prompt is empty.
+func (a *Agent) RenderCommand(data CommandData, promptOverride, defaultSystemPrompt, defaultPrompt string) (RenderCommandResult, error) {
+	// Phase 1: Expand Args
+	args, err := expandString(a.Args, data)
 	if err != nil {
 		return RenderCommandResult{}, err
 	}
 
 	// Phase 2: Expand Prompt templates to generate prompt content
-	sysPromptTemplate := w.SystemPrompt
+	sysPromptTemplate := a.SystemPrompt
 	if sysPromptTemplate == "" {
 		sysPromptTemplate = defaultSystemPrompt
 	}
@@ -151,7 +130,7 @@ func (w *Worker) RenderCommand(data CommandData, promptOverride, defaultSystemPr
 		return RenderCommandResult{}, err
 	}
 
-	userPromptTemplate := w.Prompt
+	userPromptTemplate := a.Prompt
 	if userPromptTemplate == "" {
 		userPromptTemplate = defaultPrompt
 	}
@@ -172,86 +151,13 @@ func (w *Worker) RenderCommand(data CommandData, promptOverride, defaultSystemPr
 
 	// Phase 3: Expand CommandTemplate
 	cmdData := map[string]any{
-		"Command":    w.Command,
-		"SystemArgs": systemArgs,
-		"Args":       args,
-		"Prompt":     promptOverride,
-		"Continue":   data.Continue,
-		"Model":      data.Model,
+		"Args":     args,
+		"Prompt":   promptOverride,
+		"Continue": data.Continue,
+		"Model":    data.Model,
 	}
 
-	tmpl, err := template.New("cmd").Parse(w.CommandTemplate)
-	if err != nil {
-		return RenderCommandResult{}, err
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, cmdData); err != nil {
-		return RenderCommandResult{}, err
-	}
-
-	return RenderCommandResult{
-		Command: buf.String(),
-		Prompt:  promptContent,
-	}, nil
-}
-
-// RenderCommand renders the full command string and prompt content for this manager.
-// It performs the same three-phase template expansion as Worker.RenderCommand.
-// The promptOverride parameter is the shell variable reference (e.g., `"$PROMPT"`).
-// The defaultSystemPrompt is used when Manager.SystemPrompt is empty.
-// The defaultPrompt is used when Manager.Prompt is empty.
-func (m *Manager) RenderCommand(data CommandData, promptOverride, defaultSystemPrompt, defaultPrompt string) (RenderCommandResult, error) {
-	// Phase 1: Expand SystemArgs and Args
-	systemArgs, err := expandString(m.SystemArgs, data)
-	if err != nil {
-		return RenderCommandResult{}, err
-	}
-	args, err := expandString(m.Args, data)
-	if err != nil {
-		return RenderCommandResult{}, err
-	}
-
-	// Phase 2: Expand Prompt templates to generate prompt content
-	sysPromptTemplate := m.SystemPrompt
-	if sysPromptTemplate == "" {
-		sysPromptTemplate = defaultSystemPrompt
-	}
-	sysPromptContent, err := expandString(sysPromptTemplate, data)
-	if err != nil {
-		return RenderCommandResult{}, err
-	}
-
-	userPromptTemplate := m.Prompt
-	if userPromptTemplate == "" {
-		userPromptTemplate = defaultPrompt
-	}
-	userPromptContent, err := expandString(userPromptTemplate, data)
-	if err != nil {
-		return RenderCommandResult{}, err
-	}
-
-	// Combine SystemPrompt and Prompt
-	var promptContent string
-	if sysPromptContent != "" && userPromptContent != "" {
-		promptContent = sysPromptContent + "\n\n" + userPromptContent
-	} else if sysPromptContent != "" {
-		promptContent = sysPromptContent
-	} else {
-		promptContent = userPromptContent
-	}
-
-	// Phase 3: Expand CommandTemplate
-	cmdData := map[string]any{
-		"Command":    m.Command,
-		"SystemArgs": systemArgs,
-		"Args":       args,
-		"Prompt":     promptOverride,
-		"Continue":   data.Continue,
-		"Model":      data.Model,
-	}
-
-	tmpl, err := template.New("cmd").Parse(m.CommandTemplate)
+	tmpl, err := template.New("cmd").Parse(a.CommandTemplate)
 	if err != nil {
 		return RenderCommandResult{}, err
 	}
@@ -358,32 +264,23 @@ func GlobalConfigPath(configHome string) string {
 }
 
 // NewDefaultConfig returns a Config with default values.
-// This returns empty maps for Agents, Workers, and Managers.
+// This returns an empty Agents map.
 // Builtin agents should be registered by calling builtin.Register(cfg)
 // in the infra layer before merging user config.
 func NewDefaultConfig() *Config {
 	return &Config{
-		Agents: make(map[string]Agent),
-		WorkersConfig: WorkersConfig{
-			SystemPrompt: DefaultSystemPrompt,
-			Prompt:       "",
-		},
-		Workers: make(map[string]Worker),
-		ManagersConfig: ManagersConfig{
-			SystemPrompt: DefaultManagerSystemPrompt,
-			Prompt:       "",
-		},
-		Managers: make(map[string]Manager),
+		Agents:       make(map[string]Agent),
+		AgentsConfig: AgentsConfig{},
 		Log: LogConfig{
 			Level: DefaultLogLevel,
 		},
 	}
 }
 
-// workerTemplateData holds data for a single worker in the template.
-type workerTemplateData struct {
+// agentTemplateData holds data for a single agent in the template.
+type agentTemplateData struct {
 	Name        string
-	Agent       string
+	Role        Role
 	Args        string
 	Description string
 }
@@ -394,33 +291,35 @@ type templateData struct {
 	FormattedSystemPrompt string
 	LogLevel              string
 	DefaultSystemPrompt   string
-	Workers               []workerTemplateData
+	Agents                []agentTemplateData
 }
 
 // RenderConfigTemplate renders a config template dynamically from the given Config.
-// The generated template includes all registered workers, managers, and agents as
+// The generated template includes all registered agents as
 // commented examples that users can uncomment and customize.
 func RenderConfigTemplate(cfg *Config) string {
-	// Prepare worker data (sorted for deterministic output)
-	workerNames := sortedMapKeys(cfg.Workers)
-	workers := make([]workerTemplateData, 0, len(workerNames))
+	// Prepare agent data (sorted for deterministic output)
+	agentNames := sortedMapKeys(cfg.Agents)
+	agents := make([]agentTemplateData, 0, len(agentNames))
 	firstWorkerName := ""
-	for _, name := range workerNames {
-		firstWorkerName = name
-		worker := cfg.Workers[name]
-		workers = append(workers, workerTemplateData{
+	for _, name := range agentNames {
+		agent := cfg.Agents[name]
+		if agent.Role == RoleWorker && firstWorkerName == "" {
+			firstWorkerName = name
+		}
+		agents = append(agents, agentTemplateData{
 			Name:        name,
-			Agent:       worker.Agent,
-			Args:        worker.Args,
-			Description: worker.Description,
+			Role:        agent.Role,
+			Args:        agent.Args,
+			Description: agent.Description,
 		})
 	}
 
 	data := templateData{
 		DefaultWorkerName:     firstWorkerName,
-		DefaultSystemPrompt:   cfg.WorkersConfig.SystemPrompt,
-		FormattedSystemPrompt: formatPromptForTemplate(cfg.WorkersConfig.SystemPrompt),
-		Workers:               workers,
+		DefaultSystemPrompt:   DefaultSystemPrompt,
+		FormattedSystemPrompt: formatPromptForTemplate(DefaultSystemPrompt),
+		Agents:                agents,
 		LogLevel:              cfg.Log.Level,
 	}
 
@@ -468,18 +367,18 @@ func formatPromptForTemplate(prompt string) string {
 	return buf.String()
 }
 
-// ResolveInheritance resolves worker inheritance by applying parent worker settings
-// to child workers. It detects circular dependencies and returns an error if found.
-// Workers without Inherit field are left unchanged.
+// ResolveInheritance resolves agent inheritance by applying parent agent settings
+// to child agents. It detects circular dependencies and returns an error if found.
+// Agents without Inherit field are left unchanged.
 // Only non-empty fields from the child override the parent fields.
 func (c *Config) ResolveInheritance() error {
-	// Track visited workers during traversal to detect circular dependencies
+	// Track visited agents during traversal to detect circular dependencies
 	visited := make(map[string]bool)
 	resolving := make(map[string]bool)
 
-	// Resolve each worker
-	for name := range c.Workers {
-		if err := c.resolveWorker(name, visited, resolving); err != nil {
+	// Resolve each agent
+	for name := range c.Agents {
+		if err := c.resolveAgent(name, visited, resolving); err != nil {
 			return err
 		}
 	}
@@ -487,8 +386,8 @@ func (c *Config) ResolveInheritance() error {
 	return nil
 }
 
-// resolveWorker recursively resolves inheritance for a single worker.
-func (c *Config) resolveWorker(name string, visited, resolving map[string]bool) error {
+// resolveAgent recursively resolves inheritance for a single agent.
+func (c *Config) resolveAgent(name string, visited, resolving map[string]bool) error {
 	// Already resolved
 	if visited[name] {
 		return nil
@@ -499,10 +398,10 @@ func (c *Config) resolveWorker(name string, visited, resolving map[string]bool) 
 		return ErrCircularInheritance
 	}
 
-	worker := c.Workers[name]
+	agent := c.Agents[name]
 
 	// No inheritance, mark as resolved
-	if worker.Inherit == "" {
+	if agent.Inherit == "" {
 		visited[name] = true
 		return nil
 	}
@@ -511,58 +410,59 @@ func (c *Config) resolveWorker(name string, visited, resolving map[string]bool) 
 	resolving[name] = true
 
 	// Check if parent exists
-	_, exists := c.Workers[worker.Inherit]
+	_, exists := c.Agents[agent.Inherit]
 	if !exists {
 		delete(resolving, name)
 		return ErrInheritParentNotFound
 	}
 
 	// Resolve parent first (recursive)
-	if err := c.resolveWorker(worker.Inherit, visited, resolving); err != nil {
+	if err := c.resolveAgent(agent.Inherit, visited, resolving); err != nil {
 		delete(resolving, name)
 		return err
 	}
 
 	// Get the resolved parent
-	parent := c.Workers[worker.Inherit]
+	parent := c.Agents[agent.Inherit]
 
 	// Apply inheritance: parent fields are used as defaults, child overrides if non-empty
 	resolved := parent
 
 	// Child overrides
-	if worker.Agent != "" {
-		resolved.Agent = worker.Agent
+	if agent.CommandTemplate != "" {
+		resolved.CommandTemplate = agent.CommandTemplate
 	}
-	if worker.CommandTemplate != "" {
-		resolved.CommandTemplate = worker.CommandTemplate
+	if agent.Role != "" {
+		resolved.Role = agent.Role
 	}
-	if worker.Command != "" {
-		resolved.Command = worker.Command
+	if agent.SystemPrompt != "" {
+		resolved.SystemPrompt = agent.SystemPrompt
 	}
-	if worker.SystemArgs != "" {
-		resolved.SystemArgs = worker.SystemArgs
+	if agent.Prompt != "" {
+		resolved.Prompt = agent.Prompt
 	}
-	if worker.Args != "" {
-		resolved.Args = worker.Args
+	if agent.Args != "" {
+		resolved.Args = agent.Args
 	}
-	if worker.SystemPrompt != "" {
-		resolved.SystemPrompt = worker.SystemPrompt
+	if agent.DefaultModel != "" {
+		resolved.DefaultModel = agent.DefaultModel
 	}
-	if worker.Prompt != "" {
-		resolved.Prompt = worker.Prompt
+	if agent.Description != "" {
+		resolved.Description = agent.Description
 	}
-	if worker.Model != "" {
-		resolved.Model = worker.Model
+	if agent.SetupScript != "" {
+		resolved.SetupScript = agent.SetupScript
 	}
-	if worker.Description != "" {
-		resolved.Description = worker.Description
+	// Hidden is a boolean, only override if explicitly set to true
+	if agent.Hidden {
+		resolved.Hidden = agent.Hidden
 	}
 
 	// Clear Inherit field after resolution
 	resolved.Inherit = ""
 
-	// Save resolved worker
-	c.Workers[name] = resolved
+	// Save resolved agent
+	c.Agents[name] = resolved
 
 	// Mark as resolved
 	delete(resolving, name)

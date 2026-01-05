@@ -12,7 +12,7 @@ import (
 
 // StartManagerInput contains the parameters for starting a manager.
 type StartManagerInput struct {
-	Name  string // Manager name
+	Name  string // Manager agent name
 	Model string // Model name override (optional)
 }
 
@@ -52,29 +52,20 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		return nil, fmt.Errorf("load config: %w", err)
 	}
 
-	// Resolve manager by name
+	// Resolve manager agent by name
 	name := in.Name
 	if name == "" {
-		name = cfg.ManagersConfig.Default
+		name = cfg.AgentsConfig.DefaultManager
 	}
-	manager, ok := cfg.Managers[name]
+	agent, ok := cfg.Agents[name]
 	if !ok {
-		return nil, fmt.Errorf("manager %q: %w", name, domain.ErrManagerNotFound)
+		return nil, fmt.Errorf("agent %q: %w", name, domain.ErrAgentNotFound)
 	}
 
-	// Resolve manager configuration (inherit from Agent/Worker as needed)
-	resolvedManager, defaultModel, err := uc.resolveManager(manager, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("resolve manager: %w", err)
-	}
-
-	// Resolve model priority: CLI flag > manager config > builtin default
+	// Resolve model priority: CLI flag > agent config > builtin default
 	model := in.Model
-	if model == "" && resolvedManager.Model != "" {
-		model = resolvedManager.Model
-	}
 	if model == "" {
-		model = defaultModel
+		model = agent.DefaultModel
 	}
 
 	// Build command data for template expansion
@@ -84,14 +75,12 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		Model:    model,
 	}
 
-	// Build the system prompt with priority: manager > managers config > default
-	defaultSystemPrompt := cfg.ManagersConfig.SystemPrompt
+	// Build the default prompts
+	defaultSystemPrompt := domain.DefaultManagerSystemPrompt
+	defaultPrompt := ""
 
-	// Build the user prompt with priority: manager > managers config
-	defaultPrompt := cfg.ManagersConfig.Prompt
-
-	// Render command and prompt using Manager.RenderCommand
-	result, err := resolvedManager.RenderCommand(cmdData, `"$PROMPT"`, defaultSystemPrompt, defaultPrompt)
+	// Render command and prompt using Agent.RenderCommand
+	result, err := agent.RenderCommand(cmdData, `"$PROMPT"`, defaultSystemPrompt, defaultPrompt)
 	if err != nil {
 		return nil, fmt.Errorf("render command: %w", err)
 	}
@@ -100,62 +89,6 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		Command: result.Command,
 		Prompt:  result.Prompt,
 	}, nil
-}
-
-// resolveManager resolves a Manager configuration by inheriting from Agent/Worker as needed.
-// Returns the resolved Manager with all fields populated, default model, and any error.
-func (uc *StartManager) resolveManager(manager domain.Manager, cfg *domain.Config) (domain.Manager, string, error) {
-	// Manager must have an Agent reference
-	if manager.Agent == "" {
-		return domain.Manager{}, "", fmt.Errorf("manager has no agent reference")
-	}
-
-	agentRef := manager.Agent
-	resolved := manager // Copy the original manager
-
-	// Inherit SystemArgs from builtin manager with same name as Agent if not set
-	if resolved.SystemArgs == "" {
-		if refManager, ok := cfg.Managers[agentRef]; ok {
-			resolved.SystemArgs = refManager.SystemArgs
-		}
-	}
-
-	// Get Command, CommandTemplate, and Args from Worker or Agent
-	defaultModel := ""
-	if worker, ok := cfg.Workers[agentRef]; ok {
-		// Inherit from Worker
-		if resolved.Command == "" {
-			resolved.Command = worker.Command
-		}
-		if resolved.CommandTemplate == "" {
-			resolved.CommandTemplate = worker.CommandTemplate
-		}
-		// Combine worker Args with manager Args (worker first, then manager)
-		if worker.Args != "" {
-			if resolved.Args != "" {
-				resolved.Args = worker.Args + " " + resolved.Args
-			} else {
-				resolved.Args = worker.Args
-			}
-		}
-		// Get default model from Agent definition
-		if agentDef, ok := cfg.Agents[agentRef]; ok {
-			defaultModel = agentDef.DefaultModel
-		}
-	} else if agentDef, ok := cfg.Agents[agentRef]; ok {
-		// Inherit from Agent directly
-		if resolved.Command == "" {
-			resolved.Command = agentDef.Command
-		}
-		if resolved.CommandTemplate == "" {
-			resolved.CommandTemplate = agentDef.CommandTemplate
-		}
-		defaultModel = agentDef.DefaultModel
-	} else {
-		return domain.Manager{}, "", fmt.Errorf("agent %q not found", agentRef)
-	}
-
-	return resolved, defaultModel, nil
 }
 
 // GetCommand returns the executable path and arguments for the manager command.

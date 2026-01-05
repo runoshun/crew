@@ -14,11 +14,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// setupTestWorktree creates a temp directory with .git/info for setup scripts
+func setupTestWorktree(t *testing.T) string {
+	t.Helper()
+	worktreeDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(worktreeDir, ".git", "info"), 0o755))
+	return worktreeDir
+}
+
 func TestStartTask_Execute_Success(t *testing.T) {
 	// Setup temp directory for script generation
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir() // Use temp directory for worktree
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -82,7 +90,7 @@ func TestStartTask_Execute_WithAgentSetup(t *testing.T) {
 	// Setup temp directories
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	// Create .git/info directory for exclude patterns
 	gitInfoDir := filepath.Join(repoRoot, ".git", "info")
@@ -99,15 +107,13 @@ func TestStartTask_Execute_WithAgentSetup(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
-	// Configure worker with agent reference
-	configLoader.Config.Agents["test-agent"] = domain.Agent{
-		WorktreeSetupScript: "echo 'setup done'",
-		ExcludePatterns:     []string{".test-exclude/"},
-	}
-	configLoader.Config.Workers["custom"] = domain.Worker{
-		Agent:           "test-agent",
-		CommandTemplate: "{{.Command}} {{.Prompt}}",
-		Command:         "custom-cmd",
+	// Configure agent with setup script (includes exclude patterns)
+	configLoader.Config.Agents["custom"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "custom-cmd {{.Prompt}}",
+		SetupScript: `# Add exclude patterns
+echo ".test-exclude/" >> "$GIT_INFO_EXCLUDE"
+echo 'setup done'`,
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
@@ -123,76 +129,15 @@ func TestStartTask_Execute_WithAgentSetup(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "crew-1", out.SessionName)
 
-	// Verify exclude patterns were applied
-	excludePath := filepath.Join(repoRoot, ".git", "info", "exclude")
-	excludeContent, err := os.ReadFile(excludePath)
-	require.NoError(t, err)
-	assert.Contains(t, string(excludeContent), ".test-exclude/")
-
 	// Verify task uses custom agent
 	task := repo.Tasks[1]
 	assert.Equal(t, "custom", task.Agent)
 }
 
-func TestStartTask_Execute_ExcludePatternsNoDuplicate(t *testing.T) {
-	// Setup temp directories
-	crewDir := t.TempDir()
-	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
-
-	// Create .git/info directory with existing exclude pattern
-	gitInfoDir := filepath.Join(repoRoot, ".git", "info")
-	require.NoError(t, os.MkdirAll(gitInfoDir, 0o755))
-	excludePath := filepath.Join(gitInfoDir, "exclude")
-	require.NoError(t, os.WriteFile(excludePath, []byte(".existing-pattern/\n"), 0o644))
-
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Test task",
-		Status:     domain.StatusTodo,
-		BaseBranch: "main",
-	}
-	sessions := testutil.NewMockSessionManager()
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.CreatePath = worktreeDir
-	configLoader := testutil.NewMockConfigLoader()
-	// Configure agent with exclude patterns (including one that already exists)
-	configLoader.Config.Agents["test-agent"] = domain.Agent{
-		ExcludePatterns: []string{".existing-pattern/", ".new-pattern/"},
-	}
-	configLoader.Config.Workers["custom"] = domain.Worker{
-		Agent:           "test-agent",
-		CommandTemplate: "{{.Command}} {{.Prompt}}",
-		Command:         "custom-cmd",
-	}
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
-
-	// Execute
-	_, err := uc.Execute(context.Background(), StartTaskInput{
-		TaskID: 1,
-		Agent:  "custom",
-	})
-
-	// Assert
-	require.NoError(t, err)
-
-	// Verify exclude patterns: .existing-pattern/ should NOT be duplicated
-	excludeContent, err := os.ReadFile(excludePath)
-	require.NoError(t, err)
-	content := string(excludeContent)
-	assert.Contains(t, content, ".new-pattern/")
-	// Count occurrences of .existing-pattern/
-	count := strings.Count(content, ".existing-pattern/")
-	assert.Equal(t, 1, count, "existing pattern should not be duplicated")
-}
-
 func TestStartTask_Execute_FromInReview(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -226,7 +171,7 @@ func TestStartTask_Execute_FromInReview(t *testing.T) {
 func TestStartTask_Execute_FromError(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -350,7 +295,7 @@ func TestStartTask_Execute_SessionAlreadyRunning(t *testing.T) {
 func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -364,14 +309,7 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
 	// Set default worker to "opencode"
-	configLoader.Config.WorkersConfig.Default = "opencode"
-	// Add opencode worker
-	configLoader.Config.Workers["opencode"] = domain.Worker{
-		Agent:           "opencode",
-		Command:         "opencode",
-		CommandTemplate: "{{.Command}} -m {{.Model}} {{.Args}} --prompt {{.Prompt}}",
-		Description:     "Default worker referencing opencode",
-	}
+	configLoader.Config.AgentsConfig.DefaultWorker = "opencode"
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
@@ -379,7 +317,7 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	// Execute without specifying agent
 	out, err := uc.Execute(context.Background(), StartTaskInput{
 		TaskID: 1,
-		Agent:  "", // No agent specified - falls back to "default"
+		Agent:  "", // No agent specified - falls back to default
 	})
 
 	// Assert
@@ -429,7 +367,7 @@ func TestStartTask_Execute_WorktreeCreateError(t *testing.T) {
 func TestStartTask_Execute_SessionStartError(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -467,7 +405,7 @@ func TestStartTask_Execute_SessionStartError(t *testing.T) {
 func TestStartTask_Execute_SaveError(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -506,7 +444,7 @@ func TestStartTask_Execute_SaveError(t *testing.T) {
 func TestStartTask_Execute_WithIssue(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -521,7 +459,12 @@ func TestStartTask_Execute_WithIssue(t *testing.T) {
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
 	// Use custom prompt that includes issue
-	configLoader.Config.WorkersConfig.Prompt = "Task #{{.TaskID}}{{if .Issue}} (Issue #{{.Issue}}){{end}}"
+	configLoader.Config.Agents["claude"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: configLoader.Config.Agents["claude"].CommandTemplate,
+		Prompt:          "Task #{{.TaskID}}{{if .Issue}} (Issue #{{.Issue}}){{end}}",
+		DefaultModel:    configLoader.Config.Agents["claude"].DefaultModel,
+	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
@@ -546,7 +489,7 @@ func TestStartTask_Execute_WithIssue(t *testing.T) {
 func TestStartTask_Execute_WithDescription(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -561,7 +504,12 @@ func TestStartTask_Execute_WithDescription(t *testing.T) {
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
 	// Use custom prompt that includes description
-	configLoader.Config.WorkersConfig.Prompt = "Task: {{.Title}}\n{{.Description}}"
+	configLoader.Config.Agents["claude"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: configLoader.Config.Agents["claude"].CommandTemplate,
+		Prompt:          "Task: {{.Title}}\n{{.Description}}",
+		DefaultModel:    configLoader.Config.Agents["claude"].DefaultModel,
+	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
@@ -584,7 +532,7 @@ func TestStartTask_Execute_WithDescription(t *testing.T) {
 func TestStartTask_ScriptGeneration(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -683,7 +631,7 @@ func TestStartTask_Execute_ConfigLoadError(t *testing.T) {
 	assert.Contains(t, err.Error(), "load config")
 }
 
-func TestStartTask_Execute_WithCustomAgent(t *testing.T) {
+func TestStartTask_Execute_WithUnknownAgent(t *testing.T) {
 	crewDir := t.TempDir()
 
 	repo := testutil.NewMockTaskRepository()
@@ -701,26 +649,14 @@ func TestStartTask_Execute_WithCustomAgent(t *testing.T) {
 	repoRoot := t.TempDir()
 	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
-	// Execute with unknown agent name (custom agent)
-	out, err := uc.Execute(context.Background(), StartTaskInput{
+	// Execute with unknown agent name should fail
+	_, err := uc.Execute(context.Background(), StartTaskInput{
 		TaskID: 1,
 		Agent:  "my-custom-agent",
 	})
 
-	// Assert
-	require.NoError(t, err)
-	assert.Equal(t, "crew-1", out.SessionName)
-
-	// Verify task uses custom agent
-	task := repo.Tasks[1]
-	assert.Equal(t, "my-custom-agent", task.Agent)
-
-	// Verify script uses custom agent with simple command format
-	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
-	require.NoError(t, err)
-	script := string(scriptContent)
-	assert.Contains(t, script, "my-custom-agent")
-	assert.Contains(t, script, `"$PROMPT"`)
+	// Assert - unknown agents should return ErrAgentNotFound
+	assert.ErrorIs(t, err, domain.ErrAgentNotFound)
 }
 
 func TestStartTask_Execute_WithConfiguredAgent(t *testing.T) {
@@ -737,9 +673,9 @@ func TestStartTask_Execute_WithConfiguredAgent(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
 	// Configure a custom agent in config
-	configLoader.Config.Workers["my-agent"] = domain.Worker{
-		CommandTemplate: "{{.Command}} {{.Args}} {{.Prompt}}",
-		Command:         "my-agent-bin",
+	configLoader.Config.Agents["my-agent"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "my-agent-bin {{.Args}} {{.Prompt}}",
 		Args:            "--custom-flag",
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
@@ -765,10 +701,10 @@ func TestStartTask_Execute_WithConfiguredAgent(t *testing.T) {
 	assert.Contains(t, script, "--custom-flag")
 }
 
-func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
+func TestStartTask_Execute_WithAgentPrompt(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -781,11 +717,12 @@ func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
-	// Configure worker-specific prompt
-	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} {{.Prompt}}",
-		Command:         "claude",
-		Prompt:          "Custom worker prompt for claude",
+	// Configure agent-specific prompt
+	configLoader.Config.Agents["claude"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: configLoader.Config.Agents["claude"].CommandTemplate,
+		Prompt:          "Custom agent prompt for claude",
+		DefaultModel:    configLoader.Config.Agents["claude"].DefaultModel,
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
@@ -800,16 +737,16 @@ func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 
-	// Verify script contains worker-specific prompt
+	// Verify script contains agent-specific prompt
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
-	assert.Contains(t, string(scriptContent), "Custom worker prompt for claude")
+	assert.Contains(t, string(scriptContent), "Custom agent prompt for claude")
 }
 
 func TestStartTask_Execute_WithModelOverride(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -822,11 +759,10 @@ func TestStartTask_Execute_WithModelOverride(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-		Command:         "claude",
-		SystemArgs:      "--model {{.Model}}",
-		Model:           "config-model",
+	configLoader.Config.Agents["claude"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "claude --model {{.Model}} {{.Args}} {{.Prompt}}",
+		DefaultModel:    "config-model",
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
@@ -855,7 +791,7 @@ func TestStartTask_Execute_WithModelOverride(t *testing.T) {
 func TestStartTask_Execute_WithConfigModel(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -868,11 +804,10 @@ func TestStartTask_Execute_WithConfigModel(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.CreatePath = worktreeDir
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Workers["claude"] = domain.Worker{
-		CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-		Command:         "claude",
-		SystemArgs:      "--model {{.Model}}",
-		Model:           "config-model",
+	configLoader.Config.Agents["claude"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "claude --model {{.Model}} {{.Args}} {{.Prompt}}",
+		DefaultModel:    "config-model",
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
@@ -897,7 +832,7 @@ func TestStartTask_Execute_WithConfigModel(t *testing.T) {
 func TestStartTask_Execute_WithDefaultModel(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -925,18 +860,18 @@ func TestStartTask_Execute_WithDefaultModel(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "crew-1", out.SessionName)
 
-	// Verify script uses default model from BuiltinWorkers
+	// Verify script uses default model from builtin agents
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
 	script := string(scriptContent)
-	// Default model for claude is "opus" (from BuiltinWorkers)
+	// Default model for claude is "opus" (from builtin agents)
 	assert.Contains(t, script, "--model opus")
 }
 
 func TestStartTask_Execute_OpencodeWithModelOverride(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
-	worktreeDir := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -970,4 +905,56 @@ func TestStartTask_Execute_OpencodeWithModelOverride(t *testing.T) {
 	script := string(scriptContent)
 	// The model should be expanded: -m {{.Model}} -> -m gpt-4o
 	assert.Contains(t, script, "-m gpt-4o")
+}
+
+func TestStartTask_Execute_WithSetupScript(t *testing.T) {
+	// Setup temp directories
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	// Create .git/info directory in worktree with existing exclude pattern
+	excludePath := filepath.Join(worktreeDir, ".git", "info", "exclude")
+	require.NoError(t, os.WriteFile(excludePath, []byte(".existing-pattern/\n"), 0o644))
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	configLoader := testutil.NewMockConfigLoader()
+	// Configure agent with setup script that adds exclude patterns
+	// Use template variable to access worktree path
+	configLoader.Config.Agents["custom"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "custom-cmd {{.Prompt}}",
+		SetupScript:     `echo ".new-pattern/" >> {{.Worktree}}/.git/info/exclude`,
+	}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "custom",
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify exclude pattern was added
+	excludeContent, err := os.ReadFile(excludePath)
+	require.NoError(t, err)
+	content := string(excludeContent)
+	assert.Contains(t, content, ".existing-pattern/")
+	assert.Contains(t, content, ".new-pattern/")
+	// Count occurrences of .existing-pattern/ (should only appear once)
+	count := strings.Count(content, ".existing-pattern/")
+	assert.Equal(t, 1, count, "existing pattern should not be duplicated")
 }

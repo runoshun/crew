@@ -52,39 +52,19 @@ func TestNewDefaultConfig(t *testing.T) {
 	if len(cfg.Agents) != 0 {
 		t.Errorf("Agents should be empty, got %d entries", len(cfg.Agents))
 	}
-	if cfg.Workers == nil {
-		t.Error("Workers should not be nil")
-	}
-	if len(cfg.Workers) != 0 {
-		t.Errorf("Workers should be empty, got %d entries", len(cfg.Workers))
-	}
-	if cfg.Managers == nil {
-		t.Error("Managers should not be nil")
-	}
-	if len(cfg.Managers) != 0 {
-		t.Errorf("Managers should be empty, got %d entries", len(cfg.Managers))
-	}
 
-	// Check WorkersConfig has default system prompt
-	if cfg.WorkersConfig.SystemPrompt != DefaultSystemPrompt {
-		t.Errorf("WorkersConfig.SystemPrompt = %q, want %q", cfg.WorkersConfig.SystemPrompt, DefaultSystemPrompt)
+	// Check AgentsConfig defaults are empty
+	if cfg.AgentsConfig.DefaultWorker != "" {
+		t.Errorf("AgentsConfig.DefaultWorker = %q, want empty", cfg.AgentsConfig.DefaultWorker)
 	}
-	if cfg.WorkersConfig.Prompt != "" {
-		t.Errorf("WorkersConfig.Prompt = %q, want empty", cfg.WorkersConfig.Prompt)
-	}
-
-	// Check ManagersConfig has default system prompt
-	if cfg.ManagersConfig.SystemPrompt != DefaultManagerSystemPrompt {
-		t.Errorf("ManagersConfig.SystemPrompt = %q, want %q", cfg.ManagersConfig.SystemPrompt, DefaultManagerSystemPrompt)
-	}
-	if cfg.ManagersConfig.Prompt != "" {
-		t.Errorf("ManagersConfig.Prompt = %q, want empty", cfg.ManagersConfig.Prompt)
+	if cfg.AgentsConfig.DefaultManager != "" {
+		t.Errorf("AgentsConfig.DefaultManager = %q, want empty", cfg.AgentsConfig.DefaultManager)
 	}
 }
 
 func TestAgent_RenderCommand(t *testing.T) {
 	tests := []struct {
-		agent               Worker
+		agent               Agent
 		name                string
 		promptOverride      string
 		defaultSystemPrompt string
@@ -94,58 +74,35 @@ func TestAgent_RenderCommand(t *testing.T) {
 		data                CommandData
 	}{
 		{
-			name: "claude style with shell variable",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-				Command:         "claude",
-				SystemArgs:      "--permission-mode acceptEdits",
+			name: "basic command template with args",
+			agent: Agent{
+				CommandTemplate: "agent {{.Args}} {{.Prompt}}",
 				Args:            "--model opus",
 			},
 			data:                CommandData{TaskID: 1, Title: "Fix bug"},
 			promptOverride:      `"$PROMPT"`,
 			defaultSystemPrompt: "System: {{.TaskID}}",
 			defaultPrompt:       "Task: {{.Title}}",
-			wantCommand:         `claude --permission-mode acceptEdits --model opus "$PROMPT"`,
+			wantCommand:         `agent --model opus "$PROMPT"`,
 			wantPrompt:          "System: 1\n\nTask: Fix bug",
 		},
 		{
-			name: "opencode style with -p flag",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.Args}} -p {{.Prompt}}",
-				Command:         "opencode",
-				Args:            "-m gpt-4",
+			name: "opencode style with -m flag",
+			agent: Agent{
+				CommandTemplate: "opencode -m {{.Model}} {{.Args}} -p {{.Prompt}}",
+				Args:            "",
 			},
-			data:                CommandData{TaskID: 2, Title: "Add feature"},
+			data:                CommandData{TaskID: 2, Title: "Add feature", Model: "gpt-4"},
 			promptOverride:      `"$PROMPT"`,
 			defaultSystemPrompt: "Work on: {{.Title}}",
 			defaultPrompt:       "",
-			wantCommand:         `opencode -m gpt-4 -p "$PROMPT"`,
+			wantCommand:         `opencode -m gpt-4  -p "$PROMPT"`,
 			wantPrompt:          "Work on: Add feature",
 		},
 		{
-			name: "with GitDir in SystemArgs",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-				Command:         "claude",
-				SystemArgs:      "--add-dir {{.GitDir}}",
-				Args:            "--model opus",
-			},
-			data: CommandData{
-				GitDir: "/repo/.git",
-				TaskID: 3,
-				Title:  "Fix",
-			},
-			promptOverride:      `"$PROMPT"`,
-			defaultSystemPrompt: "Do it",
-			defaultPrompt:       "",
-			wantCommand:         `claude --add-dir /repo/.git --model opus "$PROMPT"`,
-			wantPrompt:          "Do it",
-		},
-		{
-			name: "worker-specific prompt overrides default",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.Prompt}}",
-				Command:         "agent",
+			name: "agent-specific prompt overrides default",
+			agent: Agent{
+				CommandTemplate: "agent {{.Prompt}}",
 				SystemPrompt:    "Sys: {{.TaskID}}",
 				Prompt:          "Custom: {{.Title}} (Task #{{.TaskID}})",
 			},
@@ -177,10 +134,9 @@ func TestAgent_RenderCommand(t *testing.T) {
 	}
 }
 
-func TestWorker_RenderCommand_InvalidTemplate(t *testing.T) {
-	agent := Worker{
+func TestAgent_RenderCommand_InvalidTemplate(t *testing.T) {
+	agent := Agent{
 		CommandTemplate: "{{.Invalid",
-		Command:         "test",
 	}
 	_, err := agent.RenderCommand(CommandData{}, `"$PROMPT"`, "sys", "default")
 	if err == nil {
@@ -188,22 +144,20 @@ func TestWorker_RenderCommand_InvalidTemplate(t *testing.T) {
 	}
 }
 
-func TestWorker_RenderCommand_InvalidSystemArgsTemplate(t *testing.T) {
-	agent := Worker{
-		CommandTemplate: "{{.Command}} {{.SystemArgs}}",
-		Command:         "test",
-		SystemArgs:      "{{.Invalid",
+func TestAgent_RenderCommand_InvalidArgsTemplate(t *testing.T) {
+	agent := Agent{
+		CommandTemplate: "agent {{.Args}}",
+		Args:            "{{.Invalid",
 	}
 	_, err := agent.RenderCommand(CommandData{}, `"$PROMPT"`, "sys", "default")
 	if err == nil {
-		t.Error("expected error for invalid template in SystemArgs")
+		t.Error("expected error for invalid template in Args")
 	}
 }
 
-func TestWorker_RenderCommand_InvalidPromptTemplate(t *testing.T) {
-	agent := Worker{
-		CommandTemplate: "{{.Command}} {{.Prompt}}",
-		Command:         "test",
+func TestAgent_RenderCommand_InvalidPromptTemplate(t *testing.T) {
+	agent := Agent{
+		CommandTemplate: "agent {{.Prompt}}",
 		Prompt:          "{{.Invalid",
 	}
 	_, err := agent.RenderCommand(CommandData{}, `"$PROMPT"`, "sys", "default")
@@ -214,53 +168,27 @@ func TestWorker_RenderCommand_InvalidPromptTemplate(t *testing.T) {
 
 func TestAgent_RenderCommand_WithModel(t *testing.T) {
 	tests := []struct {
-		agent       Worker
+		agent       Agent
 		name        string
 		wantCommand string
 		data        CommandData
 	}{
 		{
-			name: "claude with model in SystemArgs",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-				Command:         "claude",
-				SystemArgs:      "--model {{.Model}}",
+			name: "model in command template",
+			agent: Agent{
+				CommandTemplate: "agent --model {{.Model}} {{.Args}} {{.Prompt}}",
 				Args:            "--verbose",
 			},
 			data:        CommandData{TaskID: 1, Model: "sonnet"},
-			wantCommand: `claude --model sonnet --verbose "$PROMPT"`,
+			wantCommand: `agent --model sonnet --verbose "$PROMPT"`,
 		},
 		{
-			name: "opencode with model in SystemArgs",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} --prompt {{.Prompt}}",
-				Command:         "opencode",
-				SystemArgs:      "-m {{.Model}}",
-				Args:            "",
-			},
-			data:        CommandData{TaskID: 1, Model: "gpt-4o"},
-			wantCommand: `opencode -m gpt-4o  --prompt "$PROMPT"`,
-		},
-		{
-			name: "model with empty value in SystemArgs",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Prompt}}",
-				Command:         "agent",
-				SystemArgs:      "--model {{.Model}}",
+			name: "model with empty value",
+			agent: Agent{
+				CommandTemplate: "agent --model {{.Model}} {{.Prompt}}",
 			},
 			data:        CommandData{TaskID: 1, Model: ""},
 			wantCommand: `agent --model  "$PROMPT"`,
-		},
-		{
-			name: "user Args not affected by model",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-				Command:         "claude",
-				SystemArgs:      "--model {{.Model}}",
-				Args:            "--custom-flag",
-			},
-			data:        CommandData{TaskID: 1, Model: "opus"},
-			wantCommand: `claude --model opus --custom-flag "$PROMPT"`,
 		},
 	}
 
@@ -277,56 +205,30 @@ func TestAgent_RenderCommand_WithModel(t *testing.T) {
 	}
 }
 
-func TestWorker_RenderCommand_WithContinue(t *testing.T) {
+func TestAgent_RenderCommand_WithContinue(t *testing.T) {
 	tests := []struct {
-		agent       Worker
+		agent       Agent
 		name        string
 		wantCommand string
 		data        CommandData
 	}{
 		{
 			name: "continue flag enabled with -c",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
-				Command:         "claude",
-				SystemArgs:      "--model {{.Model}}",
+			agent: Agent{
+				CommandTemplate: "agent --model {{.Model}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
 				Args:            "--verbose",
 			},
 			data:        CommandData{TaskID: 1, Model: "sonnet", Continue: true},
-			wantCommand: `claude --model sonnet --verbose -c "$PROMPT"`,
+			wantCommand: `agent --model sonnet --verbose -c "$PROMPT"`,
 		},
 		{
 			name: "continue flag disabled",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
-				Command:         "claude",
-				SystemArgs:      "--model {{.Model}}",
+			agent: Agent{
+				CommandTemplate: "agent --model {{.Model}} {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
 				Args:            "--verbose",
 			},
 			data:        CommandData{TaskID: 1, Model: "sonnet", Continue: false},
-			wantCommand: `claude --model sonnet --verbose "$PROMPT"`,
-		},
-		{
-			name: "continue flag with opencode style",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
-				Command:         "opencode",
-				SystemArgs:      "-m {{.Model}}",
-				Args:            "",
-			},
-			data:        CommandData{TaskID: 1, Model: "gpt-4o", Continue: true},
-			wantCommand: `opencode -m gpt-4o  -c --prompt "$PROMPT"`,
-		},
-		{
-			name: "continue without -c in template",
-			agent: Worker{
-				CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}",
-				Command:         "agent",
-				SystemArgs:      "--model {{.Model}}",
-				Args:            "",
-			},
-			data:        CommandData{TaskID: 1, Model: "model", Continue: true},
-			wantCommand: `agent --model model  "$PROMPT"`,
+			wantCommand: `agent --model sonnet --verbose "$PROMPT"`,
 		},
 	}
 
@@ -344,12 +246,12 @@ func TestWorker_RenderCommand_WithContinue(t *testing.T) {
 }
 
 func TestRenderConfigTemplate(t *testing.T) {
-	// Create a config with some workers to test dynamic generation
+	// Create a config with some agents to test dynamic generation
 	cfg := NewDefaultConfig()
-	cfg.Workers["test-worker"] = Worker{
-		Agent:       "test-agent",
+	cfg.Agents["test-agent"] = Agent{
+		Role:        RoleWorker,
 		Args:        "--test-args",
-		Description: "Test worker description",
+		Description: "Test agent description",
 	}
 
 	content := RenderConfigTemplate(cfg)
@@ -358,35 +260,15 @@ func TestRenderConfigTemplate(t *testing.T) {
 	if !strings.Contains(content, DefaultLogLevel) {
 		t.Errorf("expected log level %q to be embedded in template", DefaultLogLevel)
 	}
-	formattedSysPrompt := formatPromptForTemplate(DefaultSystemPrompt)
-	if !strings.Contains(content, "# system_prompt = "+formattedSysPrompt) {
-		t.Errorf("expected system prompt to be embedded in template")
-	}
 
 	// Check that Go template syntax for command_template is preserved
-	if !strings.Contains(content, "{{.Command}}") {
-		t.Error("expected {{.Command}} to be preserved in template")
+	if !strings.Contains(content, "{{.Model}}") {
+		t.Error("expected {{.Model}} to be preserved in template")
 	}
 
 	// Check header is present
 	if !strings.Contains(content, "# git-crew configuration") {
 		t.Error("expected header to be present")
-	}
-
-	// Check manager section is present
-	if !strings.Contains(content, "## Manager configuration") {
-		t.Error("expected manager configuration section to be present")
-	}
-	if !strings.Contains(content, "[managers.default]") {
-		t.Error("expected [managers.default] to be present in template")
-	}
-
-	// Check that dynamically registered worker is included
-	if !strings.Contains(content, "[workers.test-worker]") {
-		t.Error("expected [workers.test-worker] to be present in template")
-	}
-	if !strings.Contains(content, `agent = "test-agent"`) {
-		t.Error("expected test worker agent to be present in template")
 	}
 }
 
@@ -394,16 +276,15 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 	tests := []struct {
 		wantErr error
 		config  *Config
-		want    map[string]Worker
+		want    map[string]Agent
 		name    string
 	}{
 		{
 			name: "simple inheritance",
 			config: &Config{
-				Workers: map[string]Worker{
+				Agents: map[string]Agent{
 					"base": {
-						CommandTemplate: "{{.Command}} {{.Args}}",
-						Command:         "base-cmd",
+						CommandTemplate: "agent {{.Args}}",
 						Args:            "--base-arg",
 					},
 					"child": {
@@ -412,15 +293,13 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]Worker{
+			want: map[string]Agent{
 				"base": {
-					CommandTemplate: "{{.Command}} {{.Args}}",
-					Command:         "base-cmd",
+					CommandTemplate: "agent {{.Args}}",
 					Args:            "--base-arg",
 				},
 				"child": {
-					CommandTemplate: "{{.Command}} {{.Args}}",
-					Command:         "base-cmd",
+					CommandTemplate: "agent {{.Args}}",
 					Args:            "--child-arg",
 				},
 			},
@@ -429,66 +308,31 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "partial override",
 			config: &Config{
-				Workers: map[string]Worker{
+				Agents: map[string]Agent{
 					"base": {
-						CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
-						Command:         "base-cmd",
-						SystemArgs:      "--system",
+						CommandTemplate: "agent {{.Args}}",
 						Args:            "--base-arg",
 						Prompt:          "base prompt",
-						Model:           "base-model",
+						DefaultModel:    "base-model",
 					},
 					"child": {
-						Inherit:    "base",
-						SystemArgs: "--child-system",
-						Model:      "child-model",
+						Inherit:      "base",
+						DefaultModel: "child-model",
 					},
 				},
 			},
-			want: map[string]Worker{
+			want: map[string]Agent{
 				"base": {
-					CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
-					Command:         "base-cmd",
-					SystemArgs:      "--system",
+					CommandTemplate: "agent {{.Args}}",
 					Args:            "--base-arg",
 					Prompt:          "base prompt",
-					Model:           "base-model",
+					DefaultModel:    "base-model",
 				},
 				"child": {
-					CommandTemplate: "{{.Command}} {{.SystemArgs}} {{.Args}}",
-					Command:         "base-cmd",
-					SystemArgs:      "--child-system",
+					CommandTemplate: "agent {{.Args}}",
 					Args:            "--base-arg",
 					Prompt:          "base prompt",
-					Model:           "child-model",
-				},
-			},
-			wantErr: nil,
-		},
-		{
-			name: "model inheritance fallback",
-			config: &Config{
-				Workers: map[string]Worker{
-					"base": {
-						CommandTemplate: "{{.Command}}",
-						Command:         "base",
-						Model:           "base-model",
-					},
-					"child": {
-						Inherit: "base",
-					},
-				},
-			},
-			want: map[string]Worker{
-				"base": {
-					CommandTemplate: "{{.Command}}",
-					Command:         "base",
-					Model:           "base-model",
-				},
-				"child": {
-					CommandTemplate: "{{.Command}}",
-					Command:         "base",
-					Model:           "base-model",
+					DefaultModel:    "child-model",
 				},
 			},
 			wantErr: nil,
@@ -496,10 +340,9 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "multi-level inheritance",
 			config: &Config{
-				Workers: map[string]Worker{
+				Agents: map[string]Agent{
 					"base": {
-						CommandTemplate: "{{.Command}} {{.Args}}",
-						Command:         "base-cmd",
+						CommandTemplate: "agent {{.Args}}",
 						Args:            "--base",
 					},
 					"middle": {
@@ -512,20 +355,17 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]Worker{
+			want: map[string]Agent{
 				"base": {
-					CommandTemplate: "{{.Command}} {{.Args}}",
-					Command:         "base-cmd",
+					CommandTemplate: "agent {{.Args}}",
 					Args:            "--base",
 				},
 				"middle": {
-					CommandTemplate: "{{.Command}} {{.Args}}",
-					Command:         "base-cmd",
+					CommandTemplate: "agent {{.Args}}",
 					Args:            "--middle",
 				},
 				"child": {
-					CommandTemplate: "{{.Command}} {{.Args}}",
-					Command:         "base-cmd",
+					CommandTemplate: "agent {{.Args}}",
 					Args:            "--child",
 				},
 			},
@@ -534,25 +374,21 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "no inheritance",
 			config: &Config{
-				Workers: map[string]Worker{
-					"worker1": {
-						CommandTemplate: "{{.Command}}",
-						Command:         "cmd1",
+				Agents: map[string]Agent{
+					"agent1": {
+						CommandTemplate: "cmd1",
 					},
-					"worker2": {
-						CommandTemplate: "{{.Command}}",
-						Command:         "cmd2",
+					"agent2": {
+						CommandTemplate: "cmd2",
 					},
 				},
 			},
-			want: map[string]Worker{
-				"worker1": {
-					CommandTemplate: "{{.Command}}",
-					Command:         "cmd1",
+			want: map[string]Agent{
+				"agent1": {
+					CommandTemplate: "cmd1",
 				},
-				"worker2": {
-					CommandTemplate: "{{.Command}}",
-					Command:         "cmd2",
+				"agent2": {
+					CommandTemplate: "cmd2",
 				},
 			},
 			wantErr: nil,
@@ -560,7 +396,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "circular dependency - direct",
 			config: &Config{
-				Workers: map[string]Worker{
+				Agents: map[string]Agent{
 					"a": {
 						Inherit: "b",
 					},
@@ -574,7 +410,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "circular dependency - indirect",
 			config: &Config{
-				Workers: map[string]Worker{
+				Agents: map[string]Agent{
 					"a": {
 						Inherit: "b",
 					},
@@ -591,7 +427,7 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 		{
 			name: "parent not found",
 			config: &Config{
-				Workers: map[string]Worker{
+				Agents: map[string]Agent{
 					"child": {
 						Inherit: "nonexistent",
 					},
@@ -617,32 +453,26 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 			}
 
 			for name, want := range tt.want {
-				got, ok := tt.config.Workers[name]
+				got, ok := tt.config.Agents[name]
 				if !ok {
-					t.Errorf("worker %q not found in config", name)
+					t.Errorf("agent %q not found in config", name)
 					continue
 				}
 
 				if got.Inherit != "" {
-					t.Errorf("worker %q: Inherit = %q, want empty (should be cleared after resolution)", name, got.Inherit)
+					t.Errorf("agent %q: Inherit = %q, want empty (should be cleared after resolution)", name, got.Inherit)
 				}
 				if got.CommandTemplate != want.CommandTemplate {
-					t.Errorf("worker %q: CommandTemplate = %q, want %q", name, got.CommandTemplate, want.CommandTemplate)
-				}
-				if got.Command != want.Command {
-					t.Errorf("worker %q: Command = %q, want %q", name, got.Command, want.Command)
-				}
-				if got.SystemArgs != want.SystemArgs {
-					t.Errorf("worker %q: SystemArgs = %q, want %q", name, got.SystemArgs, want.SystemArgs)
+					t.Errorf("agent %q: CommandTemplate = %q, want %q", name, got.CommandTemplate, want.CommandTemplate)
 				}
 				if got.Args != want.Args {
-					t.Errorf("worker %q: Args = %q, want %q", name, got.Args, want.Args)
+					t.Errorf("agent %q: Args = %q, want %q", name, got.Args, want.Args)
 				}
 				if got.Prompt != want.Prompt {
-					t.Errorf("worker %q: Prompt = %q, want %q", name, got.Prompt, want.Prompt)
+					t.Errorf("agent %q: Prompt = %q, want %q", name, got.Prompt, want.Prompt)
 				}
-				if got.Model != want.Model {
-					t.Errorf("worker %q: Model = %q, want %q", name, got.Model, want.Model)
+				if got.DefaultModel != want.DefaultModel {
+					t.Errorf("agent %q: DefaultModel = %q, want %q", name, got.DefaultModel, want.DefaultModel)
 				}
 			}
 		})

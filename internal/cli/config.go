@@ -73,69 +73,49 @@ Use --ignore-global or --ignore-repo to exclude specific sources for debugging.`
 
 // formatEffectiveConfig formats the effective config in TOML-like format.
 func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
-	// [workers] section
-	_, _ = fmt.Fprintln(w, "[workers]")
-	if cfg.WorkersConfig.Prompt != "" {
-		_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(cfg.WorkersConfig.Prompt))
+	// [agents] section - defaults
+	_, _ = fmt.Fprintln(w, "[agents]")
+	if cfg.AgentsConfig.DefaultWorker != "" {
+		_, _ = fmt.Fprintf(w, "default_worker = %q\n", cfg.AgentsConfig.DefaultWorker)
+	}
+	if cfg.AgentsConfig.DefaultManager != "" {
+		_, _ = fmt.Fprintf(w, "default_manager = %q\n", cfg.AgentsConfig.DefaultManager)
 	}
 	_, _ = fmt.Fprintln(w)
 
-	// [workers.<name>] sections - sorted for consistent output
-	workerNames := make([]string, 0, len(cfg.Workers))
-	for name := range cfg.Workers {
-		workerNames = append(workerNames, name)
+	// [agents.<name>] sections - sorted for consistent output
+	agentNames := make([]string, 0, len(cfg.Agents))
+	for name := range cfg.Agents {
+		agentNames = append(agentNames, name)
 	}
-	sort.Strings(workerNames)
+	sort.Strings(agentNames)
 
-	for _, name := range workerNames {
-		worker := cfg.Workers[name]
-		_, _ = fmt.Fprintf(w, "[workers.%s]\n", name)
-		if worker.CommandTemplate != "" {
-			_, _ = fmt.Fprintf(w, "command_template = %q\n", worker.CommandTemplate)
+	for _, name := range agentNames {
+		agent := cfg.Agents[name]
+		_, _ = fmt.Fprintf(w, "[agents.%s]\n", name)
+		if agent.Inherit != "" {
+			_, _ = fmt.Fprintf(w, "inherit = %q\n", agent.Inherit)
 		}
-		if worker.Command != "" {
-			_, _ = fmt.Fprintf(w, "command = %q\n", worker.Command)
+		if agent.CommandTemplate != "" {
+			_, _ = fmt.Fprintf(w, "command_template = %q\n", agent.CommandTemplate)
 		}
-		if worker.SystemArgs != "" {
-			_, _ = fmt.Fprintf(w, "system_args = %q\n", worker.SystemArgs)
+		if agent.Role != "" {
+			_, _ = fmt.Fprintf(w, "role = %q\n", string(agent.Role))
 		}
-		if worker.Args != "" {
-			_, _ = fmt.Fprintf(w, "args = %q\n", worker.Args)
+		if agent.Args != "" {
+			_, _ = fmt.Fprintf(w, "args = %q\n", agent.Args)
 		}
-		if worker.Prompt != "" {
-			_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(worker.Prompt))
+		if agent.DefaultModel != "" {
+			_, _ = fmt.Fprintf(w, "default_model = %q\n", agent.DefaultModel)
 		}
-		_, _ = fmt.Fprintln(w)
-	}
-
-	// [managers] section
-	_, _ = fmt.Fprintln(w, "[managers]")
-	if cfg.ManagersConfig.Prompt != "" {
-		_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(cfg.ManagersConfig.Prompt))
-	}
-	_, _ = fmt.Fprintln(w)
-
-	// [managers.<name>] sections - sorted for consistent output
-	managerNames := make([]string, 0, len(cfg.Managers))
-	for name := range cfg.Managers {
-		managerNames = append(managerNames, name)
-	}
-	sort.Strings(managerNames)
-
-	for _, name := range managerNames {
-		manager := cfg.Managers[name]
-		_, _ = fmt.Fprintf(w, "[managers.%s]\n", name)
-		if manager.Agent != "" {
-			_, _ = fmt.Fprintf(w, "agent = %q\n", manager.Agent)
+		if agent.SystemPrompt != "" {
+			_, _ = fmt.Fprintf(w, "system_prompt = %s\n", formatMultilineString(agent.SystemPrompt))
 		}
-		if manager.Model != "" {
-			_, _ = fmt.Fprintf(w, "model = %q\n", manager.Model)
+		if agent.Prompt != "" {
+			_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(agent.Prompt))
 		}
-		if manager.Args != "" {
-			_, _ = fmt.Fprintf(w, "args = %q\n", manager.Args)
-		}
-		if manager.Prompt != "" {
-			_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(manager.Prompt))
+		if agent.Hidden {
+			_, _ = fmt.Fprintf(w, "hidden = true\n")
 		}
 		_, _ = fmt.Fprintln(w)
 	}
