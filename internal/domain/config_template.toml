@@ -2,8 +2,8 @@
 
 [workers]
 ## Workers are task execution agents that reference an Agent or define their own command.
-# default = "[[.DefaultWorkerName]]"  # Default worker to use when starting tasks
-# system_prompt = [[.FormattedSystemPrompt]] # System prompt (automatically set by crew)
+# default = "<<.DefaultWorkerName>>"  # Default worker to use when starting tasks
+# system_prompt = <<.FormattedSystemPrompt>> # System prompt (automatically set by crew)
 # prompt = ""               # User custom instructions (added after system_prompt)
 
 ## Built-in worker customization
@@ -14,20 +14,20 @@
 ## - system_prompt: Override the common system prompt for this worker
 ## - prompt: Override the common prompt for this worker
 
-[[range .Workers]]
-# [workers.[[.Name]]]
-[[- if .Agent]]
-# agent = [[.Agent | printf "%q"]]
-[[- end]]
-[[- if .Args]]
-# args = [[.Args | printf "%q"]]
-[[- end]]
+<<range .Workers>>
+# [workers.<<.Name>>]
+<<- if .Agent>>
+# agent = <<.Agent | printf "%q">>
+<<- end>>
+<<- if .Args>>
+# args = <<.Args | printf "%q">>
+<<- end>>
 # model = ""  # Override model (e.g., "opus", "sonnet")
-[[- if .Description]]
-# description = [[.Description | printf "%q"]]
-[[- end]]
+<<- if .Description>>
+# description = <<.Description | printf "%q">>
+<<- end>>
 
-[[end]]
+<<end>>
 ## Custom worker example (using custom agent)
 # [workers.my-worker]
 # agent = "my-agent"
@@ -90,4 +90,4 @@
 
 ## Log settings
 # [log]
-# level = "[[.LogLevel]]"  # debug, info, warn, error
+# level = "<<.LogLevel>>"  # debug, info, warn, error

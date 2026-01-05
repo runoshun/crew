@@ -348,7 +348,7 @@ func RenderConfigTemplate(cfg *Config) string {
 		LogLevel:              cfg.Log.Level,
 	}
 
-	tmpl, err := template.New("config").Delims("[[", "]]").Parse(configTemplateContent)
+	tmpl, err := template.New("config").Delims("<<", ">>").Parse(configTemplateContent)
 	if err != nil {
 		// Should never happen with embedded template
 		panic(fmt.Sprintf("failed to parse config template: %v", err))
