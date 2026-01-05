@@ -38,11 +38,12 @@ type Model struct {
 	agentCommands map[string]string
 
 	// Components (structs with pointers)
-	keys           KeyMap
-	styles         Styles
-	help           help.Model
-	taskList       list.Model
-	detailViewport viewport.Model
+	keys                KeyMap
+	styles              Styles
+	help                help.Model
+	taskList            list.Model
+	detailViewport      viewport.Model // For ModeDetail dialog (existing)
+	detailPanelViewport viewport.Model // For right pane detail panel (new)
 
 	// Input state (large structs)
 	titleInput  textinput.Model
@@ -62,6 +63,7 @@ type Model struct {
 	agentCursor      int
 	startFocusCustom bool
 	showAll          bool
+	detailFocused    bool // Right pane is focused for scrolling
 }
 
 // New creates a new TUI Model with the given container.
@@ -199,6 +201,21 @@ func (m *Model) initDetailViewport() {
 	m.detailViewport = viewport.New(width, height)
 	m.detailViewport.Style = lipgloss.NewStyle().Background(Colors.Background)
 	m.detailViewport.SetContent(m.detailContent(width))
+}
+
+// updateDetailPanelViewport updates the viewport size and content for the right pane.
+func (m *Model) updateDetailPanelViewport() {
+	if !m.showDetailPanel() {
+		return
+	}
+	panelWidth := m.detailPanelWidth() - 4 // account for border and padding
+	panelHeight := m.height - 6            // account for header/footer and hint
+	if panelHeight < 10 {
+		panelHeight = 10
+	}
+	m.detailPanelViewport.Width = panelWidth
+	m.detailPanelViewport.Height = panelHeight
+	m.detailPanelViewport.SetContent(m.detailPanelContent(panelWidth))
 }
 
 func (m *Model) dialogWidth() int {

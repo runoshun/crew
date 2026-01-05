@@ -13,11 +13,10 @@ import (
 
 func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 	tests := []struct {
-		name        string
-		height      int
-		task        *domain.Task
-		comments    []domain.Comment
-		expectTrunc bool
+		name     string
+		height   int
+		task     *domain.Task
+		comments []domain.Comment
 	}{
 		{
 			name:   "short content fits within height",
@@ -29,8 +28,7 @@ func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 				Status:      domain.StatusTodo,
 				Created:     time.Now(),
 			},
-			comments:    nil,
-			expectTrunc: false,
+			comments: nil,
 		},
 		{
 			name:   "long title and description exceeds height",
@@ -44,8 +42,7 @@ func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 				Created:     time.Now(),
 				Started:     time.Now(),
 			},
-			comments:    nil,
-			expectTrunc: true,
+			comments: nil,
 		},
 		{
 			name:   "content fits exactly in height",
@@ -59,8 +56,7 @@ func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 				Created:     time.Now(),
 				Started:     time.Now(),
 			},
-			comments:    nil,
-			expectTrunc: false,
+			comments: nil,
 		},
 		{
 			name:   "minimum height handles truncation gracefully",
@@ -72,8 +68,7 @@ func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 				Status:      domain.StatusTodo,
 				Created:     time.Now(),
 			},
-			comments:    nil,
-			expectTrunc: false, // With minimum height, basic info should fit
+			comments: nil,
 		},
 	}
 
@@ -92,6 +87,8 @@ func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 				styles:   styles,
 				taskList: taskList,
 			}
+			// Initialize viewport for the test
+			m.updateDetailPanelViewport()
 
 			result := m.viewDetailPanel()
 
@@ -112,10 +109,9 @@ func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 			assert.LessOrEqual(t, renderedHeight, expectedHeight,
 				"Rendered panel height should not exceed specified panel height")
 
-			// Check for truncation indicator if expected
-			if tt.expectTrunc {
-				assert.Contains(t, result, "...", "Long content should be truncated with ellipsis")
-			}
+			// Note: Since we now use viewport for scrolling, long content is handled
+			// by the viewport's built-in scrolling rather than explicit truncation markers.
+			// The content can be scrolled to view all of it.
 		})
 	}
 }
@@ -202,6 +198,8 @@ func TestViewDetailPanel_TitleWrapping(t *testing.T) {
 		styles:   styles,
 		taskList: taskList,
 	}
+	// Initialize viewport for the test
+	m.updateDetailPanelViewport()
 
 	result := m.viewDetailPanel()
 

@@ -551,8 +551,14 @@ func (m *Model) detailPanelWidth() int {
 	if !m.showDetailPanel() {
 		return 0
 	}
-	// 40% of screen width, but at least MinDetailPanelWidth
-	w := int(float64(m.width) * 0.4)
+	// When focused, expand to 70% of screen width; otherwise 40%
+	var ratio float64
+	if m.detailFocused {
+		ratio = 0.7
+	} else {
+		ratio = 0.4
+	}
+	w := int(float64(m.width) * ratio)
 	if w < MinDetailPanelWidth {
 		w = MinDetailPanelWidth
 	}
@@ -570,61 +576,14 @@ func (m *Model) listWidth() int {
 	return m.contentWidth()
 }
 
-func (m *Model) viewDetailPanel() string {
-	panelWidth := m.detailPanelWidth()
-	panelHeight := m.height - 2
-	if panelHeight < 10 {
-		panelHeight = 10
-	}
-	panelStyle := lipgloss.NewStyle().
-		Width(panelWidth).
-		Height(panelHeight).
-		PaddingLeft(GutterWidth).
-		BorderLeft(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(Colors.GroupLine)
-
+// detailPanelContent builds the content string for the detail panel viewport.
+func (m *Model) detailPanelContent(contentWidth int) string {
 	task := m.SelectedTask()
 	if task == nil {
-		emptyStyle := lipgloss.NewStyle().
-			Foreground(Colors.Muted).
-			Padding(2, 1)
-		return panelStyle.Render(emptyStyle.Render("Select a task\nto view details"))
+		return "Select a task\nto view details"
 	}
 
-	// Track lines as we build content, stopping when we exceed panelHeight
-	contentLines := make([]string, 0, panelHeight)
-	totalHeight := 0
-
-	// Helper function to add lines and track height
-	addLines := func(lines ...string) bool {
-		allAdded := true
-		for _, line := range lines {
-			h := lipgloss.Height(line)
-			if h == 0 {
-				h = 1
-			}
-			if totalHeight+h > panelHeight {
-				allAdded = false
-				break
-			}
-			contentLines = append(contentLines, line)
-			totalHeight += h
-		}
-		// If we couldn't add all lines, add ellipsis
-		if !allAdded {
-			if totalHeight < panelHeight {
-				// There's space for ellipsis
-				contentLines = append(contentLines, "...")
-				totalHeight++
-			} else if len(contentLines) > 0 {
-				// Panel is full, replace last line with ellipsis
-				lastIdx := len(contentLines) - 1
-				contentLines[lastIdx] = "..."
-			}
-		}
-		return allAdded
-	}
+	var lines []string
 
 	// Header: "Task #N"
 	headerStyle := lipgloss.NewStyle().
@@ -632,19 +591,15 @@ func (m *Model) viewDetailPanel() string {
 		Foreground(Colors.Primary).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
 		BorderForeground(Colors.GroupLine).
-		Width(panelWidth - 4)
-	if !addLines(headerStyle.Render(fmt.Sprintf("Task #%d", task.ID)), "") {
-		return panelStyle.Render(strings.Join(contentLines, "\n"))
-	}
+		Width(contentWidth)
+	lines = append(lines, headerStyle.Render(fmt.Sprintf("Task #%d", task.ID)), "")
 
 	// Title (may wrap to multiple lines)
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(Colors.TitleSelected).
-		Width(panelWidth - 4)
-	if !addLines(titleStyle.Render(task.Title), "") {
-		return panelStyle.Render(strings.Join(contentLines, "\n"))
-	}
+		Width(contentWidth)
+	lines = append(lines, titleStyle.Render(task.Title), "")
 
 	// Status
 	labelStyle := lipgloss.NewStyle().
@@ -656,9 +611,7 @@ func (m *Model) viewDetailPanel() string {
 	statusIcon := StatusIcon(task.Status)
 	statusText := StatusText(task.Status)
 	statusLine := labelStyle.Render("Status") + m.styles.StatusStyle(task.Status).Render(statusIcon+" "+statusText)
-	if !addLines(statusLine) {
-		return panelStyle.Render(strings.Join(contentLines, "\n"))
-	}
+	lines = append(lines, statusLine)
 
 	// Labels (if present)
 	if len(task.Labels) > 0 {
@@ -667,77 +620,98 @@ func (m *Model) viewDetailPanel() string {
 			labelsBuilder.WriteString("[" + l + "] ")
 		}
 		labelsLine := labelStyle.Render("Labels") + m.styles.TaskLabel.Render(labelsBuilder.String())
-		if !addLines(labelsLine) {
-			return panelStyle.Render(strings.Join(contentLines, "\n"))
-		}
+		lines = append(lines, labelsLine)
 	}
 
 	// Agent (if present)
 	if task.Agent != "" {
 		agentLine := labelStyle.Render("Agent") + valueStyle.Render(task.Agent)
-		if !addLines(agentLine) {
-			return panelStyle.Render(strings.Join(contentLines, "\n"))
-		}
+		lines = append(lines, agentLine)
 	}
 
 	// Created
 	createdLine := labelStyle.Render("Created") + valueStyle.Render(task.Created.Format("01/02 15:04"))
-	if !addLines(createdLine) {
-		return panelStyle.Render(strings.Join(contentLines, "\n"))
-	}
+	lines = append(lines, createdLine)
 
 	// Started (if present)
 	if !task.Started.IsZero() {
 		startedLine := labelStyle.Render("Started") + valueStyle.Render(task.Started.Format("01/02 15:04"))
-		if !addLines(startedLine) {
-			return panelStyle.Render(strings.Join(contentLines, "\n"))
-		}
+		lines = append(lines, startedLine)
 	}
 
-	// Description (split into lines and add line-by-line)
+	// Description
 	if task.Description != "" {
 		descLabelStyle := lipgloss.NewStyle().
 			Foreground(Colors.Muted).
 			Bold(true)
-
-		// Add label and empty line first
-		if !addLines("", descLabelStyle.Render("Description")) {
-			return panelStyle.Render(strings.Join(contentLines, "\n"))
-		}
+		lines = append(lines, "", descLabelStyle.Render("Description"))
 
 		// Render description with markdown
-		renderedDesc := m.styles.RenderMarkdown(task.Description, panelWidth-4)
-		// Split by newlines (glamour wraps text with \n)
-		descLines := strings.Split(renderedDesc, "\n")
-
-		// Add each line individually (will stop early if height limit reached)
-		for _, line := range descLines {
-			if !addLines(line) {
-				return panelStyle.Render(strings.Join(contentLines, "\n"))
-			}
-		}
+		renderedDesc := m.styles.RenderMarkdown(task.Description, contentWidth)
+		lines = append(lines, renderedDesc)
 	}
 
-	// Comments (may wrap and have multiple entries)
+	// Comments
 	if len(m.comments) > 0 {
 		commentLabelStyle := lipgloss.NewStyle().
 			Foreground(Colors.Muted).
 			Bold(true)
-		if !addLines("", commentLabelStyle.Render("Comments")) {
-			return panelStyle.Render(strings.Join(contentLines, "\n"))
-		}
+		lines = append(lines, "", commentLabelStyle.Render("Comments"))
 
 		for _, comment := range m.comments {
 			timeStr := comment.Time.Format("01/02 15:04")
 			commentStyle := lipgloss.NewStyle().
 				Foreground(Colors.DescSelected).
-				Width(panelWidth - 4)
+				Width(contentWidth)
 			commentLine := lipgloss.NewStyle().Foreground(Colors.Muted).Render("["+timeStr+"] ") + commentStyle.Render(comment.Text)
-			if !addLines(commentLine) {
-				return panelStyle.Render(strings.Join(contentLines, "\n"))
-			}
+			lines = append(lines, commentLine)
 		}
 	}
 
-	return panelStyle.Render(strings.Join(contentLines, "\n"))
+	return strings.Join(lines, "\n")
+}
+
+func (m *Model) viewDetailPanel() string {
+	panelWidth := m.detailPanelWidth()
+	panelHeight := m.height - 2
+	if panelHeight < 10 {
+		panelHeight = 10
+	}
+
+	// Change border color based on focus state
+	borderColor := Colors.GroupLine
+	if m.detailFocused {
+		borderColor = Colors.Primary
+	}
+
+	panelStyle := lipgloss.NewStyle().
+		Width(panelWidth).
+		Height(panelHeight).
+		PaddingLeft(GutterWidth).
+		BorderLeft(true).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(borderColor)
+
+	task := m.SelectedTask()
+	if task == nil {
+		emptyStyle := lipgloss.NewStyle().
+			Foreground(Colors.Muted).
+			Padding(2, 1)
+		return panelStyle.Render(emptyStyle.Render("Select a task\nto view details"))
+	}
+
+	// Use viewport for scrollable content
+	content := m.detailPanelViewport.View()
+
+	// Add footer hint when focused
+	if m.detailFocused {
+		footerStyle := lipgloss.NewStyle().
+			Foreground(Colors.Muted).
+			Width(panelWidth - 4)
+		scrollInfo := fmt.Sprintf(" %d%%", int(m.detailPanelViewport.ScrollPercent()*100))
+		footer := footerStyle.Render("j/k scroll · v/esc back" + scrollInfo)
+		content = content + "\n" + footer
+	}
+
+	return panelStyle.Render(content)
 }

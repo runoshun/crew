@@ -31,6 +31,8 @@ func TestViewDetailPanel_ShowsLabels(t *testing.T) {
 		styles:   styles,
 		taskList: taskList,
 	}
+	// Initialize viewport for the test
+	m.updateDetailPanelViewport()
 
 	result := m.viewDetailPanel()
 
