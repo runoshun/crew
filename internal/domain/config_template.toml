@@ -62,30 +62,3 @@
 ## Log settings
 # level = "<<.LogLevel>>"  # debug, info, warn, error
 
-# ----------------------------------------------------------------------------
-## Custom Agent CLI configuration
-## You can add custom AI agent CLIs
-##
-## Fields:
-## - command_template: How to assemble the full command
-##   Available variables: {{.Model}}, {{.Args}}, {{.Prompt}}, {{.Continue}}
-## - default_model: Default model for this agent
-## - description: Description of the agent's purpose
-## - setup_script: Script to run after worktree creation (template-expanded)
-##   Available variables: {{.GitDir}}, {{.RepoRoot}}, {{.Worktree}}, {{.TaskID}}
-##   The GIT_INFO_EXCLUDE env var points to .git/info/exclude for adding patterns
-
-## Custom agent example
-# [agents.my-agent]
-# role = "worker"
-# command_template = "my-custom-agent -m {{.Model}} {{.Args}} {{.Prompt}}"
-# default_model = "my-model"
-# description = "My custom AI agent"
-# setup_script = """
-# #!/bin/bash
-# cd {{.Worktree}}
-# echo "Setting up worktree for task {{.TaskID}}"
-# # Add exclude patterns
-# echo ".my-agent-cache/" >> "$GIT_INFO_EXCLUDE"
-# """
-
