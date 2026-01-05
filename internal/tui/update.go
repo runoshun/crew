@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -145,6 +146,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleHelpMode(msg)
 	case ModeDetail:
 		return m.handleDetailMode(msg)
+	case ModeExec:
+		return m.handleExecMode(msg)
 	}
 
 	return m, nil
@@ -198,6 +201,21 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return MsgAttachSession{TaskID: task.ID}
 		}
+
+	case key.Matches(msg, m.keys.Exec):
+		task := m.SelectedTask()
+		if task == nil {
+			return m, nil
+		}
+		// Check if worktree exists
+		branch := domain.BranchName(task.ID, task.Issue)
+		if exists, _ := m.container.Worktrees.Exists(branch); !exists {
+			m.err = fmt.Errorf("task worktree not found")
+			return m, nil
+		}
+		m.mode = ModeExec
+		m.execInput.Focus()
+		return m, nil
 
 	case key.Matches(msg, m.keys.New):
 		m.mode = ModeNewTask
@@ -606,5 +624,33 @@ func (m *Model) handleDetailMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.detailViewport, cmd = m.detailViewport.Update(msg)
+	return m, cmd
+}
+
+// handleExecMode handles keys in exec mode.
+func (m *Model) handleExecMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		m.execInput.Reset()
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		task := m.SelectedTask()
+		if task == nil {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		cmdStr := m.execInput.Value()
+		if cmdStr == "" {
+			return m, nil
+		}
+		m.mode = ModeNormal
+		m.execInput.Reset()
+		return m, m.executeCommand(cmdStr)
+	}
+
+	var cmd tea.Cmd
+	m.execInput, cmd = m.execInput.Update(msg)
 	return m, cmd
 }

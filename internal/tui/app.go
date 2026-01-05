@@ -50,6 +50,7 @@ type Model struct {
 	parentInput textinput.Model
 	filterInput textinput.Model
 	customInput textinput.Model
+	execInput   textinput.Model
 
 	// Numeric state (smaller types last)
 	mode             Mode
@@ -86,6 +87,10 @@ func New(c *app.Container) *Model {
 	ci.Placeholder = "Enter custom command..."
 	ci.CharLimit = 500
 
+	ei := textinput.New()
+	ei.Placeholder = "Enter command to execute..."
+	ei.CharLimit = 500
+
 	styles := DefaultStyles()
 	delegate := newTaskDelegate(styles)
 	taskList := list.New([]list.Item{}, delegate, 0, 0)
@@ -109,6 +114,7 @@ func New(c *app.Container) *Model {
 		parentInput:      pi,
 		filterInput:      fi,
 		customInput:      ci,
+		execInput:        ei,
 		builtinAgents:    []string{"claude", "opencode", "codex"},
 		customAgents:     nil,
 		agentCommands:    make(map[string]string),
@@ -568,4 +574,52 @@ func (m *Model) showDiff(taskID int) tea.Cmd {
 // execDiffMsg is an internal message to trigger diff execution.
 type execDiffMsg struct {
 	cmd *domain.ExecCommand
+}
+
+// execCmd implements tea.ExecCommand for executing a command in a worktree.
+type execCmd struct {
+	stdin        io.Reader
+	stdout       io.Writer
+	stderr       io.Writer
+	worktreePath string
+	command      string
+}
+
+func (c *execCmd) Run() error {
+	// #nosec G204 - command is user-provided, trusted in this context
+	cmd := exec.Command("sh", "-c", c.command)
+	cmd.Dir = c.worktreePath
+	cmd.Stdin = c.stdin
+	cmd.Stdout = c.stdout
+	cmd.Stderr = c.stderr
+	return cmd.Run()
+}
+
+func (c *execCmd) SetStdin(r io.Reader)  { c.stdin = r }
+func (c *execCmd) SetStdout(w io.Writer) { c.stdout = w }
+func (c *execCmd) SetStderr(w io.Writer) { c.stderr = w }
+
+// executeCommand returns a tea.Cmd that executes a command in a task's worktree.
+func (m *Model) executeCommand(command string) tea.Cmd {
+	task := m.SelectedTask()
+	if task == nil {
+		return func() tea.Msg {
+			return MsgError{Err: domain.ErrTaskNotFound}
+		}
+	}
+
+	branch := domain.BranchName(task.ID, task.Issue)
+	wtPath, err := m.container.Worktrees.Resolve(branch)
+	if err != nil {
+		return func() tea.Msg {
+			return MsgError{Err: fmt.Errorf("resolve worktree: %w", err)}
+		}
+	}
+
+	return tea.Exec(&execCmd{
+		worktreePath: wtPath,
+		command:      command,
+	}, func(err error) tea.Msg {
+		return MsgReloadTasks{}
+	})
 }
