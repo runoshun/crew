@@ -64,6 +64,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
 }
 EOF
 
-# Add exclude pattern to git
-echo ".claude/crew-plugin/" >> .git/info/exclude
+# Add exclude pattern to git (use git rev-parse for worktree support)
+GIT_DIR=$(git rev-parse --git-dir 2>/dev/null) && \
+  echo ".claude/crew-plugin/" >> "${GIT_DIR}/info/exclude" || true
 `

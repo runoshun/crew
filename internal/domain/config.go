@@ -288,6 +288,7 @@ type agentTemplateData struct {
 // templateData holds all data for rendering the config template.
 type templateData struct {
 	DefaultWorkerName     string
+	DefaultManagerName    string
 	FormattedSystemPrompt string
 	LogLevel              string
 	DefaultSystemPrompt   string
@@ -302,10 +303,14 @@ func RenderConfigTemplate(cfg *Config) string {
 	agentNames := sortedMapKeys(cfg.Agents)
 	agents := make([]agentTemplateData, 0, len(agentNames))
 	firstWorkerName := ""
+	firstManagerName := ""
 	for _, name := range agentNames {
 		agent := cfg.Agents[name]
 		if agent.Role == RoleWorker && firstWorkerName == "" {
 			firstWorkerName = name
+		}
+		if agent.Role == RoleManager && firstManagerName == "" {
+			firstManagerName = name
 		}
 		agents = append(agents, agentTemplateData{
 			Name:        name,
@@ -317,6 +322,7 @@ func RenderConfigTemplate(cfg *Config) string {
 
 	data := templateData{
 		DefaultWorkerName:     firstWorkerName,
+		DefaultManagerName:    firstManagerName,
 		DefaultSystemPrompt:   DefaultSystemPrompt,
 		FormattedSystemPrompt: formatPromptForTemplate(DefaultSystemPrompt),
 		Agents:                agents,

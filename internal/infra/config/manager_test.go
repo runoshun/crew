@@ -92,7 +92,7 @@ func TestManager_InitRepoConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "git-crew configuration")
 		assert.Contains(t, string(content), "[agents]")
-		assert.Contains(t, string(content), "default_worker = ")
+		assert.Contains(t, string(content), "worker_default = ")
 		// Verify dynamic content from registered agents
 		assert.Contains(t, string(content), "[agents.test-worker]")
 	})
