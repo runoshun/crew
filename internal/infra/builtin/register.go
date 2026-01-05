@@ -59,14 +59,4 @@ func Register(cfg *domain.Config) {
 		}
 	}
 
-	// Create default worker (references default agent)
-	cfg.Workers[domain.DefaultWorkerName] = domain.Worker{
-		Agent:       DefaultWorkerAgent,
-		Description: "Default worker agent",
-	}
-	// Create default manager (references default agent)
-	cfg.Managers[domain.DefaultManagerName] = domain.Manager{
-		Agent:       DefaultManagerAgent,
-		Description: "Default manager agent",
-	}
 }

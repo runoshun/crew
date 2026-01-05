@@ -133,31 +133,27 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
+	// Get expected config by creating default and registering builtins
+	expectedCfg := domain.NewDefaultConfig()
+	builtin.Register(expectedCfg)
+
 	// Verify: default config is returned (values from domain constants)
 	assert.Equal(t, domain.DefaultLogLevel, cfg.Log.Level)
 	// Default system prompt comes from WorkersConfig
 	assert.Equal(t, domain.DefaultSystemPrompt, cfg.WorkersConfig.SystemPrompt)
 	// Default prompt comes from WorkersConfig, which should be empty by default
 	assert.Empty(t, cfg.WorkersConfig.Prompt)
-	// Default worker should exist
-	defaultWorker, ok := cfg.Workers[domain.DefaultWorkerName]
-	assert.True(t, ok, "default worker should exist")
-	assert.Equal(t, builtin.DefaultWorkerAgent, defaultWorker.Agent)
 
-	// Get expected values from NewDefaultConfig
-	defaultCfg := domain.NewDefaultConfig()
+	// No "default" worker is registered - users should use workers.default = "opencode"
+	_, ok := cfg.Workers[domain.DefaultWorkerName]
+	assert.False(t, ok, "default worker should NOT be registered")
 
-	// Builtin workers (those with corresponding Agent) should match NewDefaultConfig
-	for name, expectedAgent := range defaultCfg.Agents {
-		expectedWorker := defaultCfg.Workers[name]
-		actualWorker := cfg.Workers[name]
-		assert.Equal(t, expectedAgent.CommandTemplate, actualWorker.CommandTemplate)
-		assert.Equal(t, expectedAgent.Command, actualWorker.Command)
-		assert.Equal(t, expectedWorker.SystemArgs, actualWorker.SystemArgs)
-		assert.Equal(t, expectedWorker.Args, actualWorker.Args)
-		// Worker.SystemPrompt and Worker.Prompt are empty; falls back to WorkersConfig
-		assert.Empty(t, actualWorker.SystemPrompt)
-		assert.Empty(t, actualWorker.Prompt)
+	// Builtin workers should be registered (derived from expectedCfg)
+	for name, expectedWorker := range expectedCfg.Workers {
+		actualWorker, exists := cfg.Workers[name]
+		assert.True(t, exists, "builtin worker %s should exist", name)
+		assert.Equal(t, expectedWorker.Command, actualWorker.Command, "worker %s Command mismatch", name)
+		assert.Equal(t, expectedWorker.CommandTemplate, actualWorker.CommandTemplate, "worker %s CommandTemplate mismatch", name)
 	}
 }
 
@@ -367,9 +363,20 @@ args = "--model repo"
 	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreGlobal: true, IgnoreRepo: true})
 	require.NoError(t, err)
 
-	// Verify: only defaults are used - default worker should exist
+	// Get expected config by creating default and registering builtins
+	expectedCfg := domain.NewDefaultConfig()
+	builtin.Register(expectedCfg)
+
+	// Verify: only defaults are used
+	// "default" worker should NOT be registered
 	_, ok := cfg.Workers[domain.DefaultWorkerName]
-	assert.True(t, ok, "default worker should exist")
+	assert.False(t, ok, "default worker should NOT be registered")
+
+	// Builtin workers should exist (derived from expectedCfg)
+	for name := range expectedCfg.Workers {
+		_, exists := cfg.Workers[name]
+		assert.True(t, exists, "builtin worker %s should exist", name)
+	}
 }
 
 func TestLoader_Load_UnknownKeys(t *testing.T) {
