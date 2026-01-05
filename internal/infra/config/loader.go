@@ -180,12 +180,18 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 		case "agents":
 			if m, ok := value.(map[string]any); ok {
 				ac := parseAgentsSection(m)
-				// Handle top-level agents config (default_worker, default_manager)
+				// Handle top-level agents config
 				if ac.DefaultWorker != "" {
 					res.AgentsConfig.DefaultWorker = ac.DefaultWorker
 				}
 				if ac.DefaultManager != "" {
 					res.AgentsConfig.DefaultManager = ac.DefaultManager
+				}
+				if ac.WorkerPrompt != "" {
+					res.AgentsConfig.WorkerPrompt = ac.WorkerPrompt
+				}
+				if ac.ManagerPrompt != "" {
+					res.AgentsConfig.ManagerPrompt = ac.ManagerPrompt
 				}
 				for name, def := range ac.Defs {
 					res.Agents[name] = domain.Agent{
@@ -308,6 +314,8 @@ type agentsConfig struct {
 	Defs           map[string]agentDef // Per-agent definitions from [agents.<name>]
 	DefaultWorker  string              // Default worker agent name
 	DefaultManager string              // Default manager agent name
+	WorkerPrompt   string              // Default prompt for all worker agents
+	ManagerPrompt  string              // Default prompt for all manager agents
 	Unknowns       []string            // Unknown keys in [agents]
 }
 
@@ -333,13 +341,21 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 
 	for key, value := range raw {
 		switch key {
-		case "default_worker":
+		case "worker_default":
 			if s, ok := value.(string); ok {
 				result.DefaultWorker = s
 			}
-		case "default_manager":
+		case "manager_default":
 			if s, ok := value.(string); ok {
 				result.DefaultManager = s
+			}
+		case "worker_prompt":
+			if s, ok := value.(string); ok {
+				result.WorkerPrompt = s
+			}
+		case "manager_prompt":
+			if s, ok := value.(string); ok {
+				result.ManagerPrompt = s
 			}
 		default:
 			if subMap, ok := value.(map[string]any); ok {
@@ -429,6 +445,12 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.AgentsConfig.DefaultManager != "" {
 		result.AgentsConfig.DefaultManager = override.AgentsConfig.DefaultManager
+	}
+	if override.AgentsConfig.WorkerPrompt != "" {
+		result.AgentsConfig.WorkerPrompt = override.AgentsConfig.WorkerPrompt
+	}
+	if override.AgentsConfig.ManagerPrompt != "" {
+		result.AgentsConfig.ManagerPrompt = override.AgentsConfig.ManagerPrompt
 	}
 
 	// Override other sections

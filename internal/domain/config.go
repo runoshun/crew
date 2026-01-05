@@ -36,6 +36,8 @@ type TasksConfig struct {
 type AgentsConfig struct {
 	DefaultWorker  string // Default worker agent name
 	DefaultManager string // Default manager agent name
+	WorkerPrompt   string // Default prompt for all worker agents
+	ManagerPrompt  string // Default prompt for all manager agents
 }
 
 // Role represents the role of an agent.

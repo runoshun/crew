@@ -463,8 +463,10 @@ func TestLoader_Load_AgentsConfig(t *testing.T) {
 	// Write repo config with agents section
 	repoConfig := `
 [agents]
-default_worker = "custom-worker"
-default_manager = "custom-manager"
+worker_default = "custom-worker"
+manager_default = "custom-manager"
+worker_prompt = "Custom worker prompt"
+manager_prompt = "Custom manager prompt"
 
 [agents.custom-worker]
 role = "worker"
@@ -492,6 +494,8 @@ hidden = true
 	// Verify agents config defaults
 	assert.Equal(t, "custom-worker", cfg.AgentsConfig.DefaultWorker)
 	assert.Equal(t, "custom-manager", cfg.AgentsConfig.DefaultManager)
+	assert.Equal(t, "Custom worker prompt", cfg.AgentsConfig.WorkerPrompt)
+	assert.Equal(t, "Custom manager prompt", cfg.AgentsConfig.ManagerPrompt)
 
 	// Verify custom worker agent
 	worker, ok := cfg.Agents["custom-worker"]
