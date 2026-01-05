@@ -2,10 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	overlay "github.com/rmhubbert/bubbletea-overlay"
+	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
 const (
@@ -85,6 +87,8 @@ func (m *Model) View() string {
 		dialog = m.viewHelp()
 	case ModeDetail:
 		dialog = m.viewDetail()
+	case ModeExec:
+		dialog = m.viewExecDialog()
 	}
 
 	if dialog != "" {
@@ -431,7 +435,7 @@ func (m *Model) viewFooter() string {
 			m.styles.FooterKey.Render("q") + " quit"
 	case ModeFilter:
 		content = "enter apply · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeDetail:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeDetail, ModeExec:
 		return ""
 	default:
 		return ""
@@ -542,6 +546,45 @@ func (m *Model) viewDetail() string {
 		ds.key.Render("esc") + ds.muted.Render(" back"))
 
 	return m.dialogStyle().Render(m.detailViewport.View() + "\n\n" + footer)
+}
+
+func (m *Model) viewExecDialog() string {
+	task := m.SelectedTask()
+	if task == nil {
+		return ""
+	}
+
+	ds := m.newDialogStyles()
+	title := ds.renderLine(ds.label.Render("Execute Command"))
+	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+
+	branch := domain.BranchName(task.ID, task.Issue)
+	wtPath, _ := m.container.Worktrees.Resolve(branch)
+	// Make path relative to repo root if possible for better display
+	displayPath := wtPath
+	if rel, err := filepath.Rel(m.container.Config.RepoRoot, wtPath); err == nil {
+		displayPath = rel
+	}
+	wtLine := ds.renderLine(ds.muted.Render("Worktree: " + displayPath))
+
+	label := ds.renderLine(ds.label.Render("Command"))
+	input := ds.renderLine(m.execInput.View())
+	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" execute  ") +
+		ds.key.Render("esc") + ds.text.Render(" cancel"))
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		ds.emptyLine(),
+		taskLine,
+		wtLine,
+		ds.emptyLine(),
+		label,
+		input,
+		ds.emptyLine(),
+		hint,
+	)
+
+	return m.dialogStyle().Render(content)
 }
 
 func (m *Model) showDetailPanel() bool {
