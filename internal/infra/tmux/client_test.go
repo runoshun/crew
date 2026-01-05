@@ -71,10 +71,12 @@ func TestClient_Start_And_IsRunning(t *testing.T) {
 
 	// Start session
 	err = client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir, // Use crewDir as working directory
-		Command: "sleep 60",
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir, // Use crewDir as working directory
+		Command:   "sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 
@@ -93,19 +95,23 @@ func TestClient_Start_AlreadyRunning(t *testing.T) {
 
 	// Start first session
 	err := client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: "sleep 60",
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 
 	// Try to start again - should fail
 	err = client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: "sleep 60",
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	assert.ErrorIs(t, err, domain.ErrSessionRunning)
 }
@@ -119,10 +125,12 @@ func TestClient_Stop(t *testing.T) {
 
 	// Start session
 	err := client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: "sleep 60",
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 
@@ -167,10 +175,12 @@ func TestClient_Stop_KillsChildProcesses(t *testing.T) {
 	command := fmt.Sprintf(`bash -c 'echo $$ > %s; sleep 60'`, pidFile)
 
 	err := client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: command,
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   command,
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 
@@ -224,10 +234,12 @@ func TestClient_Stop_KillsNestedChildProcesses(t *testing.T) {
 		childPIDFile, grandchildPIDFile)
 
 	err := client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: command,
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   command,
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 
@@ -283,10 +295,12 @@ func TestClient_Peek(t *testing.T) {
 
 	// Start session that echoes something
 	err := client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: "echo 'Hello World'; sleep 60",
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "echo 'Hello World'; sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 
@@ -319,10 +333,12 @@ func TestClient_Send(t *testing.T) {
 
 	// Start a bash session that reads input
 	err := client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: "bash",
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "bash",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 
@@ -376,10 +392,12 @@ func TestClient_MultipleSessions(t *testing.T) {
 	sessionNames := []string{"crew-1", "crew-2", "crew-3"}
 	for i, name := range sessionNames {
 		err := client.Start(context.Background(), domain.StartSessionOptions{
-			Name:    name,
-			Dir:     crewDir,
-			Command: "sleep 60",
-			TaskID:  i + 1,
+			Name:      name,
+			Dir:       crewDir,
+			Command:   "sleep 60",
+			TaskID:    i + 1,
+			TaskTitle: "Test Task",
+			TaskAgent: "test-agent",
 		})
 		require.NoError(t, err)
 	}
@@ -418,10 +436,12 @@ func TestClient_Attach(t *testing.T) {
 
 	// Start session first
 	err := client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: "sleep 60",
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 
@@ -469,10 +489,12 @@ func TestClient_Attach_ExecError(t *testing.T) {
 
 	// Start session first
 	err := client.Start(context.Background(), domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     crewDir,
-		Command: "sleep 60",
-		TaskID:  1,
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
 	})
 	require.NoError(t, err)
 

@@ -143,10 +143,12 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 	// Start session with the generated script
 	if err := uc.sessions.Start(ctx, domain.StartSessionOptions{
-		Name:    sessionName,
-		Dir:     wtPath,
-		Command: scriptPath,
-		TaskID:  task.ID,
+		Name:      sessionName,
+		Dir:       wtPath,
+		Command:   scriptPath,
+		TaskID:    task.ID,
+		TaskTitle: task.Title,
+		TaskAgent: agentName,
 	}); err != nil {
 		// Rollback: cleanup script and worktree
 		uc.cleanupScript(task.ID)

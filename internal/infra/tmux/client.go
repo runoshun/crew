@@ -83,6 +83,11 @@ func (c *Client) Start(ctx context.Context, opts domain.StartSessionOptions) err
 		return fmt.Errorf("start session: %w: %s", err, string(out))
 	}
 
+	// Configure status bar
+	if err := c.configureStatusBar(opts.Name, opts.TaskID, opts.TaskTitle, opts.TaskAgent); err != nil {
+		return fmt.Errorf("configure status bar: %w", err)
+	}
+
 	return nil
 }
 
@@ -287,4 +292,81 @@ func (c *Client) IsRunning(sessionName string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// configureStatusBar configures the status bar for a tmux session.
+func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, taskAgent string) error {
+	// Catppuccin Mocha colors
+	bgColor := "#1e1e2e"
+	fgColor := "#cdd6f4"
+	accentColor := "#89b4fa"
+	mutedColor := "#6c7086"
+
+	// Truncate title if too long
+	title := taskTitle
+	if len(title) > 30 {
+		title = title[:27] + "..."
+	}
+
+	// Shorten worker name
+	worker := shortenWorkerName(taskAgent)
+
+	// Build tmux commands
+	cmds := [][]string{
+		{"set-option", "-t", sessionName, "status", "on"},
+		{"set-option", "-t", sessionName, "status-position", "bottom"},
+		{"set-option", "-t", sessionName, "status-style", fmt.Sprintf("bg=%s,fg=%s", bgColor, fgColor)},
+		{"set-option", "-t", sessionName, "status-left", fmt.Sprintf("#[fg=%s,bold][←]#[fg=%s] C-g detach", accentColor, fgColor)},
+		{"set-option", "-t", sessionName, "status-left-length", "25"},
+		{"set-option", "-t", sessionName, "status-right", fmt.Sprintf("#[fg=%s]#%d#[fg=%s] %s #[fg=%s]│ %s", accentColor, taskID, fgColor, title, mutedColor, worker)},
+		{"set-option", "-t", sessionName, "status-right-length", "60"},
+		{"set-option", "-t", sessionName, "mouse", "on"},
+		{"bind-key", "-T", "root", "C-g", "detach-client"},
+		{"bind-key", "-T", "root", "MouseDown1StatusLeft", "detach-client"},
+	}
+
+	// Execute commands
+	for _, args := range cmds {
+		cmd := exec.Command("tmux", append([]string{"-S", c.socketPath}, args...)...) //nolint:gosec // sessionName follows crew-N naming convention
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("tmux %v: %w: %s", args, err, string(out))
+		}
+	}
+
+	return nil
+}
+
+// shortenWorkerName shortens agent/worker names for display.
+// Examples:
+//   - "opencode-medium-anthropic" -> "oc-med-an"
+//   - "opencode-small" -> "oc-small"
+func shortenWorkerName(name string) string {
+	// Split by hyphen
+	parts := strings.Split(name, "-")
+	if len(parts) == 0 {
+		return name
+	}
+
+	// Shorten each part
+	shortened := make([]string, 0, len(parts))
+	for _, part := range parts {
+		switch part {
+		case "opencode":
+			shortened = append(shortened, "oc")
+		case "medium":
+			shortened = append(shortened, "med")
+		case "anthropic":
+			shortened = append(shortened, "an")
+		default:
+			// Keep short parts as-is, abbreviate longer ones
+			if len(part) <= 5 {
+				shortened = append(shortened, part)
+			} else {
+				// Take first 3 characters for longer words
+				shortened = append(shortened, part[:3])
+			}
+		}
+	}
+
+	return strings.Join(shortened, "-")
 }
