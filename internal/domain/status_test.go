@@ -18,6 +18,7 @@ func TestStatus_CanTransitionTo(t *testing.T) {
 
 		// From in_progress
 		{"in_progress -> in_review", StatusInProgress, StatusInReview, true},
+		{"in_progress -> needs_changes", StatusInProgress, StatusNeedsChanges, true},
 		{"in_progress -> stopped", StatusInProgress, StatusStopped, true},
 		{"in_progress -> error", StatusInProgress, StatusError, true},
 		{"in_progress -> closed", StatusInProgress, StatusClosed, true},
@@ -36,6 +37,12 @@ func TestStatus_CanTransitionTo(t *testing.T) {
 		{"needs_input -> closed", StatusNeedsInput, StatusClosed, true},
 		{"needs_input -> todo", StatusNeedsInput, StatusTodo, false},
 		{"needs_input -> done", StatusNeedsInput, StatusDone, false},
+
+		// From needs_changes
+		{"needs_changes -> in_progress", StatusNeedsChanges, StatusInProgress, true},
+		{"needs_changes -> closed", StatusNeedsChanges, StatusClosed, true},
+		{"needs_changes -> todo", StatusNeedsChanges, StatusTodo, false},
+		{"needs_changes -> done", StatusNeedsChanges, StatusDone, false},
 
 		// From stopped
 		{"stopped -> in_progress", StatusStopped, StatusInProgress, true},
@@ -92,6 +99,7 @@ func TestStatus_IsTerminal(t *testing.T) {
 		{StatusInProgress, false},
 		{StatusInReview, false},
 		{StatusNeedsInput, false},
+		{StatusNeedsChanges, false},
 		{StatusStopped, false},
 		{StatusError, false},
 		{StatusDone, false},
@@ -116,6 +124,7 @@ func TestStatus_CanStart(t *testing.T) {
 		{StatusInProgress, false},
 		{StatusInReview, true},
 		{StatusNeedsInput, false},
+		{StatusNeedsChanges, false},
 		{StatusStopped, true},
 		{StatusError, true},
 		{StatusDone, false},
@@ -140,6 +149,7 @@ func TestStatus_Display(t *testing.T) {
 		{StatusInProgress, "In Progress"},
 		{StatusInReview, "In Review"},
 		{StatusNeedsInput, "Needs Input"},
+		{StatusNeedsChanges, "Needs Changes"},
 		{StatusStopped, "Stopped"},
 		{StatusError, "Error"},
 		{StatusDone, "Done"},
@@ -165,6 +175,7 @@ func TestStatus_IsValid(t *testing.T) {
 		{StatusInProgress, true},
 		{StatusInReview, true},
 		{StatusNeedsInput, true},
+		{StatusNeedsChanges, true},
 		{StatusStopped, true},
 		{StatusError, true},
 		{StatusDone, true},
@@ -189,6 +200,7 @@ func TestAllStatuses(t *testing.T) {
 		StatusInProgress,
 		StatusInReview,
 		StatusNeedsInput,
+		StatusNeedsChanges,
 		StatusStopped,
 		StatusError,
 		StatusDone,

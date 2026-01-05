@@ -287,8 +287,8 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 		m.mode = ModeStart
 		return m, nil
 
-	case domain.StatusInProgress, domain.StatusNeedsInput:
-		// Attach to session (needs_input is similar to in_progress - task is running but waiting)
+	case domain.StatusInProgress, domain.StatusNeedsInput, domain.StatusNeedsChanges:
+		// Attach to session (needs_input/needs_changes - task is running but waiting)
 		return m, func() tea.Msg {
 			return MsgAttachSession{TaskID: task.ID}
 		}

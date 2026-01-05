@@ -579,7 +579,8 @@ Examples:
 // newCommentCommand creates the comment command for adding comments to tasks.
 func newCommentCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		Edit int
+		Edit           int
+		RequestChanges bool
 	}
 
 	cmd := &cobra.Command{
@@ -593,6 +594,10 @@ They can be used to track progress, notes, or any relevant information.
 Examples:
   # Add a comment to task #1
   git crew comment 1 "Started working on authentication"
+
+  # Request changes (comment + status change + notification)
+  git crew comment 1 "修正してください" --request-changes
+  git crew comment 1 "修正してください" -R
 
   # Edit an existing comment (index starts from 0)
   git crew comment 1 --edit 0 "Updated message"
@@ -626,20 +631,26 @@ Examples:
 			// Execute add comment use case
 			uc := c.AddCommentUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.AddCommentInput{
-				TaskID:  taskID,
-				Message: args[1],
+				TaskID:         taskID,
+				Message:        args[1],
+				RequestChanges: opts.RequestChanges,
 			})
 			if err != nil {
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added comment to task #%d at %s\n",
-				taskID, out.Comment.Time.Format(time.RFC3339))
+			if opts.RequestChanges {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added comment and requested changes for task #%d\n", taskID)
+			} else {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added comment to task #%d at %s\n",
+					taskID, out.Comment.Time.Format(time.RFC3339))
+			}
 			return nil
 		},
 	}
 
 	cmd.Flags().IntVar(&opts.Edit, "edit", -1, "Edit an existing comment by index")
+	cmd.Flags().BoolVarP(&opts.RequestChanges, "request-changes", "R", false, "Request changes and update status to needs_changes")
 
 	return cmd
 }
