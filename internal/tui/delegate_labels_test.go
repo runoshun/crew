@@ -12,11 +12,12 @@ import (
 
 func TestDelegate_Render_ShowsLabels(t *testing.T) {
 	task := &domain.Task{
-		ID:      1,
-		Title:   "Task with labels",
-		Status:  domain.StatusTodo,
-		Created: time.Now(),
-		Labels:  []string{"bug", "ui"},
+		ID:         1,
+		Title:      "Task with labels",
+		Status:     domain.StatusTodo,
+		Created:    time.Now(),
+		Labels:     []string{"bug", "ui"},
+		BaseBranch: "main",
 	}
 
 	styles := DefaultStyles()
@@ -29,6 +30,7 @@ func TestDelegate_Render_ShowsLabels(t *testing.T) {
 	delegate.Render(&buf, l, 0, taskItem{task: task})
 
 	output := buf.String()
-	assert.Contains(t, output, "[bug]")
-	assert.Contains(t, output, "[ui]")
+	// Labels are now shown in the second line (metadata) without brackets
+	assert.Contains(t, output, "bug")
+	assert.Contains(t, output, "ui")
 }

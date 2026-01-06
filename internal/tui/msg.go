@@ -128,3 +128,10 @@ type MsgCommentsLoaded struct {
 }
 
 func (MsgCommentsLoaded) sealed() {}
+
+// MsgCommentCountsLoaded is sent when comment counts are loaded for all tasks.
+type MsgCommentCountsLoaded struct {
+	CommentCounts map[int]int // taskID -> comment count
+}
+
+func (MsgCommentCountsLoaded) sealed() {}
