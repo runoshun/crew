@@ -33,6 +33,7 @@ type Model struct {
 	// State (slices - contain pointers)
 	tasks           []*domain.Task
 	comments        []domain.Comment
+	commentCounts   map[int]int // taskID -> comment count
 	builtinAgents   []string
 	customAgents    []string
 	agentCommands   map[string]string
@@ -124,6 +125,7 @@ func New(c *app.Container) *Model {
 		agentCommands:    make(map[string]string),
 		customKeybinds:   make(map[string]domain.TUIKeybinding),
 		keybindWarnings:  nil,
+		commentCounts:    make(map[int]int),
 		agentCursor:      0,
 		startFocusCustom: false,
 	}
@@ -181,6 +183,22 @@ func (m *Model) loadComments(taskID int) tea.Cmd {
 	}
 }
 
+// loadCommentCounts returns a command that loads comment counts for all tasks.
+func (m *Model) loadCommentCounts() tea.Cmd {
+	return func() tea.Msg {
+		counts := make(map[int]int)
+		for _, task := range m.tasks {
+			comments, err := m.container.Tasks.GetComments(task.ID)
+			if err != nil {
+				// Skip on error, just leave count as 0
+				continue
+			}
+			counts[task.ID] = len(comments)
+		}
+		return MsgCommentCountsLoaded{CommentCounts: counts}
+	}
+}
+
 // SelectedTask returns the currently selected task, or nil if none.
 func (m *Model) SelectedTask() *domain.Task {
 	if m.taskList.SelectedItem() == nil {
@@ -197,7 +215,8 @@ func (m *Model) updateTaskList() {
 	sorted := m.sortedTasks()
 	items := make([]list.Item, 0, len(sorted))
 	for _, task := range sorted {
-		items = append(items, taskItem{task: task})
+		count := m.commentCounts[task.ID]
+		items = append(items, taskItem{task: task, commentCount: count})
 	}
 	m.taskList.SetItems(items)
 }

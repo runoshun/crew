@@ -27,12 +27,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgTasksLoaded:
 		m.tasks = msg.Tasks
 		m.updateTaskList()
-		// Load comments for selected task if detail panel is visible
+		// Load comment counts for all tasks and comments for selected task if detail panel is visible
 		task := m.SelectedTask()
+		cmds := []tea.Cmd{m.loadCommentCounts()}
 		if task != nil && m.showDetailPanel() {
-			return m, m.loadComments(task.ID)
+			cmds = append(cmds, m.loadComments(task.ID))
 		}
-		return m, nil
+		return m, tea.Batch(cmds...)
 
 	case MsgConfigLoaded:
 		m.config = msg.Config
@@ -119,6 +120,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.showDetailPanel() {
 			m.updateDetailPanelViewport()
 		}
+		return m, nil
+
+	case MsgCommentCountsLoaded:
+		m.commentCounts = msg.CommentCounts
+		m.updateTaskList()
 		return m, nil
 	}
 
