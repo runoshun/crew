@@ -151,7 +151,7 @@ func (c *Container) NewTaskUseCase() *usecase.NewTask {
 
 // ListTasksUseCase returns a new ListTasks use case.
 func (c *Container) ListTasksUseCase() *usecase.ListTasks {
-	return usecase.NewListTasks(c.Tasks)
+	return usecase.NewListTasks(c.Tasks, c.Sessions)
 }
 
 // ShowTaskUseCase returns a new ShowTask use case.

@@ -92,6 +92,15 @@ type TaskFilter struct {
 	Labels   []string // Filter by labels (AND condition)
 }
 
+// ProcessInfo contains information about a process.
+// Fields are ordered to minimize memory padding.
+type ProcessInfo struct {
+	Command string // Process command
+	State   string // Process state (S=Sleep, R=Running, Z=Zombie)
+	PID     int    // Process ID
+	PPID    int    // Parent process ID
+}
+
 // SessionManager manages tmux sessions.
 type SessionManager interface {
 	// Start creates and starts a new session.
@@ -111,6 +120,9 @@ type SessionManager interface {
 
 	// IsRunning checks if a session is running.
 	IsRunning(sessionName string) (bool, error)
+
+	// GetPaneProcesses retrieves process information for a session.
+	GetPaneProcesses(sessionName string) ([]ProcessInfo, error)
 }
 
 // StartSessionOptions configures session creation.
