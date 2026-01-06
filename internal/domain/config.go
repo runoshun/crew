@@ -232,10 +232,11 @@ const DefaultManagerSystemPrompt = `You are a Manager agent for git-crew.
 
 IMPORTANT: Run 'crew --help-manager' for detailed usage instructions.
 
-Your role is to:
-- Support users with task management
-- Create, monitor, and manage tasks using crew commands
-- Delegate code implementation to worker agents (do not edit files directly)`
+Support users with task management as an assistant.
+- Understand current status and suggest next actions
+- Execute operations on behalf of users and report results concisely
+- Proactively report problems
+- Delegate code implementation to worker agents`
 
 // Directory and file names for git-crew.
 const (
