@@ -12,39 +12,51 @@ import (
 )
 
 func TestCompleteTask_Execute_Success(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to complete",
-		Status: domain.StatusInProgress,
+	tests := []struct {
+		name   string
+		status domain.Status
+	}{
+		{"from in_progress", domain.StatusInProgress},
+		{"from needs_input", domain.StatusNeedsInput},
 	}
 
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			repo := testutil.NewMockTaskRepository()
+			repo.Tasks[1] = &domain.Task{
+				ID:     1,
+				Title:  "Task to complete",
+				Status: tt.status,
+			}
 
-	git := &testutil.MockGit{
-		HasUncommittedChangesV: false, // No uncommitted changes
+			worktrees := testutil.NewMockWorktreeManager()
+			worktrees.ResolvePath = "/tmp/worktree"
+
+			git := &testutil.MockGit{
+				HasUncommittedChangesV: false, // No uncommitted changes
+			}
+
+			configLoader := testutil.NewMockConfigLoader()
+			clock := &testutil.MockClock{}
+
+			uc := NewCompleteTask(repo, worktrees, git, configLoader, clock)
+
+			// Execute
+			out, err := uc.Execute(context.Background(), CompleteTaskInput{
+				TaskID: 1,
+			})
+
+			// Assert
+			require.NoError(t, err)
+			require.NotNil(t, out)
+			assert.Equal(t, domain.StatusInReview, out.Task.Status)
+
+			// Verify task is updated in repository
+			savedTask := repo.Tasks[1]
+			assert.Equal(t, domain.StatusInReview, savedTask.Status)
+		})
 	}
-
-	configLoader := testutil.NewMockConfigLoader()
-	clock := &testutil.MockClock{}
-
-	uc := NewCompleteTask(repo, worktrees, git, configLoader, clock)
-
-	// Execute
-	out, err := uc.Execute(context.Background(), CompleteTaskInput{
-		TaskID: 1,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusInReview, out.Task.Status)
-
-	// Verify task is updated in repository
-	savedTask := repo.Tasks[1]
-	assert.Equal(t, domain.StatusInReview, savedTask.Status)
 }
 
 func TestCompleteTask_Execute_WithCompleteCommand(t *testing.T) {

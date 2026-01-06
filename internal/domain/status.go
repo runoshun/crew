@@ -35,7 +35,7 @@ var transitions = map[Status][]Status{
 	StatusTodo:         {StatusInProgress, StatusClosed},
 	StatusInProgress:   {StatusInReview, StatusNeedsInput, StatusNeedsChanges, StatusStopped, StatusError, StatusClosed},
 	StatusInReview:     {StatusInProgress, StatusDone, StatusClosed},
-	StatusNeedsInput:   {StatusInProgress, StatusClosed},
+	StatusNeedsInput:   {StatusInProgress, StatusInReview, StatusClosed},
 	StatusNeedsChanges: {StatusInProgress, StatusClosed},
 	StatusStopped:      {StatusInProgress, StatusClosed},
 	StatusError:        {StatusInProgress, StatusClosed},

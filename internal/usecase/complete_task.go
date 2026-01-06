@@ -71,9 +71,9 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Validate status - must be in_progress
-	if task.Status != domain.StatusInProgress {
-		return nil, fmt.Errorf("cannot complete task in %s status (must be in_progress): %w", task.Status, domain.ErrInvalidTransition)
+	// Validate status - must be in_progress or needs_input
+	if task.Status != domain.StatusInProgress && task.Status != domain.StatusNeedsInput {
+		return nil, fmt.Errorf("cannot complete task in %s status (must be in_progress or needs_input): %w", task.Status, domain.ErrInvalidTransition)
 	}
 
 	// Resolve worktree path

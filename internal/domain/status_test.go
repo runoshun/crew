@@ -34,6 +34,7 @@ func TestStatus_CanTransitionTo(t *testing.T) {
 
 		// From needs_input
 		{"needs_input -> in_progress", StatusNeedsInput, StatusInProgress, true},
+		{"needs_input -> in_review", StatusNeedsInput, StatusInReview, true},
 		{"needs_input -> closed", StatusNeedsInput, StatusClosed, true},
 		{"needs_input -> todo", StatusNeedsInput, StatusTodo, false},
 		{"needs_input -> done", StatusNeedsInput, StatusDone, false},
