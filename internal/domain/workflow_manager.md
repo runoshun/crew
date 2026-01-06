@@ -83,11 +83,9 @@ crew exec <id> -- mise run ci
 # 3. Merge if OK
 echo "y" | crew merge <id>
 
-# If issues found, provide feedback
-crew comment <id> "Description of the issue"
-crew edit <id> --status in_progress
-crew send <id> "Check comments with crew show <id> and fix"
-crew send <id> Enter
+# If issues found, request changes
+crew comment <id> -R "Description of the issue"
+# This automatically sets status to in_progress and notifies the agent
 ```
 
 ### "What's the progress?"
