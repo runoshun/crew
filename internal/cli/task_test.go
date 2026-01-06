@@ -364,6 +364,89 @@ func TestNewShowCommand_WithComments(t *testing.T) {
 	assert.Contains(t, output, "First comment")
 }
 
+func TestNewShowCommand_JSON(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Test task",
+		Description: "Task description",
+		Status:      domain.StatusTodo,
+		Created:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		BaseBranch:  "main",
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newShowCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1", "--json"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "\"id\": 1")
+	assert.Contains(t, output, "\"title\": \"Test task\"")
+	assert.Contains(t, output, "\"status\": \"todo\"")
+	assert.Contains(t, output, "\"branch\": \"crew-1\"")
+	assert.Contains(t, output, "\"labels\": []")
+	assert.Contains(t, output, "\"comments\": []")
+}
+
+func TestNewShowCommand_JSON_WithAllFields(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	parentID := 42
+	started := time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Full task",
+		Description: "Detailed description",
+		Status:      domain.StatusInProgress,
+		Agent:       "test-agent",
+		Created:     time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		Started:     started,
+		ParentID:    &parentID,
+		Labels:      []string{"bug", "critical"},
+		Issue:       123,
+		BaseBranch:  "main",
+	}
+	repo.Comments[1] = []domain.Comment{
+		{
+			Time: time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC),
+			Text: "Test comment",
+		},
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newShowCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1", "--json"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	output := buf.String()
+	assert.Contains(t, output, "\"id\": 1")
+	assert.Contains(t, output, "\"title\": \"Full task\"")
+	assert.Contains(t, output, "\"status\": \"in_progress\"")
+	assert.Contains(t, output, "\"agent\": \"test-agent\"")
+	assert.Contains(t, output, "\"branch\": \"crew-1-gh-123\"")
+	assert.Contains(t, output, "\"parent_id\": 42")
+	assert.Contains(t, output, "\"labels\": [\n    \"bug\",\n    \"critical\"\n  ]")
+	assert.Contains(t, output, "\"issue\": 123")
+	assert.Contains(t, output, "\"started\": \"2024-01-01T10:00:00Z\"")
+	assert.Contains(t, output, "\"text\": \"Test comment\"")
+}
+
 // =============================================================================
 // Print Functions Tests
 // =============================================================================
