@@ -386,3 +386,111 @@ func shortenWorkerName(name string) string {
 
 	return strings.Join(shortened, "-")
 }
+
+// GetPaneProcesses retrieves process information for a tmux session.
+// It returns the pane's root process and all its children recursively.
+func (c *Client) GetPaneProcesses(sessionName string) ([]domain.ProcessInfo, error) {
+	// Check if session exists
+	running, err := c.IsRunning(sessionName)
+	if err != nil {
+		return nil, fmt.Errorf("check session: %w", err)
+	}
+	if !running {
+		return nil, domain.ErrNoSession
+	}
+
+	// Get pane PID
+	// tmux -S <socket> list-panes -t <name> -F '#{pane_pid}'
+	cmd := exec.Command("tmux", //nolint:gosec // sessionName follows crew-N naming convention
+		"-S", c.socketPath,
+		"list-panes",
+		"-t", sessionName,
+		"-F", "#{pane_pid}",
+	)
+
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("get pane pid: %w", err)
+	}
+
+	pidStr := strings.TrimSpace(string(out))
+	if pidStr == "" {
+		return nil, fmt.Errorf("no pane found for session %s", sessionName)
+	}
+
+	var rootPID int
+	if _, parseErr := fmt.Sscanf(pidStr, "%d", &rootPID); parseErr != nil || rootPID <= 0 {
+		return nil, fmt.Errorf("invalid pane pid: %s", pidStr)
+	}
+
+	// Get all processes with ps command (macOS/Linux compatible)
+	// ps -o pid,ppid,state,comm -ax
+	psCmd := exec.Command("ps", "-o", "pid,ppid,state,comm", "-ax")
+	psOut, err := psCmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("ps command failed: %w", err)
+	}
+
+	// Parse ps output
+	allProcesses := make(map[int]domain.ProcessInfo)
+	lines := strings.Split(string(psOut), "\n")
+	for i, line := range lines {
+		if i == 0 || line == "" {
+			continue // Skip header and empty lines
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			continue
+		}
+
+		var pid, ppid int
+		var state, command string
+
+		if _, scanErr := fmt.Sscanf(fields[0], "%d", &pid); scanErr != nil {
+			continue
+		}
+		if _, scanErr := fmt.Sscanf(fields[1], "%d", &ppid); scanErr != nil {
+			continue
+		}
+		state = fields[2]
+		command = strings.Join(fields[3:], " ")
+
+		allProcesses[pid] = domain.ProcessInfo{
+			PID:     pid,
+			PPID:    ppid,
+			State:   state,
+			Command: command,
+		}
+	}
+
+	// Build process tree starting from rootPID
+	var result []domain.ProcessInfo
+	visited := make(map[int]bool)
+
+	var collectProcesses func(pid int)
+	collectProcesses = func(pid int) {
+		if visited[pid] {
+			return
+		}
+		visited[pid] = true
+
+		proc, ok := allProcesses[pid]
+		if !ok {
+			return
+		}
+
+		result = append(result, proc)
+
+		// Find children
+		for childPID, childProc := range allProcesses {
+			if childProc.PPID == pid {
+				collectProcesses(childPID)
+			}
+		}
+	}
+
+	collectProcesses(rootPID)
+
+	return result, nil
+}

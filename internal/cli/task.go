@@ -98,9 +98,11 @@ Examples:
 // newListCommand creates the list command for listing tasks.
 func newListCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		Labels   []string
-		ParentID int
-		All      bool
+		Labels    []string
+		ParentID  int
+		All       bool
+		Sessions  bool
+		Processes bool
 	}
 
 	cmd := &cobra.Command{
@@ -116,6 +118,9 @@ Output format is tab-separated with columns:
 
 ELAPSED is only shown for tasks with status 'in_progress'.
 
+With --sessions (-s), SESSION column is added showing the session name.
+With --processes (-p), process details are shown instead of the task list.
+
 Examples:
   # List active tasks (default: exclude closed/done)
   git crew list
@@ -123,6 +128,14 @@ Examples:
   # List all tasks including closed/done
   git crew list --all
   git crew list -a
+
+  # List with session information
+  git crew list -s
+  git crew list --sessions
+
+  # List with process information
+  git crew list -p
+  git crew list --processes
 
   # List only sub-tasks of task #1
   git crew list --parent 1
@@ -132,8 +145,10 @@ Examples:
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Build input
 			input := usecase.ListTasksInput{
-				Labels:          opts.Labels,
-				IncludeTerminal: opts.All,
+				Labels:           opts.Labels,
+				IncludeTerminal:  opts.All,
+				IncludeSessions:  opts.Sessions,
+				IncludeProcesses: opts.Processes,
 			}
 
 			// Set parent ID if specified
@@ -149,7 +164,13 @@ Examples:
 			}
 
 			// Print output
-			printTaskList(cmd.OutOrStdout(), out.Tasks, c.Clock)
+			if opts.Processes {
+				printProcessList(cmd.OutOrStdout(), out.TasksWithInfo)
+			} else if opts.Sessions {
+				printTaskListWithSessions(cmd.OutOrStdout(), out.TasksWithInfo, c.Clock)
+			} else {
+				printTaskList(cmd.OutOrStdout(), out.Tasks, c.Clock)
+			}
 			return nil
 		},
 	}
@@ -158,6 +179,8 @@ Examples:
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Show only children of this task")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Filter by labels (AND condition)")
 	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all tasks including closed/done")
+	cmd.Flags().BoolVarP(&opts.Sessions, "sessions", "s", false, "Include session information")
+	cmd.Flags().BoolVarP(&opts.Processes, "processes", "p", false, "Show process details")
 
 	return cmd
 }
@@ -202,6 +225,95 @@ func printTaskList(w io.Writer, tasks []*domain.Task, clock domain.Clock) {
 			labelsStr,
 			task.Title,
 		)
+	}
+}
+
+// printTaskListWithSessions prints tasks with session information in TSV format.
+func printTaskListWithSessions(w io.Writer, tasksWithInfo []usecase.TaskWithSession, clock domain.Clock) {
+	tw := tabwriter.NewWriter(w, 0, 0, 3, ' ', 0)
+	defer func() { _ = tw.Flush() }()
+
+	// Header
+	_, _ = fmt.Fprintln(tw, "ID\tPARENT\tSTATUS\tAGENT\tSESSION\tLABELS\tTITLE")
+
+	// Rows
+	for _, info := range tasksWithInfo {
+		task := info.Task
+		parentStr := "-"
+		if task.ParentID != nil {
+			parentStr = fmt.Sprintf("%d", *task.ParentID)
+		}
+
+		agentStr := "-"
+		if task.Agent != "" {
+			agentStr = task.Agent
+		}
+
+		sessionStr := "-"
+		if info.IsRunning {
+			sessionStr = info.SessionName
+		}
+
+		labelsStr := "-"
+		if len(task.Labels) > 0 {
+			labelsStr = "[" + strings.Join(task.Labels, ",") + "]"
+		}
+
+		// Format status with optional elapsed time for in_progress
+		statusStr := string(task.Status)
+		if task.Status == domain.StatusInProgress && !task.Started.IsZero() {
+			elapsed := clock.Now().Sub(task.Started)
+			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
+		}
+
+		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			task.ID,
+			parentStr,
+			statusStr,
+			agentStr,
+			sessionStr,
+			labelsStr,
+			task.Title,
+		)
+	}
+}
+
+// printProcessList prints process details in TSV format.
+func printProcessList(w io.Writer, tasksWithInfo []usecase.TaskWithSession) {
+	tw := tabwriter.NewWriter(w, 0, 0, 3, ' ', 0)
+	defer func() { _ = tw.Flush() }()
+
+	// Header
+	_, _ = fmt.Fprintln(tw, "ID\tSESSION\tPID\tSTATE\tPROCESS")
+
+	// Rows
+	for _, info := range tasksWithInfo {
+		task := info.Task
+
+		if !info.IsRunning || len(info.Processes) == 0 {
+			// No running session or no processes
+			continue
+		}
+
+		// Print first process
+		first := info.Processes[0]
+		_, _ = fmt.Fprintf(tw, "%d\t%s\t%d\t%s\t%s\n",
+			task.ID,
+			info.SessionName,
+			first.PID,
+			first.State,
+			first.Command,
+		)
+
+		// Print child processes with indentation
+		for i := 1; i < len(info.Processes); i++ {
+			proc := info.Processes[i]
+			_, _ = fmt.Fprintf(tw, "\t\t%d\t%s\t└─ %s\n",
+				proc.PID,
+				proc.State,
+				proc.Command,
+			)
+		}
 	}
 }
 

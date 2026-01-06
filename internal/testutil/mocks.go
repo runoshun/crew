@@ -369,6 +369,11 @@ func (m *MockSessionManager) IsRunning(_ string) (bool, error) {
 	return m.IsRunningVal, nil
 }
 
+// GetPaneProcesses returns an empty list (mock implementation).
+func (m *MockSessionManager) GetPaneProcesses(_ string) ([]domain.ProcessInfo, error) {
+	return nil, nil
+}
+
 // MockWorktreeManager is a test double for domain.WorktreeManager.
 // Fields are ordered to minimize memory padding.
 type MockWorktreeManager struct {

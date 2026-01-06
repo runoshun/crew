@@ -31,7 +31,7 @@ func TestListTasks_Execute_AllTasks(t *testing.T) {
 		Status: domain.StatusDone,
 	}
 
-	uc := NewListTasks(repo)
+	uc := NewListTasks(repo, nil)
 
 	// Execute with IncludeTerminal = true
 	out, err := uc.Execute(context.Background(), ListTasksInput{
@@ -62,7 +62,7 @@ func TestListTasks_Execute_ExcludeTerminal(t *testing.T) {
 		Status: domain.StatusClosed,
 	}
 
-	uc := NewListTasks(repo)
+	uc := NewListTasks(repo, nil)
 
 	// Execute with IncludeTerminal = false (default)
 	out, err := uc.Execute(context.Background(), ListTasksInput{
@@ -78,7 +78,7 @@ func TestListTasks_Execute_ExcludeTerminal(t *testing.T) {
 func TestListTasks_Execute_Empty(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	uc := NewListTasks(repo)
+	uc := NewListTasks(repo, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ListTasksInput{})
@@ -115,7 +115,7 @@ func TestListTasks_Execute_WithParentFilter(t *testing.T) {
 		Status: domain.StatusTodo,
 	}
 
-	uc := NewListTasks(repo)
+	uc := NewListTasks(repo, nil)
 
 	// Execute with parent filter
 	out, err := uc.Execute(context.Background(), ListTasksInput{
@@ -151,7 +151,7 @@ func TestListTasks_Execute_WithLabelFilter(t *testing.T) {
 		Labels: []string{"bug", "feature"},
 	}
 
-	uc := NewListTasks(repo)
+	uc := NewListTasks(repo, nil)
 
 	// Execute with label filter
 	out, err := uc.Execute(context.Background(), ListTasksInput{
@@ -169,7 +169,7 @@ func TestListTasks_Execute_RepositoryError(t *testing.T) {
 		MockTaskRepository: testutil.NewMockTaskRepository(),
 		ListErr:            errors.New("database error"),
 	}
-	uc := NewListTasks(repo)
+	uc := NewListTasks(repo, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ListTasksInput{})
@@ -208,7 +208,7 @@ func TestListTasks_Execute_PreservesTaskData(t *testing.T) {
 		Labels:     []string{"bug"},
 	}
 
-	uc := NewListTasks(repo)
+	uc := NewListTasks(repo, nil)
 
 	// Execute with IncludeTerminal = true to get all tasks
 	out, err := uc.Execute(context.Background(), ListTasksInput{
