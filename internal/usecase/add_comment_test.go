@@ -231,16 +231,17 @@ func TestAddComment_Execute_RequestChanges(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "修正してください", out.Comment.Text)
 
-	// Verify status changed to needs_changes
+	// Verify status stays in_progress (was changed from needs_changes)
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusNeedsChanges, task.Status)
+	assert.Equal(t, domain.StatusInProgress, task.Status)
 
 	// Verify notification was sent (Send called)
 	assert.True(t, sessions.SendCalled)
+	assert.False(t, out.SessionStarted)
 }
 
 func TestAddComment_Execute_RequestChanges_SessionNotRunning(t *testing.T) {
-	// Setup
+	// Setup - session not running, no session starter
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
@@ -259,14 +260,98 @@ func TestAddComment_Execute_RequestChanges_SessionNotRunning(t *testing.T) {
 		RequestChanges: true,
 	})
 
-	// Assert - should still succeed even if session not running
+	// Assert - should still succeed even if session not running (no starter configured)
 	require.NoError(t, err)
 	assert.Equal(t, "修正してください", out.Comment.Text)
 
-	// Verify status changed to needs_changes
+	// Verify status changed to in_progress
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusNeedsChanges, task.Status)
+	assert.Equal(t, domain.StatusInProgress, task.Status)
 
-	// Verify no notification was sent
+	// Verify no notification was sent (session not running)
 	assert.False(t, sessions.SendCalled)
+	assert.False(t, out.SessionStarted)
+}
+
+// MockSessionStarter is a test double for SessionStarter.
+type MockSessionStarter struct {
+	StartCalled bool
+	StartTaskID int
+	StartCont   bool
+	StartErr    error
+}
+
+func (m *MockSessionStarter) Start(_ context.Context, taskID int, continueFlag bool) error {
+	m.StartCalled = true
+	m.StartTaskID = taskID
+	m.StartCont = continueFlag
+	return m.StartErr
+}
+
+func TestAddComment_Execute_RequestChanges_SessionNotRunning_AutoStart(t *testing.T) {
+	// Setup - session not running, with session starter
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = false
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
+	starter := &MockSessionStarter{}
+	uc := NewAddComment(repo, sessions, clock).WithSessionStarter(starter)
+
+	// Execute with RequestChanges
+	out, err := uc.Execute(context.Background(), AddCommentInput{
+		TaskID:         1,
+		Message:        "修正してください",
+		RequestChanges: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "修正してください", out.Comment.Text)
+
+	// Verify status changed to in_progress
+	task := repo.Tasks[1]
+	assert.Equal(t, domain.StatusInProgress, task.Status)
+
+	// Verify session was started with continue flag
+	assert.True(t, starter.StartCalled)
+	assert.Equal(t, 1, starter.StartTaskID)
+	assert.True(t, starter.StartCont)
+	assert.True(t, out.SessionStarted)
+
+	// Verify notification was sent after session start
+	assert.True(t, sessions.SendCalled)
+}
+
+func TestAddComment_Execute_RequestChanges_SessionStartError(t *testing.T) {
+	// Setup - session not running, starter returns error
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = false
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
+	starter := &MockSessionStarter{StartErr: assert.AnError}
+	uc := NewAddComment(repo, sessions, clock).WithSessionStarter(starter)
+
+	// Execute with RequestChanges
+	_, err := uc.Execute(context.Background(), AddCommentInput{
+		TaskID:         1,
+		Message:        "修正してください",
+		RequestChanges: true,
+	})
+
+	// Assert - should fail when session start fails
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "start session")
+
+	// Verify session start was attempted
+	assert.True(t, starter.StartCalled)
 }

@@ -835,7 +835,11 @@ Examples:
 			}
 
 			if opts.RequestChanges {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added comment and requested changes for task #%d\n", taskID)
+				if out.SessionStarted {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added comment and started session for task #%d\n", taskID)
+				} else {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added comment and requested changes for task #%d\n", taskID)
+				}
 			} else {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Added comment to task #%d at %s\n",
 					taskID, out.Comment.Time.Format(time.RFC3339))
@@ -845,7 +849,7 @@ Examples:
 	}
 
 	cmd.Flags().IntVar(&opts.Edit, "edit", -1, "Edit an existing comment by index")
-	cmd.Flags().BoolVarP(&opts.RequestChanges, "request-changes", "R", false, "Request changes and update status to needs_changes")
+	cmd.Flags().BoolVarP(&opts.RequestChanges, "request-changes", "R", false, "Request changes and update status to in_progress")
 
 	return cmd
 }
