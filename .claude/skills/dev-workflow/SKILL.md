@@ -19,7 +19,7 @@ Register ALL TODOs at once when starting Phase 1:
 
 ```
 # Phase 1: Setup
-- [ ] Read docs/README.md, core-concepts.md, architecture.md, spec-cli.md, spec-tui.md
+- [ ] Read docs/README.md, core-concepts.md, architecture.md
 - [ ] Check current task with `./crew list` and `./crew show <id>`
 - [ ] Ensure on feature branch
 # Phase 2: Implementation
