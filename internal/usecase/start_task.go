@@ -71,11 +71,6 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Validate status transition
-	if !task.Status.CanTransitionTo(domain.StatusInProgress) {
-		return nil, fmt.Errorf("cannot start task in %s status: %w", task.Status, domain.ErrInvalidTransition)
-	}
-
 	// Check if session is already running
 	sessionName := domain.SessionName(task.ID)
 	running, err := uc.sessions.IsRunning(sessionName)
@@ -83,7 +78,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, fmt.Errorf("check session: %w", err)
 	}
 	if running {
-		return nil, domain.ErrSessionRunning
+		return nil, fmt.Errorf("task #%d session is already running: %w", task.ID, domain.ErrSessionRunning)
 	}
 
 	// Load config for agent resolution and command building

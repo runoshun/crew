@@ -224,18 +224,21 @@ func TestStartTask_Execute_TaskNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
 }
 
-func TestStartTask_Execute_InvalidStatus(t *testing.T) {
+func TestStartTask_Execute_AllowAllStatuses(t *testing.T) {
 	tests := []struct {
 		name   string
 		status domain.Status
 	}{
 		{"done", domain.StatusDone},
 		{"closed", domain.StatusClosed},
+		{"in_progress", domain.StatusInProgress},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			crewDir := t.TempDir()
+			repoRoot := t.TempDir()
+			worktreeDir := setupTestWorktree(t)
 
 			repo := testutil.NewMockTaskRepository()
 			repo.Tasks[1] = &domain.Task{
@@ -245,10 +248,10 @@ func TestStartTask_Execute_InvalidStatus(t *testing.T) {
 			}
 			sessions := testutil.NewMockSessionManager()
 			worktrees := testutil.NewMockWorktreeManager()
+			worktrees.CreatePath = worktreeDir
 			configLoader := testutil.NewMockConfigLoader()
 			clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-			repoRoot := t.TempDir()
 			uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
 
 			// Execute
@@ -258,7 +261,8 @@ func TestStartTask_Execute_InvalidStatus(t *testing.T) {
 			})
 
 			// Assert
-			assert.ErrorIs(t, err, domain.ErrInvalidTransition)
+			assert.NoError(t, err)
+			assert.Equal(t, domain.StatusInProgress, repo.Tasks[1].Status)
 		})
 	}
 }
