@@ -388,11 +388,14 @@ func (s *Store) getCommentsLocked(taskID int) ([]domain.Comment, error) {
 }
 
 // loadMeta loads metadata from the meta ref.
+// If the meta ref doesn't exist, it calculates NextTaskID from existing tasks.
 func (s *Store) loadMeta() (*meta, error) {
 	ref, err := s.repo.Reference(s.metaRef(), true)
 	if err != nil {
 		if err == plumbing.ErrReferenceNotFound {
-			return &meta{NextTaskID: 1}, nil
+			// Meta ref doesn't exist - calculate NextTaskID from existing tasks
+			nextID := s.calculateNextTaskID()
+			return &meta{NextTaskID: nextID}, nil
 		}
 		return nil, fmt.Errorf("get meta ref: %w", err)
 	}
@@ -408,6 +411,35 @@ func (s *Store) loadMeta() (*meta, error) {
 	}
 
 	return &m, nil
+}
+
+// calculateNextTaskID finds the maximum task ID from existing tasks and returns max+1.
+// Returns 1 if no tasks exist.
+func (s *Store) calculateNextTaskID() int {
+	maxID := 0
+
+	// Iterate through all task refs to find the maximum ID
+	iter, err := s.repo.References()
+	if err != nil {
+		return 1 // If we can't iterate refs, start from 1
+	}
+
+	prefix := s.refPrefix() + "tasks/"
+	_ = iter.ForEach(func(ref *plumbing.Reference) error {
+		name := ref.Name().String()
+		if strings.HasPrefix(name, prefix) {
+			// Extract task ID from ref name (e.g., "refs/crew/tasks/42" -> 42)
+			idStr := strings.TrimPrefix(name, prefix)
+			if id, parseErr := strconv.Atoi(idStr); parseErr == nil {
+				if id > maxID {
+					maxID = id
+				}
+			}
+		}
+		return nil
+	})
+
+	return maxID + 1
 }
 
 // saveMeta saves metadata to the meta ref.
