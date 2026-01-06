@@ -83,7 +83,7 @@ func TestIntegration_Persistence(t *testing.T) {
 	// Create store and save data
 	store1, err := New(dir, "crew-test")
 	require.NoError(t, err)
-	require.NoError(t, store1.Initialize())
+	_, err := store1.Initialize(); require.NoError(t, err)
 
 	task := &domain.Task{
 		ID:          1,
@@ -155,7 +155,7 @@ func TestIntegration_GitRefs_Visible(t *testing.T) {
 
 	store, err := New(dir, "crew-test")
 	require.NoError(t, err)
-	require.NoError(t, store.Initialize())
+	_, err := store.Initialize(); require.NoError(t, err)
 
 	// Save a task
 	task := &domain.Task{ID: 1, Title: "Git visible task"}
@@ -220,7 +220,7 @@ func TestIntegration_Snapshot_Persistence(t *testing.T) {
 	// Create store and tasks
 	store1, err := New(dir, "crew-test")
 	require.NoError(t, err)
-	require.NoError(t, store1.Initialize())
+	_, err := store1.Initialize(); require.NoError(t, err)
 
 	task1 := &domain.Task{ID: 1, Title: "Task 1", Status: domain.StatusTodo}
 	task2 := &domain.Task{ID: 2, Title: "Task 2", Status: domain.StatusInProgress}
@@ -269,7 +269,7 @@ func TestIntegration_Snapshot_GitVisible(t *testing.T) {
 
 	store, err := New(dir, "crew-test")
 	require.NoError(t, err)
-	require.NoError(t, store.Initialize())
+	_, err := store.Initialize(); require.NoError(t, err)
 
 	task := &domain.Task{ID: 1, Title: "Snapshot task"}
 	require.NoError(t, store.Save(task))
@@ -296,7 +296,7 @@ func TestIntegration_SyncSnapshot(t *testing.T) {
 
 	store, err := New(dir, "crew-test")
 	require.NoError(t, err)
-	require.NoError(t, store.Initialize())
+	_, err := store.Initialize(); require.NoError(t, err)
 
 	// Create initial task and snapshot
 	task := &domain.Task{ID: 1, Title: "Original", Status: domain.StatusTodo}
@@ -330,7 +330,7 @@ func TestIntegration_PruneSnapshots(t *testing.T) {
 
 	store, err := New(dir, "crew-test")
 	require.NoError(t, err)
-	require.NoError(t, store.Initialize())
+	_, err := store.Initialize(); require.NoError(t, err)
 
 	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
 	require.NoError(t, store.Save(task))
@@ -381,7 +381,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 	// Step 1: Initialize store
 	store, err := New(dir, "crew-test")
 	require.NoError(t, err)
-	require.NoError(t, store.Initialize())
+	_, err := store.Initialize(); require.NoError(t, err)
 
 	// Step 2: Create tasks
 	id1, err := store.NextID()

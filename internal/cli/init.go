@@ -37,7 +37,15 @@ Error conditions:
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Initialized git-crew in %s\n", out.CrewDir)
+			if out.AlreadyInitialized {
+				if out.Repaired {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Repaired task ID sequence")
+				} else {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "crew already initialized")
+				}
+			} else {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Initialized git-crew in %s\n", out.CrewDir)
+			}
 			return nil
 		},
 	}

@@ -117,11 +117,12 @@ func (m *MockTaskRepository) UpdateComment(taskID, index int, comment domain.Com
 // MockStoreInitializer is a test double for domain.StoreInitializer.
 type MockStoreInitializer struct {
 	Initialized bool
+	Repaired    bool
 }
 
 // Initialize is a no-op for testing.
-func (m *MockStoreInitializer) Initialize() error {
-	return nil
+func (m *MockStoreInitializer) Initialize() (bool, error) {
+	return m.Repaired, nil
 }
 
 // IsInitialized returns the configured value.

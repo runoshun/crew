@@ -54,11 +54,11 @@ func TestStore_Initialize(t *testing.T) {
 	repo := setupTestRepo(t)
 	store := NewWithRepo(repo, "crew-test")
 
-	err := store.Initialize()
+	_, err := store.Initialize()
 	require.NoError(t, err)
 
 	// Second call should be idempotent
-	err = store.Initialize()
+	_, err = store.Initialize()
 	require.NoError(t, err)
 }
 
@@ -284,7 +284,8 @@ func TestStore_NamespaceIsolation(t *testing.T) {
 func TestSnapshot(t *testing.T) {
 	repo := setupTestRepo(t)
 	store := NewWithRepo(repo, "crew-test")
-	require.NoError(t, store.Initialize())
+	_, err := store.Initialize()
+	require.NoError(t, err)
 
 	// Create some tasks
 	task1 := &domain.Task{ID: 1, Title: "Task 1", Status: domain.StatusTodo}
@@ -334,7 +335,8 @@ func TestSnapshot(t *testing.T) {
 func TestSnapshotMultipleSequence(t *testing.T) {
 	repo := setupTestRepo(t)
 	store := NewWithRepo(repo, "crew-test")
-	require.NoError(t, store.Initialize())
+	_, err := store.Initialize()
+	require.NoError(t, err)
 
 	// Create task
 	task := &domain.Task{ID: 1, Title: "Task 1", Status: domain.StatusTodo}

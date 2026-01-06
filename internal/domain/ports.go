@@ -8,7 +8,8 @@ import (
 // StoreInitializer initializes the data store.
 type StoreInitializer interface {
 	// Initialize creates the store if it doesn't exist.
-	Initialize() error
+	// Returns true if any repair was performed (e.g., NextTaskID was updated).
+	Initialize() (repaired bool, err error)
 	// IsInitialized checks if the store has been initialized.
 	IsInitialized() bool
 }

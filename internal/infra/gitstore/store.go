@@ -529,36 +529,50 @@ func (s *Store) readBlob(hash plumbing.Hash) ([]byte, error) {
 }
 
 // Initialize creates initial metadata if it doesn't exist.
-func (s *Store) Initialize() error {
+// If meta exists but NextTaskID is less than max existing task ID, it updates NextTaskID.
+// This repair logic runs even if already initialized.
+// Returns true if any repair was performed.
+func (s *Store) Initialize() (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	repaired := false
+
+	// Always repair meta if NextTaskID is inconsistent (even if already initialized)
+	minNextID := s.calculateNextTaskID()
+	m, loadErr := s.loadMeta()
+	if loadErr != nil {
+		return false, fmt.Errorf("load meta: %w", loadErr)
+	}
+
+	if m.NextTaskID < minNextID {
+		m.NextTaskID = minNextID
+		if saveErr := s.saveMeta(m); saveErr != nil {
+			return false, saveErr
+		}
+		repaired = true
+	}
 
 	// Check if already initialized
 	_, err := s.repo.Reference(s.initializedRef(), true)
 	if err == nil {
-		return nil // Already initialized
+		return repaired, nil // Already initialized (but meta was repaired if needed)
 	}
 	if err != plumbing.ErrReferenceNotFound {
-		return fmt.Errorf("check initialized ref: %w", err)
-	}
-
-	// Create initial metadata
-	m := &meta{NextTaskID: 1}
-	if saveErr := s.saveMeta(m); saveErr != nil {
-		return saveErr
+		return false, fmt.Errorf("check initialized ref: %w", err)
 	}
 
 	// Create initialized marker (empty blob)
 	hash, err := s.writeBlob([]byte("initialized"))
 	if err != nil {
-		return err
+		return false, err
 	}
 	ref := plumbing.NewHashReference(s.initializedRef(), hash)
 	if err := s.repo.Storer.SetReference(ref); err != nil {
-		return fmt.Errorf("set initialized ref: %w", err)
+		return false, fmt.Errorf("set initialized ref: %w", err)
 	}
 
-	return nil
+	return repaired, nil
 }
 
 // IsInitialized checks if the store has been initialized.

@@ -16,7 +16,7 @@ func TestStore_Initialize(t *testing.T) {
 	store := New(path)
 
 	// Initialize should create the file
-	if err := store.Initialize(); err != nil {
+	if _, err := store.Initialize(); err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 
@@ -26,7 +26,7 @@ func TestStore_Initialize(t *testing.T) {
 	}
 
 	// Initialize again should be idempotent
-	if err := store.Initialize(); err != nil {
+	if _, err := store.Initialize(); err != nil {
 		t.Fatalf("Initialize() second call error = %v", err)
 	}
 }
@@ -409,7 +409,7 @@ func newTestStore(t *testing.T) *Store {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "tasks.json")
 	store := New(path)
-	if err := store.Initialize(); err != nil {
+	if _, err := store.Initialize(); err != nil {
 		t.Fatalf("Initialize() error = %v", err)
 	}
 	return store

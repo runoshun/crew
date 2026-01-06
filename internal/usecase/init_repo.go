@@ -18,7 +18,9 @@ type InitRepoInput struct {
 
 // InitRepoOutput contains the output from InitRepo.
 type InitRepoOutput struct {
-	CrewDir string // Path to created crew directory
+	CrewDir            string // Path to created crew directory
+	AlreadyInitialized bool   // True if was already initialized (repair only)
+	Repaired           bool   // True if meta was repaired (NextTaskID updated)
 }
 
 // InitRepo initializes a repository for git-crew.
@@ -33,47 +35,50 @@ func NewInitRepo(storeInit domain.StoreInitializer) *InitRepo {
 
 // Execute initializes a repository for git-crew.
 // It creates the .git/crew/ directory, tmux.conf, and empty tasks.json.
+// If already initialized, it still runs Initialize() to repair any inconsistencies.
 func (uc *InitRepo) Execute(_ context.Context, in InitRepoInput) (*InitRepoOutput, error) {
-	// Check if already initialized
-	if uc.storeInit.IsInitialized() {
-		return nil, domain.ErrAlreadyInitialized
-	}
+	alreadyInitialized := uc.storeInit.IsInitialized()
 
-	// Create crew directory
-	if err := os.MkdirAll(in.CrewDir, 0o750); err != nil {
-		return nil, fmt.Errorf("create crew directory: %w", err)
-	}
+	if !alreadyInitialized {
+		// Create crew directory
+		if err := os.MkdirAll(in.CrewDir, 0o750); err != nil {
+			return nil, fmt.Errorf("create crew directory: %w", err)
+		}
 
-	// Create scripts directory
-	scriptsDir := filepath.Join(in.CrewDir, "scripts")
-	if err := os.MkdirAll(scriptsDir, 0o750); err != nil {
-		return nil, fmt.Errorf("create scripts directory: %w", err)
-	}
+		// Create scripts directory
+		scriptsDir := filepath.Join(in.CrewDir, "scripts")
+		if err := os.MkdirAll(scriptsDir, 0o750); err != nil {
+			return nil, fmt.Errorf("create scripts directory: %w", err)
+		}
 
-	// Create logs directory
-	logsDir := filepath.Join(in.CrewDir, "logs")
-	if err := os.MkdirAll(logsDir, 0o750); err != nil {
-		return nil, fmt.Errorf("create logs directory: %w", err)
-	}
+		// Create logs directory
+		logsDir := filepath.Join(in.CrewDir, "logs")
+		if err := os.MkdirAll(logsDir, 0o750); err != nil {
+			return nil, fmt.Errorf("create logs directory: %w", err)
+		}
 
-	// Create tmux.conf with minimal configuration
-	tmuxConfPath := filepath.Join(in.CrewDir, "tmux.conf")
-	tmuxConf := `# git-crew tmux configuration
+		// Create tmux.conf with minimal configuration
+		tmuxConfPath := filepath.Join(in.CrewDir, "tmux.conf")
+		tmuxConf := `# git-crew tmux configuration
 unbind-key -a              # Unbind all keys
 bind-key -n C-g detach-client  # Ctrl+G to detach
 set -g status off          # Hide status bar
 set -g escape-time 0       # No escape delay
 `
-	if err := os.WriteFile(tmuxConfPath, []byte(tmuxConf), 0o600); err != nil {
-		return nil, fmt.Errorf("create tmux.conf: %w", err)
+		if err := os.WriteFile(tmuxConfPath, []byte(tmuxConf), 0o600); err != nil {
+			return nil, fmt.Errorf("create tmux.conf: %w", err)
+		}
 	}
 
-	// Initialize task store (creates empty tasks.json)
-	if err := uc.storeInit.Initialize(); err != nil {
+	// Initialize task store (creates empty tasks.json or repairs inconsistencies)
+	repaired, err := uc.storeInit.Initialize()
+	if err != nil {
 		return nil, fmt.Errorf("initialize task store: %w", err)
 	}
 
 	return &InitRepoOutput{
-		CrewDir: in.CrewDir,
+		CrewDir:            in.CrewDir,
+		AlreadyInitialized: alreadyInitialized,
+		Repaired:           repaired,
 	}, nil
 }

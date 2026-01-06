@@ -176,16 +176,18 @@ func (s *Store) IsInitialized() bool {
 }
 
 // Initialize creates an empty store file if it doesn't exist.
-func (s *Store) Initialize() error {
+// Returns true if any repair was performed (NextTaskID was updated).
+func (s *Store) Initialize() (bool, error) {
 	// Ensure parent directory exists
 	dir := filepath.Dir(s.path)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return fmt.Errorf("create directory: %w", err)
+		return false, fmt.Errorf("create directory: %w", err)
 	}
 
 	// Check if file already exists
 	if _, err := os.Stat(s.path); err == nil {
-		return nil // Already exists
+		// File exists - check and repair if needed
+		return s.repairIfNeeded()
 	}
 
 	// Create empty store
@@ -195,7 +197,34 @@ func (s *Store) Initialize() error {
 		Comments: make(map[string][]comment),
 	}
 
-	return s.write(data)
+	return false, s.write(data)
+}
+
+// repairIfNeeded checks if NextTaskID is consistent with existing tasks and repairs if needed.
+func (s *Store) repairIfNeeded() (bool, error) {
+	data, err := s.read()
+	if err != nil {
+		return false, err
+	}
+
+	// Find max task ID
+	maxID := 0
+	for idStr := range data.Tasks {
+		if id, err := strconv.Atoi(idStr); err == nil && id > maxID {
+			maxID = id
+		}
+	}
+
+	minNextID := maxID + 1
+	if data.Meta.NextTaskID < minNextID {
+		data.Meta.NextTaskID = minNextID
+		if err := s.write(data); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return false, nil
 }
 
 // withLock executes fn with a shared (read) lock.

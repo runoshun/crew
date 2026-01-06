@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,11 +15,12 @@ type mockInitializer struct {
 	initErr       error
 	initCalled    bool
 	isInitialized bool
+	repaired      bool
 }
 
-func (m *mockInitializer) Initialize() error {
+func (m *mockInitializer) Initialize() (bool, error) {
 	m.initCalled = true
-	return m.initErr
+	return m.repaired, m.initErr
 }
 
 func (m *mockInitializer) IsInitialized() bool {
@@ -72,14 +72,15 @@ func TestInitRepo_Execute_AlreadyInitialized(t *testing.T) {
 	uc := NewInitRepo(mock)
 
 	// Execute
-	_, err := uc.Execute(context.Background(), InitRepoInput{
+	out, err := uc.Execute(context.Background(), InitRepoInput{
 		CrewDir:   crewDir,
 		StorePath: filepath.Join(crewDir, "tasks.json"),
 	})
 
-	// Assert
-	assert.ErrorIs(t, err, domain.ErrAlreadyInitialized)
-	assert.False(t, mock.initCalled, "Initialize should not be called")
+	// Assert - now returns success with AlreadyInitialized flag
+	require.NoError(t, err)
+	assert.True(t, out.AlreadyInitialized)
+	assert.True(t, mock.initCalled, "Initialize should be called for repair")
 }
 
 func TestInitRepo_Execute_InitializerError(t *testing.T) {
