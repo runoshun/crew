@@ -253,4 +253,42 @@ out := runCrew(t, dir, "new", "--title", "Test task")
 assert.Contains(t, out, "Created task #1")
 ```
 
+### Testing Hard-to-Test Functions
+
+When a function calls something that terminates or replaces the process (like `syscall.Exec`), inject it as a field:
+
+```go
+// Define the function type
+type ExecFunc func(argv0 string, argv []string, envv []string) error
+
+type Client struct {
+    execFunc ExecFunc // default: syscall.Exec
+}
+
+func NewClient() *Client {
+    return &Client{execFunc: syscall.Exec}
+}
+
+// Setter for testing
+func (c *Client) SetExecFunc(fn ExecFunc) {
+    c.execFunc = fn
+}
+
+// Use c.execFunc instead of syscall.Exec directly
+func (c *Client) Attach(name string) error {
+    return c.execFunc(path, args, env)
+}
+```
+
+In tests, inject a mock to verify arguments without actually exec'ing:
+
+```go
+var capturedArgs []string
+client.SetExecFunc(func(argv0 string, argv []string, envv []string) error {
+    capturedArgs = argv
+    return nil
+})
+client.Attach("session-1")
+assert.Equal(t, expectedArgs, capturedArgs)
+```
 
