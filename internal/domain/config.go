@@ -15,30 +15,65 @@ var configTemplateContent string
 
 // Config represents the application configuration.
 type Config struct {
-	Agents       map[string]Agent // Agent definitions from [agents.<name>]
-	AgentsConfig AgentsConfig     // Common [agents] settings
-	Complete     CompleteConfig   // [complete] settings
-	Diff         DiffConfig       // [diff] settings
-	Log          LogConfig        // [log] settings
-	Tasks        TasksConfig      // [tasks] settings
-	TUI          TUIConfig        // [tui] settings
-	Worktree     WorktreeConfig   // [worktree] settings
-	Warnings     []string         // [warning] Unknown keys or other issues
+	Agents       map[string]Agent `toml:"agents"` // Agent definitions from [agents.<name>]
+	AgentsConfig AgentsConfig     `toml:"agents"` // Common [agents] settings
+	Complete     CompleteConfig   `toml:"complete"`
+	Diff         DiffConfig       `toml:"diff"`
+	Log          LogConfig        `toml:"log"`
+	Tasks        TasksConfig      `toml:"tasks"`
+	TUI          TUIConfig        `toml:"tui"`
+	Worktree     WorktreeConfig   `toml:"worktree"`
+	Warnings     []string         `toml:"-"`
+}
+
+// MarshalTOML overrides the TOML marshaling for Config to merge Agents and AgentsConfig.
+func (c *Config) MarshalTOML() (any, error) {
+	type agentsSection struct {
+		Agents         map[string]Agent `toml:",inline"`
+		DefaultWorker  string           `toml:"worker_default,omitempty"`
+		DefaultManager string           `toml:"manager_default,omitempty"`
+		WorkerPrompt   string           `toml:"worker_prompt,omitempty"`
+		ManagerPrompt  string           `toml:"manager_prompt,omitempty"`
+	}
+
+	return struct {
+		Agents   agentsSection  `toml:"agents"`
+		Complete CompleteConfig `toml:"complete"`
+		Diff     DiffConfig     `toml:"diff"`
+		Log      LogConfig      `toml:"log"`
+		Tasks    TasksConfig    `toml:"tasks"`
+		TUI      TUIConfig      `toml:"tui"`
+		Worktree WorktreeConfig `toml:"worktree"`
+	}{
+		Agents: agentsSection{
+			DefaultWorker:  c.AgentsConfig.DefaultWorker,
+			DefaultManager: c.AgentsConfig.DefaultManager,
+			WorkerPrompt:   c.AgentsConfig.WorkerPrompt,
+			ManagerPrompt:  c.AgentsConfig.ManagerPrompt,
+			Agents:         c.Agents,
+		},
+		Complete: c.Complete,
+		Diff:     c.Diff,
+		Log:      c.Log,
+		Tasks:    c.Tasks,
+		TUI:      c.TUI,
+		Worktree: c.Worktree,
+	}, nil
 }
 
 // TasksConfig holds settings for task storage from [tasks] section.
 type TasksConfig struct {
-	Store     string // Storage backend: "git" (default) or "json"
-	Namespace string // Git namespace for refs (default: "crew")
-	Encrypt   bool   // Enable encryption for task data (default: false)
+	Store     string `toml:"store,omitempty"`     // Storage backend: "git" (default) or "json"
+	Namespace string `toml:"namespace,omitempty"` // Git namespace for refs (default: "crew")
+	Encrypt   bool   `toml:"encrypt,omitempty"`   // Enable encryption for task data (default: false)
 }
 
 // AgentsConfig holds common settings for all agents from [agents] section.
 type AgentsConfig struct {
-	DefaultWorker  string // Default worker agent name
-	DefaultManager string // Default manager agent name
-	WorkerPrompt   string // Default prompt for all worker agents
-	ManagerPrompt  string // Default prompt for all manager agents
+	DefaultWorker  string `toml:"worker_default,omitempty"`  // Default worker agent name
+	DefaultManager string `toml:"manager_default,omitempty"` // Default manager agent name
+	WorkerPrompt   string `toml:"worker_prompt,omitempty"`   // Default prompt for all worker agents
+	ManagerPrompt  string `toml:"manager_prompt,omitempty"`  // Default prompt for all manager agents
 }
 
 // Role represents the role of an agent.
@@ -55,26 +90,26 @@ const (
 // This replaces the previous separate Worker and Manager types.
 type Agent struct {
 	// Inheritance
-	Inherit string // Name of agent to inherit from (optional)
+	Inherit string `toml:"inherit,omitempty"` // Name of agent to inherit from (optional)
 
 	// Command execution
-	CommandTemplate string // Full command template (e.g., "opencode -m {{.Model}} {{.Args}} --prompt {{.Prompt}}")
+	CommandTemplate string `toml:"command_template,omitempty"` // Full command template (e.g., "opencode -m {{.Model}} {{.Args}} --prompt {{.Prompt}}")
 
 	// Role configuration
-	Role         Role   // Role: worker, reviewer, manager
-	SystemPrompt string // System prompt template
-	Prompt       string // User prompt template
-	Args         string // Additional arguments
+	Role         Role   `toml:"role,omitempty"`          // Role: worker, reviewer, manager
+	SystemPrompt string `toml:"system_prompt,omitempty"` // System prompt template
+	Prompt       string `toml:"prompt,omitempty"`        // User prompt template
+	Args         string `toml:"args,omitempty"`          // Additional arguments
 
 	// Agent metadata
-	DefaultModel string // Default model for this agent
-	Description  string // Description of the agent's purpose
+	DefaultModel string `toml:"default_model,omitempty"` // Default model for this agent
+	Description  string `toml:"description,omitempty"`   // Description of the agent's purpose
 
 	// Worktree setup (for workers/reviewers)
-	SetupScript string // Setup script (replaces worktree_setup_script and exclude_patterns)
+	SetupScript string `toml:"setup_script,omitempty"` // Setup script (replaces worktree_setup_script and exclude_patterns)
 
 	// Visibility
-	Hidden bool // Hide from TUI agent list
+	Hidden bool `toml:"hidden,omitempty"` // Hide from TUI agent list
 }
 
 // CommandData holds data for rendering agent commands and prompts.
@@ -197,24 +232,24 @@ func expandString(s string, data CommandData) (string, error) {
 
 // CompleteConfig holds completion gate settings from [complete] section.
 type CompleteConfig struct {
-	Command string // Command to run as CI gate on complete
+	Command string `toml:"command,omitempty"` // Command to run as CI gate on complete
 }
 
 // DiffConfig holds diff display settings from [diff] section.
 type DiffConfig struct {
-	Command    string // Command to display diff (with {{.Args}} template support)
-	TUICommand string // Command for TUI diff display
+	Command    string `toml:"command,omitempty"`     // Command to display diff (with {{.Args}} template support)
+	TUICommand string `toml:"tui_command,omitempty"` // Command for TUI diff display
 }
 
 // LogConfig holds logging settings from [log] section.
 type LogConfig struct {
-	Level string // Log level: debug, info, warn, error
+	Level string `toml:"level,omitempty"` // Log level: debug, info, warn, error
 }
 
 // WorktreeConfig holds worktree customization settings from [worktree] section.
 type WorktreeConfig struct {
-	SetupCommand string   // Command to run after worktree creation
-	Copy         []string // Files/directories to copy (with CoW if available)
+	SetupCommand string   `toml:"setup_command,omitempty"` // Command to run after worktree creation
+	Copy         []string `toml:"copy,omitempty"`          // Files/directories to copy (with CoW if available)
 }
 
 // TUIKeybinding represents a custom keybinding configuration for TUI.

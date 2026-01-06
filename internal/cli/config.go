@@ -3,9 +3,8 @@ package cli
 import (
 	"fmt"
 	"io"
-	"sort"
-	"strings"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
@@ -71,91 +70,17 @@ Use --ignore-global or --ignore-repo to exclude specific sources for debugging.`
 	return cmd
 }
 
-// formatEffectiveConfig formats the effective config in TOML-like format.
+// formatEffectiveConfig formats the effective config in TOML format.
 func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
-	// [agents] section - defaults
-	_, _ = fmt.Fprintln(w, "[agents]")
-	if cfg.AgentsConfig.DefaultWorker != "" {
-		_, _ = fmt.Fprintf(w, "default_worker = %q\n", cfg.AgentsConfig.DefaultWorker)
+	data, err := toml.Marshal(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintf(w, "Error marshaling config: %v\n", err)
+		return
 	}
-	if cfg.AgentsConfig.DefaultManager != "" {
-		_, _ = fmt.Fprintf(w, "default_manager = %q\n", cfg.AgentsConfig.DefaultManager)
-	}
-	_, _ = fmt.Fprintln(w)
-
-	// [agents.<name>] sections - sorted for consistent output
-	agentNames := make([]string, 0, len(cfg.Agents))
-	for name := range cfg.Agents {
-		agentNames = append(agentNames, name)
-	}
-	sort.Strings(agentNames)
-
-	for _, name := range agentNames {
-		agent := cfg.Agents[name]
-		_, _ = fmt.Fprintf(w, "[agents.%s]\n", name)
-		if agent.Inherit != "" {
-			_, _ = fmt.Fprintf(w, "inherit = %q\n", agent.Inherit)
-		}
-		if agent.CommandTemplate != "" {
-			_, _ = fmt.Fprintf(w, "command_template = %q\n", agent.CommandTemplate)
-		}
-		if agent.Role != "" {
-			_, _ = fmt.Fprintf(w, "role = %q\n", string(agent.Role))
-		}
-		if agent.Args != "" {
-			_, _ = fmt.Fprintf(w, "args = %q\n", agent.Args)
-		}
-		if agent.DefaultModel != "" {
-			_, _ = fmt.Fprintf(w, "default_model = %q\n", agent.DefaultModel)
-		}
-		if agent.SystemPrompt != "" {
-			_, _ = fmt.Fprintf(w, "system_prompt = %s\n", formatMultilineString(agent.SystemPrompt))
-		}
-		if agent.Prompt != "" {
-			_, _ = fmt.Fprintf(w, "prompt = %s\n", formatMultilineString(agent.Prompt))
-		}
-		if agent.Hidden {
-			_, _ = fmt.Fprintf(w, "hidden = true\n")
-		}
-		_, _ = fmt.Fprintln(w)
-	}
-
-	// [complete] section
-	if cfg.Complete.Command != "" {
-		_, _ = fmt.Fprintln(w, "[complete]")
-		_, _ = fmt.Fprintf(w, "command = %q\n", cfg.Complete.Command)
-		_, _ = fmt.Fprintln(w)
-	}
-
-	// [diff] section
-	if cfg.Diff.Command != "" || cfg.Diff.TUICommand != "" {
-		_, _ = fmt.Fprintln(w, "[diff]")
-		if cfg.Diff.Command != "" {
-			_, _ = fmt.Fprintf(w, "command = %q\n", cfg.Diff.Command)
-		}
-		if cfg.Diff.TUICommand != "" {
-			_, _ = fmt.Fprintf(w, "tui_command = %q\n", cfg.Diff.TUICommand)
-		}
-		_, _ = fmt.Fprintln(w)
-	}
-
-	// [log] section
-	if cfg.Log.Level != "" {
-		_, _ = fmt.Fprintln(w, "[log]")
-		_, _ = fmt.Fprintf(w, "level = %q\n", cfg.Log.Level)
-	}
+	_, _ = w.Write(data)
 }
 
 // formatMultilineString formats a string for TOML output.
-// Uses triple quotes for multiline strings.
-func formatMultilineString(s string) string {
-	if strings.Contains(s, "\n") {
-		// Use TOML multiline basic string
-		return fmt.Sprintf(`"""%s"""`, "\n"+s)
-	}
-	return fmt.Sprintf("%q", s)
-}
-
 // newConfigInitCommand creates the config init subcommand.
 func newConfigInitCommand(c *app.Container) *cobra.Command {
 	var global bool
