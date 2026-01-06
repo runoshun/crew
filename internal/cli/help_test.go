@@ -47,6 +47,8 @@ func TestShowManagerHelp(t *testing.T) {
 	assert.Contains(t, content, "crew peek")
 	assert.Contains(t, content, "crew merge")
 	assert.Contains(t, content, "Send Enter after send")
+	assert.Contains(t, content, "## Interaction Style")
+	assert.Contains(t, content, "Numbered Selection Example")
 
 	// Check available workers section
 	assert.Contains(t, content, "## Available Workers")
