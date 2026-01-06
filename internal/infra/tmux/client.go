@@ -297,10 +297,11 @@ func (c *Client) IsRunning(sessionName string) (bool, error) {
 // configureStatusBar configures the status bar for a tmux session.
 func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, taskAgent string) error {
 	// Catppuccin Mocha colors
-	bgColor := "#1e1e2e"
-	fgColor := "#cdd6f4"
-	accentColor := "#89b4fa"
-	mutedColor := "#6c7086"
+	crewBlue := "#89b4fa"  // Main crew blue - used for background
+	white := "#ffffff"     // White for high contrast text
+	lightText := "#cdd6f4" // Light text
+	yellow := "#f9e2af"    // Yellow for emphasis
+	mutedText := "#bac2de" // Muted text (Subtext0)
 
 	// Truncate title if too long
 	title := taskTitle
@@ -311,15 +312,29 @@ func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, t
 	// Shorten worker name
 	worker := shortenWorkerName(taskAgent)
 
+	// Build status-left: [←] C-g detach
+	// Background: crew blue, [←] in white, C-g in yellow, detach in light text
+	statusLeft := fmt.Sprintf("#[bg=%s,fg=%s,bold] [←] #[fg=%s,bold]C-g#[fg=%s,nobold] detach ",
+		crewBlue, white, yellow, lightText)
+
+	// Build status-right: #ID Title | worker
+	// All on crew blue background
+	statusRight := fmt.Sprintf("#[bg=%s,fg=%s]#%d #[fg=%s]%s #[fg=%s]│ %s ",
+		crewBlue, white, taskID, lightText, title, mutedText, worker)
+
 	// Build tmux commands
 	cmds := [][]string{
 		{"set-option", "-t", sessionName, "status", "on"},
 		{"set-option", "-t", sessionName, "status-position", "bottom"},
-		{"set-option", "-t", sessionName, "status-style", fmt.Sprintf("bg=%s,fg=%s", bgColor, fgColor)},
-		{"set-option", "-t", sessionName, "status-left", fmt.Sprintf("#[fg=%s,bold][←]#[fg=%s] C-g detach", accentColor, fgColor)},
-		{"set-option", "-t", sessionName, "status-left-length", "25"},
-		{"set-option", "-t", sessionName, "status-right", fmt.Sprintf("#[fg=%s]#%d#[fg=%s] %s #[fg=%s]│ %s", accentColor, taskID, fgColor, title, mutedColor, worker)},
+		// Set status bar background to crew blue with white text
+		{"set-option", "-t", sessionName, "status-style", fmt.Sprintf("bg=%s,fg=%s", crewBlue, white)},
+		{"set-option", "-t", sessionName, "status-left", statusLeft},
+		{"set-option", "-t", sessionName, "status-left-length", "30"},
+		{"set-option", "-t", sessionName, "status-right", statusRight},
 		{"set-option", "-t", sessionName, "status-right-length", "60"},
+		// Hide window list (prevents "0:bash*" from appearing in the center)
+		{"set-option", "-t", sessionName, "window-status-format", ""},
+		{"set-option", "-t", sessionName, "window-status-current-format", ""},
 		{"set-option", "-t", sessionName, "mouse", "on"},
 		{"bind-key", "-T", "root", "C-g", "detach-client"},
 		{"bind-key", "-T", "root", "MouseDown1StatusLeft", "detach-client"},
