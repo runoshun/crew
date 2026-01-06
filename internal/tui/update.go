@@ -188,7 +188,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Start):
 		task := m.SelectedTask()
-		if task == nil || !task.Status.CanStart() {
+		if task == nil {
 			return m, nil
 		}
 		m.mode = ModeStart
