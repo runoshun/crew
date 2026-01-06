@@ -237,10 +237,10 @@ func (m *Model) dialogWidth() int {
 var statusPriority = map[domain.Status]int{
 	domain.StatusInReview:     0,
 	domain.StatusInProgress:   1,
-	domain.StatusNeedsInput:   1, // 追加
-	domain.StatusNeedsChanges: 1, // 追加
+	domain.StatusNeedsInput:   1,
+	domain.StatusNeedsChanges: 1,
 	domain.StatusError:        2,
-	domain.StatusStopped:      2, // 追加
+	domain.StatusStopped:      2,
 	domain.StatusTodo:         3,
 	domain.StatusDone:         4,
 	domain.StatusClosed:       5,
