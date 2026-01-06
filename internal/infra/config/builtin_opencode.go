@@ -26,11 +26,42 @@ import type { Plugin } from "@opencode-ai/plugin"
 
 export const CrewHooksPlugin: Plugin = async ({ $ }) => {
   return {
-		event: async ({ event }) => {
-			if (event.type === "session.idle") {
-				await ` + "$`crew show {{.TaskID}} | grep -q \"^Status: in_review\" || crew edit {{.TaskID}} --status needs_input`" + `;
+	event: async ({ event }) => {
+		// Check if current status is in_review (if so, skip auto-switching)
+		const isInReview = async () => {
+			try {
+				const { exitCode } = await ` + "$`crew show {{.TaskID}} | grep -q \"^Status: in_review\"`" + `;
+				return exitCode === 0;
+			} catch {
+				return false;
+			}
+		};
+
+		// Transition to needs_input: session idle
+		if (event.type === "session.idle") {
+			if (!(await isInReview())) {
+				await ` + "$`crew edit {{.TaskID}} --status needs_input`" + `;
 			}
 		}
+
+		// Transition to needs_input or in_progress: session status change
+		if (event.type === "session.status") {
+			if (!(await isInReview())) {
+				if (event.status.type === "idle") {
+					await ` + "$`crew edit {{.TaskID}} --status needs_input`" + `;
+				} else if (event.status.type === "busy") {
+					await ` + "$`crew edit {{.TaskID}} --status in_progress`" + `;
+				}
+			}
+		}
+
+		// Transition to needs_input: permission asked
+		if (event.type === "permission.asked") {
+			if (!(await isInReview())) {
+				await ` + "$`crew edit {{.TaskID}} --status needs_input`" + `;
+			}
+		}
+	}
   }
 }
 EOF
