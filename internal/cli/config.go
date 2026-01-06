@@ -13,7 +13,7 @@ import (
 
 // newConfigCommand creates the config command.
 func newConfigCommand(c *app.Container) *cobra.Command {
-	var ignoreGlobal, ignoreRepo bool
+	var ignoreGlobal, ignoreRepo, ignoreRootRepo bool
 
 	cmd := &cobra.Command{
 		Use:   "config",
@@ -21,12 +21,13 @@ func newConfigCommand(c *app.Container) *cobra.Command {
 		Long: `Display effective configuration after merging all sources.
 
 Shows which config files were loaded and the final merged configuration.
-Use --ignore-global or --ignore-repo to exclude specific sources for debugging.`,
+Use --ignore-global, --ignore-repo or --ignore-root-repo to exclude specific sources for debugging.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			uc := c.ShowConfigUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.ShowConfigInput{
-				IgnoreGlobal: ignoreGlobal,
-				IgnoreRepo:   ignoreRepo,
+				IgnoreGlobal:   ignoreGlobal,
+				IgnoreRepo:     ignoreRepo,
+				IgnoreRootRepo: ignoreRootRepo,
 			})
 			if err != nil {
 				return err
@@ -41,6 +42,13 @@ Use --ignore-global or --ignore-repo to exclude specific sources for debugging.`
 					_, _ = fmt.Fprintf(w, "- %s\n", out.GlobalConfig.Path)
 				} else {
 					_, _ = fmt.Fprintf(w, "- %s (not found)\n", out.GlobalConfig.Path)
+				}
+			}
+			if !ignoreRootRepo {
+				if out.RootRepoConfig.Exists {
+					_, _ = fmt.Fprintf(w, "- %s\n", out.RootRepoConfig.Path)
+				} else {
+					_, _ = fmt.Fprintf(w, "- %s (not found)\n", out.RootRepoConfig.Path)
 				}
 			}
 			if !ignoreRepo {
@@ -62,7 +70,8 @@ Use --ignore-global or --ignore-repo to exclude specific sources for debugging.`
 	}
 
 	cmd.Flags().BoolVar(&ignoreGlobal, "ignore-global", false, "Ignore global configuration")
-	cmd.Flags().BoolVar(&ignoreRepo, "ignore-repo", false, "Ignore repository configuration")
+	cmd.Flags().BoolVar(&ignoreRepo, "ignore-repo", false, "Ignore repository configuration (.git/crew/config.toml)")
+	cmd.Flags().BoolVar(&ignoreRootRepo, "ignore-root-repo", false, "Ignore root repository configuration (.crew.toml)")
 
 	// Add init subcommand
 	cmd.AddCommand(newConfigInitCommand(c))

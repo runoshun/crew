@@ -256,6 +256,9 @@ type ConfigManager interface {
 	// GetGlobalConfigInfo returns information about the global config file.
 	GetGlobalConfigInfo() ConfigInfo
 
+	// GetRootRepoConfigInfo returns information about the root repository config file (.crew.toml).
+	GetRootRepoConfigInfo() ConfigInfo
+
 	// InitRepoConfig creates a repository config file with default template.
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.

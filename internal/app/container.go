@@ -110,7 +110,7 @@ func New(dir string) (*Container, error) {
 	sessionClient := tmux.NewClient(cfg.SocketPath, cfg.CrewDir)
 
 	// Create config manager
-	configManager := config.NewManager(cfg.CrewDir)
+	configManager := config.NewManager(cfg.CrewDir, cfg.RepoRoot)
 
 	return &Container{
 		Tasks:            taskRepo,
