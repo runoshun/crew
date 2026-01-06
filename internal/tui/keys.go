@@ -153,3 +153,42 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
 	}
 }
+
+// GetBuiltinKeys returns a set of all keys used by builtin keybindings.
+// This is used to detect conflicts with custom keybindings.
+func (k KeyMap) GetBuiltinKeys() map[string]bool {
+	keys := make(map[string]bool)
+
+	// Add all keys from all bindings
+	addKeys := func(binding key.Binding) {
+		for _, k := range binding.Keys() {
+			keys[k] = true
+		}
+	}
+
+	addKeys(k.Up)
+	addKeys(k.Down)
+	addKeys(k.Enter)
+	addKeys(k.Start)
+	addKeys(k.Stop)
+	addKeys(k.Attach)
+	addKeys(k.Exec)
+	addKeys(k.New)
+	addKeys(k.Copy)
+	addKeys(k.Delete)
+	addKeys(k.EditStatus)
+	addKeys(k.Merge)
+	addKeys(k.Close)
+	addKeys(k.PR)
+	addKeys(k.Refresh)
+	addKeys(k.Filter)
+	addKeys(k.Sort)
+	addKeys(k.Help)
+	addKeys(k.Detail)
+	addKeys(k.ToggleShowAll)
+	addKeys(k.Quit)
+	addKeys(k.Escape)
+	addKeys(k.Confirm)
+
+	return keys
+}
