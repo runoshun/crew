@@ -253,8 +253,9 @@ Support users with task management as an assistant.
 
 // Directory and file names for git-crew.
 const (
-	CrewDirName    = "crew"        // Directory name for crew data
-	ConfigFileName = "config.toml" // Config file name
+	CrewDirName        = "crew"        // Directory name for crew data
+	ConfigFileName     = "config.toml" // Config file name
+	RootConfigFileName = ".crew.toml"  // Config file name in repository root
 )
 
 // RepoCrewDir returns the crew directory path for a repository.
@@ -265,6 +266,11 @@ func RepoCrewDir(repoRoot string) string {
 // RepoConfigPath returns the repo config path.
 func RepoConfigPath(repoRoot string) string {
 	return filepath.Join(RepoCrewDir(repoRoot), ConfigFileName)
+}
+
+// RepoRootConfigPath returns the repo root config path.
+func RepoRootConfigPath(repoRoot string) string {
+	return filepath.Join(repoRoot, RootConfigFileName)
 }
 
 // GlobalCrewDir returns the global crew directory path.

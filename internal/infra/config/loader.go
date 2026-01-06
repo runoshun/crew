@@ -18,22 +18,25 @@ var _ domain.ConfigLoader = (*Loader)(nil)
 // Loader loads configuration from TOML files.
 type Loader struct {
 	crewDir       string // Path to .git/crew directory
+	repoRoot      string // Path to repository root
 	globalConfDir string // Path to global config directory (e.g., ~/.config/git-crew)
 }
 
 // NewLoader creates a new Loader.
-func NewLoader(crewDir string) *Loader {
+func NewLoader(crewDir, repoRoot string) *Loader {
 	return &Loader{
 		crewDir:       crewDir,
+		repoRoot:      repoRoot,
 		globalConfDir: defaultGlobalConfigDir(),
 	}
 }
 
 // NewLoaderWithGlobalDir creates a new Loader with a custom global config directory.
 // This is useful for testing.
-func NewLoaderWithGlobalDir(crewDir, globalConfDir string) *Loader {
+func NewLoaderWithGlobalDir(crewDir, repoRoot, globalConfDir string) *Loader {
 	return &Loader{
 		crewDir:       crewDir,
+		repoRoot:      repoRoot,
 		globalConfDir: globalConfDir,
 	}
 }
@@ -54,42 +57,7 @@ func defaultGlobalConfigDir() string {
 // Load returns the merged configuration (repo + global).
 // Repository config takes precedence over global config.
 func (l *Loader) Load() (*domain.Config, error) {
-	// Load global config first
-	global, err := l.LoadGlobal()
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-
-	// Load repo config
-	repoPath := filepath.Join(l.crewDir, domain.ConfigFileName)
-	repo, err := l.loadFile(repoPath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-
-	// Start with default config and register builtin agents
-	base := domain.NewDefaultConfig()
-	Register(base)
-
-	// If both don't exist, return default config
-	if global == nil && repo == nil {
-		return base, nil
-	}
-
-	// Merge: default <- global <- repo (later takes precedence)
-	if global != nil {
-		base = mergeConfigs(base, global)
-	}
-	if repo != nil {
-		base = mergeConfigs(base, repo)
-	}
-
-	// Resolve inheritance after merging
-	if err := base.ResolveInheritance(); err != nil {
-		return nil, err
-	}
-
-	return base, nil
+	return l.LoadWithOptions(domain.LoadConfigOptions{})
 }
 
 // LoadGlobal returns only the global configuration.
@@ -101,7 +69,16 @@ func (l *Loader) LoadGlobal() (*domain.Config, error) {
 	return l.loadFile(globalPath)
 }
 
-// LoadRepo returns only the repository configuration.
+// LoadRootRepo returns only the repository root configuration (.crew.toml).
+func (l *Loader) LoadRootRepo() (*domain.Config, error) {
+	if l.repoRoot == "" {
+		return nil, os.ErrNotExist
+	}
+	rootRepoPath := domain.RepoRootConfigPath(l.repoRoot)
+	return l.loadFile(rootRepoPath)
+}
+
+// LoadRepo returns only the repository configuration (.git/crew/config.toml).
 func (l *Loader) LoadRepo() (*domain.Config, error) {
 	repoPath := filepath.Join(l.crewDir, domain.ConfigFileName)
 	return l.loadFile(repoPath)
@@ -109,12 +86,20 @@ func (l *Loader) LoadRepo() (*domain.Config, error) {
 
 // LoadWithOptions returns the merged configuration with options to ignore sources.
 func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config, error) {
-	var global, repo *domain.Config
+	var global, rootRepo, repo *domain.Config
 	var err error
 
 	// Load global config unless ignored
 	if !opts.IgnoreGlobal {
 		global, err = l.LoadGlobal()
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+
+	// Load root repo config unless ignored
+	if !opts.IgnoreRootRepo {
+		rootRepo, err = l.LoadRootRepo()
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
@@ -132,14 +117,17 @@ func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config,
 	base := domain.NewDefaultConfig()
 	Register(base)
 
-	// If both don't exist or are ignored, return default config
-	if global == nil && repo == nil {
+	// If all don't exist or are ignored, return default config
+	if global == nil && rootRepo == nil && repo == nil {
 		return base, nil
 	}
 
-	// Merge: default <- global <- repo (later takes precedence)
+	// Merge: default <- global <- rootRepo <- repo (later takes precedence)
 	if global != nil {
 		base = mergeConfigs(base, global)
+	}
+	if rootRepo != nil {
+		base = mergeConfigs(base, rootRepo)
 	}
 	if repo != nil {
 		base = mergeConfigs(base, repo)
