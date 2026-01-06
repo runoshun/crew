@@ -215,10 +215,10 @@ func (m *Model) updateDetailPanelViewport() {
 // updateLayoutSizes updates all layout-dependent sizes (taskList, viewport).
 // Call this when detailFocused changes or window size changes.
 func (m *Model) updateLayoutSizes() {
-	// Align taskList width with header/footer content width
-	// headerFooterContentWidth() returns the content width used for header/footer
-	// We add back the Header's internal padding (2) to get the total rendered width
-	listW := m.headerFooterContentWidth() + 2
+	// Set taskList width to headerFooterContentWidth for consistent alignment
+	// Header/Footer use this same width with Padding(0, 1) which adds 2 to total width
+	// but lipgloss Width() includes padding, so the content area matches
+	listW := m.headerFooterContentWidth()
 	m.taskList.SetSize(listW, m.height-8)
 	m.updateDetailPanelViewport()
 }

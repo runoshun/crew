@@ -151,10 +151,10 @@ func (m *Model) viewMain() string {
 }
 
 func (m *Model) headerFooterContentWidth() int {
-	width := m.listWidth() - 6
-	if m.showDetailPanel() {
-		width -= 1
-	}
+	// Return the same width as taskList for consistent alignment
+	// taskList width is set in updateLayoutSizes() based on listWidth()
+	// We subtract 4 from listWidth to account for the left margin (4 spaces) used in delegate rendering
+	width := m.listWidth() - 4
 	if width < 40 {
 		width = 40
 	}
@@ -182,7 +182,9 @@ func (m *Model) viewHeader() string {
 
 	leftLen := lipgloss.Width(title)
 	rightLen := lipgloss.Width(rightText)
-	spacing := contentWidth - leftLen - rightLen
+	// Header style has Padding(0, 1), so inner content width is contentWidth - 2
+	innerWidth := contentWidth - 2
+	spacing := innerWidth - leftLen - rightLen
 	if spacing < 1 {
 		spacing = 1
 	}
@@ -454,9 +456,11 @@ func (m *Model) viewFooter() string {
 	pagination := m.taskList.Paginator.View()
 
 	contentWidth := m.headerFooterContentWidth()
+	// Footer style has Padding(0, 1), so inner content width is contentWidth - 2
+	innerWidth := contentWidth - 2
 	contentLen := lipgloss.Width(content)
 	paginationLen := lipgloss.Width(pagination)
-	spacing := contentWidth - contentLen - paginationLen
+	spacing := innerWidth - contentLen - paginationLen
 	if spacing < 1 {
 		spacing = 1
 	}
