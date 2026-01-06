@@ -15,7 +15,6 @@ Before starting any work, read the project design documentation:
 | `dev-workflow` | `dev` | Development workflow with TODO tracking |
 | `review-workflow` | `review` | Code review workflow with TODO tracking |
 | `terminal` | - | Interactive terminal sessions (for TUI development) |
-| `web-search` | - | Web search for research tasks |
 
 Load a skill with the `skill` tool when needed.
 
@@ -105,23 +104,13 @@ For detailed steps, use the `review-workflow` skill.
 
 ## Architecture Principles
 
-### Rules (MUST follow)
+See [docs/architecture.md](./docs/architecture.md) for detailed architecture documentation.
 
-1. **Respect layer responsibilities** - Place code based on "whose concern is it". Don't put code that doesn't depend on a specific external I/F in that layer
-2. **Centralize domain knowledge in domain** - Types, errors, and rules used across the app belong in the domain package
-3. **Explicit over implicit** - Environment-dependent values (cwd, etc.) should be determined by external I/F and passed explicitly as parameters
-4. **No compromises on foundations** - Don't defer design decisions on foundational code; build the correct structure from the start
-
-### Examples
-
-| Principle | Bad | Good | Reason |
-|-----------|-----|------|--------|
-| Layer responsibility | Implement git root detection in `cmd` | Implement in `infra/git` | Git operations are not CLI-specific; needed by TUI and tests too |
-| Layer responsibility | CLI/TUI imports infra packages directly | Get UseCase via Container | Presentation layer should not directly reference Infrastructure |
-| Layer responsibility | CLI calls UseCase A, then uses result to call UseCase B | UseCase B fetches required data internally | CLI should not orchestrate; gathering necessary information is the UseCase's responsibility |
-| Domain centralization | Define `ErrNotGitRepository` in `app` package | Define in `domain/errors.go` | Git repository existence is domain knowledge for the whole app |
-| Explicit over implicit | `git.NewClient()` calls `os.Getwd()` internally | `git.NewClient(dir)` receives it | Allows specifying arbitrary directories in tests or other use cases |
-| No compromises | Place in `app` temporarily "to move later" | Create `infra/git` package from the start | Temporary placements become tech debt; dependencies spread and increase migration cost |
+Key principles:
+- **Respect layer responsibilities** - Place code based on "whose concern is it"
+- **Centralize domain knowledge in domain** - Types, errors, and rules belong in domain package
+- **Explicit over implicit** - Environment-dependent values should be passed explicitly
+- **No compromises on foundations** - Build correct structure from the start
 
 ---
 
