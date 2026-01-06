@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -333,6 +334,10 @@ func formatDuration(d time.Duration) string {
 
 // newShowCommand creates the show command for displaying task details.
 func newShowCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		JSON bool
+	}
+
 	cmd := &cobra.Command{
 		Use:   "show [id]",
 		Short: "Display task details",
@@ -355,7 +360,10 @@ Examples:
   git crew show 1
 
   # Auto-detect task from current branch
-  git crew show`,
+  git crew show
+
+  # Output in JSON format
+  git crew show 1 --json`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve task ID
@@ -374,10 +382,63 @@ Examples:
 			}
 
 			// Print output
+			if opts.JSON {
+				type jsonComment struct {
+					Time time.Time `json:"time"`
+					Text string    `json:"text"`
+				}
+				type jsonTask struct {
+					Created     time.Time     `json:"created"`
+					Started     *time.Time    `json:"started,omitempty"`
+					ParentID    *int          `json:"parent_id"`
+					Description string        `json:"description"`
+					Agent       string        `json:"agent"`
+					Branch      string        `json:"branch"`
+					Status      domain.Status `json:"status"`
+					Title       string        `json:"title"`
+					Labels      []string      `json:"labels"`
+					Comments    []jsonComment `json:"comments"`
+					ID          int           `json:"id"`
+					Issue       int           `json:"issue"`
+				}
+
+				jt := jsonTask{
+					Created:     out.Task.Created,
+					ParentID:    out.Task.ParentID,
+					Description: out.Task.Description,
+					Agent:       out.Task.Agent,
+					Branch:      domain.BranchName(out.Task.ID, out.Task.Issue),
+					Status:      out.Task.Status,
+					Title:       out.Task.Title,
+					Labels:      out.Task.Labels,
+					ID:          out.Task.ID,
+					Issue:       out.Task.Issue,
+					Comments:    make([]jsonComment, len(out.Comments)),
+				}
+				if !out.Task.Started.IsZero() {
+					jt.Started = &out.Task.Started
+				}
+				if jt.Labels == nil {
+					jt.Labels = []string{}
+				}
+				for i, c := range out.Comments {
+					jt.Comments[i] = jsonComment{
+						Time: c.Time,
+						Text: c.Text,
+					}
+				}
+
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(jt)
+			}
+
 			printTaskDetails(cmd.OutOrStdout(), out)
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output in JSON format")
 
 	return cmd
 }
