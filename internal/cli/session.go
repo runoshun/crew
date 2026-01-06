@@ -182,7 +182,8 @@ Examples:
 // newPeekCommand creates the peek command for viewing session output.
 func newPeekCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		lines int
+		lines  int
+		escape bool
 	}
 
 	cmd := &cobra.Command{
@@ -203,7 +204,11 @@ Examples:
 
   # View last 50 lines
   git crew peek 1 --lines 50
-  git crew peek 1 -n 50`,
+  git crew peek 1 -n 50
+
+  # View with ANSI escape sequences (colors)
+  git crew peek 1 --escape
+  git crew peek 1 -e`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -217,6 +222,7 @@ Examples:
 			out, err := uc.Execute(cmd.Context(), usecase.PeekSessionInput{
 				TaskID: taskID,
 				Lines:  opts.lines,
+				Escape: opts.escape,
 			})
 			if err != nil {
 				return err
@@ -229,6 +235,7 @@ Examples:
 	}
 
 	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 0, "Number of lines to display (default: 30)")
+	cmd.Flags().BoolVarP(&opts.escape, "escape", "e", false, "Include ANSI escape sequences (colors)")
 
 	return cmd
 }

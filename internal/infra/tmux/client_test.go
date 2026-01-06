@@ -308,9 +308,44 @@ func TestClient_Peek(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Peek at output
-	output, err := client.Peek(sessionName, 10)
+	output, err := client.Peek(sessionName, 10, false)
 	require.NoError(t, err)
 	assert.Contains(t, output, "Hello World")
+}
+
+func TestClient_Peek_Escape(t *testing.T) {
+	socketPath, crewDir, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	client := NewClient(socketPath, crewDir)
+	sessionName := "test-session"
+
+	// Start session that echoes colored text
+	// \x1b[31m is red
+	err := client.Start(context.Background(), domain.StartSessionOptions{
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "printf 'Hello \\033[31mRed\\033[0m World\\n'; sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
+	})
+	require.NoError(t, err)
+
+	// Wait a bit for the printf to complete
+	time.Sleep(100 * time.Millisecond)
+
+	// Peek at output without escape
+	output, err := client.Peek(sessionName, 10, false)
+	require.NoError(t, err)
+	assert.Contains(t, output, "Hello Red World")
+	assert.NotContains(t, output, "\x1b[31m")
+
+	// Peek at output with escape
+	output, err = client.Peek(sessionName, 10, true)
+	require.NoError(t, err)
+	assert.Contains(t, output, "Hello \x1b[31mRed")
+	assert.Contains(t, output, "World")
 }
 
 func TestClient_Peek_NoSession(t *testing.T) {
@@ -320,7 +355,7 @@ func TestClient_Peek_NoSession(t *testing.T) {
 	client := NewClient(socketPath, crewDir)
 
 	// Peek at non-existent session
-	_, err := client.Peek("non-existent", 10)
+	_, err := client.Peek("non-existent", 10, false)
 	assert.ErrorIs(t, err, domain.ErrNoSession)
 }
 
@@ -357,7 +392,7 @@ func TestClient_Send(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify the output
-	output, err := client.Peek(sessionName, 20)
+	output, err := client.Peek(sessionName, 20, false)
 	require.NoError(t, err)
 	assert.Contains(t, output, "Sent from test")
 }

@@ -309,6 +309,7 @@ type MockSessionManager struct {
 	SentKeys     string
 	StartOpts    domain.StartSessionOptions
 	PeekLines    int
+	PeekEscape   bool
 	IsRunningVal bool
 	StartCalled  bool
 	StopCalled   bool
@@ -345,9 +346,10 @@ func (m *MockSessionManager) Attach(_ string) error {
 }
 
 // Peek records the call and returns configured output or error.
-func (m *MockSessionManager) Peek(_ string, lines int) (string, error) {
+func (m *MockSessionManager) Peek(_ string, lines int, escape bool) (string, error) {
 	m.PeekCalled = true
 	m.PeekLines = lines
+	m.PeekEscape = escape
 	if m.PeekErr != nil {
 		return "", m.PeekErr
 	}
