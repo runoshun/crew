@@ -104,4 +104,3 @@ scripts/terminal.sh execute --raw-output 'grep --color=always pattern file.txt' 
 - Use `--literal` for text containing special key names
 - Use `--read-wait` with longer values for slow commands
 - Use `C-c` to interrupt running processes
-- Use `--raw-output` when inspecting colors or ANSI formatting (e.g., debugging TUI display issues)

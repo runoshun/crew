@@ -18,6 +18,8 @@ Before starting any work, read the project design documentation:
 
 Load a skill with the `skill` tool when needed.
 
+**Tip:** When checking colors/escape sequences with terminal skill, use `--raw-output` to preserve ANSI formatting.
+
 ---
 
 ## Common Rules
