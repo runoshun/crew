@@ -121,18 +121,29 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	_, _ = fmt.Fprintln(w, line)
 
 	// Build metadata line
-	metaParts := []string{}
+	// Collect plain text and styled text separately for width calculation
+	type metaPart struct {
+		plain  string // plain text for width calculation
+		styled string // styled text for display
+	}
+	var metaParts []metaPart
+
 	grayStyle := lipgloss.NewStyle().Foreground(Colors.DescNormal) // Gray for metadata
 	greenStyle := lipgloss.NewStyle().Foreground(Colors.Success)   // Green for play icon
 	blueStyle := lipgloss.NewStyle().Foreground(Colors.Primary)    // Blue for GitHub
-	sepStyle := lipgloss.NewStyle().Foreground(Colors.DescNormal)  // Gray for separator
 
 	// 1. Base branch (always shown)
-	metaParts = append(metaParts, grayStyle.Render(task.BaseBranch))
+	metaParts = append(metaParts, metaPart{
+		plain:  task.BaseBranch,
+		styled: grayStyle.Render(task.BaseBranch),
+	})
 
 	// 2. Created (always shown)
 	createdStr := task.Created.Format("Jan 02")
-	metaParts = append(metaParts, grayStyle.Render(createdStr))
+	metaParts = append(metaParts, metaPart{
+		plain:  createdStr,
+		styled: grayStyle.Render(createdStr),
+	})
 
 	// 3. Labels (if any)
 	if len(task.Labels) > 0 {
@@ -141,21 +152,29 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 			labelStyle := lipgloss.NewStyle().Bold(true).Foreground(labelColor(label))
 			labelsStrs = append(labelsStrs, labelStyle.Render(label))
 		}
-		metaParts = append(metaParts, strings.Join(labelsStrs, " "))
+		metaParts = append(metaParts, metaPart{
+			plain:  strings.Join(task.Labels, " "),
+			styled: strings.Join(labelsStrs, " "),
+		})
 	}
 
 	// 4. Parent (if has parent)
 	if task.ParentID != nil {
 		parentStr := fmt.Sprintf("^%d", *task.ParentID)
-		metaParts = append(metaParts, grayStyle.Render(parentStr))
+		metaParts = append(metaParts, metaPart{
+			plain:  parentStr,
+			styled: grayStyle.Render(parentStr),
+		})
 	}
 
 	// 5. Session + elapsed time (if running)
 	if task.Session != "" {
 		elapsed := time.Since(task.Started)
-		playIcon := greenStyle.Render("▶")
-		elapsedStr := grayStyle.Render(formatElapsedTime(elapsed))
-		metaParts = append(metaParts, playIcon+" "+elapsedStr)
+		elapsedFmt := formatElapsedTime(elapsed)
+		metaParts = append(metaParts, metaPart{
+			plain:  "▶ " + elapsedFmt,
+			styled: greenStyle.Render("▶") + " " + grayStyle.Render(elapsedFmt),
+		})
 	}
 
 	// 6. Comments (if any)
@@ -164,7 +183,10 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		if ti.commentCount > 1 {
 			commentStr += "s"
 		}
-		metaParts = append(metaParts, grayStyle.Render(commentStr))
+		metaParts = append(metaParts, metaPart{
+			plain:  commentStr,
+			styled: grayStyle.Render(commentStr),
+		})
 	}
 
 	// 7. GitHub (if linked)
@@ -177,12 +199,44 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 	if len(ghParts) > 0 {
 		ghStr := strings.Join(ghParts, " ")
-		metaParts = append(metaParts, blueStyle.Render(ghStr))
+		metaParts = append(metaParts, metaPart{
+			plain:  ghStr,
+			styled: blueStyle.Render(ghStr),
+		})
 	}
 
-	// Join with separator
-	sep := sepStyle.Render("  |  ")
-	metaLine := "                   " + strings.Join(metaParts, sep)
+	// Calculate available width
+	prefix := "                   " // 19 spaces to align with title
+	sep := "  |  "
+	maxMetaLen := listWidth - runewidth.StringWidth(prefix) - 2
+	if maxMetaLen < 10 {
+		maxMetaLen = 10
+	}
+
+	// Try to fit metadata, removing items from the end if necessary
+	numItems := len(metaParts)
+	for numItems > 0 {
+		// Calculate width of plain text
+		plainTexts := make([]string, numItems)
+		for i := 0; i < numItems; i++ {
+			plainTexts[i] = metaParts[i].plain
+		}
+		plainStr := strings.Join(plainTexts, sep)
+		if runewidth.StringWidth(plainStr) <= maxMetaLen {
+			break
+		}
+		numItems--
+	}
+
+	// Build styled string
+	styledParts := make([]string, numItems)
+	for i := 0; i < numItems; i++ {
+		styledParts[i] = metaParts[i].styled
+	}
+	styledSep := grayStyle.Render(sep)
+	metaStr := strings.Join(styledParts, styledSep)
+
+	metaLine := prefix + metaStr
 
 	// Pad to full width
 	metaLineWidth := runewidth.StringWidth(metaLine)
