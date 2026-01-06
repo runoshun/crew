@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRenderWorkerHelp(t *testing.T) {
+func TestShowWorkerHelp(t *testing.T) {
 	var buf bytes.Buffer
 
-	err := RenderWorkerHelp(&buf, HelpTemplateData{})
+	err := showWorkerHelp(&buf)
 
 	require.NoError(t, err)
 	content := buf.String()
@@ -24,17 +25,17 @@ func TestRenderWorkerHelp(t *testing.T) {
 	assert.Contains(t, content, "git push") // in prohibited actions section
 }
 
-func TestRenderManagerHelp(t *testing.T) {
+func TestShowManagerHelp(t *testing.T) {
 	var buf bytes.Buffer
 
-	data := HelpTemplateData{
-		Workers: []WorkerInfo{
-			{Name: "worker1", Model: "model1", Description: "desc1"},
-			{Name: "worker2", Model: "model2", Description: "desc2"},
+	cfg := &domain.Config{
+		Agents: map[string]domain.Agent{
+			"worker1": {DefaultModel: "model1", Description: "desc1", Role: domain.RoleWorker},
+			"worker2": {DefaultModel: "model2", Description: "desc2", Role: domain.RoleWorker},
 		},
 	}
 
-	err := RenderManagerHelp(&buf, data)
+	err := showManagerHelp(&buf, cfg)
 
 	require.NoError(t, err)
 	content := buf.String()
