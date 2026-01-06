@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -30,11 +31,13 @@ type Model struct {
 	err       error
 
 	// State (slices - contain pointers)
-	tasks         []*domain.Task
-	comments      []domain.Comment
-	builtinAgents []string
-	customAgents  []string
-	agentCommands map[string]string
+	tasks           []*domain.Task
+	comments        []domain.Comment
+	builtinAgents   []string
+	customAgents    []string
+	agentCommands   map[string]string
+	customKeybinds  map[string]domain.TUIKeybinding
+	keybindWarnings []string
 
 	// Components (structs with pointers)
 	keys                KeyMap
@@ -119,6 +122,8 @@ func New(c *app.Container) *Model {
 		builtinAgents:    []string{"claude", "opencode", "codex"},
 		customAgents:     nil,
 		agentCommands:    make(map[string]string),
+		customKeybinds:   make(map[string]domain.TUIKeybinding),
+		keybindWarnings:  nil,
 		agentCursor:      0,
 		startFocusCustom: false,
 	}
@@ -452,6 +457,30 @@ func (m *Model) allAgents() []string {
 	return result
 }
 
+// loadCustomKeybindings loads custom keybindings from config and checks for conflicts.
+func (m *Model) loadCustomKeybindings() {
+	if m.config == nil {
+		return
+	}
+
+	m.customKeybinds = make(map[string]domain.TUIKeybinding)
+	m.keybindWarnings = nil
+
+	// Get builtin keys
+	builtinKeys := m.keys.GetBuiltinKeys()
+
+	// Load custom keybindings
+	for key, binding := range m.config.TUI.Keybindings {
+		// Check for conflict with builtin keys
+		if builtinKeys[key] && !binding.Override {
+			warning := fmt.Sprintf("keybinding conflict: '%s' already exists (set override=true to override)", key)
+			m.keybindWarnings = append(m.keybindWarnings, warning)
+			continue
+		}
+		m.customKeybinds[key] = binding
+	}
+}
+
 // tmuxAttachCmd implements tea.ExecCommand for attaching to a tmux session.
 type tmuxAttachCmd struct {
 	stdin       io.Reader
@@ -582,4 +611,56 @@ func (m *Model) executeCommand(command string) tea.Cmd {
 	}, func(err error) tea.Msg {
 		return MsgReloadTasks{}
 	})
+}
+
+// handleCustomKeybinding handles a custom keybinding action.
+func (m *Model) handleCustomKeybinding(binding domain.TUIKeybinding) (tea.Model, tea.Cmd) {
+	task := m.SelectedTask()
+	if task == nil {
+		return m, nil
+	}
+
+	// Render template
+	command, err := m.renderKeybindingTemplate(binding.Command, task)
+	if err != nil {
+		m.err = fmt.Errorf("render keybinding template: %w", err)
+		return m, nil
+	}
+
+	// Execute the command
+	return m, m.executeCommand(command)
+}
+
+// renderKeybindingTemplate renders a keybinding command template with task data.
+func (m *Model) renderKeybindingTemplate(cmdTemplate string, task *domain.Task) (string, error) {
+	branch := domain.BranchName(task.ID, task.Issue)
+	wtPath, err := m.container.Worktrees.Resolve(branch)
+	if err != nil {
+		wtPath = "" // Worktree may not exist yet
+	}
+
+	data := map[string]interface{}{
+		"TaskID":       task.ID,
+		"TaskTitle":    task.Title,
+		"TaskStatus":   string(task.Status),
+		"Branch":       branch,
+		"WorktreePath": wtPath,
+	}
+
+	return renderTemplate(cmdTemplate, data)
+}
+
+// renderTemplate renders a template string with the given data.
+func renderTemplate(tmpl string, data map[string]interface{}) (string, error) {
+	t, err := template.New("keybinding").Parse(tmpl)
+	if err != nil {
+		return "", err
+	}
+
+	var buf strings.Builder
+	if err := t.Execute(&buf, data); err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }

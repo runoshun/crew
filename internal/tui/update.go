@@ -38,6 +38,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.config = msg.Config
 		m.warnings = msg.Config.Warnings
 		m.updateAgents()
+		m.loadCustomKeybindings()
 		return m, nil
 
 	case MsgTaskStarted:
@@ -312,6 +313,12 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.ToggleShowAll):
 		m.showAll = !m.showAll
 		return m, m.loadTasks()
+	}
+
+	// Check custom keybindings
+	keyStr := msg.String()
+	if binding, exists := m.customKeybinds[keyStr]; exists {
+		return m.handleCustomKeybinding(binding)
 	}
 
 	return m, nil

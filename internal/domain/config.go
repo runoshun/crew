@@ -21,6 +21,7 @@ type Config struct {
 	Diff         DiffConfig       // [diff] settings
 	Log          LogConfig        // [log] settings
 	Tasks        TasksConfig      // [tasks] settings
+	TUI          TUIConfig        // [tui] settings
 	Worktree     WorktreeConfig   // [worktree] settings
 	Warnings     []string         // [warning] Unknown keys or other issues
 }
@@ -214,6 +215,18 @@ type LogConfig struct {
 type WorktreeConfig struct {
 	SetupCommand string   // Command to run after worktree creation
 	Copy         []string // Files/directories to copy (with CoW if available)
+}
+
+// TUIKeybinding represents a custom keybinding configuration for TUI.
+type TUIKeybinding struct {
+	Command     string `toml:"command"`     // Command to execute
+	Description string `toml:"description"` // Description shown in help
+	Override    bool   `toml:"override"`    // Allow overriding existing keybindings
+}
+
+// TUIConfig holds TUI customization settings from [tui] section.
+type TUIConfig struct {
+	Keybindings map[string]TUIKeybinding `toml:"keybindings"` // Custom keybindings
 }
 
 // Default configuration values.
