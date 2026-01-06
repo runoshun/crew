@@ -94,6 +94,8 @@ crew start <id> opencode
 
 ## Task Creation Best Practices
 
+**Before writing detailed implementation plans**: Investigate the source code first to understand existing patterns and architecture. Do not guess file names or implementation details.
+
 **What to include in --body**:
 1. **Files to change**: File names and line numbers if possible
 2. **Implementation plan**: Break down into steps
