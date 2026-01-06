@@ -104,7 +104,7 @@ type SessionManager interface {
 	Attach(sessionName string) error
 
 	// Peek captures the last N lines from a session.
-	Peek(sessionName string, lines int) (string, error)
+	Peek(sessionName string, lines int, escape bool) (string, error)
 
 	// Send sends keys to a session.
 	Send(sessionName string, keys string) error

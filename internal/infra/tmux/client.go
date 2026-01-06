@@ -208,7 +208,7 @@ func (c *Client) Attach(sessionName string) error {
 }
 
 // Peek captures the last N lines from a session.
-func (c *Client) Peek(sessionName string, lines int) (string, error) {
+func (c *Client) Peek(sessionName string, lines int, escape bool) (string, error) {
 	// Check if session exists
 	running, err := c.IsRunning(sessionName)
 	if err != nil {
@@ -220,15 +220,21 @@ func (c *Client) Peek(sessionName string, lines int) (string, error) {
 
 	// tmux -S <socket> capture-pane -t <name> -p -S -<lines>
 	// -p: print to stdout
+	// -e: include escape sequences
 	// -S -<lines>: start capture from <lines> lines before the current position
 	// Session names follow our naming convention (crew-N) and are safe to pass to tmux.
-	cmd := exec.Command("tmux", //nolint:gosec // sessionName follows crew-N naming convention
+	args := []string{
 		"-S", c.socketPath,
 		"capture-pane",
 		"-t", sessionName,
 		"-p",
 		"-S", fmt.Sprintf("-%d", lines),
-	)
+	}
+	if escape {
+		args = append(args, "-e")
+	}
+
+	cmd := exec.Command("tmux", args...)
 
 	out, err := cmd.Output()
 	if err != nil {

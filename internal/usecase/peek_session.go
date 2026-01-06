@@ -12,8 +12,9 @@ const DefaultPeekLines = 30
 
 // PeekSessionInput contains the parameters for peeking at a session.
 type PeekSessionInput struct {
-	TaskID int // Task ID to peek
-	Lines  int // Number of lines to display (0 uses default)
+	TaskID int  // Task ID to peek
+	Lines  int  // Number of lines to display (0 uses default)
+	Escape bool // Include ANSI escape sequences
 }
 
 // PeekSessionOutput contains the result of peeking at a session.
@@ -68,7 +69,7 @@ func (uc *PeekSession) Execute(_ context.Context, in PeekSessionInput) (*PeekSes
 	}
 
 	// Peek at session
-	output, err := uc.sessions.Peek(sessionName, lines)
+	output, err := uc.sessions.Peek(sessionName, lines, in.Escape)
 	if err != nil {
 		return nil, fmt.Errorf("peek session: %w", err)
 	}
