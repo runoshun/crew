@@ -83,6 +83,11 @@ func (c *Client) Start(ctx context.Context, opts domain.StartSessionOptions) err
 		return fmt.Errorf("start session: %w: %s", err, string(out))
 	}
 
+	// Configure status bar
+	if err := c.configureStatusBar(opts.Name, opts.TaskID, opts.TaskTitle, opts.TaskAgent); err != nil {
+		return fmt.Errorf("configure status bar: %w", err)
+	}
+
 	return nil
 }
 
@@ -287,4 +292,97 @@ func (c *Client) IsRunning(sessionName string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// configureStatusBar configures the status bar for a tmux session.
+func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, taskAgent string) error {
+	// Colors
+	mainBg := "#1e66f5"    // Catppuccin Latte Blue - main background
+	keyBg := "#1146b4"     // Darker blue for C-g keybind
+	btnBg := "#ffffff"     // White background for arrow button
+	white := "#ffffff"     // White text
+	black := "#1e1e2e"     // Black text for button
+	lightText := "#cdd6f4" // Light text
+	mutedText := "#bac2de" // Muted text
+
+	// Truncate title if too long
+	title := taskTitle
+	if len(title) > 30 {
+		title = title[:27] + "..."
+	}
+
+	// Shorten worker name
+	worker := shortenWorkerName(taskAgent)
+
+	// Build status-left: [←] C-g detach
+	// White bg button, dark blue bg for C-g, light text for detach
+	statusLeft := fmt.Sprintf("#[bg=%s,fg=%s,bold] ← #[bg=%s,fg=%s,bold] C-g #[bg=%s,fg=%s,nobold] detach ",
+		btnBg, black, keyBg, white, mainBg, lightText)
+
+	// Build status-right: #ID Title | worker
+	statusRight := fmt.Sprintf("#[bg=%s,fg=%s,bold]#%d #[fg=%s,nobold]%s #[fg=%s]│ %s ",
+		mainBg, white, taskID, lightText, title, mutedText, worker)
+
+	// Build tmux commands
+	cmds := [][]string{
+		{"set-option", "-t", sessionName, "status", "on"},
+		{"set-option", "-t", sessionName, "status-position", "top"},
+		// Set status bar background
+		{"set-option", "-t", sessionName, "status-style", fmt.Sprintf("bg=%s,fg=%s", mainBg, white)},
+		{"set-option", "-t", sessionName, "status-left", statusLeft},
+		{"set-option", "-t", sessionName, "status-left-length", "30"},
+		{"set-option", "-t", sessionName, "status-right", statusRight},
+		{"set-option", "-t", sessionName, "status-right-length", "60"},
+		// Hide window list (prevents "0:bash*" from appearing in the center)
+		{"set-option", "-t", sessionName, "window-status-format", ""},
+		{"set-option", "-t", sessionName, "window-status-current-format", ""},
+		{"set-option", "-t", sessionName, "mouse", "on"},
+		{"bind-key", "-T", "root", "C-g", "detach-client"},
+		{"bind-key", "-T", "root", "MouseDown1StatusLeft", "detach-client"},
+	}
+
+	// Execute commands
+	for _, args := range cmds {
+		cmd := exec.Command("tmux", append([]string{"-S", c.socketPath}, args...)...) //nolint:gosec // sessionName follows crew-N naming convention
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("tmux %v: %w: %s", args, err, string(out))
+		}
+	}
+
+	return nil
+}
+
+// shortenWorkerName shortens agent/worker names for display.
+// Examples:
+//   - "opencode-medium-anthropic" -> "oc-med-an"
+//   - "opencode-small" -> "oc-small"
+func shortenWorkerName(name string) string {
+	// Split by hyphen
+	parts := strings.Split(name, "-")
+	if len(parts) == 0 {
+		return name
+	}
+
+	// Shorten each part
+	shortened := make([]string, 0, len(parts))
+	for _, part := range parts {
+		switch part {
+		case "opencode":
+			shortened = append(shortened, "oc")
+		case "medium":
+			shortened = append(shortened, "med")
+		case "anthropic":
+			shortened = append(shortened, "an")
+		default:
+			// Keep short parts as-is, abbreviate longer ones
+			if len(part) <= 5 {
+				shortened = append(shortened, part)
+			} else {
+				// Take first 3 characters for longer words
+				shortened = append(shortened, part[:3])
+			}
+		}
+	}
+
+	return strings.Join(shortened, "-")
 }

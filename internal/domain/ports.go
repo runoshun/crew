@@ -115,10 +115,12 @@ type SessionManager interface {
 
 // StartSessionOptions configures session creation.
 type StartSessionOptions struct {
-	Name    string // Session name
-	Dir     string // Working directory
-	Command string // Command to run
-	TaskID  int    // Associated task ID
+	Name      string // Session name
+	Dir       string // Working directory
+	Command   string // Command to run
+	TaskTitle string // Task title for status bar
+	TaskAgent string // Agent name for status bar
+	TaskID    int    // Associated task ID
 }
 
 // WorktreeManager manages git worktrees.
