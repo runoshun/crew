@@ -192,18 +192,18 @@ crew start <id> opencode
 
 ---
 
-## アクション待ち監視
+## Monitoring for Action
 
-マネージャーがユーザーのアクションを待機するための簡単なワンライナー集。
+A short one-liner collection for managers to wait for user actions.
 
 ```bash
-# needs_input または in_review が出るまで待機（5分タイムアウト）
+# Wait until needs_input or in_review appears (5m timeout)
 timeout 5m sh -c 'while ! crew list | grep -qE "needs_input|in_review"; do sleep 5; done' && echo "Action needed"
 
-# 通知付き（Linux の notify-send を使用）
+# With notification (uses Linux notify-send)
 timeout 5m sh -c 'while ! crew list | grep -qE "needs_input|in_review"; do sleep 5; done' && notify-send "crew: Action needed"
 
-# 継続監視（10秒間隔で表示を更新）
+# Continuous watch (update display every 10s)
 watch -n 10 'crew list | grep -E "needs_input|in_review"'
 ```
 
