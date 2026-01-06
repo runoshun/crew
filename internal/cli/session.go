@@ -249,12 +249,12 @@ func newCompleteCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "complete [id]",
 		Short: "Mark task as complete",
-		Long: `Mark a task as complete (in_progress → in_review).
+		Long: `Mark a task as complete (in_progress/needs_input → in_review).
 
 If no ID is provided, the task ID is auto-detected from the current branch name.
 
 Preconditions:
-  - Task status must be 'in_progress'
+  - Task status must be 'in_progress' or 'needs_input'
   - No uncommitted changes in the worktree
 
 If [complete].command is configured, it will be executed before transitioning
