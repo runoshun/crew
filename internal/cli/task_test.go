@@ -16,13 +16,15 @@ import (
 // newTestContainer creates an app.Container with mock dependencies.
 func newTestContainer(repo *testutil.MockTaskRepository) *app.Container {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	return app.NewWithDeps(
+	container := app.NewWithDeps(
 		app.Config{},
 		repo,
 		&testutil.MockStoreInitializer{},
 		&testutil.MockClock{NowTime: time.Now()},
 		logger,
 	)
+	container.Git = &testutil.MockGit{}
+	return container
 }
 
 // =============================================================================
@@ -142,6 +144,48 @@ func TestNewNewCommand_WithIssue(t *testing.T) {
 	assert.NoError(t, err)
 	task := repo.Tasks[1]
 	assert.Equal(t, 42, task.Issue)
+}
+
+func TestNewNewCommand_WithBaseBranch(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newNewCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--title", "Test task", "--base", "develop"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	task := repo.Tasks[1]
+	assert.Equal(t, "develop", task.BaseBranch)
+}
+
+func TestNewNewCommand_DefaultBaseBranch(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	container := newTestContainer(repo)
+	// Mock git to return current branch
+	container.Git = &testutil.MockGit{CurrentBranchName: "feature-branch"}
+
+	// Create command
+	cmd := newNewCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"--title", "Test task"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	task := repo.Tasks[1]
+	assert.Equal(t, "feature-branch", task.BaseBranch)
 }
 
 // =============================================================================

@@ -74,6 +74,28 @@ func TestNewTask_Execute_WithParent(t *testing.T) {
 	assert.Equal(t, parentID, *task.ParentID)
 }
 
+func TestNewTask_Execute_WithBaseBranch(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	uc := NewNewTask(repo, clock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), NewTaskInput{
+		Title:      "Test task",
+		BaseBranch: "develop",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, 1, out.TaskID)
+
+	// Verify saved task
+	task := repo.Tasks[1]
+	require.NotNil(t, task)
+	assert.Equal(t, "develop", task.BaseBranch)
+}
+
 func TestNewTask_Execute_WithIssue(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()

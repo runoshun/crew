@@ -19,6 +19,7 @@ func newNewCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		Title       string
 		Description string
+		Base        string
 		Labels      []string
 		ParentID    int
 		Issue       int
@@ -45,12 +46,22 @@ Examples:
   # Create a task with labels
   git crew new --title "Add feature" --label feature --label urgent`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Resolve base branch
+			baseBranch := opts.Base
+			if baseBranch == "" {
+				baseBranch, _ = c.Git.CurrentBranch()
+				if baseBranch == "" {
+					baseBranch = "main" // fallback
+				}
+			}
+
 			// Build input
 			input := usecase.NewTaskInput{
 				Title:       opts.Title,
 				Description: opts.Description,
 				Issue:       opts.Issue,
 				Labels:      opts.Labels,
+				BaseBranch:  baseBranch,
 			}
 
 			// Set parent ID if specified
@@ -79,6 +90,7 @@ Examples:
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Parent task ID (creates a sub-task)")
 	cmd.Flags().IntVar(&opts.Issue, "issue", 0, "Linked GitHub issue number")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Labels (can specify multiple)")
+	cmd.Flags().StringVar(&opts.Base, "base", "", "Base branch for worktree (default: current branch)")
 
 	return cmd
 }
