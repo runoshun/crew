@@ -299,6 +299,45 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 					}
 				}
 			}
+		case "tui":
+			if m, ok := value.(map[string]any); ok {
+				for k, v := range m {
+					switch k {
+					case "keybindings":
+						if kbMap, ok := v.(map[string]any); ok {
+							if res.TUI.Keybindings == nil {
+								res.TUI.Keybindings = make(map[string]domain.TUIKeybinding)
+							}
+							for key, binding := range kbMap {
+								if bMap, ok := binding.(map[string]any); ok {
+									kb := domain.TUIKeybinding{}
+									for bk, bv := range bMap {
+										switch bk {
+										case "command":
+											if s, ok := bv.(string); ok {
+												kb.Command = s
+											}
+										case "description":
+											if s, ok := bv.(string); ok {
+												kb.Description = s
+											}
+										case "override":
+											if b, ok := bv.(bool); ok {
+												kb.Override = b
+											}
+										default:
+											warnings = append(warnings, fmt.Sprintf("unknown key in [tui.keybindings.%s]: %s", key, bk))
+										}
+									}
+									res.TUI.Keybindings[key] = kb
+								}
+							}
+						}
+					default:
+						warnings = append(warnings, fmt.Sprintf("unknown key in [tui]: %s", k))
+					}
+				}
+			}
 		default:
 			warnings = append(warnings, fmt.Sprintf("unknown section: %s", section))
 		}
@@ -427,6 +466,7 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		Diff:         base.Diff,
 		Log:          base.Log,
 		Tasks:        base.Tasks,
+		TUI:          base.TUI,
 		Worktree:     base.Worktree,
 		Warnings:     append([]string{}, base.Warnings...),
 	}
@@ -480,6 +520,14 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if len(override.Worktree.Copy) > 0 {
 		result.Worktree.Copy = override.Worktree.Copy
+	}
+	if len(override.TUI.Keybindings) > 0 {
+		if result.TUI.Keybindings == nil {
+			result.TUI.Keybindings = make(map[string]domain.TUIKeybinding)
+		}
+		for key, binding := range override.TUI.Keybindings {
+			result.TUI.Keybindings[key] = binding
+		}
 	}
 
 	// Merge agents: override individual fields, not entire agent

@@ -65,3 +65,15 @@
 ## Log settings
 # level = "<<.LogLevel>>"  # debug, info, warn, error
 
+[tui]
+## Custom keybindings (list view only)
+## - command: Command to execute (supports template variables)
+## - description: Description for help text
+## - override: Set to true to override builtin keybindings
+##
+## Template variables:
+##   {{.TaskID}}, {{.TaskTitle}}, {{.TaskStatus}}, {{.Branch}}, {{.WorktreePath}}
+##
+# [tui.keybindings]
+# "ctrl+p" = { command = "crew peek {{.TaskID}}", description = "Peek task" }
+
