@@ -434,6 +434,10 @@ func (m *Model) updateAgents() {
 		}
 	}
 
+	// Sort agent lists for stable alphabetical order
+	sort.Strings(m.builtinAgents)
+	sort.Strings(m.customAgents)
+
 	// Set cursor to default agent
 	allAgents := m.allAgents()
 	for i, a := range allAgents {
