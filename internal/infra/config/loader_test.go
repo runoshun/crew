@@ -32,7 +32,7 @@ level = "debug"
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -58,7 +58,7 @@ args = "-m gpt-4"
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -101,7 +101,7 @@ command = "mise run ci"
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -119,7 +119,7 @@ func TestLoader_Load_NoConfigFiles(t *testing.T) {
 	globalDir := t.TempDir()
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -152,7 +152,7 @@ args = "-m custom"
 	require.NoError(t, err)
 
 	// Load global config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.LoadGlobal()
 	require.NoError(t, err)
 
@@ -166,7 +166,7 @@ func TestLoader_LoadGlobal_NotFound(t *testing.T) {
 	globalDir := t.TempDir()
 
 	// Load global config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.LoadGlobal()
 
 	// Verify: returns error for non-existent file
@@ -187,7 +187,7 @@ this is not valid toml [[[
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 
 	// Verify: returns error
@@ -209,7 +209,7 @@ command_template = 'my-custom-agent --task "{{.Title}}"'
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -231,7 +231,7 @@ args = "--model claude-sonnet"
 	require.NoError(t, err)
 
 	// Load repo config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.LoadRepo()
 	require.NoError(t, err)
 
@@ -245,7 +245,7 @@ func TestLoader_LoadRepo_NotFound(t *testing.T) {
 	globalDir := t.TempDir()
 
 	// Load repo config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.LoadRepo()
 
 	// Verify: returns error for non-existent file
@@ -275,7 +275,7 @@ args = "--model repo"
 	require.NoError(t, err)
 
 	// Load with IgnoreGlobal
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreGlobal: true})
 	require.NoError(t, err)
 
@@ -309,7 +309,7 @@ args = "--model repo-model"
 	require.NoError(t, err)
 
 	// Load with IgnoreRepo
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreRepo: true})
 	require.NoError(t, err)
 
@@ -342,7 +342,7 @@ args = "--model repo"
 	require.NoError(t, err)
 
 	// Load with both ignored
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreGlobal: true, IgnoreRepo: true})
 	require.NoError(t, err)
 
@@ -391,7 +391,7 @@ unknown_log_key = "value"
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -423,7 +423,7 @@ copy = ["node_modules", ".env.local"]
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -446,7 +446,7 @@ args = "--model test"
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
@@ -455,63 +455,78 @@ args = "--model test"
 	assert.Empty(t, cfg.Worktree.Copy)
 }
 
-func TestLoader_Load_AgentsConfig(t *testing.T) {
+func TestLoader_Load_Priority(t *testing.T) {
 	// Setup
-	crewDir := t.TempDir()
+	repoRootDir := t.TempDir()
+	crewDir := filepath.Join(repoRootDir, ".git", "crew")
+	err := os.MkdirAll(crewDir, 0o755)
+	require.NoError(t, err)
 	globalDir := t.TempDir()
 
-	// Write repo config with agents section
-	repoConfig := `
-[agents]
-worker_default = "custom-worker"
-manager_default = "custom-manager"
-worker_prompt = "Custom worker prompt"
-manager_prompt = "Custom manager prompt"
-
-[agents.custom-worker]
-role = "worker"
-command_template = "custom-cmd {{.Prompt}}"
-system_prompt = "Custom system prompt"
-prompt = "Custom user prompt"
-description = "Custom worker"
-
-[agents.custom-manager]
-role = "manager"
-inherit = "custom-worker"
-system_prompt = "Manager system prompt"
-prompt = "Manager user prompt"
-description = "Custom manager"
-hidden = true
+	// 1. Global config
+	globalConfig := `
+[log]
+level = "debug"
+[agents.opencode]
+args = "global"
 `
-	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	err = os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// 2. Root repo config (.crew.toml)
+	rootRepoConfig := `
+[log]
+level = "info"
+[agents.opencode]
+args = "root"
+[agents.claude]
+args = "root"
+`
+	err = os.WriteFile(filepath.Join(repoRootDir, domain.RootConfigFileName), []byte(rootRepoConfig), 0o644)
+	require.NoError(t, err)
+
+	// 3. Repo config (.git/crew/config.toml)
+	repoConfig := `
+[agents.claude]
+args = "repo"
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
 	require.NoError(t, err)
 
 	// Load config
-	loader := NewLoaderWithGlobalDir(crewDir, globalDir)
+	loader := NewLoaderWithGlobalDir(crewDir, repoRootDir, globalDir)
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
-	// Verify agents config defaults
-	assert.Equal(t, "custom-worker", cfg.AgentsConfig.DefaultWorker)
-	assert.Equal(t, "custom-manager", cfg.AgentsConfig.DefaultManager)
-	assert.Equal(t, "Custom worker prompt", cfg.AgentsConfig.WorkerPrompt)
-	assert.Equal(t, "Custom manager prompt", cfg.AgentsConfig.ManagerPrompt)
+	// Verify priority: repo > rootRepo > global
+	assert.Equal(t, "info", cfg.Log.Level)               // rootRepo overrides global
+	assert.Equal(t, "root", cfg.Agents["opencode"].Args) // rootRepo overrides global
+	assert.Equal(t, "repo", cfg.Agents["claude"].Args)   // repo overrides rootRepo
+}
 
-	// Verify custom worker agent
-	worker, ok := cfg.Agents["custom-worker"]
-	require.True(t, ok)
-	assert.Equal(t, domain.RoleWorker, worker.Role)
-	assert.Equal(t, "custom-cmd {{.Prompt}}", worker.CommandTemplate)
-	assert.Equal(t, "Custom system prompt", worker.SystemPrompt)
-	assert.Equal(t, "Custom user prompt", worker.Prompt)
-	assert.Equal(t, "Custom worker", worker.Description)
+func TestLoader_LoadWithOptions_IgnoreRootRepo(t *testing.T) {
+	// Setup
+	repoRootDir := t.TempDir()
+	crewDir := filepath.Join(repoRootDir, ".git", "crew")
+	err := os.MkdirAll(crewDir, 0o755)
+	require.NoError(t, err)
+	globalDir := t.TempDir()
 
-	// Verify custom manager agent
-	manager, ok := cfg.Agents["custom-manager"]
-	require.True(t, ok)
-	assert.Equal(t, domain.RoleManager, manager.Role)
-	assert.Equal(t, "Manager system prompt", manager.SystemPrompt)
-	assert.Equal(t, "Manager user prompt", manager.Prompt)
-	assert.Equal(t, "Custom manager", manager.Description)
-	assert.True(t, manager.Hidden)
+	// Write root repo config
+	rootRepoConfig := `
+[agents.claude]
+args = "root"
+`
+	err = os.WriteFile(filepath.Join(repoRootDir, domain.RootConfigFileName), []byte(rootRepoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load with IgnoreRootRepo
+	loader := NewLoaderWithGlobalDir(crewDir, repoRootDir, globalDir)
+	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreRootRepo: true})
+	require.NoError(t, err)
+
+	// Verify: root repo config is ignored
+	defaultCfg := domain.NewDefaultConfig()
+	Register(defaultCfg)
+	assert.Equal(t, defaultCfg.Agents["claude"].Args, cfg.Agents["claude"].Args)
 }

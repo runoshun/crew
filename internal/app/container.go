@@ -74,7 +74,7 @@ func New(dir string) (*Container, error) {
 	cfg := newConfig(gitClient)
 
 	// Load app config to determine store type
-	configLoader := config.NewLoader(cfg.CrewDir)
+	configLoader := config.NewLoader(cfg.CrewDir, cfg.RepoRoot)
 	appConfig, _ := configLoader.Load() // ignore error, use defaults
 
 	// Create task repository based on config

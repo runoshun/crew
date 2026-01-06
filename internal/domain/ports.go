@@ -236,8 +236,9 @@ type ConfigLoader interface {
 
 // LoadConfigOptions specifies options for loading configuration.
 type LoadConfigOptions struct {
-	IgnoreGlobal bool // Skip loading global config
-	IgnoreRepo   bool // Skip loading repo config
+	IgnoreGlobal   bool // Skip loading global config
+	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
+	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
 }
 
 // ConfigInfo holds information about a config file.
