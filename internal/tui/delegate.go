@@ -122,14 +122,19 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 
 	// Build metadata line
 	metaParts := []string{}
-	grayStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
-	sepStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
+	grayStyle := lipgloss.NewStyle().Foreground(Colors.DescNormal) // Gray for metadata
+	greenStyle := lipgloss.NewStyle().Foreground(Colors.Success)   // Green for play icon
+	blueStyle := lipgloss.NewStyle().Foreground(Colors.Primary)    // Blue for GitHub
+	sepStyle := lipgloss.NewStyle().Foreground(Colors.DescNormal)  // Gray for separator
 
-	// 1. Created (always shown)
+	// 1. Base branch (always shown)
+	metaParts = append(metaParts, grayStyle.Render(task.BaseBranch))
+
+	// 2. Created (always shown)
 	createdStr := task.Created.Format("Jan 02")
 	metaParts = append(metaParts, grayStyle.Render(createdStr))
 
-	// 2. Labels (if any)
+	// 3. Labels (if any)
 	if len(task.Labels) > 0 {
 		labelsStrs := []string{}
 		for _, label := range task.Labels {
@@ -139,21 +144,21 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		metaParts = append(metaParts, strings.Join(labelsStrs, " "))
 	}
 
-	// 3. Parent (if has parent)
+	// 4. Parent (if has parent)
 	if task.ParentID != nil {
 		parentStr := fmt.Sprintf("^%d", *task.ParentID)
 		metaParts = append(metaParts, grayStyle.Render(parentStr))
 	}
 
-	// 4. Session + elapsed time (if running)
+	// 5. Session + elapsed time (if running)
 	if task.Session != "" {
 		elapsed := time.Since(task.Started)
-		playIcon := lipgloss.NewStyle().Foreground(Colors.Success).Render("▶")
+		playIcon := greenStyle.Render("▶")
 		elapsedStr := grayStyle.Render(formatElapsedTime(elapsed))
 		metaParts = append(metaParts, playIcon+" "+elapsedStr)
 	}
 
-	// 5. Comments (if any)
+	// 6. Comments (if any)
 	if ti.commentCount > 0 {
 		commentStr := fmt.Sprintf("%d comment", ti.commentCount)
 		if ti.commentCount > 1 {
@@ -162,15 +167,17 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		metaParts = append(metaParts, grayStyle.Render(commentStr))
 	}
 
-	// 6. GitHub (if linked)
+	// 7. GitHub (if linked)
+	ghParts := []string{}
 	if task.Issue > 0 {
-		ghStr := fmt.Sprintf("GH#%d", task.Issue)
-		ghStyle := lipgloss.NewStyle().Foreground(Colors.Primary)
-		metaParts = append(metaParts, ghStyle.Render(ghStr))
-	} else if task.PR > 0 {
-		ghStr := fmt.Sprintf("PR#%d", task.PR)
-		ghStyle := lipgloss.NewStyle().Foreground(Colors.Primary)
-		metaParts = append(metaParts, ghStyle.Render(ghStr))
+		ghParts = append(ghParts, fmt.Sprintf("GH#%d", task.Issue))
+	}
+	if task.PR > 0 {
+		ghParts = append(ghParts, fmt.Sprintf("PR#%d", task.PR))
+	}
+	if len(ghParts) > 0 {
+		ghStr := strings.Join(ghParts, " ")
+		metaParts = append(metaParts, blueStyle.Render(ghStr))
 	}
 
 	// Join with separator
@@ -206,17 +213,17 @@ func formatElapsedTime(d time.Duration) string {
 }
 
 // labelColor returns a color for a label based on its hash.
-// Uses a palette of colors for variety.
+// Uses a palette of colors for variety from existing Colors.
 func labelColor(label string) lipgloss.Color {
 	palette := []lipgloss.Color{
-		lipgloss.Color("#F38BA8"), // Red
-		lipgloss.Color("#FAB387"), // Peach
-		lipgloss.Color("#F9E2AF"), // Yellow
-		lipgloss.Color("#A6E3A1"), // Green
-		lipgloss.Color("#94E2D5"), // Teal
-		lipgloss.Color("#89B4FA"), // Blue
-		lipgloss.Color("#CBA6F7"), // Mauve
-		lipgloss.Color("#F5C2E7"), // Pink
+		Colors.Error,        // Red - #F38BA8
+		Colors.NeedsChanges, // Peach - #FAB387
+		Colors.Warning,      // Yellow - #F9E2AF
+		Colors.Success,      // Green - #A6E3A1
+		Colors.NeedsInput,   // Teal - #94E2D5
+		Colors.Primary,      // Blue - #89B4FA
+		Colors.Secondary,    // Mauve - #CBA6F7
+		Colors.InReview,     // Also Mauve - #CBA6F7 (keeping for 8 colors)
 	}
 
 	h := fnv.New32a()
