@@ -174,9 +174,13 @@ func (c *Container) CopyTaskUseCase() *usecase.CopyTask {
 	return usecase.NewCopyTask(c.Tasks, c.Clock)
 }
 
-// AddCommentUseCase returns a new AddComment use case.
+// AddCommentUseCase returns a new AddComment use case with session starter.
 func (c *Container) AddCommentUseCase() *usecase.AddComment {
-	return usecase.NewAddComment(c.Tasks, c.Sessions, c.Clock)
+	uc := usecase.NewAddComment(c.Tasks, c.Sessions, c.Clock)
+	// Set up session starter to auto-start sessions when needed
+	startTask := c.StartTaskUseCase()
+	adapter := usecase.NewStartTaskAdapter(startTask)
+	return uc.WithSessionStarter(adapter)
 }
 
 // EditCommentUseCase returns a new EditComment use case.
