@@ -86,8 +86,6 @@ echo "y" | crew merge <id>
 # If issues found, request changes
 crew comment <id> -R "Description of the issue"
 # This automatically sets status to in_progress and notifies the agent
-crew send <id> "Check comments with crew show <id> and fix"
-crew send <id> Enter
 ```
 
 ### "What's the progress?"
