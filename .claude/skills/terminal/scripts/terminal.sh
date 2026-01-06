@@ -81,7 +81,14 @@ get_or_create_session() {
 # Capture pane output
 capture_output() {
     local session_name="$1"
-    tmux "${TMUX_OPTS[@]}" capture-pane -p -t "$session_name"
+    local raw_output="${2:-false}"
+    
+    if [[ "$raw_output" == "true" ]]; then
+        # -e option preserves escape sequences
+        tmux "${TMUX_OPTS[@]}" capture-pane -p -e -t "$session_name"
+    else
+        tmux "${TMUX_OPTS[@]}" capture-pane -p -t "$session_name"
+    fi
 }
 
 # Close session
@@ -115,6 +122,7 @@ main() {
             local read_wait=1000
             local key_delay=0
             local literal=false
+            local raw_output=false
             local width=""
             local height=""
             local -a keys=()
@@ -125,6 +133,7 @@ main() {
                     --read-wait) read_wait="$2"; shift 2 ;;
                     --key-delay) key_delay="$2"; shift 2 ;;
                     --literal) literal=true; shift ;;
+                    --raw-output) raw_output=true; shift ;;
                     --width) width="$2"; shift 2 ;;
                     --height) height="$2"; shift 2 ;;
                     --) shift; keys+=("$@"); break ;;
@@ -154,7 +163,7 @@ main() {
             fi
             
             local output
-            output=$(capture_output "$session_name")
+            output=$(capture_output "$session_name" "$raw_output")
             
             echo "Session: $session_name"
             echo "---"
@@ -193,6 +202,7 @@ main() {
             echo "    --read-wait MS    Wait time before capturing (default: 1000)"
             echo "    --key-delay MS    Delay between keys (default: 0)"
             echo "    --literal         Send keys literally without parsing special keys"
+            echo "    --raw-output      Preserve escape sequences in output (for colored text)"
             echo "    --width N         Terminal width for new sessions"
             echo "    --height N        Terminal height for new sessions"
             echo "    [keys...]         Keys to send (special keys: Enter, Escape, Up, Down, etc.)"

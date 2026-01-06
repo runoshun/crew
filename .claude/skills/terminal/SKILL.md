@@ -30,6 +30,7 @@ scripts/terminal.sh execute [options] [keys...]
 - `--read-wait MS` - Wait time before capturing output (default: 1000)
 - `--key-delay MS` - Delay between keystrokes (default: 0)
 - `--literal` - Send keys literally without parsing special keys
+- `--raw-output` - Preserve escape sequences (ANSI colors, formatting) in output
 - `--width N` - Terminal width for new sessions
 - `--height N` - Terminal height for new sessions
 
@@ -88,6 +89,12 @@ scripts/terminal.sh execute C-c
 scripts/terminal.sh execute --session dev 'cd /project && npm start' Enter
 scripts/terminal.sh execute --session dev  # Check output later
 scripts/terminal.sh close --session dev
+```
+
+**Capture colored output:**
+```bash
+scripts/terminal.sh execute --raw-output 'ls --color=always' Enter
+scripts/terminal.sh execute --raw-output 'grep --color=always pattern file.txt' Enter
 ```
 
 ## Best Practices
