@@ -15,22 +15,25 @@ var _ domain.ConfigManager = (*Manager)(nil)
 // Manager manages configuration files.
 type Manager struct {
 	crewDir       string // Path to .git/crew directory
+	repoRoot      string // Path to repository root
 	globalConfDir string // Path to global config directory (e.g., ~/.config/git-crew)
 }
 
 // NewManager creates a new Manager.
-func NewManager(crewDir string) *Manager {
+func NewManager(crewDir, repoRoot string) *Manager {
 	return &Manager{
 		crewDir:       crewDir,
+		repoRoot:      repoRoot,
 		globalConfDir: defaultGlobalConfigDir(),
 	}
 }
 
 // NewManagerWithGlobalDir creates a new Manager with a custom global config directory.
 // This is useful for testing.
-func NewManagerWithGlobalDir(crewDir, globalConfDir string) *Manager {
+func NewManagerWithGlobalDir(crewDir, repoRoot, globalConfDir string) *Manager {
 	return &Manager{
 		crewDir:       crewDir,
+		repoRoot:      repoRoot,
 		globalConfDir: globalConfDir,
 	}
 }
@@ -50,6 +53,18 @@ func (m *Manager) GetGlobalConfigInfo() domain.ConfigInfo {
 		}
 	}
 	path := filepath.Join(m.globalConfDir, domain.ConfigFileName)
+	return m.getConfigInfo(path)
+}
+
+// GetRootRepoConfigInfo returns information about the root repository config file (.crew.toml).
+func (m *Manager) GetRootRepoConfigInfo() domain.ConfigInfo {
+	if m.repoRoot == "" {
+		return domain.ConfigInfo{
+			Path:   "",
+			Exists: false,
+		}
+	}
+	path := domain.RepoRootConfigPath(m.repoRoot)
 	return m.getConfigInfo(path)
 }
 

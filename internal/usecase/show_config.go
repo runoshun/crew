@@ -9,15 +9,17 @@ import (
 
 // ShowConfigInput contains the input for the ShowConfig use case.
 type ShowConfigInput struct {
-	IgnoreGlobal bool // Skip loading global config
-	IgnoreRepo   bool // Skip loading repo config
+	IgnoreGlobal   bool // Skip loading global config
+	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
+	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
 }
 
 // ShowConfigOutput contains the output of the ShowConfig use case.
 type ShowConfigOutput struct {
 	EffectiveConfig *domain.Config    // Merged effective configuration
 	GlobalConfig    domain.ConfigInfo // Global config file info
-	RepoConfig      domain.ConfigInfo // Repository config file info
+	RepoConfig      domain.ConfigInfo // Repository config file info (.git/crew/config.toml)
+	RootRepoConfig  domain.ConfigInfo // Root repository config file info (.crew.toml)
 }
 
 // ShowConfig displays configuration file information.
@@ -45,11 +47,15 @@ func (uc *ShowConfig) Execute(_ context.Context, input ShowConfigInput) (*ShowCo
 	if !input.IgnoreRepo {
 		output.RepoConfig = uc.configManager.GetRepoConfigInfo()
 	}
+	if !input.IgnoreRootRepo {
+		output.RootRepoConfig = uc.configManager.GetRootRepoConfigInfo()
+	}
 
 	// Load effective config with options
 	effectiveConfig, err := uc.configLoader.LoadWithOptions(domain.LoadConfigOptions{
-		IgnoreGlobal: input.IgnoreGlobal,
-		IgnoreRepo:   input.IgnoreRepo,
+		IgnoreGlobal:   input.IgnoreGlobal,
+		IgnoreRepo:     input.IgnoreRepo,
+		IgnoreRootRepo: input.IgnoreRootRepo,
 	})
 	if err != nil {
 		return nil, err

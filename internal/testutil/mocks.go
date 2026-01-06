@@ -509,12 +509,13 @@ func (m *MockConfigLoader) LoadWithOptions(opts domain.LoadConfigOptions) (*doma
 // MockConfigManager is a test double for domain.ConfigManager.
 // Fields are ordered to minimize memory padding.
 type MockConfigManager struct {
-	InitRepoErr      error
-	InitGlobalErr    error
-	RepoConfigInfo   domain.ConfigInfo
-	GlobalConfigInfo domain.ConfigInfo
-	InitRepoCalled   bool
-	InitGlobalCalled bool
+	InitRepoErr        error
+	InitGlobalErr      error
+	RepoConfigInfo     domain.ConfigInfo
+	GlobalConfigInfo   domain.ConfigInfo
+	RootRepoConfigInfo domain.ConfigInfo
+	InitRepoCalled     bool
+	InitGlobalCalled   bool
 }
 
 // NewMockConfigManager creates a new MockConfigManager.
@@ -526,6 +527,10 @@ func NewMockConfigManager() *MockConfigManager {
 		},
 		GlobalConfigInfo: domain.ConfigInfo{
 			Path:   "/home/test/.config/git-crew/config.toml",
+			Exists: false,
+		},
+		RootRepoConfigInfo: domain.ConfigInfo{
+			Path:   "/test/.crew.toml",
 			Exists: false,
 		},
 	}
@@ -542,6 +547,11 @@ func (m *MockConfigManager) GetRepoConfigInfo() domain.ConfigInfo {
 // GetGlobalConfigInfo returns the configured global config info.
 func (m *MockConfigManager) GetGlobalConfigInfo() domain.ConfigInfo {
 	return m.GlobalConfigInfo
+}
+
+// GetRootRepoConfigInfo returns the configured root repository config info.
+func (m *MockConfigManager) GetRootRepoConfigInfo() domain.ConfigInfo {
+	return m.RootRepoConfigInfo
 }
 
 // InitRepoConfig records the call and returns configured error.
