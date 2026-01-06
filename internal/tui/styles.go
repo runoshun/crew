@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -499,7 +500,7 @@ func StatusIcon(status domain.Status) string {
 // RenderMarkdown renders markdown text with the given width.
 func (s Styles) RenderMarkdown(text string, width int) string {
 	r, err := glamour.NewTermRenderer(
-		glamour.WithStandardStyle("dark"),
+		glamour.WithStyles(s.markdownStyle()),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
@@ -512,4 +513,75 @@ func (s Styles) RenderMarkdown(text string, width int) string {
 	}
 
 	return strings.TrimSpace(out)
+}
+
+func (s Styles) markdownStyle() ansi.StyleConfig {
+	return ansi.StyleConfig{
+		Document: ansi.StyleBlock{
+			StylePrimitive: ansi.StylePrimitive{
+				Color: stringPtr(string(Colors.TitleNormal)),
+			},
+		},
+		Heading: ansi.StyleBlock{
+			StylePrimitive: ansi.StylePrimitive{
+				Color: stringPtr(string(Colors.Primary)),
+				Bold:  boolPtr(true),
+			},
+		},
+		Code: ansi.StyleBlock{
+			StylePrimitive: ansi.StylePrimitive{
+				Color: stringPtr(string(Colors.TitleSelected)),
+			},
+		},
+		CodeBlock: ansi.StyleCodeBlock{
+			Theme: "catppuccin-mocha",
+		},
+		Table: ansi.StyleTable{
+			StyleBlock: ansi.StyleBlock{
+				StylePrimitive: ansi.StylePrimitive{
+					Color: stringPtr(string(Colors.TitleNormal)),
+				},
+			},
+		},
+		Link: ansi.StylePrimitive{
+			Color:     stringPtr(string(Colors.Primary)),
+			Underline: boolPtr(true),
+		},
+		LinkText: ansi.StylePrimitive{
+			Color: stringPtr(string(Colors.Primary)),
+			Bold:  boolPtr(true),
+		},
+		List: ansi.StyleList{
+			StyleBlock: ansi.StyleBlock{
+				StylePrimitive: ansi.StylePrimitive{
+					Color: stringPtr(string(Colors.TitleNormal)),
+				},
+			},
+		},
+		Item: ansi.StylePrimitive{
+			Color: stringPtr(string(Colors.TitleNormal)),
+		},
+		BlockQuote: ansi.StyleBlock{
+			StylePrimitive: ansi.StylePrimitive{
+				Color: stringPtr(string(Colors.Muted)),
+			},
+		},
+		HorizontalRule: ansi.StylePrimitive{
+			Color: stringPtr(string(Colors.GroupLine)),
+		},
+		Strong: ansi.StylePrimitive{
+			Bold: boolPtr(true),
+		},
+		Emph: ansi.StylePrimitive{
+			Italic: boolPtr(true),
+		},
+	}
+}
+
+func stringPtr(s string) *string {
+	return &s
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
