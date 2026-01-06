@@ -296,12 +296,14 @@ func (c *Client) IsRunning(sessionName string) (bool, error) {
 
 // configureStatusBar configures the status bar for a tmux session.
 func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, taskAgent string) error {
-	// Catppuccin Mocha colors
-	crewBlue := "#89b4fa"  // Main crew blue - used for background
-	white := "#ffffff"     // White for high contrast text
+	// Colors
+	mainBg := "#1e66f5"    // Catppuccin Latte Blue - main background
+	keyBg := "#1146b4"     // Darker blue for C-g keybind
+	btnBg := "#ffffff"     // White background for arrow button
+	white := "#ffffff"     // White text
+	black := "#1e1e2e"     // Black text for button
 	lightText := "#cdd6f4" // Light text
-	yellow := "#f9e2af"    // Yellow for emphasis
-	mutedText := "#bac2de" // Muted text (Subtext0)
+	mutedText := "#bac2de" // Muted text
 
 	// Truncate title if too long
 	title := taskTitle
@@ -313,21 +315,20 @@ func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, t
 	worker := shortenWorkerName(taskAgent)
 
 	// Build status-left: [←] C-g detach
-	// Background: crew blue, [←] in white, C-g in yellow, detach in light text
-	statusLeft := fmt.Sprintf("#[bg=%s,fg=%s,bold] [←] #[fg=%s,bold]C-g#[fg=%s,nobold] detach ",
-		crewBlue, white, yellow, lightText)
+	// White bg button, dark blue bg for C-g, light text for detach
+	statusLeft := fmt.Sprintf("#[bg=%s,fg=%s,bold] ← #[bg=%s,fg=%s,bold] C-g #[bg=%s,fg=%s,nobold] detach ",
+		btnBg, black, keyBg, white, mainBg, lightText)
 
 	// Build status-right: #ID Title | worker
-	// All on crew blue background
-	statusRight := fmt.Sprintf("#[bg=%s,fg=%s]#%d #[fg=%s]%s #[fg=%s]│ %s ",
-		crewBlue, white, taskID, lightText, title, mutedText, worker)
+	statusRight := fmt.Sprintf("#[bg=%s,fg=%s,bold]#%d #[fg=%s,nobold]%s #[fg=%s]│ %s ",
+		mainBg, white, taskID, lightText, title, mutedText, worker)
 
 	// Build tmux commands
 	cmds := [][]string{
 		{"set-option", "-t", sessionName, "status", "on"},
-		{"set-option", "-t", sessionName, "status-position", "bottom"},
-		// Set status bar background to crew blue with white text
-		{"set-option", "-t", sessionName, "status-style", fmt.Sprintf("bg=%s,fg=%s", crewBlue, white)},
+		{"set-option", "-t", sessionName, "status-position", "top"},
+		// Set status bar background
+		{"set-option", "-t", sessionName, "status-style", fmt.Sprintf("bg=%s,fg=%s", mainBg, white)},
 		{"set-option", "-t", sessionName, "status-left", statusLeft},
 		{"set-option", "-t", sessionName, "status-left-length", "30"},
 		{"set-option", "-t", sessionName, "status-right", statusRight},
