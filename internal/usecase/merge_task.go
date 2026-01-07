@@ -10,7 +10,8 @@ import (
 
 // MergeTaskInput contains the parameters for merging a task.
 type MergeTaskInput struct {
-	TaskID int // Task ID to merge
+	BaseBranch string // Target branch to merge into (defaults to "main")
+	TaskID     int    // Task ID to merge
 }
 
 // MergeTaskOutput contains the result of merging a task.
@@ -44,10 +45,11 @@ func NewMergeTask(
 	}
 }
 
-// Execute merges a task branch into main.
+// Execute merges a task branch into the base branch.
 // Preconditions:
-// - Current branch is main
-// - main's working tree is clean
+// - Current branch is the base branch (defaults to "main" if not specified)
+// - Base branch's working tree is clean
+// - Task's base branch matches the target base branch (if specified)
 //
 // Processing:
 // 1. If session is running, stop it
@@ -65,17 +67,32 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Check current branch is main
+	// Determine target base branch (default to "main" if not specified)
+	targetBaseBranch := in.BaseBranch
+	if targetBaseBranch == "" {
+		targetBaseBranch = "main"
+	}
+
+	// Validate that task's base branch matches the target base branch
+	if task.BaseBranch != targetBaseBranch {
+		return nil, fmt.Errorf("task base branch %q does not match target base branch %q", task.BaseBranch, targetBaseBranch)
+	}
+
+	// Check current branch is the target base branch
 	currentBranch, err := uc.git.CurrentBranch()
 	if err != nil {
 		return nil, fmt.Errorf("get current branch: %w", err)
 	}
-	if currentBranch != "main" {
-		return nil, domain.ErrNotOnMainBranch
+	if currentBranch != targetBaseBranch {
+		// For backward compatibility, keep ErrNotOnMainBranch for "main" branch
+		if targetBaseBranch == "main" {
+			return nil, domain.ErrNotOnMainBranch
+		}
+		return nil, domain.ErrNotOnBaseBranch
 	}
 
-	// Check main's working tree is clean
-	// Use repo root for checking main's working tree (empty string will be handled by the caller)
+	// Check base branch's working tree is clean
+	// Use repo root for checking base branch's working tree (empty string will be handled by the caller)
 	hasChanges, err := uc.git.HasUncommittedChanges("")
 	if err != nil {
 		return nil, fmt.Errorf("check uncommitted changes: %w", err)
