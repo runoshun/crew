@@ -171,7 +171,7 @@ func findGitRoot(dir string) (repoRoot, gitDir, workingDir string, err error) {
 
 	// Make gitDir absolute if it's relative
 	if !filepath.IsAbs(gitDir) {
-		gitDir = filepath.Join(workingDir, gitDir)
+		gitDir = filepath.Join(dir, gitDir)
 	}
 
 	// Clean the path
