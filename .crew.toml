@@ -1,0 +1,72 @@
+# git-crew configuration
+
+[agents]
+worker_prompt = "Use 'dev-workflow' skill and follow the instructions." # Default prompt for all worker agent
+
+# manager_default = "claude-manager" # Default agent for starting manager tasks
+# manager_prompt = ""                         # Default prompt for all manager agents
+
+## Fields for all agents:
+## [agents.<name>]
+## inherit = "..."        # Name of agent to inherit from (copies all fields, allows overrides)
+## role = "worker"        # Agent role ("worker", "manager")
+## command_template = "xxx --model {{.Model}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}} {{.Args}}"  # Full command template
+## system_prompt = "..."  # (optional) System prompt template.
+## prompt = "..."         # (optional) User prompt template (added after system_prompt)
+## args = "..."           # (optional) Additional arguments
+## default_model = "opus" # (optional) Default model for this agent
+## description = "..."    # (optional) Description of the agent's purpose
+## setup_script = "..."   # (optional) Script to run after worktree creation
+## hidden = false         # (optional) Hide from TUI agent list (default: false)
+##
+
+
+# [agents.claude]
+# role = "worker"
+# default_model = ""  # Override model (e.g., "opus", "sonnet")
+# description = "Claude model via Anthropic CLI"
+
+
+# [agents.claude-manager]
+# role = "manager"
+# default_model = ""  # Override model (e.g., "opus", "sonnet")
+# description = "Claude manager agent for task orchestration"
+
+
+# [agents.opencode]
+# role = "worker"
+# default_model = ""  # Override model (e.g., "opus", "sonnet")
+# description = "General purpose coding agent via opencode CLI"
+
+
+# [agents.opencode-manager]
+# role = "manager"
+# default_model = ""  # Override model (e.g., "opus", "sonnet")
+# description = "OpenCode manager agent for task orchestration"
+
+
+
+[worktree]
+## Worktree initialization settings (applied to all workers)
+## - setup_command: Command to run after worktree creation
+## - copy: Files/directories to copy from main repo (uses CoW if available)
+# setup_command = ""
+# copy = []
+
+[complete]
+## CI gate on completion
+# command = "mise run ci"
+
+[diff]
+## Diff display settings
+## - command: Shell command to display diff. Supports template variables:
+##   - {{.BaseBranch}}: Task's base branch (e.g., "main")
+##   - {{.Args}}: Additional arguments passed to the diff command
+##     The command runs from the worktree directory.
+## - tui_command: Command for TUI diff display (optional)
+# command = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}}{{end}}"
+# tui_command = "git diff --color {{.BaseBranch}}...HEAD | less -R"
+
+[log]
+## Log settings
+# level = "info"  # debug, info, warn, error

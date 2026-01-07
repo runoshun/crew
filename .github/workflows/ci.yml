@@ -7,28 +7,19 @@ on:
   pull_request:
 
 jobs:
-  lint:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
-      - run: mise run lint
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2
-      - run: mise run test:cover
-      - uses: actions/upload-artifact@v4
+
+      - name: Run CI checks
+        run: mise run ci
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage.out
           retention-days: 7
-
-  vuln:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v2
-      - run: mise run vuln
