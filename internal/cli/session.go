@@ -490,21 +490,26 @@ Examples:
 	return cmd
 }
 
-// newMergeCommand creates the merge command for merging a task branch into main.
+// newMergeCommand creates the merge command for merging a task branch into a base branch.
 func newMergeCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		yes bool
+		base string
+		yes  bool
 	}
 
 	cmd := &cobra.Command{
 		Use:   "merge <id>",
-		Short: "Merge task branch into main",
-		Long: `Merge a task branch into main and mark the task as done.
+		Short: "Merge task branch into base branch",
+		Long: `Merge a task branch into the base branch and mark the task as done.
 
 Preconditions:
-  - Current branch must be 'main'
-  - Main's working tree must be clean
+  - Current branch must be the base branch
+  - Base branch's working tree must be clean
   - No merge conflict
+
+Base branch selection:
+  - If --base is not specified, uses task's base branch (or 'main' if task has no base branch)
+  - If --base is specified, uses the specified branch (allows merging to different branch)
 
 Processing:
   1. If session is running, stop it
@@ -513,8 +518,11 @@ Processing:
   4. Update task status to 'done'
 
 Examples:
-  # Merge task #1 into main
+  # Merge task #1 into its base branch (or main if not set)
   git crew merge 1
+
+  # Merge task #1 into feature/workspace branch (override task's base branch)
+  git crew merge 1 --base feature/workspace
 
   # Skip confirmation prompt
   git crew merge 1 --yes`,
@@ -535,12 +543,22 @@ Examples:
 				return err
 			}
 
+			// Determine target base branch for confirmation message
+			// Match the logic in MergeTask.Execute
+			targetBaseBranch := opts.base
+			if targetBaseBranch == "" {
+				targetBaseBranch = showOut.Task.BaseBranch
+				if targetBaseBranch == "" {
+					targetBaseBranch = "main"
+				}
+			}
+
 			// Get branch name for confirmation message
 			branch := domain.BranchName(showOut.Task.ID, showOut.Task.Issue)
 
 			// Confirmation prompt (skip with --yes)
 			if !opts.yes {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Merge task #%d (%s) to main? [y/N] ", taskID, branch)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Merge task #%d (%s) to %s? [y/N] ", taskID, branch, targetBaseBranch)
 				reader := bufio.NewReader(os.Stdin)
 				response, readErr := reader.ReadString('\n')
 				if readErr != nil {
@@ -556,7 +574,8 @@ Examples:
 			// Execute use case
 			uc := c.MergeTaskUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.MergeTaskInput{
-				TaskID: taskID,
+				TaskID:     taskID,
+				BaseBranch: opts.base,
 			})
 			if err != nil {
 				return err
@@ -568,6 +587,7 @@ Examples:
 	}
 
 	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "Skip confirmation prompt")
+	cmd.Flags().StringVar(&opts.base, "base", "", "Base branch to merge into (default: task's base branch or 'main')")
 
 	return cmd
 }

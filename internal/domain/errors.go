@@ -18,6 +18,7 @@ var (
 	ErrEmptyTitle            = errors.New("title cannot be empty")
 	ErrEmptyMessage          = errors.New("message cannot be empty")
 	ErrNotOnMainBranch       = errors.New("not on main branch")
+	ErrNotOnBaseBranch       = errors.New("not on base branch")
 	ErrNotGitRepository      = errors.New("not a git repository (or any of the parent directories)")
 	ErrNoFieldsToUpdate      = errors.New("no fields to update")
 	ErrConfigExists          = errors.New("config file already exists")
