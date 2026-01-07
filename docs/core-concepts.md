@@ -104,46 +104,42 @@ Configuration is loaded from (in priority order):
 2. User config: `~/.config/git-crew/config.toml`
 3. Built-in defaults
 
-### Configuration Example
+### Configuration Structure
+
+The configuration format has been unified under the `[agents]` table, replacing the older `[workers]` and `[managers]` separation.
 
 ```toml
-# Common worker settings
-[workers]
-system_prompt = """
-You are working on Task #{{.TaskID}}.
+[agents]
+worker_default = "opencode"      # Default agent for starting tasks
+worker_prompt = ""               # Default prompt for all worker agents
 
-IMPORTANT: First run 'crew --help-worker' and follow the workflow instructions exactly.
-"""
-prompt = ""  # User custom instructions (optional)
+manager_default = "opencode-manager" # Default agent for starting manager tasks
+manager_prompt = ""                  # Default prompt for all manager agents
 
-# Default worker (references another worker)
-[workers.default]
-agent = "opencode"
-model = "sonnet"
-
-# Custom worker with different settings
-[workers.reviewer]
-agent = "claude"
-model = "opus"
-prompt = "Focus on code quality and best practices."
-
-# Manager configuration
-[managers.default]
-agent = "opencode"
-model = "opus"
-
-# Custom agent definition
+# Define a new agent or override an existing one
 [agents.my-agent]
-command = "my-custom-cli"
-command_template = "{{.Command}} {{.SystemArgs}} {{.Args}} {{.Prompt}}"
-default_model = "default"
-description = "My custom AI agent"
-worktree_setup_script = """
+inherit = "opencode"             # Inherit settings from another agent
+default_model = "gpt-4o"         # Override model
+description = "My custom agent"  # Description for agent selection
+role = "worker"                  # "worker" or "manager"
+# system_prompt = "..."          # Add custom system prompt
+# prompt = "..."                 # Add custom user prompt
+# args = "--verbose"             # Add CLI arguments
+
+# Complex custom agent definition
+[agents.custom-cli]
+command_template = "my-cli --model {{.Model}} {{.Args}} --prompt {{.Prompt}}"
+setup_script = """
 #!/bin/bash
 cd {{.Worktree}}
-echo "Setting up worktree for task {{.TaskID}}"
+echo "Setting up custom environment..."
 """
-exclude_patterns = [".my-agent-cache/"]
+exclude_patterns = [".cache/"]
+
+# Worktree initialization settings
+[worktree]
+setup_command = "npm install"    # Run after creation
+copy = [".env.example"]          # Copy files from main repo
 
 # CI gate on completion
 [complete]
@@ -152,11 +148,26 @@ command = "mise run ci"
 # Diff display
 [diff]
 command = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}}{{end}}"
+tui_command = "git diff --color {{.BaseBranch}}...HEAD | less -R"
 
 # Logging
 [log]
 level = "info"
+
+# TUI Customization
+[tui.keybindings]
+"ctrl+r" = { command = "crew run-review {{.TaskID}}", description = "Run review script" }
 ```
+
+### Agent Inheritance
+
+The `inherit` field allows you to create specialized variations of agents without redefining everything.
+
+1. **Base Agent**: Defines the CLI command and argument template (e.g., `claude`, `opencode`).
+2. **Specialized Agent**: Inherits from Base, overrides model or adds prompts (e.g., `claude-architect`).
+
+This allows you to easily switch models or create role-specific agents (QA, Security, Frontend) while reusing the underlying CLI integration.
+
 
 ---
 
