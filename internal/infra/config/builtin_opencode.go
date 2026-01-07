@@ -67,6 +67,6 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 EOF
 
 # Add exclude pattern to git (use git rev-parse for worktree support)
-GIT_DIR=$(git rev-parse --git-dir 2>/dev/null) && \
-  echo ".opencode/plugin/crew-hooks.ts" >> "${GIT_DIR}/info/exclude" || true
+GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null) && \
+  echo ".opencode/plugin/crew-hooks.ts" >> "${GIT_COMMON_DIR}/info/exclude" || true
 `
