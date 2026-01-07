@@ -26,8 +26,8 @@ func setupTestRepo(t *testing.T) (repoRoot, worktreeDir string, cleanup func()) 
 	require.NoError(t, os.MkdirAll(repoRoot, 0755))
 	require.NoError(t, os.MkdirAll(worktreeDir, 0755))
 
-	// Initialize git repo
-	cmd := exec.Command("git", "init")
+	// Initialize git repo with main as default branch
+	cmd := exec.Command("git", "init", "-b", "main")
 	cmd.Dir = repoRoot
 	require.NoError(t, cmd.Run())
 
