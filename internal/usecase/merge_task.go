@@ -47,9 +47,12 @@ func NewMergeTask(
 
 // Execute merges a task branch into the base branch.
 // Preconditions:
-// - Current branch is the base branch (defaults to "main" if not specified)
+// - Current branch is the base branch
 // - Base branch's working tree is clean
-// - Task's base branch matches the target base branch (if specified)
+//
+// BaseBranch behavior:
+// - If BaseBranch is empty, uses task.BaseBranch (or "main" if task.BaseBranch is also empty)
+// - If BaseBranch is specified, uses it regardless of task.BaseBranch
 //
 // Processing:
 // 1. If session is running, stop it
@@ -67,15 +70,14 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Determine target base branch (default to "main" if not specified)
+	// Determine target base branch
+	// If not specified, use task's BaseBranch (or "main" if task.BaseBranch is empty)
 	targetBaseBranch := in.BaseBranch
 	if targetBaseBranch == "" {
-		targetBaseBranch = "main"
-	}
-
-	// Validate that task's base branch matches the target base branch
-	if task.BaseBranch != targetBaseBranch {
-		return nil, fmt.Errorf("task base branch %q does not match target base branch %q", task.BaseBranch, targetBaseBranch)
+		targetBaseBranch = task.BaseBranch
+		if targetBaseBranch == "" {
+			targetBaseBranch = "main"
+		}
 	}
 
 	// Check current branch is the target base branch

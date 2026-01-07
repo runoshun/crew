@@ -503,10 +503,13 @@ func newMergeCommand(c *app.Container) *cobra.Command {
 		Long: `Merge a task branch into the base branch and mark the task as done.
 
 Preconditions:
-  - Current branch must be the base branch (defaults to 'main')
+  - Current branch must be the base branch
   - Base branch's working tree must be clean
-  - Task's base branch must match the target base branch
   - No merge conflict
+
+Base branch selection:
+  - If --base is not specified, uses task's base branch (or 'main' if task has no base branch)
+  - If --base is specified, uses the specified branch (allows merging to different branch)
 
 Processing:
   1. If session is running, stop it
@@ -515,10 +518,10 @@ Processing:
   4. Update task status to 'done'
 
 Examples:
-  # Merge task #1 into main (default)
+  # Merge task #1 into its base branch (or main if not set)
   git crew merge 1
 
-  # Merge task #1 into feature/workspace branch
+  # Merge task #1 into feature/workspace branch (override task's base branch)
   git crew merge 1 --base feature/workspace
 
   # Skip confirmation prompt
@@ -540,10 +543,14 @@ Examples:
 				return err
 			}
 
-			// Determine target base branch
+			// Determine target base branch for confirmation message
+			// Match the logic in MergeTask.Execute
 			targetBaseBranch := opts.base
 			if targetBaseBranch == "" {
-				targetBaseBranch = "main"
+				targetBaseBranch = showOut.Task.BaseBranch
+				if targetBaseBranch == "" {
+					targetBaseBranch = "main"
+				}
 			}
 
 			// Get branch name for confirmation message
@@ -580,7 +587,7 @@ Examples:
 	}
 
 	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "Skip confirmation prompt")
-	cmd.Flags().StringVar(&opts.base, "base", "", "Base branch to merge into (default: main)")
+	cmd.Flags().StringVar(&opts.base, "base", "", "Base branch to merge into (default: task's base branch or 'main')")
 
 	return cmd
 }
