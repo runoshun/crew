@@ -46,7 +46,7 @@ func NewMergeTask(
 
 // Execute merges a task branch into main.
 // Preconditions:
-// - Current branch is main
+// - Current branch is main (or default branch)
 // - main's working tree is clean
 //
 // Processing:
@@ -65,12 +65,18 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Check current branch is main
+	// Get default branch dynamically
+	defaultBranch, err := uc.git.GetDefaultBranch()
+	if err != nil {
+		return nil, fmt.Errorf("get default branch: %w", err)
+	}
+
+	// Check current branch is default branch
 	currentBranch, err := uc.git.CurrentBranch()
 	if err != nil {
 		return nil, fmt.Errorf("get current branch: %w", err)
 	}
-	if currentBranch != "main" {
+	if currentBranch != defaultBranch {
 		return nil, domain.ErrNotOnMainBranch
 	}
 
