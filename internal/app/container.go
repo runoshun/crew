@@ -269,3 +269,9 @@ func (c *Container) ExecCommandUseCase() *usecase.ExecCommand {
 func (c *Container) StartManagerUseCase() *usecase.StartManager {
 	return usecase.NewStartManager(c.ConfigLoader, c.Config.RepoRoot, c.Config.GitDir)
 }
+
+// ReviewTaskUseCase returns a new ReviewTask use case.
+// stdout and stderr are the writers for command output.
+func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewTask {
+	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Config.RepoRoot, stdout, stderr)
+}

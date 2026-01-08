@@ -19,8 +19,9 @@ type builtinAgentDef struct {
 
 // builtinAgentSet contains all agent variants for a CLI tool.
 type builtinAgentSet struct {
-	Worker  builtinAgentDef
-	Manager builtinAgentDef
+	Worker   builtinAgentDef
+	Manager  builtinAgentDef
+	Reviewer builtinAgentDef
 }
 
 // builtinAgents contains preset configurations for known agents.
@@ -31,7 +32,8 @@ var builtinAgents = map[string]builtinAgentSet{
 
 // Register adds all built-in agents to the given config.
 // This should be called after NewDefaultConfig() and before merging user config.
-// Creates worker agents (e.g., "claude", "opencode") and manager agents (e.g., "claude-manager", "opencode-manager").
+// Creates worker agents (e.g., "claude", "opencode"), manager agents (e.g., "claude-manager", "opencode-manager"),
+// and reviewer agents (e.g., "claude-reviewer", "opencode-reviewer").
 func Register(cfg *domain.Config) {
 	for name, agentSet := range builtinAgents {
 		// Register worker agent
@@ -53,9 +55,21 @@ func Register(cfg *domain.Config) {
 			Description:  agentSet.Manager.Description,
 			Hidden:       true,
 		}
+
+		// Register reviewer agent (hidden by default)
+		reviewerName := name + "-reviewer"
+		cfg.Agents[reviewerName] = domain.Agent{
+			CommandTemplate: agentSet.Reviewer.CommandTemplate,
+			Role:            domain.RoleReviewer,
+			SystemPrompt:    domain.DefaultReviewerSystemPrompt,
+			DefaultModel:    agentSet.Reviewer.DefaultModel,
+			Description:     agentSet.Reviewer.Description,
+			Hidden:          true,
+		}
 	}
 
-	// Set default worker and manager
+	// Set default worker, manager, and reviewer
 	cfg.AgentsConfig.DefaultWorker = "opencode"
 	cfg.AgentsConfig.DefaultManager = "opencode-manager"
+	cfg.AgentsConfig.DefaultReviewer = "opencode-reviewer"
 }
