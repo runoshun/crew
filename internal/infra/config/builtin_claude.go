@@ -16,6 +16,12 @@ var claudeAgents = builtinAgentSet{
 	Manager: builtinAgentDef{
 		Description: "Claude manager agent for task orchestration",
 	},
+	Reviewer: builtinAgentDef{
+		// Non-interactive mode: -p (print) for synchronous execution
+		CommandTemplate: "claude -p --model {{.Model}} {{.Args}} {{.Prompt}}",
+		DefaultModel:    "sonnet",
+		Description:     "Code review agent via Claude CLI",
+	},
 }
 
 const claudeSetupScript = `#!/bin/bash

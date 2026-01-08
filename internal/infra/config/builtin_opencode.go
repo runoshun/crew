@@ -11,6 +11,12 @@ var opencodeAgents = builtinAgentSet{
 	Manager: builtinAgentDef{
 		Description: "OpenCode manager agent for task orchestration",
 	},
+	Reviewer: builtinAgentDef{
+		// Non-interactive mode: opencode run for synchronous execution
+		CommandTemplate: "opencode run -m {{.Model}} {{.Args}} {{.Prompt}}",
+		DefaultModel:    "anthropic/claude-sonnet-4-5",
+		Description:     "Code review agent via opencode CLI",
+	},
 }
 
 const opencodeSetupScript = `#!/bin/bash

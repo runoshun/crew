@@ -29,11 +29,13 @@ type Config struct {
 // MarshalTOML overrides the TOML marshaling for Config to merge Agents and AgentsConfig.
 func (c *Config) MarshalTOML() (any, error) {
 	type agentsSection struct {
-		Agents         map[string]Agent `toml:",inline"`
-		DefaultWorker  string           `toml:"worker_default,omitempty"`
-		DefaultManager string           `toml:"manager_default,omitempty"`
-		WorkerPrompt   string           `toml:"worker_prompt,omitempty"`
-		ManagerPrompt  string           `toml:"manager_prompt,omitempty"`
+		Agents          map[string]Agent `toml:",inline"`
+		DefaultWorker   string           `toml:"worker_default,omitempty"`
+		DefaultManager  string           `toml:"manager_default,omitempty"`
+		DefaultReviewer string           `toml:"reviewer_default,omitempty"`
+		WorkerPrompt    string           `toml:"worker_prompt,omitempty"`
+		ManagerPrompt   string           `toml:"manager_prompt,omitempty"`
+		ReviewerPrompt  string           `toml:"reviewer_prompt,omitempty"`
 	}
 
 	return struct {
@@ -46,11 +48,13 @@ func (c *Config) MarshalTOML() (any, error) {
 		Worktree WorktreeConfig `toml:"worktree"`
 	}{
 		Agents: agentsSection{
-			DefaultWorker:  c.AgentsConfig.DefaultWorker,
-			DefaultManager: c.AgentsConfig.DefaultManager,
-			WorkerPrompt:   c.AgentsConfig.WorkerPrompt,
-			ManagerPrompt:  c.AgentsConfig.ManagerPrompt,
-			Agents:         c.Agents,
+			DefaultWorker:   c.AgentsConfig.DefaultWorker,
+			DefaultManager:  c.AgentsConfig.DefaultManager,
+			DefaultReviewer: c.AgentsConfig.DefaultReviewer,
+			WorkerPrompt:    c.AgentsConfig.WorkerPrompt,
+			ManagerPrompt:   c.AgentsConfig.ManagerPrompt,
+			ReviewerPrompt:  c.AgentsConfig.ReviewerPrompt,
+			Agents:          c.Agents,
 		},
 		Complete: c.Complete,
 		Diff:     c.Diff,
@@ -70,10 +74,12 @@ type TasksConfig struct {
 
 // AgentsConfig holds common settings for all agents from [agents] section.
 type AgentsConfig struct {
-	DefaultWorker  string `toml:"worker_default,omitempty"`  // Default worker agent name
-	DefaultManager string `toml:"manager_default,omitempty"` // Default manager agent name
-	WorkerPrompt   string `toml:"worker_prompt,omitempty"`   // Default prompt for all worker agents
-	ManagerPrompt  string `toml:"manager_prompt,omitempty"`  // Default prompt for all manager agents
+	DefaultWorker   string `toml:"worker_default,omitempty"`   // Default worker agent name
+	DefaultManager  string `toml:"manager_default,omitempty"`  // Default manager agent name
+	DefaultReviewer string `toml:"reviewer_default,omitempty"` // Default reviewer agent name
+	WorkerPrompt    string `toml:"worker_prompt,omitempty"`    // Default prompt for all worker agents
+	ManagerPrompt   string `toml:"manager_prompt,omitempty"`   // Default prompt for all manager agents
+	ReviewerPrompt  string `toml:"reviewer_prompt,omitempty"`  // Default prompt for all reviewer agents
 }
 
 // Role represents the role of an agent.
@@ -285,6 +291,27 @@ Support users with task management as an assistant.
 - Execute operations on behalf of users and report results concisely
 - Proactively report problems
 - Delegate code implementation to worker agents`
+
+// DefaultReviewerSystemPrompt is the default system prompt template for reviewers.
+const DefaultReviewerSystemPrompt = `You are a code reviewer for git-crew Task #{{.TaskID}}.
+
+## Available Commands
+
+- crew show {{.TaskID}} - View task details
+- crew diff {{.TaskID}} - View changes
+
+## Review Checklist
+
+1. Correctness - Does the code work as intended?
+2. Tests - Are edge cases covered?
+3. Architecture - Does it follow project patterns?
+4. Error handling - Are errors handled appropriately?
+5. Readability - Will future developers understand this?
+
+## Output Format
+
+Start with: ` + "`✅ LGTM`" + `, ` + "`⚠️ Minor issues`" + `, or ` + "`❌ Needs changes`" + `
+Then list specific issues with file:line references.`
 
 // Directory and file names for git-crew.
 const (

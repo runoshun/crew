@@ -74,13 +74,16 @@ crew peek <id>
 ### "Review this"
 
 ```bash
-# 1. Check diff
+# 1. Run AI review
+crew review <id>
+
+# 2. Check diff manually
 crew diff <id>
 
-# 2. Run CI (using crew exec)
+# 3. Run CI (using crew exec)
 crew exec <id> -- mise run ci
 
-# 3. Merge if OK
+# 4. Merge if OK
 echo "y" | crew merge <id>
 
 # If issues found, request changes
@@ -235,6 +238,7 @@ watch -n 10 'crew list | grep -E "needs_input|in_review"'
 ### Review & Completion
 | Command | Description |
 |---------|-------------|
+| `crew review` | AI code review |
 | `crew merge` | Merge to main |
 
 ---
