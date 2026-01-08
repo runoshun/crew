@@ -14,10 +14,11 @@ func TestMergeTask_Execute_Success(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to merge",
-		Status: domain.StatusInReview,
-		Issue:  0,
+		ID:         1,
+		Title:      "Task to merge",
+		Status:     domain.StatusInReview,
+		Issue:      0,
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = false
@@ -54,10 +55,11 @@ func TestMergeTask_Execute_SuccessWithIssue(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task with issue",
-		Status: domain.StatusInReview,
-		Issue:  123,
+		ID:         1,
+		Title:      "Task with issue",
+		Status:     domain.StatusInReview,
+		Issue:      123,
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = false
@@ -85,11 +87,12 @@ func TestMergeTask_Execute_StopsRunningSession(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:      1,
-		Title:   "Task with running session",
-		Status:  domain.StatusInProgress,
-		Agent:   "claude",
-		Session: "crew-1",
+		ID:         1,
+		Title:      "Task with running session",
+		Status:     domain.StatusInProgress,
+		Agent:      "claude",
+		Session:    "crew-1",
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true
@@ -117,9 +120,10 @@ func TestMergeTask_Execute_NoWorktree(t *testing.T) {
 	// Setup - worktree doesn't exist (already removed or never created)
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task without worktree",
-		Status: domain.StatusInReview,
+		ID:         1,
+		Title:      "Task without worktree",
+		Status:     domain.StatusInReview,
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = false
@@ -165,9 +169,10 @@ func TestMergeTask_Execute_NotOnMain(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to merge",
-		Status: domain.StatusInReview,
+		ID:         1,
+		Title:      "Task to merge",
+		Status:     domain.StatusInReview,
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -190,9 +195,10 @@ func TestMergeTask_Execute_UncommittedChanges(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to merge",
-		Status: domain.StatusInReview,
+		ID:         1,
+		Title:      "Task to merge",
+		Status:     domain.StatusInReview,
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -236,9 +242,10 @@ func TestMergeTask_Execute_MergeError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to merge",
-		Status: domain.StatusInReview,
+		ID:         1,
+		Title:      "Task to merge",
+		Status:     domain.StatusInReview,
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = false
@@ -265,9 +272,10 @@ func TestMergeTask_Execute_DeleteBranchError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to merge",
-		Status: domain.StatusInReview,
+		ID:         1,
+		Title:      "Task to merge",
+		Status:     domain.StatusInReview,
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = false
@@ -294,9 +302,10 @@ func TestMergeTask_Execute_SaveError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to merge",
-		Status: domain.StatusInReview,
+		ID:         1,
+		Title:      "Task to merge",
+		Status:     domain.StatusInReview,
+		BaseBranch: "main",
 	}
 	repo.SaveErr = assert.AnError
 	sessions := testutil.NewMockSessionManager()
@@ -323,11 +332,12 @@ func TestMergeTask_Execute_StopSessionError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:      1,
-		Title:   "Task with running session",
-		Status:  domain.StatusInProgress,
-		Agent:   "claude",
-		Session: "crew-1",
+		ID:         1,
+		Title:      "Task with running session",
+		Status:     domain.StatusInProgress,
+		Agent:      "claude",
+		Session:    "crew-1",
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true
@@ -353,9 +363,10 @@ func TestMergeTask_Execute_RemoveWorktreeError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to merge",
-		Status: domain.StatusInReview,
+		ID:         1,
+		Title:      "Task to merge",
+		Status:     domain.StatusInReview,
+		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = false

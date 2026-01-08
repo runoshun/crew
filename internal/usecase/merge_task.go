@@ -77,7 +77,6 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	if targetBaseBranch == "" {
 		targetBaseBranch = task.BaseBranch
 		if targetBaseBranch == "" {
-			// Use GetDefaultBranch() instead of hardcoded "main"
 			defaultBranch, defaultErr := uc.git.GetDefaultBranch()
 			if defaultErr != nil {
 				return nil, fmt.Errorf("get default branch: %w", defaultErr)
