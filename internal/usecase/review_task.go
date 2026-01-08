@@ -137,7 +137,7 @@ END_OF_PROMPT
 `, result.Prompt, result.Command)
 
 	// Execute the command synchronously
-	cmd := exec.CommandContext(ctx, "sh", "-c", script)
+	cmd := exec.CommandContext(ctx, "bash", "-c", script)
 	cmd.Dir = wtPath
 
 	// Capture output
