@@ -460,6 +460,14 @@ func (m *Model) viewFooter() string {
 	innerWidth := contentWidth - 2
 	contentLen := lipgloss.Width(content)
 	paginationLen := lipgloss.Width(pagination)
+
+	// Truncate content if too wide
+	maxContentWidth := innerWidth - paginationLen - 1 // 1 for spacing
+	if contentLen > maxContentWidth && maxContentWidth > 3 {
+		content = lipgloss.NewStyle().MaxWidth(maxContentWidth-3).Render(content) + "..."
+		contentLen = lipgloss.Width(content)
+	}
+
 	spacing := innerWidth - contentLen - paginationLen
 	if spacing < 1 {
 		spacing = 1
