@@ -10,7 +10,8 @@ import (
 
 // MergeTaskInput contains the parameters for merging a task.
 type MergeTaskInput struct {
-	TaskID int // Task ID to merge
+	BaseBranch string // Target branch to merge into (defaults to task.BaseBranch or GetDefaultBranch())
+	TaskID     int    // Task ID to merge
 }
 
 // MergeTaskOutput contains the result of merging a task.
@@ -44,10 +45,15 @@ func NewMergeTask(
 	}
 }
 
-// Execute merges a task branch into main.
+// Execute merges a task branch into the base branch.
 // Preconditions:
-// - Current branch is main (or default branch)
-// - main's working tree is clean
+// - Current branch is the base branch
+// - Base branch's working tree is clean
+//
+// BaseBranch behavior:
+// - If BaseBranch is specified (non-empty), uses it regardless of task.BaseBranch
+// - If BaseBranch is empty, uses task.BaseBranch
+// - If both are empty, uses GetDefaultBranch()
 //
 // Processing:
 // 1. If session is running, stop it
@@ -65,23 +71,36 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Get default branch dynamically
-	defaultBranch, err := uc.git.GetDefaultBranch()
-	if err != nil {
-		return nil, fmt.Errorf("get default branch: %w", err)
+	// Determine target base branch
+	// Priority: in.BaseBranch > task.BaseBranch > GetDefaultBranch()
+	targetBaseBranch := in.BaseBranch
+	if targetBaseBranch == "" {
+		targetBaseBranch = task.BaseBranch
+		if targetBaseBranch == "" {
+			// Use GetDefaultBranch() instead of hardcoded "main"
+			defaultBranch, defaultErr := uc.git.GetDefaultBranch()
+			if defaultErr != nil {
+				return nil, fmt.Errorf("get default branch: %w", defaultErr)
+			}
+			targetBaseBranch = defaultBranch
+		}
 	}
 
-	// Check current branch is default branch
+	// Check current branch is the target base branch
 	currentBranch, err := uc.git.CurrentBranch()
 	if err != nil {
 		return nil, fmt.Errorf("get current branch: %w", err)
 	}
-	if currentBranch != defaultBranch {
-		return nil, domain.ErrNotOnMainBranch
+	if currentBranch != targetBaseBranch {
+		// For backward compatibility, keep ErrNotOnMainBranch for "main" branch
+		if targetBaseBranch == "main" {
+			return nil, domain.ErrNotOnMainBranch
+		}
+		return nil, domain.ErrNotOnBaseBranch
 	}
 
-	// Check main's working tree is clean
-	// Use repo root for checking main's working tree (empty string will be handled by the caller)
+	// Check base branch's working tree is clean
+	// Use repo root for checking base branch's working tree (empty string will be handled by the caller)
 	hasChanges, err := uc.git.HasUncommittedChanges("")
 	if err != nil {
 		return nil, fmt.Errorf("check uncommitted changes: %w", err)
