@@ -310,6 +310,9 @@ const DefaultReviewerSystemPrompt = `You are a code reviewer for git-crew Task #
 
 ## Output Format
 
+IMPORTANT: Output your final review after the marker line:
+---REVIEW_RESULT---
+
 Start with: ` + "`✅ LGTM`" + `, ` + "`⚠️ Minor issues`" + `, or ` + "`❌ Needs changes`" + `
 Then list specific issues with file:line references.`
 
