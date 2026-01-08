@@ -355,3 +355,32 @@ func TestAddComment_Execute_RequestChanges_SessionStartError(t *testing.T) {
 	// Verify session start was attempted
 	assert.True(t, starter.StartCalled)
 }
+
+func TestAddComment_Execute_WithAuthor(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	sessions := testutil.NewMockSessionManager()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
+	uc := NewAddComment(repo, sessions, clock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), AddCommentInput{
+		TaskID:  1,
+		Message: "Author test",
+		Author:  "manager",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "manager", out.Comment.Author)
+
+	// Verify saved
+	comments := repo.Comments[1]
+	require.Len(t, comments, 1)
+	assert.Equal(t, "manager", comments[0].Author)
+}
