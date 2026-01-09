@@ -75,20 +75,24 @@ func New(dir string) (*Container, error) {
 
 	// Load app config to determine store type
 	configLoader := config.NewLoader(cfg.CrewDir, cfg.RepoRoot)
-	appConfig, _ := configLoader.Load() // ignore error, use defaults
+	appConfig, err := configLoader.Load()
+	if err != nil {
+		// Use default config if loading fails
+		appConfig = domain.NewDefaultConfig()
+	}
 
 	// Create task repository based on config
 	// Default is "git" store; use "json" only if explicitly specified
 	var taskRepo domain.TaskRepository
 	var storeInit domain.StoreInitializer
-	if appConfig.Tasks.Store == "json" {
+	if appConfig != nil && appConfig.Tasks.Store == "json" {
 		jsonStore := jsonstore.New(cfg.StorePath)
 		taskRepo = jsonStore
 		storeInit = jsonStore
 	} else {
-		namespace := appConfig.Tasks.Namespace
-		if namespace == "" {
-			namespace = "crew"
+		namespace := "crew"
+		if appConfig != nil && appConfig.Tasks.Namespace != "" {
+			namespace = appConfig.Tasks.Namespace
 		}
 		gitStore, err := gitstore.New(cfg.RepoRoot, namespace)
 		if err != nil {
