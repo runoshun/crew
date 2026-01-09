@@ -14,12 +14,13 @@ var claudeAgents = builtinAgentSet{
 		WorkerSetupScript: claudeSetupScript,
 	},
 	Manager: builtinAgentDef{
-		Description: "Claude manager agent for task orchestration",
+		CommandTemplate: "claude --model {{.Model}} " + claudeAllowedToolsForManager + " {{.Args}} {{.Prompt}}",
+		Description:     "Claude manager agent for task orchestration",
 	},
 	Reviewer: builtinAgentDef{
 		// Non-interactive mode: -p (print) for synchronous execution
 		CommandTemplate: "claude -p --model {{.Model}} {{.Args}} {{.Prompt}}",
-		DefaultModel:    "sonnet",
+		DefaultModel:    "opus",
 		Description:     "Code review agent via Claude CLI",
 	},
 }
