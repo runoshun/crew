@@ -12,9 +12,6 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
-// reviewResultMarker is the marker line that separates verbose output from the final review result.
-const reviewResultMarker = "---REVIEW_RESULT---"
-
 // ReviewTaskInput contains the parameters for reviewing a task.
 // Fields are ordered to minimize memory padding.
 type ReviewTaskInput struct {
@@ -191,11 +188,11 @@ END_OF_PROMPT
 }
 
 // extractReviewResult extracts the final review result from the full output.
-// It looks for the reviewResultMarker and returns everything after it.
+// It looks for domain.ReviewResultMarker and returns everything after it.
 // If the marker is not found, it returns the full output as a fallback.
 func extractReviewResult(output string) string {
-	if idx := strings.Index(output, reviewResultMarker); idx != -1 {
-		return output[idx+len(reviewResultMarker):]
+	if idx := strings.Index(output, domain.ReviewResultMarker); idx != -1 {
+		return output[idx+len(domain.ReviewResultMarker):]
 	}
 	return output // fallback: return full output
 }
