@@ -15,8 +15,7 @@ import (
 // newReviewCommand creates the review command for reviewing task changes with AI.
 func newReviewCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		model   string
-		verbose bool
+		model string
 	}
 
 	cmd := &cobra.Command{
@@ -74,7 +73,6 @@ Examples:
 				Agent:   agent,
 				Model:   opts.model,
 				Message: message,
-				Verbose: opts.verbose,
 			})
 			if err != nil {
 				return err
@@ -85,7 +83,6 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
-	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "Show full output including intermediate steps")
 
 	return cmd
 }
