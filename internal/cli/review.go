@@ -69,7 +69,7 @@ Examples:
 
 			// Execute use case
 			uc := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
-			_, err = uc.Execute(cmd.Context(), usecase.ReviewTaskInput{
+			out, err := uc.Execute(cmd.Context(), usecase.ReviewTaskInput{
 				TaskID:  taskID,
 				Agent:   agent,
 				Model:   opts.model,
@@ -78,6 +78,11 @@ Examples:
 			})
 			if err != nil {
 				return err
+			}
+
+			// Print the review result (in non-verbose mode, this is the extracted result)
+			if !opts.verbose && out.Review != "" {
+				fmt.Fprintln(cmd.OutOrStdout(), out.Review)
 			}
 
 			return nil

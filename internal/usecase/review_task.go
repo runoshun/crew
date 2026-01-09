@@ -144,13 +144,14 @@ END_OF_PROMPT
 	// Capture output
 	var stdout, stderr bytes.Buffer
 
-	// If stdout/stderr writers are provided, use them for streaming
-	if uc.stdout != nil {
+	// In verbose mode, stream output in real-time
+	// In normal mode, buffer everything and extract result after completion
+	if in.Verbose && uc.stdout != nil {
 		cmd.Stdout = io.MultiWriter(&stdout, uc.stdout)
 	} else {
 		cmd.Stdout = &stdout
 	}
-	if uc.stderr != nil {
+	if in.Verbose && uc.stderr != nil {
 		cmd.Stderr = io.MultiWriter(&stderr, uc.stderr)
 	} else {
 		cmd.Stderr = &stderr
