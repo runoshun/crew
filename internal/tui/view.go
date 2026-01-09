@@ -800,13 +800,27 @@ func (m *Model) detailPanelContent(contentWidth int) string {
 			Bold(true)
 		lines = append(lines, "", commentLabelStyle.Render("Comments"))
 
-		for _, comment := range m.comments {
+		separator := lipgloss.NewStyle().
+			Foreground(Colors.GroupLine).
+			Render("─────────────────")
+		lines = append(lines, separator)
+
+		for i, comment := range m.comments {
+			if i > 0 {
+				lines = append(lines, "")
+			}
 			timeStr := comment.Time.Format("01/02 15:04")
+			authorPart := ""
+			if comment.Author != "" {
+				authorPart = " · " + comment.Author
+			}
+			headerLine := lipgloss.NewStyle().Foreground(Colors.Muted).Render(timeStr + authorPart)
+			lines = append(lines, headerLine)
+
 			commentStyle := lipgloss.NewStyle().
-				Foreground(Colors.DescSelected).
+				Foreground(Colors.TitleNormal).
 				Width(contentWidth)
-			commentLine := lipgloss.NewStyle().Foreground(Colors.Muted).Render("["+timeStr+"] ") + commentStyle.Render(comment.Text)
-			lines = append(lines, commentLine)
+			lines = append(lines, commentStyle.Render(comment.Text))
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 // Fields are ordered to minimize memory padding.
 type AddCommentInput struct {
 	Message        string // Comment text (required)
+	Author         string // Author name (optional)
 	TaskID         int    // Task ID (required)
 	RequestChanges bool   // If true, change status to in_progress and notify session
 }
@@ -70,8 +71,9 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 
 	// Create comment
 	comment := domain.Comment{
-		Text: message,
-		Time: uc.clock.Now(),
+		Text:   message,
+		Time:   uc.clock.Now(),
+		Author: in.Author,
 	}
 
 	// Save comment

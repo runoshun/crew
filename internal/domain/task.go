@@ -134,6 +134,7 @@ func trimLeadingNewlines(s string) string {
 // Comment represents a note attached to a task.
 // Fields are ordered to minimize memory padding.
 type Comment struct {
-	Time time.Time `json:"time"` // Creation time
-	Text string    `json:"text"` // Comment text
+	Time   time.Time `json:"time"`             // Creation time
+	Text   string    `json:"text"`             // Comment text
+	Author string    `json:"author,omitempty"` // "manager", "worker", or empty
 }
