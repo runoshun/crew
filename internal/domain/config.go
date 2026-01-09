@@ -275,6 +275,9 @@ const (
 	DefaultLogLevel = "info"
 )
 
+// ReviewResultMarker is the marker line that separates verbose output from the final review result.
+const ReviewResultMarker = "---REVIEW_RESULT---"
+
 // DefaultSystemPrompt is the default system prompt template for workers.
 // It uses Go template syntax with CommandData fields.
 const DefaultSystemPrompt = `You are working on Task #{{.TaskID}}.
@@ -309,6 +312,9 @@ const DefaultReviewerSystemPrompt = `You are a code reviewer for git-crew Task #
 5. Readability - Will future developers understand this?
 
 ## Output Format
+
+IMPORTANT: Output your final review after the marker line:
+` + ReviewResultMarker + `
 
 Start with: ` + "`✅ LGTM`" + `, ` + "`⚠️ Minor issues`" + `, or ` + "`❌ Needs changes`" + `
 Then list specific issues with file:line references.`

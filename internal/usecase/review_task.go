@@ -19,6 +19,7 @@ type ReviewTaskInput struct {
 	Model   string // Model name override (optional, uses agent's default if empty)
 	Message string // Additional instructions for the reviewer (optional)
 	TaskID  int    // Task ID to review
+	Verbose bool   // Show full output including intermediate steps (default: false)
 }
 
 // ReviewTaskOutput contains the result of reviewing a task.
@@ -174,8 +175,24 @@ END_OF_PROMPT
 		}
 	}
 
+	// Extract final review result if not verbose mode
+	review := stdout.String()
+	if !in.Verbose {
+		review = extractReviewResult(review)
+	}
+
 	return &ReviewTaskOutput{
-		Review: strings.TrimSpace(stdout.String()),
+		Review: strings.TrimSpace(review),
 		Task:   task,
 	}, nil
+}
+
+// extractReviewResult extracts the final review result from the full output.
+// It looks for domain.ReviewResultMarker and returns everything after it.
+// If the marker is not found, it returns the full output as a fallback.
+func extractReviewResult(output string) string {
+	if idx := strings.Index(output, domain.ReviewResultMarker); idx != -1 {
+		return output[idx+len(domain.ReviewResultMarker):]
+	}
+	return output // fallback: return full output
 }
