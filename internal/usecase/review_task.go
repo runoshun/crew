@@ -115,6 +115,9 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 	// Build user prompt
 	userPrompt := in.Message
 	if userPrompt == "" {
+		userPrompt = cfg.AgentsConfig.ReviewerPrompt
+	}
+	if userPrompt == "" {
 		userPrompt = "Please review this task."
 	}
 

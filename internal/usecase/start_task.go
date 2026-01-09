@@ -130,7 +130,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	}
 
 	// Generate prompt and script files
-	scriptPath, err := uc.generateScript(task, wtPath, agent, model, in.Continue)
+	scriptPath, err := uc.generateScript(task, wtPath, agent, model, in.Continue, cfg)
 	if err != nil {
 		_ = uc.worktrees.Remove(branch)
 		return nil, fmt.Errorf("generate script: %w", err)
@@ -172,14 +172,14 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 // generateScript creates the task script with embedded prompt.
 // Returns the path to the generated script.
-func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, agent domain.Agent, model string, continueFlag bool) (string, error) {
+func (uc *StartTask) generateScript(task *domain.Task, worktreePath string, agent domain.Agent, model string, continueFlag bool, cfg *domain.Config) (string, error) {
 	scriptsDir := filepath.Join(uc.crewDir, "scripts")
 	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
 		return "", fmt.Errorf("create scripts directory: %w", err)
 	}
 
 	// Build command and prompt using RenderCommand
-	script, err := uc.buildScript(task, worktreePath, agent, model, continueFlag)
+	script, err := uc.buildScript(task, worktreePath, agent, model, continueFlag, cfg)
 	if err != nil {
 		return "", fmt.Errorf("build script: %w", err)
 	}
@@ -204,7 +204,7 @@ type scriptTemplateData struct {
 }
 
 // buildScript constructs the task script with embedded prompt and session-ended callback.
-func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent domain.Agent, model string, continueFlag bool) (string, error) {
+func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent domain.Agent, model string, continueFlag bool, cfg *domain.Config) (string, error) {
 	// Find crew binary path (for _session-ended callback)
 	crewBin, err := os.Executable()
 	if err != nil {
@@ -229,7 +229,7 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent d
 
 	// Determine default prompts: agent has its own SystemPrompt, or use default
 	defaultSystemPrompt := domain.DefaultSystemPrompt
-	defaultPrompt := ""
+	defaultPrompt := cfg.AgentsConfig.WorkerPrompt
 
 	// Render command and prompt using Agent.RenderCommand
 	// Pass shell variable reference as promptOverride - will be expanded at runtime
