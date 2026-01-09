@@ -2,6 +2,7 @@
 package app
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -77,7 +78,8 @@ func New(dir string) (*Container, error) {
 	configLoader := config.NewLoader(cfg.CrewDir, cfg.RepoRoot)
 	appConfig, err := configLoader.Load()
 	if err != nil {
-		// Use default config if loading fails
+		// Warn about config error and use defaults
+		fmt.Fprintf(os.Stderr, "warning: config error: %v (using defaults)\n", err)
 		appConfig = domain.NewDefaultConfig()
 	}
 
