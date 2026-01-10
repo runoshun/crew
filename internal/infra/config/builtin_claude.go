@@ -1,5 +1,7 @@
 package config
 
+import "github.com/runoshun/git-crew/v2/internal/domain"
+
 const (
 	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show) Bash(crew edit:*)'`
 	claudeAllowedToolsForManager = `--allowedTools='Bash(crew:*)'`
@@ -7,19 +9,20 @@ const (
 
 // claudeAgents contains the built-in configuration for the Claude CLI.
 var claudeAgents = builtinAgentSet{
-	Worker: builtinAgentDef{
-		CommandTemplate:   "claude --model {{.Model}} --permission-mode acceptEdits " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
-		DefaultModel:      "opus",
-		Description:       "Claude model via Anthropic CLI",
-		WorkerSetupScript: claudeSetupScript,
+	Worker: domain.Agent{
+		CommandTemplate: "claude --model {{.Model}} --permission-mode acceptEdits --plugin-dir .claude/crew-plugin " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
+		DefaultModel:    "opus",
+		Description:     "Claude model via Anthropic CLI",
+		SetupScript:     claudeSetupScript,
 	},
-	Manager: builtinAgentDef{
-		Description: "Claude manager agent for task orchestration",
+	Manager: domain.Agent{
+		CommandTemplate: "claude --model {{.Model}} " + claudeAllowedToolsForManager + " {{.Args}} {{.Prompt}}",
+		Description:     "Claude manager agent for task orchestration",
 	},
-	Reviewer: builtinAgentDef{
+	Reviewer: domain.Agent{
 		// Non-interactive mode: -p (print) for synchronous execution
 		CommandTemplate: "claude -p --model {{.Model}} {{.Args}} {{.Prompt}}",
-		DefaultModel:    "sonnet",
+		DefaultModel:    "opus",
 		Description:     "Code review agent via Claude CLI",
 	},
 }
@@ -45,6 +48,17 @@ mkdir -p ${PLUGIN_DIR}/hooks
 cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '(.cwd) as $cwd | .tool_input.file_path // \"\" | if startswith($cwd) then {permissionDecision: \"allow\"} else {} end'"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "permission_prompt|idle_prompt",
@@ -71,6 +85,6 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
 EOF
 
 # Add exclude pattern to git (use git rev-parse for worktree support)
-GIT_DIR=$(git rev-parse --git-dir 2>/dev/null) && \
-  echo ".claude/crew-plugin/" >> "${GIT_DIR}/info/exclude" || true
+GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null) && \
+  echo ".claude/crew-plugin/" >> "${GIT_COMMON_DIR}/info/exclude" || true
 `

@@ -530,3 +530,32 @@ args = "root"
 	Register(defaultCfg)
 	assert.Equal(t, defaultCfg.Agents["claude"].Args, cfg.Agents["claude"].Args)
 }
+
+func TestLoader_Load_ReviewerDefault(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config with reviewer_default and reviewer_prompt
+	repoConfig := `
+[agents]
+reviewer_default = "claude-reviewer"
+reviewer_prompt = "Please review this code."
+
+[agents.claude-reviewer]
+role = "reviewer"
+args = "--model claude-opus-4"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify reviewer config
+	assert.Equal(t, "claude-reviewer", cfg.AgentsConfig.DefaultReviewer)
+	assert.Equal(t, "Please review this code.", cfg.AgentsConfig.ReviewerPrompt)
+	assert.Len(t, cfg.Warnings, 0, "should have no warnings for valid config")
+}

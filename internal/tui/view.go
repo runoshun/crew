@@ -400,7 +400,8 @@ func (m *Model) viewAgentPicker() string {
 	}
 
 	// Build content
-	lines := []string{title, taskTitle, ds.emptyLine(), selectLabel}
+	lines := make([]string, 0, 4+len(agentRows)+4)
+	lines = append(lines, title, taskTitle, ds.emptyLine(), selectLabel)
 	lines = append(lines, agentRows...)
 	lines = append(lines, customLabel, customInputView, ds.emptyLine(), ds.renderLine(hint))
 
@@ -633,7 +634,8 @@ func (m *Model) viewStatusPicker() string {
 	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" select · ") +
 		ds.key.Render("esc") + ds.text.Render(" cancel"))
 
-	lines := []string{title, ds.emptyLine(), taskLine, currentLine, ds.emptyLine(), selectLabel}
+	lines := make([]string, 0, 6+len(statusRows)+2)
+	lines = append(lines, title, ds.emptyLine(), taskLine, currentLine, ds.emptyLine(), selectLabel)
 	lines = append(lines, statusRows...)
 	lines = append(lines, ds.emptyLine(), hint)
 
@@ -800,13 +802,27 @@ func (m *Model) detailPanelContent(contentWidth int) string {
 			Bold(true)
 		lines = append(lines, "", commentLabelStyle.Render("Comments"))
 
-		for _, comment := range m.comments {
+		separator := lipgloss.NewStyle().
+			Foreground(Colors.GroupLine).
+			Render("─────────────────")
+		lines = append(lines, separator)
+
+		for i, comment := range m.comments {
+			if i > 0 {
+				lines = append(lines, "")
+			}
 			timeStr := comment.Time.Format("01/02 15:04")
+			authorPart := ""
+			if comment.Author != "" {
+				authorPart = " · " + comment.Author
+			}
+			headerLine := lipgloss.NewStyle().Foreground(Colors.Muted).Render(timeStr + authorPart)
+			lines = append(lines, headerLine)
+
 			commentStyle := lipgloss.NewStyle().
-				Foreground(Colors.DescSelected).
+				Foreground(Colors.TitleNormal).
 				Width(contentWidth)
-			commentLine := lipgloss.NewStyle().Foreground(Colors.Muted).Render("["+timeStr+"] ") + commentStyle.Render(comment.Text)
-			lines = append(lines, commentLine)
+			lines = append(lines, commentStyle.Render(comment.Text))
 		}
 	}
 

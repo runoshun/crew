@@ -73,22 +73,23 @@ crew peek <id>
 
 ### "Review this"
 
+Delegate reviews to a dedicated reviewer agent via `crew review`.
+The manager should NOT review code directly.
+
 ```bash
-# 1. Run AI review
+# 1. Delegate review to reviewer agent
 crew review <id>
+# This spawns a reviewer agent that analyzes the diff and provides feedback
 
-# 2. Check diff manually
-crew diff <id>
+# 2. Wait for review completion and check result
+# The reviewer agent will output findings
 
-# 3. Run CI (using crew exec)
-crew exec <id> -- mise run ci
-
-# 4. Merge if OK
+# 3. If LGTM, merge
 echo "y" | crew merge <id>
 
-# If issues found, request changes
-crew comment <id> -R "Description of the issue"
-# This automatically sets status to in_progress and notifies the agent
+# If issues found, forward feedback to worker
+crew comment <id> -R "Description of the issue from reviewer"
+# This automatically sets status to in_progress and notifies the worker agent
 ```
 
 ### "What's the progress?"

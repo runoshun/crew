@@ -15,6 +15,11 @@ func TestRegisterWithLookPath_BothCommandsAvailable(t *testing.T) {
 	})
 	RegisterWithLookPath(cfg, lookPath)
 
+	// Resolve inheritance (required for agents using Inherit field)
+	if err := cfg.ResolveInheritance(); err != nil {
+		t.Fatalf("failed to resolve inheritance: %v", err)
+	}
+
 	// Check that builtin worker agents are registered
 	expectedWorkers := []string{"claude", "opencode"}
 	for _, name := range expectedWorkers {
@@ -44,6 +49,10 @@ func TestRegisterWithLookPath_BothCommandsAvailable(t *testing.T) {
 		}
 		if !agent.Hidden {
 			t.Errorf("manager agent %q should be hidden by default", name)
+		}
+		// Manager should have CommandTemplate set (from builtin definition)
+		if agent.CommandTemplate == "" {
+			t.Errorf("manager agent %q should have a CommandTemplate", name)
 		}
 	}
 
@@ -161,7 +170,7 @@ func TestBuiltinAgentConfigs(t *testing.T) {
 	if claudeSet.Worker.DefaultModel != "opus" {
 		t.Errorf("claude agent default model = %q, want %q", claudeSet.Worker.DefaultModel, "opus")
 	}
-	if claudeSet.Worker.WorkerSetupScript == "" {
+	if claudeSet.Worker.SetupScript == "" {
 		t.Error("claude agent should have worker setup script")
 	}
 
@@ -170,7 +179,7 @@ func TestBuiltinAgentConfigs(t *testing.T) {
 	if opencodeSet.Worker.DefaultModel != "anthropic/claude-opus-4-5" {
 		t.Errorf("opencode agent default model = %q, want %q", opencodeSet.Worker.DefaultModel, "anthropic/claude-opus-4-5")
 	}
-	if opencodeSet.Worker.WorkerSetupScript == "" {
+	if opencodeSet.Worker.SetupScript == "" {
 		t.Error("opencode agent should have worker setup script")
 	}
 }

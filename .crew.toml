@@ -50,7 +50,7 @@ worker_prompt = "Use 'dev-workflow' skill and follow the instructions." # Defaul
 ## Worktree initialization settings (applied to all workers)
 ## - setup_command: Command to run after worktree creation
 ## - copy: Files/directories to copy from main repo (uses CoW if available)
-# setup_command = ""
+setup_command = "mise trust"
 # copy = []
 
 [complete]
