@@ -68,6 +68,18 @@ func (m *Manager) GetRootRepoConfigInfo() domain.ConfigInfo {
 	return m.getConfigInfo(path)
 }
 
+// GetOverrideConfigInfo returns information about the global override config file (config.override.toml).
+func (m *Manager) GetOverrideConfigInfo() domain.ConfigInfo {
+	if m.globalConfDir == "" {
+		return domain.ConfigInfo{
+			Path:   "",
+			Exists: false,
+		}
+	}
+	path := filepath.Join(m.globalConfDir, domain.ConfigOverrideFileName)
+	return m.getConfigInfo(path)
+}
+
 // getConfigInfo reads a config file and returns its info.
 func (m *Manager) getConfigInfo(path string) domain.ConfigInfo {
 	content, err := os.ReadFile(path)
@@ -98,6 +110,22 @@ func (m *Manager) InitGlobalConfig(cfg *domain.Config) error {
 		return errors.New("global config directory not available")
 	}
 	path := filepath.Join(m.globalConfDir, domain.ConfigFileName)
+
+	// Create parent directory if it doesn't exist
+	if err := os.MkdirAll(m.globalConfDir, 0700); err != nil {
+		return err
+	}
+
+	return m.initConfig(path, cfg)
+}
+
+// InitOverrideConfig creates a global override config file with default template.
+// The cfg parameter should have builtin agents registered (via builtin.Register).
+func (m *Manager) InitOverrideConfig(cfg *domain.Config) error {
+	if m.globalConfDir == "" {
+		return errors.New("global config directory not available")
+	}
+	path := filepath.Join(m.globalConfDir, domain.ConfigOverrideFileName)
 
 	// Create parent directory if it doesn't exist
 	if err := os.MkdirAll(m.globalConfDir, 0700); err != nil {

@@ -36,6 +36,7 @@ func (c *Config) MarshalTOML() (any, error) {
 		WorkerPrompt    string           `toml:"worker_prompt,omitempty"`
 		ManagerPrompt   string           `toml:"manager_prompt,omitempty"`
 		ReviewerPrompt  string           `toml:"reviewer_prompt,omitempty"`
+		DisabledAgents  []string         `toml:"disabled_agents,omitempty"`
 	}
 
 	return struct {
@@ -54,6 +55,7 @@ func (c *Config) MarshalTOML() (any, error) {
 			WorkerPrompt:    c.AgentsConfig.WorkerPrompt,
 			ManagerPrompt:   c.AgentsConfig.ManagerPrompt,
 			ReviewerPrompt:  c.AgentsConfig.ReviewerPrompt,
+			DisabledAgents:  c.AgentsConfig.DisabledAgents,
 			Agents:          c.Agents,
 		},
 		Complete: c.Complete,
@@ -74,12 +76,13 @@ type TasksConfig struct {
 
 // AgentsConfig holds common settings for all agents from [agents] section.
 type AgentsConfig struct {
-	DefaultWorker   string `toml:"worker_default,omitempty"`   // Default worker agent name
-	DefaultManager  string `toml:"manager_default,omitempty"`  // Default manager agent name
-	DefaultReviewer string `toml:"reviewer_default,omitempty"` // Default reviewer agent name
-	WorkerPrompt    string `toml:"worker_prompt,omitempty"`    // Default prompt for all worker agents
-	ManagerPrompt   string `toml:"manager_prompt,omitempty"`   // Default prompt for all manager agents
-	ReviewerPrompt  string `toml:"reviewer_prompt,omitempty"`  // Default prompt for all reviewer agents
+	DefaultWorker   string   `toml:"worker_default,omitempty"`   // Default worker agent name
+	DefaultManager  string   `toml:"manager_default,omitempty"`  // Default manager agent name
+	DefaultReviewer string   `toml:"reviewer_default,omitempty"` // Default reviewer agent name
+	WorkerPrompt    string   `toml:"worker_prompt,omitempty"`    // Default prompt for all worker agents
+	ManagerPrompt   string   `toml:"manager_prompt,omitempty"`   // Default prompt for all manager agents
+	ReviewerPrompt  string   `toml:"reviewer_prompt,omitempty"`  // Default prompt for all reviewer agents
+	DisabledAgents  []string `toml:"disabled_agents,omitempty"`  // List of agent names to disable
 }
 
 // Role represents the role of an agent.
@@ -321,9 +324,10 @@ Then list specific issues with file:line references.`
 
 // Directory and file names for git-crew.
 const (
-	CrewDirName        = "crew"        // Directory name for crew data
-	ConfigFileName     = "config.toml" // Config file name
-	RootConfigFileName = ".crew.toml"  // Config file name in repository root
+	CrewDirName            = "crew"                 // Directory name for crew data
+	ConfigFileName         = "config.toml"          // Config file name
+	ConfigOverrideFileName = "config.override.toml" // Override config file name
+	RootConfigFileName     = ".crew.toml"           // Config file name in repository root
 )
 
 // RepoCrewDir returns the crew directory path for a repository.
@@ -351,6 +355,12 @@ func GlobalCrewDir(configHome string) string {
 // configHome is typically XDG_CONFIG_HOME or ~/.config (resolved by caller).
 func GlobalConfigPath(configHome string) string {
 	return filepath.Join(GlobalCrewDir(configHome), ConfigFileName)
+}
+
+// GlobalOverrideConfigPath returns the global override config path.
+// configHome is typically XDG_CONFIG_HOME or ~/.config (resolved by caller).
+func GlobalOverrideConfigPath(configHome string) string {
+	return filepath.Join(GlobalCrewDir(configHome), ConfigOverrideFileName)
 }
 
 // NewDefaultConfig returns a Config with default values.

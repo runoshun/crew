@@ -84,14 +84,31 @@ func (l *Loader) LoadRepo() (*domain.Config, error) {
 	return l.loadFile(repoPath)
 }
 
+// LoadOverride returns only the global override configuration (config.override.toml).
+func (l *Loader) LoadOverride() (*domain.Config, error) {
+	if l.globalConfDir == "" {
+		return nil, os.ErrNotExist
+	}
+	overridePath := filepath.Join(l.globalConfDir, domain.ConfigOverrideFileName)
+	return l.loadFile(overridePath)
+}
+
 // LoadWithOptions returns the merged configuration with options to ignore sources.
 func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config, error) {
-	var global, rootRepo, repo *domain.Config
+	var global, override, rootRepo, repo *domain.Config
 	var err error
 
 	// Load global config unless ignored
 	if !opts.IgnoreGlobal {
 		global, err = l.LoadGlobal()
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+
+	// Load override config unless ignored
+	if !opts.IgnoreOverride {
+		override, err = l.LoadOverride()
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
@@ -118,13 +135,16 @@ func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config,
 	Register(base)
 
 	// If all don't exist or are ignored, return default config
-	if global == nil && rootRepo == nil && repo == nil {
+	if global == nil && override == nil && rootRepo == nil && repo == nil {
 		return base, nil
 	}
 
-	// Merge: default <- global <- rootRepo <- repo (later takes precedence)
+	// Merge: default <- global <- override <- rootRepo <- repo (later takes precedence)
 	if global != nil {
 		base = mergeConfigs(base, global)
+	}
+	if override != nil {
+		base = mergeConfigs(base, override)
 	}
 	if rootRepo != nil {
 		base = mergeConfigs(base, rootRepo)
@@ -186,6 +206,9 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 				}
 				if ac.ReviewerPrompt != "" {
 					res.AgentsConfig.ReviewerPrompt = ac.ReviewerPrompt
+				}
+				if len(ac.DisabledAgents) > 0 {
+					res.AgentsConfig.DisabledAgents = ac.DisabledAgents
 				}
 				for name, def := range ac.Defs {
 					res.Agents[name] = domain.Agent{
@@ -351,6 +374,7 @@ type agentsConfig struct {
 	WorkerPrompt    string              // Default prompt for all worker agents
 	ManagerPrompt   string              // Default prompt for all manager agents
 	ReviewerPrompt  string              // Default prompt for all reviewer agents
+	DisabledAgents  []string            // List of agent names to disable
 	Unknowns        []string            // Unknown keys in [agents]
 }
 
@@ -399,6 +423,14 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 		case "reviewer_prompt":
 			if s, ok := value.(string); ok {
 				result.ReviewerPrompt = s
+			}
+		case "disabled_agents":
+			if arr, ok := value.([]any); ok {
+				for _, item := range arr {
+					if s, ok := item.(string); ok {
+						result.DisabledAgents = append(result.DisabledAgents, s)
+					}
+				}
 			}
 		default:
 			if subMap, ok := value.(map[string]any); ok {
@@ -501,6 +533,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.AgentsConfig.ReviewerPrompt != "" {
 		result.AgentsConfig.ReviewerPrompt = override.AgentsConfig.ReviewerPrompt
+	}
+	if len(override.AgentsConfig.DisabledAgents) > 0 {
+		result.AgentsConfig.DisabledAgents = override.AgentsConfig.DisabledAgents
 	}
 
 	// Override other sections

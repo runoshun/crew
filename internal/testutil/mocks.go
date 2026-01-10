@@ -537,11 +537,14 @@ func (m *MockConfigLoader) LoadWithOptions(opts domain.LoadConfigOptions) (*doma
 type MockConfigManager struct {
 	InitRepoErr        error
 	InitGlobalErr      error
+	InitOverrideErr    error
 	RepoConfigInfo     domain.ConfigInfo
 	GlobalConfigInfo   domain.ConfigInfo
 	RootRepoConfigInfo domain.ConfigInfo
+	OverrideConfigInfo domain.ConfigInfo
 	InitRepoCalled     bool
 	InitGlobalCalled   bool
+	InitOverrideCalled bool
 }
 
 // NewMockConfigManager creates a new MockConfigManager.
@@ -557,6 +560,10 @@ func NewMockConfigManager() *MockConfigManager {
 		},
 		RootRepoConfigInfo: domain.ConfigInfo{
 			Path:   "/test/.crew.toml",
+			Exists: false,
+		},
+		OverrideConfigInfo: domain.ConfigInfo{
+			Path:   "/home/test/.config/git-crew/config.override.toml",
 			Exists: false,
 		},
 	}
@@ -580,6 +587,11 @@ func (m *MockConfigManager) GetRootRepoConfigInfo() domain.ConfigInfo {
 	return m.RootRepoConfigInfo
 }
 
+// GetOverrideConfigInfo returns the configured override config info.
+func (m *MockConfigManager) GetOverrideConfigInfo() domain.ConfigInfo {
+	return m.OverrideConfigInfo
+}
+
 // InitRepoConfig records the call and returns configured error.
 func (m *MockConfigManager) InitRepoConfig(_ *domain.Config) error {
 	m.InitRepoCalled = true
@@ -590,6 +602,12 @@ func (m *MockConfigManager) InitRepoConfig(_ *domain.Config) error {
 func (m *MockConfigManager) InitGlobalConfig(_ *domain.Config) error {
 	m.InitGlobalCalled = true
 	return m.InitGlobalErr
+}
+
+// InitOverrideConfig records the call and returns configured error.
+func (m *MockConfigManager) InitOverrideConfig(_ *domain.Config) error {
+	m.InitOverrideCalled = true
+	return m.InitOverrideErr
 }
 
 // === Snapshot methods (no-op for mock) ===
