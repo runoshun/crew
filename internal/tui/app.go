@@ -442,12 +442,23 @@ func (m *Model) updateAgents() {
 	// Build agent command previews
 	m.agentCommands = make(map[string]string)
 
-	// Filter agents: only show worker-role agents that are not hidden
+	// Filter agents: only show worker-role agents that are not hidden or disabled
 	m.builtinAgents = []string{}
 	m.customAgents = []string{}
 	for name, agentDef := range m.config.Agents {
-		// Skip hidden agents and non-worker roles
+		// Skip hidden agents, non-worker roles, and disabled agents
 		if agentDef.Hidden || (agentDef.Role != "" && agentDef.Role != domain.RoleWorker) {
+			continue
+		}
+		// Skip disabled agents
+		isDisabled := false
+		for _, disabled := range m.config.AgentsConfig.DisabledAgents {
+			if disabled == name {
+				isDisabled = true
+				break
+			}
+		}
+		if isDisabled {
 			continue
 		}
 		m.builtinAgents = append(m.builtinAgents, name)

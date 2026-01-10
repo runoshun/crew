@@ -1000,3 +1000,45 @@ func TestStartTask_Execute_WithSetupScript(t *testing.T) {
 	count := strings.Count(content, ".existing-pattern/")
 	assert.Equal(t, 1, count, "existing pattern should not be duplicated")
 }
+
+func TestStartTask_Execute_WithDisabledAgent(t *testing.T) {
+	// Setup
+	task := &domain.Task{
+		ID:         1,
+		Title:      "Test",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	mockTasks := testutil.NewMockTaskRepository()
+	mockTasks.Tasks[1] = task
+	mockSessions := testutil.NewMockSessionManager()
+	mockWorktrees := testutil.NewMockWorktreeManager()
+	mockGit := &testutil.MockGit{}
+
+	// Mock config with disabled agent
+	cfg := &domain.Config{
+		Agents: map[string]domain.Agent{
+			"claude": {
+				CommandTemplate: "claude {{.Args}} --prompt {{.Prompt}}",
+				Role:            domain.RoleWorker,
+			},
+		},
+		AgentsConfig: domain.AgentsConfig{
+			DisabledAgents: []string{"claude"},
+		},
+	}
+	mockLoader := &testutil.MockConfigLoader{Config: cfg}
+
+	uc := NewStartTask(mockTasks, mockSessions, mockWorktrees, mockLoader, mockGit, domain.RealClock{}, "/test/.git/crew", "/test")
+
+	// Execute with disabled agent
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+	})
+
+	// Assert - disabled agents should return ErrAgentDisabled
+	assert.ErrorIs(t, err, domain.ErrAgentDisabled)
+	assert.Contains(t, err.Error(), "claude")
+	assert.Contains(t, err.Error(), "disabled")
+}

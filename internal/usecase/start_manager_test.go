@@ -315,3 +315,31 @@ func TestSplitCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestStartManager_Execute_WithDisabledAgent(t *testing.T) {
+	// Mock config with disabled agent
+	cfg := &domain.Config{
+		Agents: map[string]domain.Agent{
+			"opencode-manager": {
+				CommandTemplate: "opencode {{.Args}} --prompt {{.Prompt}}",
+				Role:            domain.RoleManager,
+			},
+		},
+		AgentsConfig: domain.AgentsConfig{
+			DisabledAgents: []string{"opencode-manager"},
+		},
+	}
+	mockLoader := &testutil.MockConfigLoader{Config: cfg}
+
+	uc := NewStartManager(mockLoader, "/test", "/test/.git")
+
+	// Execute with disabled agent
+	_, err := uc.Execute(context.Background(), StartManagerInput{
+		Name: "opencode-manager",
+	})
+
+	// Assert - disabled agents should return ErrAgentDisabled
+	assert.ErrorIs(t, err, domain.ErrAgentDisabled)
+	assert.Contains(t, err.Error(), "opencode-manager")
+	assert.Contains(t, err.Error(), "disabled")
+}

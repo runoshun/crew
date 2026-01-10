@@ -240,3 +240,44 @@ func TestReviewTask_Execute_TaskWithIssue(t *testing.T) {
 	expectedBranch := domain.BranchName(1, 123)
 	assert.Equal(t, "crew-1-gh-123", expectedBranch)
 }
+
+func TestReviewTask_Execute_WithDisabledAgent(t *testing.T) {
+	// Setup
+	task := &domain.Task{
+		ID:         1,
+		Title:      "Test",
+		Status:     domain.StatusInProgress,
+		BaseBranch: "main",
+	}
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = task
+	worktrees := testutil.NewMockWorktreeManager()
+
+	// Mock config with disabled agent
+	cfg := &domain.Config{
+		Agents: map[string]domain.Agent{
+			"claude-reviewer": {
+				CommandTemplate: "claude {{.Args}} --prompt {{.Prompt}}",
+				Role:            domain.RoleReviewer,
+			},
+		},
+		AgentsConfig: domain.AgentsConfig{
+			DisabledAgents: []string{"claude-reviewer"},
+		},
+	}
+	loader := &testutil.MockConfigLoader{Config: cfg}
+
+	var stdout, stderr bytes.Buffer
+	uc := NewReviewTask(repo, worktrees, loader, "/test", &stdout, &stderr)
+
+	// Execute with disabled agent
+	_, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID: 1,
+		Agent:  "claude-reviewer",
+	})
+
+	// Assert - disabled agents should return ErrAgentDisabled
+	assert.ErrorIs(t, err, domain.ErrAgentDisabled)
+	assert.Contains(t, err.Error(), "claude-reviewer")
+	assert.Contains(t, err.Error(), "disabled")
+}
