@@ -91,6 +91,6 @@ GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null) && \
 # Trust worktree in Claude
 CLAUDE_JSON=~/.claude.json
 if [ -f "$CLAUDE_JSON" ] && command -v jq &> /dev/null; then
-  jq --arg path "{{.Worktree}}" '.projects[$path] //= {} | .projects[$path].hasTrustDialogAccepted = true' "$CLAUDE_JSON" > /tmp/claude.json.tmp && mv /tmp/claude.json.tmp "$CLAUDE_JSON"
+  TMPFILE=$(mktemp) && jq --arg path "{{.Worktree}}" '.projects[$path] //= {} | .projects[$path].hasTrustDialogAccepted = true' "$CLAUDE_JSON" > "$TMPFILE" && mv "$TMPFILE" "$CLAUDE_JSON"
 fi
 `
