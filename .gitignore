@@ -9,8 +9,6 @@ coverage.html
 # IDE
 .idea/
 .vscode/
-.claude/
-.opencode/
 *.swp
 *.swo
 *~
