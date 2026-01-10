@@ -291,3 +291,22 @@ type RealClock struct{}
 func (RealClock) Now() time.Time {
 	return time.Now()
 }
+
+// Logger provides structured logging with task-aware output.
+// Logs are written to both a global log file and task-specific log files.
+type Logger interface {
+	// Info logs an info message.
+	Info(taskID int, category, msg string)
+
+	// Debug logs a debug message.
+	Debug(taskID int, category, msg string)
+
+	// Warn logs a warning message.
+	Warn(taskID int, category, msg string)
+
+	// Error logs an error message.
+	Error(taskID int, category, msg string)
+
+	// Close closes any open log files.
+	Close() error
+}
