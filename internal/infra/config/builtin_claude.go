@@ -10,7 +10,7 @@ const (
 // claudeAgents contains the built-in configuration for the Claude CLI.
 var claudeAgents = builtinAgentSet{
 	Worker: domain.Agent{
-		CommandTemplate: "claude --model {{.Model}} --permission-mode acceptEdits --plugin-dir .claude/crew-plugin " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
+		CommandTemplate: "claude --model {{.Model}} --plugin-dir .claude/crew-plugin " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
 		DefaultModel:    "opus",
 		Description:     "Claude model via Anthropic CLI",
 		SetupScript:     claudeSetupScript,
@@ -27,6 +27,10 @@ var claudeAgents = builtinAgentSet{
 	},
 }
 
+// claudeSetupScript creates the plugin configuration for the Claude worker.
+// The PreToolUse hook restricts Edit/Write operations to the worktree directory.
+// This is a workaround for --permission-mode acceptEdits not working as expected.
+// See: https://github.com/anthropics/claude-code/issues/12070
 const claudeSetupScript = `#!/bin/bash
 cd {{.Worktree}}
 
