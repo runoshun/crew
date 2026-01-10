@@ -152,3 +152,78 @@ func TestClient_CurrentBranch_AfterSwitch(t *testing.T) {
 	assert.Equal(t, "new-branch", newBranch)
 	assert.NotEqual(t, initialBranch, newBranch)
 }
+
+// =============================================================================
+// Merge Tests
+// =============================================================================
+
+func TestClient_Merge_Success(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Create a feature branch with a new file
+	runGit(t, dir, "checkout", "-b", "feature")
+	featureFile := filepath.Join(dir, "feature.txt")
+	require.NoError(t, os.WriteFile(featureFile, []byte("feature content\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Add feature")
+
+	// Switch back to main and merge
+	runGit(t, dir, "checkout", "-")
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+
+	err = client.Merge("feature", false)
+	require.NoError(t, err)
+
+	// Verify merge was successful
+	_, err = os.Stat(featureFile)
+	assert.NoError(t, err, "feature file should exist after merge")
+}
+
+func TestClient_Merge_Conflict_AutoAbort(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Get the initial branch name first
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+	mainBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+
+	// Modify README.md on main branch
+	readme := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(readme, []byte("# Main Branch\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update README on main")
+
+	// Create feature branch from the initial commit (before main's change)
+	runGit(t, dir, "checkout", "HEAD~1")
+	runGit(t, dir, "checkout", "-b", "feature")
+
+	// Modify the same file differently on feature branch
+	require.NoError(t, os.WriteFile(readme, []byte("# Feature Branch\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update README on feature")
+
+	// Switch back to main branch (use explicit branch name)
+	runGit(t, dir, "checkout", mainBranch)
+
+	// Attempt to merge feature into main (will conflict)
+	err = client.Merge("feature", false)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to merge")
+
+	// Verify that we're still on the main branch
+	currentBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+	assert.Equal(t, mainBranch, currentBranch)
+
+	// Verify that git status is clean (merge was aborted)
+	hasChanges, err := client.HasUncommittedChanges(dir)
+	require.NoError(t, err)
+	assert.False(t, hasChanges, "working tree should be clean after auto-abort")
+
+	// Verify no MERGE_HEAD exists (merge state was aborted)
+	mergeHead := filepath.Join(dir, ".git", "MERGE_HEAD")
+	_, err = os.Stat(mergeHead)
+	assert.True(t, os.IsNotExist(err), "MERGE_HEAD should not exist after abort")
+}
