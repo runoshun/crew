@@ -92,6 +92,7 @@ func (c *Client) HasMergeConflict(_, _ string) (bool, error) {
 
 // Merge merges a branch into the current branch.
 // If noFF is true, a merge commit is always created (--no-ff).
+// On conflict, automatically runs git merge --abort to restore clean state.
 func (c *Client) Merge(branch string, noFF bool) error {
 	args := []string{"merge"}
 	if noFF {
@@ -102,6 +103,11 @@ func (c *Client) Merge(branch string, noFF bool) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = c.repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
+		// On merge failure (including conflicts), abort the merge to restore clean state
+		abortCmd := exec.Command("git", "merge", "--abort")
+		abortCmd.Dir = c.repoRoot
+		_ = abortCmd.Run() // Ignore abort errors - merge may have failed before creating merge state
+
 		return fmt.Errorf("failed to merge branch %s: %w: %s", branch, err, string(out))
 	}
 	return nil
