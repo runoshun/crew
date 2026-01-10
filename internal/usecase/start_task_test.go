@@ -929,9 +929,10 @@ func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	// Set WorkerPrompt in AgentsConfig
 	configLoader.Config.AgentsConfig.WorkerPrompt = "Custom worker prompt from config"
+	git := &testutil.MockGit{}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
