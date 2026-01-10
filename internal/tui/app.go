@@ -451,14 +451,7 @@ func (m *Model) updateAgents() {
 			continue
 		}
 		// Skip disabled agents
-		isDisabled := false
-		for _, disabled := range m.config.AgentsConfig.DisabledAgents {
-			if disabled == name {
-				isDisabled = true
-				break
-			}
-		}
-		if isDisabled {
+		if domain.IsAgentDisabled(name, m.config.AgentsConfig.DisabledAgents) {
 			continue
 		}
 		m.builtinAgents = append(m.builtinAgents, name)
