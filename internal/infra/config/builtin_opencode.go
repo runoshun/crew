@@ -1,17 +1,19 @@
 package config
 
+import "github.com/runoshun/git-crew/v2/internal/domain"
+
 // opencodeAgents contains the built-in configuration for the OpenCode CLI.
 var opencodeAgents = builtinAgentSet{
-	Worker: builtinAgentDef{
-		CommandTemplate:   "opencode -m {{.Model}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
-		DefaultModel:      "anthropic/claude-opus-4-5",
-		Description:       "General purpose coding agent via opencode CLI",
-		WorkerSetupScript: opencodeSetupScript,
+	Worker: domain.Agent{
+		CommandTemplate: "opencode -m {{.Model}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}}",
+		DefaultModel:    "anthropic/claude-opus-4-5",
+		Description:     "General purpose coding agent via opencode CLI",
+		SetupScript:     opencodeSetupScript,
 	},
-	Manager: builtinAgentDef{
+	Manager: domain.Agent{
 		Description: "OpenCode manager agent for task orchestration",
 	},
-	Reviewer: builtinAgentDef{
+	Reviewer: domain.Agent{
 		// Non-interactive mode: opencode run for synchronous execution
 		CommandTemplate: "opencode run -m {{.Model}} {{.Args}} {{.Prompt}}",
 		DefaultModel:    "anthropic/claude-sonnet-4-5",
