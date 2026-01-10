@@ -63,10 +63,8 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 	}
 
 	// Check if agent is disabled
-	for _, disabled := range cfg.AgentsConfig.DisabledAgents {
-		if disabled == name {
-			return nil, fmt.Errorf("agent %q is disabled: %w", name, domain.ErrAgentDisabled)
-		}
+	if domain.IsAgentDisabled(name, cfg.AgentsConfig.DisabledAgents) {
+		return nil, fmt.Errorf("agent %q is disabled: %w", name, domain.ErrAgentDisabled)
 	}
 
 	// Resolve model priority: CLI flag > agent config > builtin default

@@ -106,10 +106,8 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	}
 
 	// Check if agent is disabled
-	for _, disabled := range cfg.AgentsConfig.DisabledAgents {
-		if disabled == agentName {
-			return nil, fmt.Errorf("agent %q is disabled: %w", agentName, domain.ErrAgentDisabled)
-		}
+	if domain.IsAgentDisabled(agentName, cfg.AgentsConfig.DisabledAgents) {
+		return nil, fmt.Errorf("agent %q is disabled: %w", agentName, domain.ErrAgentDisabled)
 	}
 
 	// Resolve model priority: CLI flag > agent config > builtin default

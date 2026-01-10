@@ -7,7 +7,7 @@
 # manager_default = "<<.DefaultManagerName>>" # Default agent for starting manager tasks
 # manager_prompt = ""                         # Default prompt for all manager agents
 #
-# disabled_agents = ["agent1", "agent2"]      # List of agents to disable (they won't appear in selection or be usable)
+# disabled_agents = ["agent1", "oc-*", "!oc-medium"]  # Supports exact match, wildcards (*), and exclusion (!)
 
 ## Fields for all agents:
 ## [agents.<name>]
