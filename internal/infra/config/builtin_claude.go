@@ -3,7 +3,7 @@ package config
 import "github.com/runoshun/git-crew/v2/internal/domain"
 
 const (
-	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show) Bash(crew edit:*) Bash(crew --help-worker) Skill(dev-workflow)'`
+	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show:*) Bash(crew list:*) Bash(crew --help-worker) Skill(dev-workflow)'`
 	claudeAllowedToolsForManager = `--allowedTools='Bash(crew:*)'`
 )
 
