@@ -47,22 +47,14 @@ Examples:
   # Create a task with labels
   git crew new --title "Add feature" --label feature --label urgent`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Resolve base branch
-			baseBranch := opts.Base
-			if baseBranch == "" {
-				baseBranch, _ = c.Git.CurrentBranch()
-				if baseBranch == "" {
-					baseBranch = "main" // fallback
-				}
-			}
-
 			// Build input
+			// BaseBranch: if --base is provided, use it; otherwise empty (let UseCase decide)
 			input := usecase.NewTaskInput{
 				Title:       opts.Title,
 				Description: opts.Description,
 				Issue:       opts.Issue,
 				Labels:      opts.Labels,
-				BaseBranch:  baseBranch,
+				BaseBranch:  opts.Base,
 			}
 
 			// Set parent ID if specified

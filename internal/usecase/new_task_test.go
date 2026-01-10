@@ -15,7 +15,7 @@ func TestNewTask_Execute_Success(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), NewTaskInput{
@@ -46,7 +46,7 @@ func TestNewTask_Execute_WithParent(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Create parent task first
 	parentID := 1
@@ -78,7 +78,7 @@ func TestNewTask_Execute_WithBaseBranch(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), NewTaskInput{
@@ -100,7 +100,7 @@ func TestNewTask_Execute_WithIssue(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), NewTaskInput{
@@ -122,7 +122,7 @@ func TestNewTask_Execute_EmptyTitle(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), NewTaskInput{
@@ -137,7 +137,7 @@ func TestNewTask_Execute_ParentNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Execute with non-existent parent
 	nonExistentParent := 999
@@ -155,7 +155,7 @@ func TestNewTask_Execute_SaveError(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.SaveErr = assert.AnError
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), NewTaskInput{
@@ -172,7 +172,7 @@ func TestNewTask_Execute_GetParentError(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.GetErr = assert.AnError
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Execute with parent that causes Get error
 	parentID := 1
@@ -193,7 +193,7 @@ func TestNewTask_Execute_NextIDError(t *testing.T) {
 		NextIDErr:          assert.AnError,
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewNewTask(repo, clock)
+	uc := NewNewTask(repo, &testutil.MockGit{}, clock, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), NewTaskInput{

@@ -41,7 +41,7 @@ func TestStartTask_Execute_Success(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -117,7 +117,7 @@ echo 'setup done'`,
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -152,7 +152,7 @@ func TestStartTask_Execute_FromInReview(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -186,7 +186,7 @@ func TestStartTask_Execute_FromError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -212,7 +212,7 @@ func TestStartTask_Execute_TaskNotFound(t *testing.T) {
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -252,7 +252,7 @@ func TestStartTask_Execute_AllowAllStatuses(t *testing.T) {
 			configLoader := testutil.NewMockConfigLoader()
 			clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-			uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+			uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 			// Execute
 			_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -284,7 +284,7 @@ func TestStartTask_Execute_SessionAlreadyRunning(t *testing.T) {
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -316,7 +316,7 @@ func TestStartTask_Execute_WithDefaultAgent(t *testing.T) {
 	configLoader.Config.AgentsConfig.DefaultWorker = "opencode"
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute without specifying agent
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -355,7 +355,7 @@ func TestStartTask_Execute_WorktreeCreateError(t *testing.T) {
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -387,7 +387,7 @@ func TestStartTask_Execute_SessionStartError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -425,7 +425,7 @@ func TestStartTask_Execute_SaveError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -471,7 +471,7 @@ func TestStartTask_Execute_WithIssue(t *testing.T) {
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -516,7 +516,7 @@ func TestStartTask_Execute_WithDescription(t *testing.T) {
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -551,7 +551,7 @@ func TestStartTask_ScriptGeneration(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -596,7 +596,7 @@ func TestStartTask_CleanupScript(t *testing.T) {
 	require.NoError(t, os.WriteFile(scriptPath, []byte("test"), 0o755))
 
 	// Create use case
-	uc := NewStartTask(nil, nil, nil, nil, nil, crewDir, "")
+	uc := NewStartTask(nil, nil, nil, nil, nil, nil, nil, crewDir, "")
 
 	// Cleanup
 	uc.cleanupScript(1)
@@ -622,7 +622,7 @@ func TestStartTask_Execute_ConfigLoadError(t *testing.T) {
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute without agent (will try to load default from config)
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -651,7 +651,7 @@ func TestStartTask_Execute_WithUnknownAgent(t *testing.T) {
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute with unknown agent name should fail
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -685,7 +685,7 @@ func TestStartTask_Execute_WithConfiguredAgent(t *testing.T) {
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	repoRoot := t.TempDir()
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute with configured agent
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -730,7 +730,7 @@ func TestStartTask_Execute_WithAgentPrompt(t *testing.T) {
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -770,7 +770,7 @@ func TestStartTask_Execute_WithModelOverride(t *testing.T) {
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute with model override
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -815,7 +815,7 @@ func TestStartTask_Execute_WithConfigModel(t *testing.T) {
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute without specifying model flag
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -851,7 +851,7 @@ func TestStartTask_Execute_WithDefaultModel(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute without model (should use agent's default)
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -890,7 +890,7 @@ func TestStartTask_Execute_OpencodeWithModelOverride(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute with opencode and model override
 	out, err := uc.Execute(context.Background(), StartTaskInput{
@@ -929,9 +929,10 @@ func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	// Set WorkerPrompt in AgentsConfig
 	configLoader.Config.AgentsConfig.WorkerPrompt = "Custom worker prompt from config"
+	git := &testutil.MockGit{}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -978,7 +979,7 @@ func TestStartTask_Execute_WithSetupScript(t *testing.T) {
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{

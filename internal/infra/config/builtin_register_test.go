@@ -16,7 +16,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	// Check that builtin worker agents are registered
-	expectedWorkers := []string{"claude", "opencode"}
+	expectedWorkers := []string{"claude", "codex", "opencode"}
 	for _, name := range expectedWorkers {
 		agent, ok := cfg.Agents[name]
 		if !ok {
@@ -32,7 +32,7 @@ func TestRegister(t *testing.T) {
 	}
 
 	// Check that builtin manager agents are registered
-	expectedManagers := []string{"claude-manager", "opencode-manager"}
+	expectedManagers := []string{"claude-manager", "codex-manager", "opencode-manager"}
 	for _, name := range expectedManagers {
 		agent, ok := cfg.Agents[name]
 		if !ok {
@@ -51,12 +51,15 @@ func TestRegister(t *testing.T) {
 		}
 	}
 
-	// Check default agents are set
+	// Check default agents are set to opencode
 	if cfg.AgentsConfig.DefaultWorker != "opencode" {
 		t.Errorf("DefaultWorker = %q, want %q", cfg.AgentsConfig.DefaultWorker, "opencode")
 	}
 	if cfg.AgentsConfig.DefaultManager != "opencode-manager" {
 		t.Errorf("DefaultManager = %q, want %q", cfg.AgentsConfig.DefaultManager, "opencode-manager")
+	}
+	if cfg.AgentsConfig.DefaultReviewer != "opencode-reviewer" {
+		t.Errorf("DefaultReviewer = %q, want %q", cfg.AgentsConfig.DefaultReviewer, "opencode-reviewer")
 	}
 }
 

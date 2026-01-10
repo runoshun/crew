@@ -231,17 +231,21 @@ func (m *MockTaskRepositoryWithUpdateCommentError) UpdateComment(_ int, _ int, _
 // MockGit is a test double for domain.Git.
 // Fields are ordered to minimize memory padding.
 type MockGit struct {
-	CurrentBranchErr       error
-	HasUncommittedErr      error
-	MergeErr               error
-	DeleteBranchErr        error
-	CurrentBranchName      string
-	MergeBranch            string
-	DeletedBranch          string
-	HasUncommittedChangesV bool
-	MergeNoFF              bool
-	MergeCalled            bool
-	DeleteBranchCalled     bool
+	CurrentBranchErr        error
+	HasUncommittedErr       error
+	MergeErr                error
+	DeleteBranchErr         error
+	GetDefaultBranchErr     error
+	GetNewTaskBaseBranchErr error
+	CurrentBranchName       string
+	DefaultBranchName       string
+	NewTaskBaseBranchName   string
+	MergeBranch             string
+	DeletedBranch           string
+	HasUncommittedChangesV  bool
+	MergeNoFF               bool
+	MergeCalled             bool
+	DeleteBranchCalled      bool
 }
 
 // Ensure MockGit implements domain.Git interface.
@@ -294,6 +298,28 @@ func (m *MockGit) DeleteBranch(branch string, force bool) error {
 	m.DeletedBranch = branch
 	// force is ignored in mock for now, or we could add a field to verify it
 	return m.DeleteBranchErr
+}
+
+// GetDefaultBranch returns the configured default branch name or error.
+func (m *MockGit) GetDefaultBranch() (string, error) {
+	if m.GetDefaultBranchErr != nil {
+		return "", m.GetDefaultBranchErr
+	}
+	if m.DefaultBranchName != "" {
+		return m.DefaultBranchName, nil
+	}
+	return "main", nil
+}
+
+// GetNewTaskBaseBranch returns the configured new task base branch name or error.
+func (m *MockGit) GetNewTaskBaseBranch() (string, error) {
+	if m.GetNewTaskBaseBranchErr != nil {
+		return "", m.GetNewTaskBaseBranchErr
+	}
+	if m.NewTaskBaseBranchName != "" {
+		return m.NewTaskBaseBranchName, nil
+	}
+	return m.GetDefaultBranch()
 }
 
 // MockSessionManager is a test double for domain.SessionManager.
@@ -643,4 +669,54 @@ func (m *MockTaskRepositoryWithUpdateCommentError) Push() error                 
 func (m *MockTaskRepositoryWithUpdateCommentError) Fetch(_ string) error               { return nil }
 func (m *MockTaskRepositoryWithUpdateCommentError) ListNamespaces() ([]string, error) {
 	return nil, nil
+}
+
+// MockLogger is a test double for domain.Logger.
+// It captures all log calls for verification in tests.
+type MockLogger struct {
+	Entries []LogEntry
+}
+
+// LogEntry represents a single log entry.
+// Fields are ordered to minimize memory padding.
+type LogEntry struct {
+	Level    string
+	Category string
+	Msg      string
+	TaskID   int
+}
+
+// NewMockLogger creates a new MockLogger.
+func NewMockLogger() *MockLogger {
+	return &MockLogger{
+		Entries: make([]LogEntry, 0),
+	}
+}
+
+// Ensure MockLogger implements domain.Logger interface.
+var _ domain.Logger = (*MockLogger)(nil)
+
+// Info logs an info message.
+func (m *MockLogger) Info(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "INFO", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Debug logs a debug message.
+func (m *MockLogger) Debug(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "DEBUG", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Warn logs a warning message.
+func (m *MockLogger) Warn(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "WARN", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Error logs an error message.
+func (m *MockLogger) Error(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "ERROR", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Close closes the logger (no-op for mock).
+func (m *MockLogger) Close() error {
+	return nil
 }

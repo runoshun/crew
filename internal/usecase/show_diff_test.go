@@ -28,7 +28,7 @@ func TestShowDiff_Execute_Success(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	// Track command execution
 	var capturedCommand string
@@ -68,7 +68,7 @@ func TestShowDiff_Execute_WithArgs(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	// Track command execution
 	var capturedCommand string
@@ -113,7 +113,7 @@ func TestShowDiff_Execute_WithConfiguredCommand(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	// Track command execution
 	var capturedCommand string
@@ -155,7 +155,7 @@ func TestShowDiff_Execute_TaskWithIssue(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
 		return exec.Command("echo", "diff output")
@@ -179,7 +179,7 @@ func TestShowDiff_Execute_TaskNotFound(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowDiffInput{
@@ -199,7 +199,7 @@ func TestShowDiff_Execute_GetError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowDiffInput{
@@ -226,7 +226,7 @@ func TestShowDiff_Execute_WorktreeResolveError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowDiffInput{
@@ -254,7 +254,7 @@ func TestShowDiff_Execute_ConfigLoadError(t *testing.T) {
 	configLoader.LoadErr = assert.AnError
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowDiffInput{
@@ -287,7 +287,7 @@ func TestShowDiff_Execute_InvalidTemplate(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowDiffInput{
@@ -315,7 +315,7 @@ func TestShowDiff_Execute_NoArgsNoExpansion(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	var capturedCommand string
 	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
@@ -353,7 +353,7 @@ func TestShowDiff_Execute_CustomBaseBranch(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	var capturedCommand string
 	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
@@ -390,7 +390,7 @@ func TestShowDiff_Execute_EmptyBaseBranchDefaultsToMain(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	var capturedCommand string
 	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
@@ -434,7 +434,7 @@ func TestShowDiff_Execute_UseTUICommand(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	var capturedCommand string
 	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
@@ -480,7 +480,7 @@ func TestShowDiff_Execute_UseTUICommandFallbackToCommand(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	var capturedCommand string
 	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {
@@ -525,7 +525,7 @@ func TestShowDiff_Execute_UseTUICommandFalse(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, configLoader, &stdout, &stderr)
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, &stdout, &stderr)
 
 	var capturedCommand string
 	uc.SetExecCmd(func(name string, args ...string) *exec.Cmd {

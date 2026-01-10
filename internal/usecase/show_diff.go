@@ -32,6 +32,7 @@ type ShowDiffOutput struct {
 type ShowDiff struct {
 	tasks     domain.TaskRepository
 	worktrees domain.WorktreeManager
+	git       domain.Git
 	config    domain.ConfigLoader
 	execCmd   func(name string, args ...string) *exec.Cmd
 	stdout    io.Writer
@@ -42,6 +43,7 @@ type ShowDiff struct {
 func NewShowDiff(
 	tasks domain.TaskRepository,
 	worktrees domain.WorktreeManager,
+	git domain.Git,
 	config domain.ConfigLoader,
 	stdout io.Writer,
 	stderr io.Writer,
@@ -49,6 +51,7 @@ func NewShowDiff(
 	return &ShowDiff{
 		tasks:     tasks,
 		worktrees: worktrees,
+		git:       git,
 		config:    config,
 		execCmd:   exec.Command,
 		stdout:    stdout,
@@ -106,7 +109,12 @@ func (uc *ShowDiff) GetCommand(_ context.Context, in ShowDiffInput) (*domain.Exe
 	// Expand template with args and task info
 	baseBranch := task.BaseBranch
 	if baseBranch == "" {
-		baseBranch = "main" // Default base branch
+		// Use GetDefaultBranch for backward compatibility
+		defaultBranch, defaultErr := uc.git.GetDefaultBranch()
+		if defaultErr != nil {
+			return nil, fmt.Errorf("get default branch: %w", defaultErr)
+		}
+		baseBranch = defaultBranch
 	}
 	data := DiffTemplateData{
 		Args:       strings.Join(in.Args, " "),

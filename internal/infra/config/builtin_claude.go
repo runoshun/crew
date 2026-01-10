@@ -3,7 +3,7 @@ package config
 import "github.com/runoshun/git-crew/v2/internal/domain"
 
 const (
-	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show) Bash(crew edit:*)'`
+	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete) Bash(crew show:*) Bash(crew list:*) Bash(crew --help-worker) Skill(dev-workflow)'`
 	claudeAllowedToolsForManager = `--allowedTools='Bash(crew:*)'`
 )
 
@@ -54,7 +54,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '(.cwd) as $cwd | .tool_input.file_path // \"\" | if startswith($cwd) then {permissionDecision: \"allow\"} else {} end'"
+            "command": "jq -c '(.cwd) as $cwd | .tool_input.file_path // \"\" | if startswith($cwd) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"allow\"}} else {} end'"
           }
         ]
       }

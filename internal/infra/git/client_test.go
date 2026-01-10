@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -226,4 +227,122 @@ func TestClient_Merge_Conflict_AutoAbort(t *testing.T) {
 	mergeHead := filepath.Join(dir, ".git", "MERGE_HEAD")
 	_, err = os.Stat(mergeHead)
 	assert.True(t, os.IsNotExist(err), "MERGE_HEAD should not exist after abort")
+}
+
+// =============================================================================
+// GetDefaultBranch Tests
+// =============================================================================
+
+func TestClient_GetDefaultBranch_FromConfig(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Set crew.defaultBranch config
+	runGit(t, dir, "config", "crew.defaultBranch", "develop")
+
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+
+	branch, err := client.GetDefaultBranch()
+	require.NoError(t, err)
+	assert.Equal(t, "develop", branch)
+}
+
+func TestClient_GetDefaultBranch_FromOriginHEAD(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Create a bare remote repository
+	remoteDir := filepath.Join(t.TempDir(), "remote.git")
+	runGit(t, t.TempDir(), "init", "--bare", remoteDir)
+
+	// Set up remote
+	runGit(t, dir, "remote", "add", "origin", remoteDir)
+
+	// Check if 'main' branch already exists
+	currentBranch, _ := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
+	branch := strings.TrimSpace(string(currentBranch))
+
+	// If not on 'main', create it
+	if branch != "main" {
+		runGit(t, dir, "checkout", "-b", "main")
+	}
+
+	// Push to origin
+	runGit(t, dir, "push", "-u", "origin", branch)
+
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+
+	defaultBranch, err := client.GetDefaultBranch()
+	require.NoError(t, err)
+	assert.Equal(t, branch, defaultBranch)
+}
+
+func TestClient_GetDefaultBranch_Fallback(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Don't set any config or remote
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+
+	branch, err := client.GetDefaultBranch()
+	require.NoError(t, err)
+	assert.Equal(t, "main", branch)
+}
+
+// =============================================================================
+// GetNewTaskBaseBranch Tests
+// =============================================================================
+
+func TestClient_GetNewTaskBaseBranch_Default(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Set crew.defaultBranch config
+	runGit(t, dir, "config", "crew.defaultBranch", "develop")
+
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+
+	// When crew.newTaskBase is not set, should use default branch
+	branch, err := client.GetNewTaskBaseBranch()
+	require.NoError(t, err)
+	assert.Equal(t, "develop", branch)
+}
+
+func TestClient_GetNewTaskBaseBranch_Current(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Set crew.newTaskBase to "current"
+	runGit(t, dir, "config", "crew.newTaskBase", "current")
+
+	// Create and checkout a feature branch
+	runGit(t, dir, "checkout", "-b", "feature/test")
+
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+
+	// Should return the current branch
+	branch, err := client.GetNewTaskBaseBranch()
+	require.NoError(t, err)
+	assert.Equal(t, "feature/test", branch)
+}
+
+func TestClient_GetNewTaskBaseBranch_CurrentOnMain(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Set crew.newTaskBase to "current"
+	runGit(t, dir, "config", "crew.newTaskBase", "current")
+	// Set crew.defaultBranch to something else
+	runGit(t, dir, "config", "crew.defaultBranch", "develop")
+
+	// Stay on the initial branch (main/master)
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+
+	currentBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+
+	// Should return the current branch (not develop)
+	branch, err := client.GetNewTaskBaseBranch()
+	require.NoError(t, err)
+	assert.Equal(t, currentBranch, branch)
 }

@@ -34,7 +34,9 @@ type StartTask struct {
 	sessions     domain.SessionManager
 	worktrees    domain.WorktreeManager
 	configLoader domain.ConfigLoader
+	git          domain.Git
 	clock        domain.Clock
+	logger       domain.Logger
 	crewDir      string // Path to .git/crew directory
 	repoRoot     string // Repository root path
 }
@@ -45,7 +47,9 @@ func NewStartTask(
 	sessions domain.SessionManager,
 	worktrees domain.WorktreeManager,
 	configLoader domain.ConfigLoader,
+	git domain.Git,
 	clock domain.Clock,
+	logger domain.Logger,
 	crewDir string,
 	repoRoot string,
 ) *StartTask {
@@ -54,7 +58,9 @@ func NewStartTask(
 		sessions:     sessions,
 		worktrees:    worktrees,
 		configLoader: configLoader,
+		git:          git,
 		clock:        clock,
+		logger:       logger,
 		crewDir:      crewDir,
 		repoRoot:     repoRoot,
 	}
@@ -109,7 +115,12 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	branch := domain.BranchName(task.ID, task.Issue)
 	baseBranch := task.BaseBranch
 	if baseBranch == "" {
-		baseBranch = "main"
+		// Use GetDefaultBranch for backward compatibility
+		defaultBranch, defaultErr := uc.git.GetDefaultBranch()
+		if defaultErr != nil {
+			return nil, fmt.Errorf("get default branch: %w", defaultErr)
+		}
+		baseBranch = defaultBranch
 	}
 
 	wtPath, err := uc.worktrees.Create(branch, baseBranch)
@@ -162,6 +173,11 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		uc.cleanupScript(task.ID)
 		_ = uc.worktrees.Remove(branch)
 		return nil, fmt.Errorf("save task: %w", err)
+	}
+
+	// Log task start
+	if uc.logger != nil {
+		uc.logger.Info(task.ID, "task", fmt.Sprintf("started with agent %q", agentName))
 	}
 
 	return &StartTaskOutput{
