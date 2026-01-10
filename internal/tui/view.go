@@ -400,7 +400,8 @@ func (m *Model) viewAgentPicker() string {
 	}
 
 	// Build content
-	lines := []string{title, taskTitle, ds.emptyLine(), selectLabel}
+	lines := make([]string, 0, 4+len(agentRows)+4)
+	lines = append(lines, title, taskTitle, ds.emptyLine(), selectLabel)
 	lines = append(lines, agentRows...)
 	lines = append(lines, customLabel, customInputView, ds.emptyLine(), ds.renderLine(hint))
 
@@ -463,8 +464,15 @@ func (m *Model) viewFooter() string {
 
 	// Truncate content if too wide
 	maxContentWidth := innerWidth - paginationLen - 1 // 1 for spacing
-	if contentLen > maxContentWidth && maxContentWidth > 3 {
-		content = lipgloss.NewStyle().MaxWidth(maxContentWidth-3).Render(content) + "..."
+	if contentLen > maxContentWidth {
+		if maxContentWidth <= 3 {
+			// When space is very limited, show only "..."
+			content = "..."
+		} else {
+			// Truncate content and append "..."
+			truncateStyle := lipgloss.NewStyle().MaxWidth(maxContentWidth - 3)
+			content = truncateStyle.Render(content) + "..."
+		}
 		contentLen = lipgloss.Width(content)
 	}
 
@@ -641,7 +649,8 @@ func (m *Model) viewStatusPicker() string {
 	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" select · ") +
 		ds.key.Render("esc") + ds.text.Render(" cancel"))
 
-	lines := []string{title, ds.emptyLine(), taskLine, currentLine, ds.emptyLine(), selectLabel}
+	lines := make([]string, 0, 6+len(statusRows)+2)
+	lines = append(lines, title, ds.emptyLine(), taskLine, currentLine, ds.emptyLine(), selectLabel)
 	lines = append(lines, statusRows...)
 	lines = append(lines, ds.emptyLine(), hint)
 
