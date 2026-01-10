@@ -82,7 +82,7 @@ Examples:
 
 			// Print the review result (in non-verbose mode, this is the extracted result)
 			if !opts.verbose && out.Review != "" {
-				fmt.Fprintln(cmd.OutOrStdout(), out.Review)
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.Review)
 			}
 
 			return nil
