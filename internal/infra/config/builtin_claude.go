@@ -48,6 +48,17 @@ mkdir -p ${PLUGIN_DIR}/hooks
 cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '(.cwd) as $cwd | .tool_input.file_path // \"\" | if startswith($cwd) then {permissionDecision: \"allow\"} else {} end'"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "permission_prompt|idle_prompt",
