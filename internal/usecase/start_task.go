@@ -34,6 +34,7 @@ type StartTask struct {
 	sessions     domain.SessionManager
 	worktrees    domain.WorktreeManager
 	configLoader domain.ConfigLoader
+	git          domain.Git
 	clock        domain.Clock
 	logger       domain.Logger
 	crewDir      string // Path to .git/crew directory
@@ -46,6 +47,7 @@ func NewStartTask(
 	sessions domain.SessionManager,
 	worktrees domain.WorktreeManager,
 	configLoader domain.ConfigLoader,
+	git domain.Git,
 	clock domain.Clock,
 	logger domain.Logger,
 	crewDir string,
@@ -56,6 +58,7 @@ func NewStartTask(
 		sessions:     sessions,
 		worktrees:    worktrees,
 		configLoader: configLoader,
+		git:          git,
 		clock:        clock,
 		logger:       logger,
 		crewDir:      crewDir,
@@ -112,7 +115,12 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	branch := domain.BranchName(task.ID, task.Issue)
 	baseBranch := task.BaseBranch
 	if baseBranch == "" {
-		baseBranch = "main"
+		// Use GetDefaultBranch for backward compatibility
+		defaultBranch, defaultErr := uc.git.GetDefaultBranch()
+		if defaultErr != nil {
+			return nil, fmt.Errorf("get default branch: %w", defaultErr)
+		}
+		baseBranch = defaultBranch
 	}
 
 	wtPath, err := uc.worktrees.Create(branch, baseBranch)

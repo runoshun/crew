@@ -27,14 +27,16 @@ type NewTaskOutput struct {
 // NewTask is the use case for creating a new task.
 type NewTask struct {
 	tasks  domain.TaskRepository
+	git    domain.Git
 	clock  domain.Clock
 	logger domain.Logger
 }
 
 // NewNewTask creates a new NewTask use case.
-func NewNewTask(tasks domain.TaskRepository, clock domain.Clock, logger domain.Logger) *NewTask {
+func NewNewTask(tasks domain.TaskRepository, git domain.Git, clock domain.Clock, logger domain.Logger) *NewTask {
 	return &NewTask{
 		tasks:  tasks,
+		git:    git,
 		clock:  clock,
 		logger: logger,
 	}
@@ -68,7 +70,11 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 	now := uc.clock.Now()
 	baseBranch := in.BaseBranch
 	if baseBranch == "" {
-		baseBranch = "main"
+		// Use GetNewTaskBaseBranch to dynamically resolve base branch
+		baseBranch, err = uc.git.GetNewTaskBaseBranch()
+		if err != nil {
+			return nil, fmt.Errorf("get new task base branch: %w", err)
+		}
 	}
 	task := &domain.Task{
 		ID:          id,

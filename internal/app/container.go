@@ -149,7 +149,7 @@ func (c *Container) InitRepoUseCase() *usecase.InitRepo {
 
 // NewTaskUseCase returns a new NewTask use case.
 func (c *Container) NewTaskUseCase() *usecase.NewTask {
-	return usecase.NewNewTask(c.Tasks, c.Clock, c.Logger)
+	return usecase.NewNewTask(c.Tasks, c.Git, c.Clock, c.Logger)
 }
 
 // ListTasksUseCase returns a new ListTasks use case.
@@ -198,7 +198,7 @@ func (c *Container) CloseTaskUseCase() *usecase.CloseTask {
 
 // StartTaskUseCase returns a new StartTask use case.
 func (c *Container) StartTaskUseCase() *usecase.StartTask {
-	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Clock, c.Logger, c.Config.CrewDir, c.Config.RepoRoot)
+	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Git, c.Clock, c.Logger, c.Config.CrewDir, c.Config.RepoRoot)
 }
 
 // AttachSessionUseCase returns a new AttachSession use case.
@@ -244,13 +244,13 @@ func (c *Container) MergeTaskUseCase() *usecase.MergeTask {
 // ShowDiffUseCase returns a new ShowDiff use case.
 // stdout and stderr are the writers for command output.
 func (c *Container) ShowDiffUseCase(stdout, stderr io.Writer) *usecase.ShowDiff {
-	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.ConfigLoader, stdout, stderr)
+	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, stdout, stderr)
 }
 
 // ShowDiffUseCaseForCommand returns a new ShowDiff use case for GetCommand() only.
 // This is used by TUI which executes the command via tea.Exec.
 func (c *Container) ShowDiffUseCaseForCommand() *usecase.ShowDiff {
-	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.ConfigLoader, nil, nil)
+	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, nil, nil)
 }
 
 // StopTaskUseCase returns a new StopTask use case.

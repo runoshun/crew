@@ -168,8 +168,8 @@ func TestNewNewCommand_DefaultBaseBranch(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
-	// Mock git to return current branch
-	container.Git = &testutil.MockGit{CurrentBranchName: "feature-branch"}
+	// Mock git to return feature-branch as new task base branch
+	container.Git = &testutil.MockGit{NewTaskBaseBranchName: "feature-branch"}
 
 	// Create command
 	cmd := newNewCommand(container)

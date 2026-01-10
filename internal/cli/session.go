@@ -508,7 +508,7 @@ Preconditions:
   - No merge conflict
 
 Base branch selection:
-  - If --base is not specified, uses task's base branch (or 'main' if task has no base branch)
+  - If --base is not specified, uses task's base branch (or default branch if task has no base branch)
   - If --base is specified, uses the specified branch (allows merging to different branch)
 
 Processing:
@@ -518,7 +518,7 @@ Processing:
   4. Update task status to 'done'
 
 Examples:
-  # Merge task #1 into its base branch (or main if not set)
+  # Merge task #1 into its base branch (or default branch if not set)
   git crew merge 1
 
   # Merge task #1 into feature/workspace branch (override task's base branch)
@@ -549,7 +549,9 @@ Examples:
 			if targetBaseBranch == "" {
 				targetBaseBranch = showOut.Task.BaseBranch
 				if targetBaseBranch == "" {
-					targetBaseBranch = "main"
+					// Note: At runtime, this would call GetDefaultBranch()
+					// For confirmation message, we use "default branch" as placeholder
+					targetBaseBranch = "default branch"
 				}
 			}
 
@@ -586,8 +588,8 @@ Examples:
 		},
 	}
 
+	cmd.Flags().StringVar(&opts.base, "base", "", "Base branch to merge into (default: task's base branch or default branch)")
 	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "Skip confirmation prompt")
-	cmd.Flags().StringVar(&opts.base, "base", "", "Base branch to merge into (default: task's base branch or 'main')")
 
 	return cmd
 }
