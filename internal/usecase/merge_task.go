@@ -10,7 +10,7 @@ import (
 
 // MergeTaskInput contains the parameters for merging a task.
 type MergeTaskInput struct {
-	BaseBranch string // Target branch to merge into (defaults to "main")
+	BaseBranch string // Target branch to merge into (defaults to task.BaseBranch or GetDefaultBranch())
 	TaskID     int    // Task ID to merge
 }
 
@@ -51,8 +51,9 @@ func NewMergeTask(
 // - Base branch's working tree is clean
 //
 // BaseBranch behavior:
-// - If BaseBranch is empty, uses task.BaseBranch (or "main" if task.BaseBranch is also empty)
-// - If BaseBranch is specified, uses it regardless of task.BaseBranch
+// - If BaseBranch is specified (non-empty), uses it regardless of task.BaseBranch
+// - If BaseBranch is empty, uses task.BaseBranch
+// - If both are empty, uses GetDefaultBranch()
 //
 // Processing:
 // 1. If session is running, stop it
@@ -71,12 +72,16 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	}
 
 	// Determine target base branch
-	// If not specified, use task's BaseBranch (or "main" if task.BaseBranch is empty)
+	// Priority: in.BaseBranch > task.BaseBranch > GetDefaultBranch()
 	targetBaseBranch := in.BaseBranch
 	if targetBaseBranch == "" {
 		targetBaseBranch = task.BaseBranch
 		if targetBaseBranch == "" {
-			targetBaseBranch = "main"
+			defaultBranch, defaultErr := uc.git.GetDefaultBranch()
+			if defaultErr != nil {
+				return nil, fmt.Errorf("get default branch: %w", defaultErr)
+			}
+			targetBaseBranch = defaultBranch
 		}
 	}
 
