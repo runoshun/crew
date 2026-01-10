@@ -247,6 +247,7 @@ type LoadConfigOptions struct {
 	IgnoreGlobal   bool // Skip loading global config
 	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
 	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
+	IgnoreOverride bool // Skip loading override config (config.override.toml)
 }
 
 // ConfigInfo holds information about a config file.
@@ -267,6 +268,9 @@ type ConfigManager interface {
 	// GetRootRepoConfigInfo returns information about the root repository config file (.crew.toml).
 	GetRootRepoConfigInfo() ConfigInfo
 
+	// GetOverrideConfigInfo returns information about the global override config file (config.override.toml).
+	GetOverrideConfigInfo() ConfigInfo
+
 	// InitRepoConfig creates a repository config file with default template.
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
@@ -276,6 +280,11 @@ type ConfigManager interface {
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
 	InitGlobalConfig(cfg *Config) error
+
+	// InitOverrideConfig creates a global override config file with default template.
+	// The cfg parameter should have builtin agents registered (via builtin.Register).
+	// Returns error if file already exists.
+	InitOverrideConfig(cfg *Config) error
 }
 
 // Clock provides time operations for testability.

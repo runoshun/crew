@@ -87,6 +87,13 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, fmt.Errorf("agent %q: %w", agentName, domain.ErrAgentNotFound)
 	}
 
+	// Check if agent is disabled
+	for _, disabled := range cfg.AgentsConfig.DisabledAgents {
+		if disabled == agentName {
+			return nil, fmt.Errorf("agent %q is disabled: %w", agentName, domain.ErrAgentDisabled)
+		}
+	}
+
 	// Resolve model priority: CLI flag > agent config > builtin default
 	model := in.Model
 	if model == "" {

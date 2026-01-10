@@ -559,3 +559,90 @@ args = "--model claude-opus-4"
 	assert.Equal(t, "Please review this code.", cfg.AgentsConfig.ReviewerPrompt)
 	assert.Len(t, cfg.Warnings, 0, "should have no warnings for valid config")
 }
+
+func TestLoader_Load_OverrideConfig(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config
+	globalConfig := `
+[agents]
+worker_default = "opencode"
+
+[agents.opencode]
+args = "--verbose"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write override config
+	overrideConfig := `
+[agents]
+worker_default = "claude"
+disabled_agents = ["opencode", "codex"]
+`
+	err = os.WriteFile(filepath.Join(globalDir, domain.ConfigOverrideFileName), []byte(overrideConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify override takes precedence
+	assert.Equal(t, "claude", cfg.AgentsConfig.DefaultWorker)
+	assert.Equal(t, []string{"opencode", "codex"}, cfg.AgentsConfig.DisabledAgents)
+}
+
+func TestLoader_Load_DisabledAgents(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config with disabled_agents
+	repoConfig := `
+[agents]
+disabled_agents = ["agent1", "agent2"]
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify disabled_agents
+	assert.Equal(t, []string{"agent1", "agent2"}, cfg.AgentsConfig.DisabledAgents)
+}
+
+func TestLoader_Load_IgnoreOverride(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config
+	globalConfig := `
+[agents]
+worker_default = "opencode"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write override config
+	overrideConfig := `
+[agents]
+worker_default = "claude"
+`
+	err = os.WriteFile(filepath.Join(globalDir, domain.ConfigOverrideFileName), []byte(overrideConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config with IgnoreOverride option
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreOverride: true})
+	require.NoError(t, err)
+
+	// Verify override was ignored, global config is used
+	assert.Equal(t, "opencode", cfg.AgentsConfig.DefaultWorker)
+}

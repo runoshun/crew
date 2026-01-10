@@ -13,7 +13,7 @@ import (
 
 // newConfigCommand creates the config command.
 func newConfigCommand(c *app.Container) *cobra.Command {
-	var ignoreGlobal, ignoreRepo, ignoreRootRepo bool
+	var ignoreGlobal, ignoreOverride, ignoreRepo, ignoreRootRepo bool
 
 	cmd := &cobra.Command{
 		Use:   "config",
@@ -21,11 +21,12 @@ func newConfigCommand(c *app.Container) *cobra.Command {
 		Long: `Display effective configuration after merging all sources.
 
 Shows which config files were loaded and the final merged configuration.
-Use --ignore-global, --ignore-repo or --ignore-root-repo to exclude specific sources for debugging.`,
+Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to exclude specific sources for debugging.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			uc := c.ShowConfigUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.ShowConfigInput{
 				IgnoreGlobal:   ignoreGlobal,
+				IgnoreOverride: ignoreOverride,
 				IgnoreRepo:     ignoreRepo,
 				IgnoreRootRepo: ignoreRootRepo,
 			})
@@ -42,6 +43,13 @@ Use --ignore-global, --ignore-repo or --ignore-root-repo to exclude specific sou
 					_, _ = fmt.Fprintf(w, "- %s\n", out.GlobalConfig.Path)
 				} else {
 					_, _ = fmt.Fprintf(w, "- %s (not found)\n", out.GlobalConfig.Path)
+				}
+			}
+			if !ignoreOverride {
+				if out.OverrideConfig.Exists {
+					_, _ = fmt.Fprintf(w, "- %s\n", out.OverrideConfig.Path)
+				} else {
+					_, _ = fmt.Fprintf(w, "- %s (not found)\n", out.OverrideConfig.Path)
 				}
 			}
 			if !ignoreRootRepo {
@@ -70,6 +78,7 @@ Use --ignore-global, --ignore-repo or --ignore-root-repo to exclude specific sou
 	}
 
 	cmd.Flags().BoolVar(&ignoreGlobal, "ignore-global", false, "Ignore global configuration")
+	cmd.Flags().BoolVar(&ignoreOverride, "ignore-override", false, "Ignore override configuration (config.override.toml)")
 	cmd.Flags().BoolVar(&ignoreRepo, "ignore-repo", false, "Ignore repository configuration (.git/crew/config.toml)")
 	cmd.Flags().BoolVar(&ignoreRootRepo, "ignore-root-repo", false, "Ignore root repository configuration (.crew.toml)")
 
