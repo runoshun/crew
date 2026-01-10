@@ -18,6 +18,7 @@ type builtinAgentSet struct {
 // builtinAgents contains preset configurations for known agents.
 var builtinAgents = map[string]builtinAgentSet{
 	"claude":   claudeAgents,
+	"codex":    codexAgents,
 	"opencode": opencodeAgents,
 }
 
