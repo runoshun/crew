@@ -1029,7 +1029,7 @@ func TestStartTask_Execute_WithDisabledAgent(t *testing.T) {
 	}
 	mockLoader := &testutil.MockConfigLoader{Config: cfg}
 
-	uc := NewStartTask(mockTasks, mockSessions, mockWorktrees, mockLoader, mockGit, domain.RealClock{}, "/test/.git/crew", "/test")
+	uc := NewStartTask(mockTasks, mockSessions, mockWorktrees, mockLoader, mockGit, domain.RealClock{}, nil, "/test/.git/crew", "/test")
 
 	// Execute with disabled agent
 	_, err := uc.Execute(context.Background(), StartTaskInput{

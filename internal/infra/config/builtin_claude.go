@@ -10,7 +10,7 @@ const (
 // claudeAgents contains the built-in configuration for the Claude CLI.
 var claudeAgents = builtinAgentSet{
 	Worker: domain.Agent{
-		CommandTemplate: "claude --model {{.Model}} --permission-mode acceptEdits --plugin-dir .claude/crew-plugin " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
+		CommandTemplate: "claude --model {{.Model}} --plugin-dir .claude/crew-plugin " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
 		DefaultModel:    "opus",
 		Description:     "Claude model via Anthropic CLI",
 		SetupScript:     claudeSetupScript,
@@ -54,6 +54,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
         "hooks": [
           {
             "type": "command",
+            "comment": "Workaround for --permission-mode acceptEdits not working as expected. Allow Edit/Write only within worktree. See: https://github.com/anthropics/claude-code/issues/12070",
             "command": "jq -c '(.cwd) as $cwd | .tool_input.file_path // \"\" | if startswith($cwd) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"allow\"}} else {} end'"
           }
         ]
