@@ -644,3 +644,53 @@ func (m *MockTaskRepositoryWithUpdateCommentError) Fetch(_ string) error        
 func (m *MockTaskRepositoryWithUpdateCommentError) ListNamespaces() ([]string, error) {
 	return nil, nil
 }
+
+// MockLogger is a test double for domain.Logger.
+// It captures all log calls for verification in tests.
+type MockLogger struct {
+	Entries []LogEntry
+}
+
+// LogEntry represents a single log entry.
+// Fields are ordered to minimize memory padding.
+type LogEntry struct {
+	Level    string
+	Category string
+	Msg      string
+	TaskID   int
+}
+
+// NewMockLogger creates a new MockLogger.
+func NewMockLogger() *MockLogger {
+	return &MockLogger{
+		Entries: make([]LogEntry, 0),
+	}
+}
+
+// Ensure MockLogger implements domain.Logger interface.
+var _ domain.Logger = (*MockLogger)(nil)
+
+// Info logs an info message.
+func (m *MockLogger) Info(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "INFO", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Debug logs a debug message.
+func (m *MockLogger) Debug(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "DEBUG", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Warn logs a warning message.
+func (m *MockLogger) Warn(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "WARN", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Error logs an error message.
+func (m *MockLogger) Error(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "ERROR", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Close closes the logger (no-op for mock).
+func (m *MockLogger) Close() error {
+	return nil
+}

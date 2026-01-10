@@ -2,8 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"log/slog"
-	"os"
 	"testing"
 	"time"
 
@@ -15,7 +13,7 @@ import (
 
 // newTestContainer creates an app.Container with mock dependencies.
 func newTestContainer(repo *testutil.MockTaskRepository) *app.Container {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	logger := testutil.NewMockLogger()
 	container := app.NewWithDeps(
 		app.Config{},
 		repo,

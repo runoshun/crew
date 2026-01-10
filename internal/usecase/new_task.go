@@ -26,15 +26,17 @@ type NewTaskOutput struct {
 
 // NewTask is the use case for creating a new task.
 type NewTask struct {
-	tasks domain.TaskRepository
-	clock domain.Clock
+	tasks  domain.TaskRepository
+	clock  domain.Clock
+	logger domain.Logger
 }
 
 // NewNewTask creates a new NewTask use case.
-func NewNewTask(tasks domain.TaskRepository, clock domain.Clock) *NewTask {
+func NewNewTask(tasks domain.TaskRepository, clock domain.Clock, logger domain.Logger) *NewTask {
 	return &NewTask{
-		tasks: tasks,
-		clock: clock,
+		tasks:  tasks,
+		clock:  clock,
+		logger: logger,
 	}
 }
 
@@ -83,6 +85,11 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {
 		return nil, fmt.Errorf("save task: %w", err)
+	}
+
+	// Log task creation
+	if uc.logger != nil {
+		uc.logger.Info(id, "task", fmt.Sprintf("created: %q", in.Title))
 	}
 
 	return &NewTaskOutput{TaskID: id}, nil

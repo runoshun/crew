@@ -27,6 +27,7 @@ type CompleteTask struct {
 	git       domain.Git
 	config    domain.ConfigLoader
 	clock     domain.Clock
+	logger    domain.Logger
 	execCmd   func(name string, args ...string) *exec.Cmd
 }
 
@@ -37,6 +38,7 @@ func NewCompleteTask(
 	git domain.Git,
 	config domain.ConfigLoader,
 	clock domain.Clock,
+	logger domain.Logger,
 ) *CompleteTask {
 	return &CompleteTask{
 		tasks:     tasks,
@@ -44,6 +46,7 @@ func NewCompleteTask(
 		git:       git,
 		config:    config,
 		clock:     clock,
+		logger:    logger,
 		execCmd:   exec.Command,
 	}
 }
@@ -125,6 +128,11 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {
 		return nil, fmt.Errorf("save task: %w", err)
+	}
+
+	// Log task completion
+	if uc.logger != nil {
+		uc.logger.Info(task.ID, "task", "completed (status: in_review)")
 	}
 
 	return &CompleteTaskOutput{Task: task}, nil
