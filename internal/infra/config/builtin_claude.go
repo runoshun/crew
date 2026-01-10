@@ -54,7 +54,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '(.cwd) as $cwd | .tool_input.file_path // \"\" | if startswith($cwd) then {permissionDecision: \"allow\"} else {} end'"
+            "command": "jq -c '(.cwd) as $cwd | .tool_input.file_path // \"\" | if startswith($cwd) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"allow\"}} else {} end'"
           }
         ]
       }
