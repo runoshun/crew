@@ -1,19 +1,14 @@
 package config
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
-func TestRegisterWithLookPath_BothCommandsAvailable(t *testing.T) {
+func TestRegister(t *testing.T) {
 	cfg := domain.NewDefaultConfig()
-	lookPath := mockLookPath(map[string]bool{
-		"claude":   true,
-		"opencode": true,
-	})
-	RegisterWithLookPath(cfg, lookPath)
+	Register(cfg)
 
 	// Resolve inheritance (required for agents using Inherit field)
 	if err := cfg.ResolveInheritance(); err != nil {
@@ -21,7 +16,7 @@ func TestRegisterWithLookPath_BothCommandsAvailable(t *testing.T) {
 	}
 
 	// Check that builtin worker agents are registered
-	expectedWorkers := []string{"claude", "opencode"}
+	expectedWorkers := []string{"claude", "codex", "opencode"}
 	for _, name := range expectedWorkers {
 		agent, ok := cfg.Agents[name]
 		if !ok {
@@ -37,7 +32,7 @@ func TestRegisterWithLookPath_BothCommandsAvailable(t *testing.T) {
 	}
 
 	// Check that builtin manager agents are registered
-	expectedManagers := []string{"claude-manager", "opencode-manager"}
+	expectedManagers := []string{"claude-manager", "codex-manager", "opencode-manager"}
 	for _, name := range expectedManagers {
 		agent, ok := cfg.Agents[name]
 		if !ok {
@@ -56,7 +51,7 @@ func TestRegisterWithLookPath_BothCommandsAvailable(t *testing.T) {
 		}
 	}
 
-	// Check default agents are set (should prefer opencode)
+	// Check default agents are set to opencode
 	if cfg.AgentsConfig.DefaultWorker != "opencode" {
 		t.Errorf("DefaultWorker = %q, want %q", cfg.AgentsConfig.DefaultWorker, "opencode")
 	}
@@ -65,102 +60,6 @@ func TestRegisterWithLookPath_BothCommandsAvailable(t *testing.T) {
 	}
 	if cfg.AgentsConfig.DefaultReviewer != "opencode-reviewer" {
 		t.Errorf("DefaultReviewer = %q, want %q", cfg.AgentsConfig.DefaultReviewer, "opencode-reviewer")
-	}
-}
-
-func TestRegisterWithLookPath_OnlyClaudeAvailable(t *testing.T) {
-	cfg := domain.NewDefaultConfig()
-	lookPath := mockLookPath(map[string]bool{
-		"claude":   true,
-		"opencode": false,
-	})
-	RegisterWithLookPath(cfg, lookPath)
-
-	// Check that only claude worker agent is registered
-	if _, ok := cfg.Agents["claude"]; !ok {
-		t.Errorf("expected worker agent %q to be registered", "claude")
-	}
-	if _, ok := cfg.Agents["opencode"]; ok {
-		t.Errorf("expected worker agent %q NOT to be registered", "opencode")
-	}
-
-	// Check that claude manager and reviewer are registered
-	if _, ok := cfg.Agents["claude-manager"]; !ok {
-		t.Errorf("expected manager agent %q to be registered", "claude-manager")
-	}
-	if _, ok := cfg.Agents["opencode-manager"]; ok {
-		t.Errorf("expected manager agent %q NOT to be registered", "opencode-manager")
-	}
-
-	// Check default agents are set to claude
-	if cfg.AgentsConfig.DefaultWorker != "claude" {
-		t.Errorf("DefaultWorker = %q, want %q", cfg.AgentsConfig.DefaultWorker, "claude")
-	}
-	if cfg.AgentsConfig.DefaultManager != "claude-manager" {
-		t.Errorf("DefaultManager = %q, want %q", cfg.AgentsConfig.DefaultManager, "claude-manager")
-	}
-	if cfg.AgentsConfig.DefaultReviewer != "claude-reviewer" {
-		t.Errorf("DefaultReviewer = %q, want %q", cfg.AgentsConfig.DefaultReviewer, "claude-reviewer")
-	}
-}
-
-func TestRegisterWithLookPath_OnlyOpencodeAvailable(t *testing.T) {
-	cfg := domain.NewDefaultConfig()
-	lookPath := mockLookPath(map[string]bool{
-		"claude":   false,
-		"opencode": true,
-	})
-	RegisterWithLookPath(cfg, lookPath)
-
-	// Check that only opencode worker agent is registered
-	if _, ok := cfg.Agents["opencode"]; !ok {
-		t.Errorf("expected worker agent %q to be registered", "opencode")
-	}
-	if _, ok := cfg.Agents["claude"]; ok {
-		t.Errorf("expected worker agent %q NOT to be registered", "claude")
-	}
-
-	// Check default agents are set to opencode
-	if cfg.AgentsConfig.DefaultWorker != "opencode" {
-		t.Errorf("DefaultWorker = %q, want %q", cfg.AgentsConfig.DefaultWorker, "opencode")
-	}
-}
-
-func TestRegisterWithLookPath_NoCommandsAvailable(t *testing.T) {
-	cfg := domain.NewDefaultConfig()
-	lookPath := mockLookPath(map[string]bool{
-		"claude":   false,
-		"opencode": false,
-	})
-	RegisterWithLookPath(cfg, lookPath)
-
-	// Check that no worker agents are registered
-	if _, ok := cfg.Agents["claude"]; ok {
-		t.Errorf("expected worker agent %q NOT to be registered", "claude")
-	}
-	if _, ok := cfg.Agents["opencode"]; ok {
-		t.Errorf("expected worker agent %q NOT to be registered", "opencode")
-	}
-
-	// Check that no default agents are set
-	if cfg.AgentsConfig.DefaultWorker != "" {
-		t.Errorf("DefaultWorker = %q, want empty string", cfg.AgentsConfig.DefaultWorker)
-	}
-	if cfg.AgentsConfig.DefaultManager != "" {
-		t.Errorf("DefaultManager = %q, want empty string", cfg.AgentsConfig.DefaultManager)
-	}
-	if cfg.AgentsConfig.DefaultReviewer != "" {
-		t.Errorf("DefaultReviewer = %q, want empty string", cfg.AgentsConfig.DefaultReviewer)
-	}
-}
-
-// mockLookPath creates a mock LookPath function that returns success or error based on the provided map
-func mockLookPath(available map[string]bool) func(string) (string, error) {
-	return func(name string) (string, error) {
-		if available[name] {
-			return name, nil
-		}
-		return "", errors.New("not found")
 	}
 }
 
