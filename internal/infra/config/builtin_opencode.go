@@ -69,6 +69,13 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 				await ` + "$`crew edit {{.TaskID}} --status needs_input`" + `;
 			}
 		}
+
+		// Transition to in_progress: permission replied
+		if (event.type === "permission.replied") {
+			if (!(await isInReview())) {
+				await ` + "$`crew edit {{.TaskID}} --status in_progress`" + `;
+			}
+		}
 	}
   }
 }
