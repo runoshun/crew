@@ -83,7 +83,17 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
           }
         ]
       }
-		]
+		],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew show {{.TaskID}} | grep -q '^Status: needs_input' && crew edit {{.TaskID}} --status in_progress || true"
+          }
+        ]
+      }
+    ]
   }
 }
 EOF
