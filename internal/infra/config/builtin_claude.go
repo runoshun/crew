@@ -8,7 +8,7 @@ const (
 // claudeAgents contains the built-in configuration for the Claude CLI.
 var claudeAgents = builtinAgentSet{
 	Worker: builtinAgentDef{
-		CommandTemplate:   "claude --model {{.Model}} --permission-mode acceptEdits " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
+		CommandTemplate:   "claude --model {{.Model}} --permission-mode acceptEdits --plugin-dir .claude/crew-plugin " + claudeAllowedToolsForWorker + " {{.Args}}{{if .Continue}} -c{{end}} {{.Prompt}}",
 		DefaultModel:      "opus",
 		Description:       "Claude model via Anthropic CLI",
 		WorkerSetupScript: claudeSetupScript,
