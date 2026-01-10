@@ -27,6 +27,10 @@ var claudeAgents = builtinAgentSet{
 	},
 }
 
+// claudeSetupScript creates the plugin configuration for the Claude worker.
+// The PreToolUse hook restricts Edit/Write operations to the worktree directory.
+// This is a workaround for --permission-mode acceptEdits not working as expected.
+// See: https://github.com/anthropics/claude-code/issues/12070
 const claudeSetupScript = `#!/bin/bash
 cd {{.Worktree}}
 
@@ -54,7 +58,6 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
         "hooks": [
           {
             "type": "command",
-            "comment": "Workaround for --permission-mode acceptEdits not working as expected. Allow Edit/Write only within worktree. See: https://github.com/anthropics/claude-code/issues/12070",
             "command": "jq -c '(.cwd) as $cwd | .tool_input.file_path // \"\" | if startswith($cwd) then {hookSpecificOutput: {hookEventName: \"PreToolUse\", permissionDecision: \"allow\"}} else {} end'"
           }
         ]
