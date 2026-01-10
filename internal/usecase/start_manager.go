@@ -77,7 +77,7 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 
 	// Build the default prompts
 	defaultSystemPrompt := domain.DefaultManagerSystemPrompt
-	defaultPrompt := ""
+	defaultPrompt := cfg.AgentsConfig.ManagerPrompt
 
 	// Render command and prompt using Agent.RenderCommand
 	result, err := agent.RenderCommand(cmdData, `"$PROMPT"`, defaultSystemPrompt, defaultPrompt)

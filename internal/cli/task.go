@@ -376,8 +376,9 @@ Examples:
 			// Print output
 			if opts.JSON {
 				type jsonComment struct {
-					Time time.Time `json:"time"`
-					Text string    `json:"text"`
+					Time   time.Time `json:"time"`
+					Text   string    `json:"text"`
+					Author string    `json:"author,omitempty"`
 				}
 				type jsonTask struct {
 					Created     time.Time     `json:"created"`
@@ -415,8 +416,9 @@ Examples:
 				}
 				for i, c := range out.Comments {
 					jt.Comments[i] = jsonComment{
-						Time: c.Time,
-						Text: c.Text,
+						Time:   c.Time,
+						Text:   c.Text,
+						Author: c.Author,
 					}
 				}
 
@@ -766,6 +768,7 @@ Examples:
 // newCommentCommand creates the comment command for adding comments to tasks.
 func newCommentCommand(c *app.Container) *cobra.Command {
 	var opts struct {
+		Author         string
 		Edit           int
 		RequestChanges bool
 	}
@@ -820,6 +823,7 @@ Examples:
 			out, err := uc.Execute(cmd.Context(), usecase.AddCommentInput{
 				TaskID:         taskID,
 				Message:        args[1],
+				Author:         opts.Author,
 				RequestChanges: opts.RequestChanges,
 			})
 			if err != nil {
@@ -840,6 +844,7 @@ Examples:
 		},
 	}
 
+	cmd.Flags().StringVar(&opts.Author, "author", "", "Author name (manager, worker, etc.)")
 	cmd.Flags().IntVar(&opts.Edit, "edit", -1, "Edit an existing comment by index")
 	cmd.Flags().BoolVarP(&opts.RequestChanges, "request-changes", "R", false, "Request changes and update status to in_progress")
 
@@ -945,8 +950,19 @@ func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
 	// Comments
 	if len(out.Comments) > 0 {
 		_, _ = fmt.Fprintln(w, "\nComments:")
-		for i, comment := range out.Comments {
-			_, _ = fmt.Fprintf(w, "  %d: [%s] %s\n", i, comment.Time.Format(time.RFC3339), comment.Text)
+		separator := "  ─────────────────"
+		for _, comment := range out.Comments {
+			_, _ = fmt.Fprintln(w, separator)
+			authorPart := ""
+			if comment.Author != "" {
+				authorPart = " " + comment.Author
+			}
+			_, _ = fmt.Fprintf(w, "  [%s]%s\n", comment.Time.Format(time.RFC3339), authorPart)
+			// Indent message
+			lines := strings.Split(strings.TrimSpace(comment.Text), "\n")
+			for _, line := range lines {
+				_, _ = fmt.Fprintf(w, "  %s\n", line)
+			}
 		}
 	}
 }

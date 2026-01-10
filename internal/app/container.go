@@ -2,6 +2,7 @@
 package app
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -75,20 +76,25 @@ func New(dir string) (*Container, error) {
 
 	// Load app config to determine store type
 	configLoader := config.NewLoader(cfg.CrewDir, cfg.RepoRoot)
-	appConfig, _ := configLoader.Load() // ignore error, use defaults
+	appConfig, err := configLoader.Load()
+	if err != nil {
+		// Warn about config error and use defaults
+		fmt.Fprintf(os.Stderr, "warning: config error: %v (using defaults)\n", err)
+		appConfig = domain.NewDefaultConfig()
+	}
 
 	// Create task repository based on config
 	// Default is "git" store; use "json" only if explicitly specified
 	var taskRepo domain.TaskRepository
 	var storeInit domain.StoreInitializer
-	if appConfig.Tasks.Store == "json" {
+	if appConfig != nil && appConfig.Tasks.Store == "json" {
 		jsonStore := jsonstore.New(cfg.StorePath)
 		taskRepo = jsonStore
 		storeInit = jsonStore
 	} else {
-		namespace := appConfig.Tasks.Namespace
-		if namespace == "" {
-			namespace = "crew"
+		namespace := "crew"
+		if appConfig != nil && appConfig.Tasks.Namespace != "" {
+			namespace = appConfig.Tasks.Namespace
 		}
 		gitStore, err := gitstore.New(cfg.RepoRoot, namespace)
 		if err != nil {
@@ -268,4 +274,10 @@ func (c *Container) ExecCommandUseCase() *usecase.ExecCommand {
 // StartManagerUseCase returns a new StartManager use case.
 func (c *Container) StartManagerUseCase() *usecase.StartManager {
 	return usecase.NewStartManager(c.ConfigLoader, c.Config.RepoRoot, c.Config.GitDir)
+}
+
+// ReviewTaskUseCase returns a new ReviewTask use case.
+// stdout and stderr are the writers for command output.
+func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewTask {
+	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Config.RepoRoot, stdout, stderr)
 }
