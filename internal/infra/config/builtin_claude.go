@@ -79,7 +79,7 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
         "hooks": [
           {
             "type": "command",
-            "command": "crew edit {{.TaskID}} --status in_progress"
+            "command": "crew edit {{.TaskID}} --status in_progress --if-status needs_input"
           }
         ]
       }
