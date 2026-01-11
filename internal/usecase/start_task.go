@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -37,6 +36,7 @@ type StartTask struct {
 	git          domain.Git
 	clock        domain.Clock
 	logger       domain.Logger
+	runner       domain.ScriptRunner
 	crewDir      string // Path to .git/crew directory
 	repoRoot     string // Repository root path
 }
@@ -50,6 +50,7 @@ func NewStartTask(
 	git domain.Git,
 	clock domain.Clock,
 	logger domain.Logger,
+	runner domain.ScriptRunner,
 	crewDir string,
 	repoRoot string,
 ) *StartTask {
@@ -61,6 +62,7 @@ func NewStartTask(
 		git:          git,
 		clock:        clock,
 		logger:       logger,
+		runner:       runner,
 		crewDir:      crewDir,
 		repoRoot:     repoRoot,
 	}
@@ -350,13 +352,9 @@ func (uc *StartTask) runSetupScript(task *domain.Task, wtPath, scriptTemplate st
 		return fmt.Errorf("expand setup script template: %w", err)
 	}
 
-	// Execute the script
-	// G204: Script content is from built-in agent config or user config (trusted source)
-	cmd := exec.Command("sh", "-c", script.String()) //nolint:gosec // Script from trusted config
-	cmd.Dir = wtPath
-
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("execute setup script: %w: %s", err, string(out))
+	// Execute the script using ScriptRunner
+	if err := uc.runner.Run(wtPath, script.String()); err != nil {
+		return fmt.Errorf("run setup script: %w", err)
 	}
 
 	return nil

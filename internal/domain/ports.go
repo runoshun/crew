@@ -319,3 +319,10 @@ type Logger interface {
 	// Close closes any open log files.
 	Close() error
 }
+
+// ScriptRunner executes shell scripts in a specified directory.
+type ScriptRunner interface {
+	// Run executes a script in the given directory.
+	// Returns an error if the script execution fails.
+	Run(dir, script string) error
+}
