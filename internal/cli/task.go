@@ -551,7 +551,8 @@ Examples:
 				cmd.Flags().Changed("status") ||
 				cmd.Flags().Changed("labels") ||
 				len(opts.AddLabels) > 0 ||
-				len(opts.RemoveLabels) > 0
+				len(opts.RemoveLabels) > 0 ||
+				len(opts.IfStatus) > 0
 
 			if !hasFlags {
 				// Editor mode: open task in editor

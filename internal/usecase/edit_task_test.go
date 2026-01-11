@@ -840,3 +840,25 @@ func TestEditTask_Execute_ConditionalStatusUpdate_WithOtherFields(t *testing.T) 
 	assert.Equal(t, domain.StatusTodo, out.Task.Status, "status should not change when condition not met")
 	assert.Equal(t, "Updated title", out.Task.Title, "title should be updated even when status condition not met")
 }
+
+func TestEditTask_Execute_InvalidIfStatus(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with invalid IfStatus
+	newStatus := domain.StatusInProgress
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		Status:   &newStatus,
+		IfStatus: []domain.Status{domain.Status("invalid")},
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrInvalidStatus)
+}

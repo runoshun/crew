@@ -64,6 +64,13 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 		return nil, domain.ErrInvalidStatus
 	}
 
+	// Validate IfStatus values are valid if provided
+	for _, status := range in.IfStatus {
+		if !status.IsValid() {
+			return nil, domain.ErrInvalidStatus
+		}
+	}
+
 	// Get existing task
 	task, err := uc.tasks.Get(in.TaskID)
 	if err != nil {
