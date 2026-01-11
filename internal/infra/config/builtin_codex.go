@@ -3,12 +3,9 @@ package config
 import "github.com/runoshun/git-crew/v2/internal/domain"
 
 // codexAgents contains the built-in configuration for the Codex CLI.
-// Note: Codex currently only supports notify hook on agent-turn-complete,
-// so automatic status transitions (needs_input, in_progress) are not available.
-// Only in_review transition can be configured via global ~/.codex/config.toml.
 var codexAgents = builtinAgentSet{
 	Worker: domain.Agent{
-		CommandTemplate: "codex --model {{.Model}} --full-auto {{.Args}} {{.Prompt}}",
+		CommandTemplate: "codex -c 'notify=[\"sh\", \"-c\", \"crew show {{.TaskID}} | grep -q '\"'\"'^Status: in_progress'\"'\"' && crew edit {{.TaskID}} --status needs_input || true\"]' --model {{.Model}} --full-auto {{.Args}} {{.Prompt}}",
 		DefaultModel:    "gpt-5.2-codex",
 		Description:     "General purpose coding agent via Codex CLI",
 	},
