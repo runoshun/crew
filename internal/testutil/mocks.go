@@ -246,6 +246,7 @@ type MockGit struct {
 	MergeNoFF               bool
 	MergeCalled             bool
 	DeleteBranchCalled      bool
+	GetDefaultBranchCalled  bool
 }
 
 // Ensure MockGit implements domain.Git interface.
@@ -302,6 +303,7 @@ func (m *MockGit) DeleteBranch(branch string, force bool) error {
 
 // GetDefaultBranch returns the configured default branch name or error.
 func (m *MockGit) GetDefaultBranch() (string, error) {
+	m.GetDefaultBranchCalled = true
 	if m.GetDefaultBranchErr != nil {
 		return "", m.GetDefaultBranchErr
 	}
