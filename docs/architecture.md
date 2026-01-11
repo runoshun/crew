@@ -194,7 +194,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 ```go
 func (c *Container) StartTask() *usecase.StartTask {
-    return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.Config, c.Clock)
+    return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Git, c.Clock, c.Logger, c.Runner, c.Config.CrewDir, c.Config.RepoRoot)
 }
 ```
 
@@ -225,7 +225,7 @@ type MockTaskRepository struct {
     tasks map[int]*domain.Task
 }
 
-uc := usecase.NewStartTask(mockRepo, mockSessions, ...)
+uc := usecase.NewStartTask(mockRepo, mockSessions, mockWorktrees, mockConfigLoader, mockGit, mockClock, mockLogger, mockRunner, crewDir, repoRoot)
 out, err := uc.Execute(ctx, input)
 ```
 
