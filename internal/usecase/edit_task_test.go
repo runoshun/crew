@@ -744,3 +744,99 @@ Description`
 	// Assert
 	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
 }
+
+func TestEditTask_Execute_ConditionalStatusUpdate_MatchingStatus(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - update status with matching condition
+	newStatus := domain.StatusNeedsInput
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		Status:   &newStatus,
+		IfStatus: []domain.Status{domain.StatusInProgress},
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusNeedsInput, out.Task.Status)
+}
+
+func TestEditTask_Execute_ConditionalStatusUpdate_NonMatchingStatus(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - update status with non-matching condition
+	newStatus := domain.StatusNeedsInput
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		Status:   &newStatus,
+		IfStatus: []domain.Status{domain.StatusInProgress},
+	})
+
+	// Assert - no error, but status should not change
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusTodo, out.Task.Status, "status should not change when condition not met")
+}
+
+func TestEditTask_Execute_ConditionalStatusUpdate_MultipleConditions(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusNeedsInput,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - update status with multiple conditions (one matches)
+	newStatus := domain.StatusInProgress
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		Status:   &newStatus,
+		IfStatus: []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
+}
+
+func TestEditTask_Execute_ConditionalStatusUpdate_WithOtherFields(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Original title",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - conditional status update with title change
+	// Status condition not met, but title should still be updated
+	newStatus := domain.StatusNeedsInput
+	newTitle := "Updated title"
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		Status:   &newStatus,
+		IfStatus: []domain.Status{domain.StatusInProgress},
+		Title:    &newTitle,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, domain.StatusTodo, out.Task.Status, "status should not change when condition not met")
+	assert.Equal(t, "Updated title", out.Task.Title, "title should be updated even when status condition not met")
+}
