@@ -81,15 +81,14 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		agentName = cfg.AgentsConfig.DefaultReviewer
 	}
 
-	// Get agent configuration
-	agent, ok := cfg.Agents[agentName]
+	// Get agent configuration from enabled agents only
+	agent, ok := cfg.EnabledAgents()[agentName]
 	if !ok {
+		// Check if agent exists but is disabled
+		if _, exists := cfg.Agents[agentName]; exists {
+			return nil, fmt.Errorf("agent %q is disabled: %w", agentName, domain.ErrAgentDisabled)
+		}
 		return nil, fmt.Errorf("agent %q: %w", agentName, domain.ErrAgentNotFound)
-	}
-
-	// Check if agent is disabled
-	if domain.IsAgentDisabled(agentName, cfg.AgentsConfig.DisabledAgents) {
-		return nil, fmt.Errorf("agent %q is disabled: %w", agentName, domain.ErrAgentDisabled)
 	}
 
 	// Resolve model priority: CLI flag > agent config > builtin default

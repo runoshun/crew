@@ -159,6 +159,10 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	// Snapshot commands
 	snapshotCmd := newSnapshotCmd(c)
 
+	// Agent list command
+	listAgentsCmd := newListAgentsCommand(c)
+	listAgentsCmd.GroupID = groupSetup
+
 	// Internal commands (hidden)
 	sessionEndedCmd := newSessionEndedCommand(c)
 
@@ -166,6 +170,7 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	root.AddCommand(
 		initCmd,
 		configCmd,
+		listAgentsCmd,
 		newCmd,
 		listCmd,
 		showCmd,

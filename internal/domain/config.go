@@ -473,6 +473,18 @@ func formatPromptForTemplate(prompt string) string {
 	return buf.String()
 }
 
+// EnabledAgents returns a map of agents that are not disabled.
+// It filters out agents that match any pattern in DisabledAgents.
+func (c *Config) EnabledAgents() map[string]Agent {
+	result := make(map[string]Agent)
+	for name, agent := range c.Agents {
+		if !IsAgentDisabled(name, c.AgentsConfig.DisabledAgents) {
+			result[name] = agent
+		}
+	}
+	return result
+}
+
 // ResolveInheritance resolves agent inheritance by applying parent agent settings
 // to child agents. It detects circular dependencies and returns an error if found.
 // Agents without Inherit field are left unchanged.
