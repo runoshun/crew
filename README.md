@@ -95,6 +95,21 @@ You are not limited to pre-built integrations. You can define fully custom agent
 
 For details on custom agents and full configuration options, see [Core Concepts: Configuration](./docs/core-concepts.md#4-configuration-system) or run `crew config`.
 
+### Listing Available Agents
+
+Use `crew list-agents` to see all configured agents:
+
+```bash
+# List enabled agents
+crew list-agents
+
+# List all agents including disabled ones
+crew list-agents --all
+
+# List only disabled agents
+crew list-agents --disabled
+```
+
 ---
 
 ## ⚡ Quick Start (Manual Mode)

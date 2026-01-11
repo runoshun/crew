@@ -98,6 +98,34 @@ func TestListAgentsCommand(t *testing.T) {
 	}
 }
 
+func TestListAgentsCommand_MutuallyExclusiveFlags(t *testing.T) {
+	cfg := &domain.Config{
+		Agents: map[string]domain.Agent{
+			"agent1": {Role: domain.RoleWorker},
+		},
+		AgentsConfig: domain.AgentsConfig{},
+	}
+
+	container := &app.Container{
+		ConfigLoader: &mockConfigLoader{cfg: cfg},
+	}
+
+	cmd := newListAgentsCommand(container)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--all", "--disabled"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when using --all and --disabled together")
+	}
+
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("error should mention mutually exclusive, got: %v", err)
+	}
+}
+
 // mockConfigLoader implements domain.ConfigLoader for testing.
 type mockConfigLoader struct {
 	cfg *domain.Config

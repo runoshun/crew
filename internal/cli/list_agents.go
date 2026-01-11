@@ -25,6 +25,8 @@ func newListAgentsCommand(c *app.Container) *cobra.Command {
 By default, only enabled agents are shown. Use --all to show all agents
 including disabled ones, or --disabled to show only disabled agents.
 
+Note: --all and --disabled are mutually exclusive.
+
 Examples:
   # List enabled agents
   crew list-agents
@@ -35,6 +37,11 @@ Examples:
   # List only disabled agents
   crew list-agents --disabled`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Validate mutually exclusive flags
+			if opts.All && opts.Disabled {
+				return fmt.Errorf("--all and --disabled are mutually exclusive")
+			}
+
 			cfg, err := c.ConfigLoader.Load()
 			if err != nil {
 				return fmt.Errorf("load config: %w", err)
