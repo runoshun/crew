@@ -145,6 +145,9 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	reviewCmd := newReviewCommand(c)
 	reviewCmd.GroupID = groupSession
 
+	pollCmd := newPollCommand(c)
+	pollCmd.GroupID = groupSession
+
 	pruneCmd := newPruneCommand(c)
 	pruneCmd.GroupID = groupTask
 
@@ -189,6 +192,7 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 		completeCmd,
 		mergeCmd,
 		reviewCmd,
+		pollCmd,
 		pruneCmd,
 		tuiCmd,
 		managerCmd,
