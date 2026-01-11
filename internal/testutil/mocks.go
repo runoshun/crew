@@ -738,3 +738,28 @@ func (m *MockLogger) Error(taskID int, category, msg string) {
 func (m *MockLogger) Close() error {
 	return nil
 }
+
+// MockScriptRunner is a test double for domain.ScriptRunner.
+// Fields are ordered to minimize memory padding.
+type MockScriptRunner struct {
+	RunErr    error
+	RunDir    string
+	RunScript string
+	RunCalled bool
+}
+
+// NewMockScriptRunner creates a new MockScriptRunner.
+func NewMockScriptRunner() *MockScriptRunner {
+	return &MockScriptRunner{}
+}
+
+// Ensure MockScriptRunner implements domain.ScriptRunner interface.
+var _ domain.ScriptRunner = (*MockScriptRunner)(nil)
+
+// Run records the call and returns configured error.
+func (m *MockScriptRunner) Run(dir, script string) error {
+	m.RunCalled = true
+	m.RunDir = dir
+	m.RunScript = script
+	return m.RunErr
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/infra/gitstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/logging"
+	"github.com/runoshun/git-crew/v2/internal/infra/runner"
 	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
 	"github.com/runoshun/git-crew/v2/internal/infra/worktree"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
@@ -55,6 +56,7 @@ type Container struct {
 	ConfigLoader     domain.ConfigLoader
 	ConfigManager    domain.ConfigManager
 	Logger           domain.Logger
+	Runner           domain.ScriptRunner
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 
 	// Configuration
@@ -115,6 +117,9 @@ func New(dir string) (*Container, error) {
 	// Create config manager
 	configManager := config.NewManager(cfg.CrewDir, cfg.RepoRoot)
 
+	// Create script runner
+	scriptRunner := runner.NewClient()
+
 	return &Container{
 		Tasks:            taskRepo,
 		StoreInitializer: storeInit,
@@ -125,6 +130,7 @@ func New(dir string) (*Container, error) {
 		ConfigLoader:     configLoader,
 		ConfigManager:    configManager,
 		Logger:           logger,
+		Runner:           scriptRunner,
 		Config:           cfg,
 	}, nil
 }
@@ -198,7 +204,7 @@ func (c *Container) CloseTaskUseCase() *usecase.CloseTask {
 
 // StartTaskUseCase returns a new StartTask use case.
 func (c *Container) StartTaskUseCase() *usecase.StartTask {
-	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Git, c.Clock, c.Logger, c.Config.CrewDir, c.Config.RepoRoot)
+	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Git, c.Clock, c.Logger, c.Runner, c.Config.CrewDir, c.Config.RepoRoot)
 }
 
 // AttachSessionUseCase returns a new AttachSession use case.
