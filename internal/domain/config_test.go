@@ -272,6 +272,114 @@ func TestRenderConfigTemplate(t *testing.T) {
 	}
 }
 
+func TestConfig_EnabledAgents(t *testing.T) {
+	tests := []struct {
+		name     string
+		config   *Config
+		wantLen  int
+		wantKeys []string
+	}{
+		{
+			name: "no disabled agents",
+			config: &Config{
+				Agents: map[string]Agent{
+					"agent1": {CommandTemplate: "cmd1"},
+					"agent2": {CommandTemplate: "cmd2"},
+				},
+				AgentsConfig: AgentsConfig{
+					DisabledAgents: []string{},
+				},
+			},
+			wantLen:  2,
+			wantKeys: []string{"agent1", "agent2"},
+		},
+		{
+			name: "some agents disabled",
+			config: &Config{
+				Agents: map[string]Agent{
+					"agent1":   {CommandTemplate: "cmd1"},
+					"agent2":   {CommandTemplate: "cmd2"},
+					"disabled": {CommandTemplate: "cmd3"},
+				},
+				AgentsConfig: AgentsConfig{
+					DisabledAgents: []string{"disabled"},
+				},
+			},
+			wantLen:  2,
+			wantKeys: []string{"agent1", "agent2"},
+		},
+		{
+			name: "wildcard disabled pattern",
+			config: &Config{
+				Agents: map[string]Agent{
+					"oc-small":  {CommandTemplate: "cmd1"},
+					"oc-medium": {CommandTemplate: "cmd2"},
+					"claude":    {CommandTemplate: "cmd3"},
+				},
+				AgentsConfig: AgentsConfig{
+					DisabledAgents: []string{"oc-*"},
+				},
+			},
+			wantLen:  1,
+			wantKeys: []string{"claude"},
+		},
+		{
+			name: "exclusion pattern re-enables agent",
+			config: &Config{
+				Agents: map[string]Agent{
+					"oc-small":  {CommandTemplate: "cmd1"},
+					"oc-medium": {CommandTemplate: "cmd2"},
+					"claude":    {CommandTemplate: "cmd3"},
+				},
+				AgentsConfig: AgentsConfig{
+					DisabledAgents: []string{"oc-*", "!oc-medium"},
+				},
+			},
+			wantLen:  2,
+			wantKeys: []string{"claude", "oc-medium"},
+		},
+		{
+			name: "all agents disabled",
+			config: &Config{
+				Agents: map[string]Agent{
+					"agent1": {CommandTemplate: "cmd1"},
+					"agent2": {CommandTemplate: "cmd2"},
+				},
+				AgentsConfig: AgentsConfig{
+					DisabledAgents: []string{"agent1", "agent2"},
+				},
+			},
+			wantLen:  0,
+			wantKeys: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.EnabledAgents()
+
+			if len(got) != tt.wantLen {
+				t.Errorf("EnabledAgents() returned %d agents, want %d", len(got), tt.wantLen)
+			}
+
+			for _, key := range tt.wantKeys {
+				if _, ok := got[key]; !ok {
+					t.Errorf("EnabledAgents() missing expected agent %q", key)
+				}
+			}
+
+			// Verify disabled agents are not present
+			for name := range tt.config.Agents {
+				if IsAgentDisabled(name, tt.config.AgentsConfig.DisabledAgents) {
+					if _, ok := got[name]; ok {
+						t.Errorf("EnabledAgents() should not contain disabled agent %q", name)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestConfig_ResolveInheritance(t *testing.T) {
 	tests := []struct {
 		wantErr error

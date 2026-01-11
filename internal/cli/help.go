@@ -9,8 +9,9 @@ import (
 )
 
 func buildHelpData(cfg *domain.Config) domain.HelpData {
-	workers := make([]domain.WorkerInfo, 0, len(cfg.Agents))
-	for name, agent := range cfg.Agents {
+	enabledAgents := cfg.EnabledAgents()
+	workers := make([]domain.WorkerInfo, 0, len(enabledAgents))
+	for name, agent := range enabledAgents {
 		if agent.Hidden || (agent.Role != "" && agent.Role != domain.RoleWorker) {
 			continue
 		}
