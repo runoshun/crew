@@ -61,6 +61,11 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 		return nil, domain.ErrTaskNotFound
 	}
 
+	// Check if task is already in terminal state (immediate exit)
+	if uc.isTerminalStatus(task.Status) {
+		return &PollTaskOutput{}, nil
+	}
+
 	previousStatus := task.Status
 	ticker := time.NewTicker(time.Duration(in.Interval) * time.Second)
 	defer ticker.Stop()
@@ -76,6 +81,10 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 	for {
 		select {
 		case <-ctx.Done():
+			// Ctrl+C (context.Canceled) is a normal exit, not an error
+			if ctx.Err() == context.Canceled {
+				return &PollTaskOutput{}, nil
+			}
 			return nil, ctx.Err()
 		case <-timeoutChan:
 			// Timeout reached
