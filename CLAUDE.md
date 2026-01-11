@@ -63,7 +63,7 @@ Development follows three phases. For detailed steps, use the `dev-workflow` ski
 
 ### Phase 1: Setup
 
-- Read docs/README.md and related docs (architecture.md, spec-*.md as needed)
+- Read docs/README.md and related docs (architecture.md as needed)
 - Check current task with `crew list` and `crew show <id>`
 - Ensure you're on a feature branch (create if needed)
 
