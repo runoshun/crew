@@ -1,391 +1,391 @@
 # E2E Test Guide
 
-手動E2Eテストの手順書。自動テストでカバーできない範囲を検証する。
+Manual E2E testing procedures for verifying functionality that automated tests cannot cover.
 
-## 前提条件
+## Prerequisites
 
-- `mise run build` でバイナリがビルド済み
-- 各CLI（claude, opencode, codex）がインストール済み
+- Binary built with `mise run build`
+- Each CLI (claude, opencode, codex) installed
 
 ---
 
-## 環境セットアップ
+## Environment Setup
 
-### 自動セットアップ
+### Automatic Setup
 
 ```bash
-# テスト用リポジトリを作成（.e2e-test/ に作成、gitignored）
+# Create test repository (created in .e2e-test/, gitignored)
 ./scripts/e2e-setup.sh
 
-# または任意のディレクトリに作成
+# Or create in a custom directory
 ./scripts/e2e-setup.sh /path/to/test-dir
 ```
 
-### 手動セットアップ
+### Manual Setup
 
 ```bash
-# 1. テスト用ディレクトリ作成（リポジトリ内、gitignored）
+# 1. Create test directory (inside repository, gitignored)
 TEST_DIR=.e2e-test
 mkdir -p $TEST_DIR && cd $TEST_DIR
 
-# 2. gitリポジトリ初期化
+# 2. Initialize git repository
 git init
 git config user.email "test@example.com"
 git config user.name "E2E Test"
 
-# 3. 初期ファイル作成
+# 3. Create initial files
 echo "# E2E Test" > README.md
 git add . && git commit -m "Initial commit"
 
-# 4. crew初期化
+# 4. Initialize crew
 crew init
 ```
 
-### クリーンアップ
+### Cleanup
 
 ```bash
-# テスト完了後
+# After testing is complete
 rm -rf .e2e-test
 ```
 
-**Note:** `.e2e-test/` はメインリポジトリの `.gitignore` に追加済み。エージェントの権限設定上、リポジトリ内に配置することで worktree アクセスが容易になる。
+**Note:** `.e2e-test/` is already added to the main repository's `.gitignore`. Placing it inside the repository makes worktree access easier due to agent permission settings.
 
 ---
 
-## 1. ステータス遷移テスト
+## 1. Status Transition Tests
 
-各エージェントがステータスを正しく遷移させるか検証する。
+Verify that each agent transitions status correctly.
 
-### 1.1 Claude (cc-medium) ステータス遷移
+### 1.1 Claude (cc-medium) Status Transitions
 
-**期待動作:**
-- 起動時: `todo` → `in_progress`
-- アイドル/パーミッション要求時: `in_progress` → `needs_input`
-- ユーザー入力後: `needs_input` → `in_progress`
-- `crew complete` 実行後: `in_progress` → `in_review`
+**Expected Behavior:**
+- On start: `todo` → `in_progress`
+- On idle/permission request: `in_progress` → `needs_input`
+- After user input: `needs_input` → `in_progress`
+- After `crew complete`: `in_progress` → `in_review`
 
-**手順:**
+**Steps:**
 
 ```bash
-# 1. テストタスク作成
-crew new --title "E2E: Claude ステータス遷移テスト"
+# 1. Create test task
+crew new --title "E2E: Claude status transition test"
 
-# 2. タスク開始
+# 2. Start task
 crew start <id> cc-medium
 
-# 3. ステータス確認（in_progress になるはず）
+# 3. Check status (should be in_progress)
 crew list | grep <id>
 
-# 4. エージェントがアイドルになるまで待機
+# 4. Wait for agent to become idle
 sleep 30
 
-# 5. ステータス確認（needs_input になるはず）
+# 5. Check status (should be needs_input)
 crew list | grep <id>
 
-# 6. 何か入力を送信
+# 6. Send some input
 crew send <id> "echo test"
 crew send <id> Enter
 
-# 7. ステータス確認（in_progress に戻るはず）
+# 7. Check status (should return to in_progress)
 sleep 5
 crew list | grep <id>
 
-# 8. 完了指示
+# 8. Send completion instruction
 crew send <id> "crew complete <id>"
 crew send <id> Enter
-# パーミッション許可
+# Allow permission
 crew send <id> y
 crew send <id> Enter
 
-# 9. ステータス確認（in_review になるはず）
+# 9. Check status (should be in_review)
 sleep 10
 crew list | grep <id>
 
-# 10. クリーンアップ
+# 10. Cleanup
 crew close <id>
 ```
 
-**検証ポイント:**
-- [ ] 起動後 `in_progress` に遷移
-- [ ] アイドル時 `needs_input` に遷移
-- [ ] 入力後 `in_progress` に戻る
-- [ ] complete 後 `in_review` に遷移
+**Verification Points:**
+- [ ] Transitions to `in_progress` after start
+- [ ] Transitions to `needs_input` when idle
+- [ ] Returns to `in_progress` after input
+- [ ] Transitions to `in_review` after complete
 
 ---
 
-### 1.2 OpenCode (oc-medium-ag) ステータス遷移
+### 1.2 OpenCode (oc-medium-ag) Status Transitions
 
-**期待動作:** Claude と同様
+**Expected Behavior:** Same as Claude
 
-**手順:**
+**Steps:**
 
 ```bash
-# 1. テストタスク作成
-crew new --title "E2E: OpenCode ステータス遷移テスト"
+# 1. Create test task
+crew new --title "E2E: OpenCode status transition test"
 
-# 2. タスク開始
+# 2. Start task
 crew start <id> oc-medium-ag
 
-# 3-9. Claude と同様の手順で検証
+# 3-9. Follow the same steps as Claude
 
-# 10. クリーンアップ
+# 10. Cleanup
 crew close <id>
 ```
 
-**検証ポイント:**
-- [ ] TypeScript plugin が正しくロードされる
-- [ ] 各イベントでステータスが遷移する
+**Verification Points:**
+- [ ] TypeScript plugin loads correctly
+- [ ] Status transitions on each event
 
 ---
 
-### 1.3 Codex ステータス遷移
+### 1.3 Codex Status Transitions
 
-**期待動作:**
-- `agent-turn-complete` イベント時に `in_progress` → `needs_input`
+**Expected Behavior:**
+- On `agent-turn-complete` event: `in_progress` → `needs_input`
 
-**手順:**
+**Steps:**
 
 ```bash
-# 1. テストタスク作成
-crew new --title "E2E: Codex ステータス遷移テスト"
+# 1. Create test task
+crew new --title "E2E: Codex status transition test"
 
-# 2. タスク開始
+# 2. Start task
 crew start <id> codex
 
-# 3. ステータス確認
+# 3. Check status
 crew list | grep <id>
 
-# 4. エージェントがターンを完了するまで待機（プロンプト表示など）
-# codex は notify が agent-turn-complete のみなので、
-# アイドル検知は限定的
+# 4. Wait for agent to complete turn (prompt display, etc.)
+# codex only has notify for agent-turn-complete,
+# so idle detection is limited
 
-# 5. ステータス確認
+# 5. Check status
 crew list | grep <id>
 
-# 6. クリーンアップ
+# 6. Cleanup
 crew close <id>
 ```
 
-**検証ポイント:**
-- [ ] notify 設定が正しくパースされる
-- [ ] ターン完了時にステータス遷移する
+**Verification Points:**
+- [ ] notify configuration is parsed correctly
+- [ ] Status transitions on turn completion
 
-**既知の制限:**
-- codex の notify は `agent-turn-complete` のみ対応
-- アイドル状態の即座な検知は不可
+**Known Limitations:**
+- codex notify only supports `agent-turn-complete`
+- Immediate idle state detection is not possible
 
 ---
 
-## 2. TUI操作テスト
+## 2. TUI Operation Tests
 
-### 2.1 基本操作
+### 2.1 Basic Operations
 
-**手順:**
+**Steps:**
 
 ```bash
-# 1. TUI起動
+# 1. Launch TUI
 crew
 
-# 2. 操作確認
-# - j/k: タスク選択
-# - Enter: 詳細表示
-# - s: タスク開始
-# - p: peek（セッション出力確認）
-# - a: attach（セッションにアタッチ）
-# - d: diff表示
-# - ?: ヘルプ表示
-# - q: 終了
+# 2. Test operations
+# - j/k: Select task
+# - Enter: Show details
+# - s: Start task
+# - p: peek (view session output)
+# - a: attach (attach to session)
+# - d: Show diff
+# - ?: Show help
+# - q: Quit
 ```
 
-**検証ポイント:**
-- [ ] キーバインドが正しく動作
-- [ ] ステータス表示がリアルタイム更新
-- [ ] エラー時の表示が適切
+**Verification Points:**
+- [ ] Key bindings work correctly
+- [ ] Status display updates in real-time
+- [ ] Error messages display appropriately
 
 ---
 
 ### 2.2 peek/attach
 
-**手順:**
+**Steps:**
 
 ```bash
-# 1. タスク開始
+# 1. Start task
 crew start <id> cc-small
 
-# 2. TUIで peek
+# 2. peek from TUI
 crew
-# p キーで peek
+# Press p key to peek
 
-# 3. 出力が表示されることを確認
+# 3. Verify output is displayed
 
 # 4. attach
-# a キーで attach
-# Ctrl+b d で detach
+# Press a key to attach
+# Ctrl+b d to detach
 ```
 
-**検証ポイント:**
-- [ ] peek で最新出力が表示
-- [ ] attach でセッションに接続
-- [ ] detach で TUI に戻る
+**Verification Points:**
+- [ ] peek displays latest output
+- [ ] attach connects to session
+- [ ] detach returns to TUI
 
 ---
 
 ### 2.3 send
 
-**手順:**
+**Steps:**
 
 ```bash
-# 1. タスク開始（needs_input 状態で）
+# 1. Start task (in needs_input state)
 crew start <id> cc-small
 
-# 2. needs_input になるまで待機
+# 2. Wait for needs_input
 sleep 30
 
-# 3. キー送信
+# 3. Send keys
 crew send <id> "ls -la"
 crew send <id> Enter
 
-# 4. peek で確認
+# 4. Verify with peek
 crew peek <id>
 ```
 
-**検証ポイント:**
-- [ ] 文字列が正しく送信される
-- [ ] Enter が送信される
-- [ ] 特殊キー（Ctrl+C など）が送信される
+**Verification Points:**
+- [ ] String is sent correctly
+- [ ] Enter is sent
+- [ ] Special keys (Ctrl+C, etc.) are sent
 
 ---
 
-## 3. ワークフローテスト
+## 3. Workflow Tests
 
-### 3.1 タスク完了フロー
+### 3.1 Task Completion Flow
 
 ```bash
-# 1. タスク作成
-crew new --title "E2E: 完了フローテスト" --body "echo hello を実行してください"
+# 1. Create task
+crew new --title "E2E: Completion flow test" --body "Please run echo hello"
 
-# 2. 開始
+# 2. Start
 crew start <id> cc-small
 
-# 3. 完了まで待機（または手動で crew complete）
+# 3. Wait for completion (or manually run crew complete)
 
-# 4. レビュー
+# 4. Review
 crew review <id>
 
-# 5. マージ
+# 5. Merge
 echo "y" | crew merge <id>
 
-# 6. 確認
+# 6. Verify
 crew show <id>  # status: done
 ```
 
-**検証ポイント:**
-- [ ] todo → in_progress → in_review → done の遷移
-- [ ] worktree が削除される
-- [ ] main にマージされる
+**Verification Points:**
+- [ ] Transitions todo → in_progress → in_review → done
+- [ ] worktree is deleted
+- [ ] Merged to main
 
 ---
 
-### 3.2 レビュー＆修正フロー
+### 3.2 Review & Revision Flow
 
 ```bash
-# 1. タスク作成・開始・完了
-crew new --title "E2E: レビュー修正フローテスト"
+# 1. Create task, start, complete
+crew new --title "E2E: Review revision flow test"
 crew start <id> cc-small
-# ... in_review まで進める
+# ... proceed to in_review
 
-# 2. レビュー（修正要求）
+# 2. Review (request changes)
 crew review <id>
 
-# 3. コメント送信
-crew comment <id> -R "修正してください: XXX"
+# 3. Send comment
+crew comment <id> -R "Please fix: XXX"
 
-# 4. ステータス確認（in_progress に戻るはず）
+# 4. Check status (should return to in_progress)
 crew list | grep <id>
 
-# 5. 再度 in_review まで進める
+# 5. Proceed to in_review again
 
-# 6. 再レビュー・マージ
+# 6. Re-review and merge
 crew review <id>
 echo "y" | crew merge <id>
 ```
 
-**検証ポイント:**
-- [ ] comment -R で in_progress に戻る
-- [ ] エージェントがコメントを読んで修正する
+**Verification Points:**
+- [ ] comment -R returns to in_progress
+- [ ] Agent reads comment and makes fixes
 
 ---
 
-## 4. エラーケーステスト
+## 4. Error Case Tests
 
-### 4.1 存在しないタスク
+### 4.1 Non-existent Task
 
 ```bash
 crew show 99999
-# エラーメッセージが適切か
+# Check if error message is appropriate
 ```
 
-### 4.2 存在しないエージェント
+### 4.2 Non-existent Agent
 
 ```bash
 crew start <id> nonexistent-agent
-# エラーメッセージが適切か
+# Check if error message is appropriate
 ```
 
-### 4.3 既に開始済みタスク
+### 4.3 Already Started Task
 
 ```bash
 crew start <id> cc-small
-crew start <id> cc-small  # 2回目
-# エラーまたは適切な動作か
+crew start <id> cc-small  # Second time
+# Check for error or appropriate behavior
 ```
 
 ---
 
-## 5. poll コマンドテスト
+## 5. poll Command Tests
 
 ```bash
-# 1. タスク作成・開始
-crew new --title "E2E: poll テスト"
+# 1. Create and start task
+crew new --title "E2E: poll test"
 crew start <id> cc-small
 
-# 2. バックグラウンドで poll
+# 2. poll in background
 crew poll <id> --timeout 120 &
 
-# 3. ステータス変化を確認
-# needs_input になったら出力されるはず
+# 3. Verify status change detection
+# Should output when needs_input is reached
 
-# 4. 確認後 poll を停止
+# 4. Stop poll after verification
 kill %1
 ```
 
-**検証ポイント:**
-- [ ] ステータス変化時に出力
-- [ ] タイムアウトで終了
-- [ ] 終端状態で終了
+**Verification Points:**
+- [ ] Outputs on status change
+- [ ] Exits on timeout
+- [ ] Exits on terminal state
 
 ---
 
-## チェックリスト
+## Checklist
 
-### ステータス遷移
+### Status Transitions
 - [ ] Claude: in_progress → needs_input → in_progress → in_review
-- [ ] OpenCode: 同上
-- [ ] Codex: notify によるステータス変更
+- [ ] OpenCode: Same as above
+- [ ] Codex: Status change via notify
 
 ### TUI
-- [ ] 基本操作（j/k/Enter/q）
+- [ ] Basic operations (j/k/Enter/q)
 - [ ] peek/attach/detach
 - [ ] send
 
-### ワークフロー
-- [ ] 完了フロー（todo → done）
-- [ ] レビュー修正フロー
+### Workflow
+- [ ] Completion flow (todo → done)
+- [ ] Review revision flow
 
-### エラーケース
-- [ ] 存在しないリソースへのアクセス
-- [ ] 重複操作
+### Error Cases
+- [ ] Access to non-existent resources
+- [ ] Duplicate operations
 
 ### poll
-- [ ] ステータス変化検知
-- [ ] タイムアウト・終了条件
+- [ ] Status change detection
+- [ ] Timeout and exit conditions

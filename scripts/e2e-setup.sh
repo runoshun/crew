@@ -58,6 +58,22 @@ git commit -m "Initial commit"
 echo "Initializing crew..."
 "$CREW_BIN" init
 
+# Create .claude/settings.json for permission pre-approval
+echo "Creating .claude/settings.json..."
+mkdir -p .claude
+cat > .claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash(mise run:*)",
+      "Bash(crew diff:*)",
+      "Bash(crew comment:*)",
+      "Bash(cd:*)"
+    ]
+  }
+}
+EOF
+
 echo ""
 echo "=== Setup Complete ==="
 echo ""
