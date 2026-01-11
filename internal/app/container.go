@@ -278,3 +278,8 @@ func (c *Container) StartManagerUseCase() *usecase.StartManager {
 func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewTask {
 	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Config.RepoRoot, stdout, stderr)
 }
+
+// PollTaskUseCase returns a new PollTask use case.
+func (c *Container) PollTaskUseCase() *usecase.PollTask {
+	return usecase.NewPollTask(c.Tasks, c.Clock)
+}
