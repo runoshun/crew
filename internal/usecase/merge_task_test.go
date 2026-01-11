@@ -422,6 +422,40 @@ func TestMergeTask_Execute_WithCustomBaseBranch(t *testing.T) {
 	assert.Equal(t, "crew-1", git.MergeBranch)
 }
 
+func TestMergeTask_Execute_PrioritizesInputBaseBranch(t *testing.T) {
+	// Setup - in.BaseBranch should override task.BaseBranch
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with different base branch",
+		Status:     domain.StatusInReview,
+		BaseBranch: "feature/workspace",
+	}
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = false
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ExistsVal = true
+	git := &testutil.MockGit{
+		CurrentBranchName: "release",
+		DefaultBranchName: "develop",
+	}
+
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+
+	// Execute - input base branch should take precedence
+	out, err := uc.Execute(context.Background(), MergeTaskInput{
+		TaskID:     1,
+		BaseBranch: "release",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
+	assert.True(t, git.MergeCalled)
+	assert.False(t, git.GetDefaultBranchCalled)
+}
+
 func TestMergeTask_Execute_BaseBranchMismatch(t *testing.T) {
 	// Setup - task has different base branch but --base allows override
 	repo := testutil.NewMockTaskRepository()
@@ -511,6 +545,7 @@ func TestMergeTask_Execute_UseTaskBaseBranch(t *testing.T) {
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.True(t, git.MergeCalled)
+	assert.False(t, git.GetDefaultBranchCalled)
 }
 
 func TestMergeTask_Execute_EmptyTaskBaseBranch(t *testing.T) {
@@ -527,19 +562,49 @@ func TestMergeTask_Execute_EmptyTaskBaseBranch(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ExistsVal = true
 	git := &testutil.MockGit{
-		CurrentBranchName: "main",
+		CurrentBranchName: "develop",
+		DefaultBranchName: "develop",
 	}
 
 	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
-	// Execute - BaseBranch not specified, task's BaseBranch is empty, should default to "main"
+	// Execute - BaseBranch not specified, task's BaseBranch is empty, should use GetDefaultBranch
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
 		TaskID: 1,
 	})
 
-	// Assert - should merge to main (default)
+	// Assert - should merge to develop (default branch)
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.True(t, git.MergeCalled)
+	assert.True(t, git.GetDefaultBranchCalled)
+}
+
+func TestMergeTask_Execute_DefaultBranchMismatch(t *testing.T) {
+	// Setup - derived default branch doesn't match current branch
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task without base branch",
+		Status:     domain.StatusInReview,
+		BaseBranch: "",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	git := &testutil.MockGit{
+		CurrentBranchName: "main",
+		DefaultBranchName: "develop",
+	}
+
+	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+
+	// Execute - BaseBranch not specified, default branch is develop but current is main
+	_, err := uc.Execute(context.Background(), MergeTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrNotOnBaseBranch)
+	assert.True(t, git.GetDefaultBranchCalled)
 }
