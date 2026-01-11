@@ -8,7 +8,7 @@ import "github.com/runoshun/git-crew/v2/internal/domain"
 // Only in_review transition can be configured via global ~/.codex/config.toml.
 var codexAgents = builtinAgentSet{
 	Worker: domain.Agent{
-		CommandTemplate: "codex --model {{.Model}} {{.Args}} {{.Prompt}}",
+		CommandTemplate: "codex --model {{.Model}} --full-auto {{.Args}} {{.Prompt}}",
 		DefaultModel:    "gpt-5.2-codex",
 		Description:     "General purpose coding agent via Codex CLI",
 	},
@@ -17,7 +17,7 @@ var codexAgents = builtinAgentSet{
 	},
 	Reviewer: domain.Agent{
 		// Non-interactive mode: codex exec for synchronous execution
-		CommandTemplate: "codex exec --model {{.Model}} {{.Args}} {{.Prompt}}",
+		CommandTemplate: "codex exec -s read-only --model {{.Model}} {{.Args}} {{.Prompt}}",
 		DefaultModel:    "gpt-5.2-codex",
 		Description:     "Code review agent via Codex CLI",
 	},
