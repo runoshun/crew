@@ -3,6 +3,7 @@ package testutil
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -769,10 +770,14 @@ func (m *MockScriptRunner) Run(dir, script string) error {
 // MockCommandExecutor is a test double for domain.CommandExecutor.
 // Fields are ordered to minimize memory padding.
 type MockCommandExecutor struct {
-	ExecutedCmd   *domain.ExecCommand
-	ExecuteErr    error
-	ExecuteOutput []byte
-	ExecuteCalled bool
+	ExecutedCmd              *domain.ExecCommand
+	ExecuteErr               error
+	ExecuteInteractiveErr    error
+	ExecuteWithContextErr    error
+	ExecuteOutput            []byte
+	ExecuteCalled            bool
+	ExecuteInteractiveCalled bool
+	ExecuteWithContextCalled bool
 }
 
 // NewMockCommandExecutor creates a new MockCommandExecutor.
@@ -791,4 +796,18 @@ func (m *MockCommandExecutor) Execute(cmd *domain.ExecCommand) ([]byte, error) {
 		return m.ExecuteOutput, m.ExecuteErr
 	}
 	return m.ExecuteOutput, nil
+}
+
+// ExecuteInteractive records the call and returns configured error.
+func (m *MockCommandExecutor) ExecuteInteractive(cmd *domain.ExecCommand) error {
+	m.ExecuteInteractiveCalled = true
+	m.ExecutedCmd = cmd
+	return m.ExecuteInteractiveErr
+}
+
+// ExecuteWithContext records the call and returns configured error.
+func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.ExecCommand, _, _ io.Writer) error {
+	m.ExecuteWithContextCalled = true
+	m.ExecutedCmd = cmd
+	return m.ExecuteWithContextErr
 }

@@ -18,7 +18,8 @@ func TestReviewTask_Execute_TaskNotFound(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
@@ -38,7 +39,8 @@ func TestReviewTask_Execute_GetError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
@@ -64,7 +66,8 @@ func TestReviewTask_Execute_ConfigLoadError(t *testing.T) {
 	configLoader.LoadErr = assert.AnError
 
 	var stdout, stderr bytes.Buffer
-	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
@@ -89,7 +92,8 @@ func TestReviewTask_Execute_AgentNotFound(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
 
 	// Execute with non-existent agent
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
@@ -117,7 +121,8 @@ func TestReviewTask_Execute_WorktreeResolveError(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
@@ -183,7 +188,8 @@ func TestReviewTask_Execute_ModelOverride(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 
 	var stdout, stderr bytes.Buffer
-	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
 
 	// This test just verifies the flow doesn't error when model is specified
 	// The actual command execution would fail without a real agent
@@ -207,7 +213,8 @@ func TestReviewTask_Execute_WithReviewerPrompt(t *testing.T) {
 	configLoader.Config.AgentsConfig.ReviewerPrompt = "Custom reviewer prompt from config"
 
 	var stdout, stderr bytes.Buffer
-	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
 
 	// This test verifies that ReviewerPrompt is used when no message is provided
 	// The actual command execution would fail without a real agent, but we can
@@ -268,7 +275,8 @@ func TestReviewTask_Execute_WithDisabledAgent(t *testing.T) {
 	loader := &testutil.MockConfigLoader{Config: cfg}
 
 	var stdout, stderr bytes.Buffer
-	uc := NewReviewTask(repo, worktrees, loader, "/test", &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, loader, executor, "/test", &stdout, &stderr)
 
 	// Execute with disabled agent
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{

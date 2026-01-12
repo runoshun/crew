@@ -3,7 +3,8 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
+
+	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
 // getEditor returns the user's preferred editor from environment variables.
@@ -21,15 +22,11 @@ func getEditor() string {
 
 // openEditor opens the specified file in the user's editor.
 // It returns an error if the editor cannot be started or exits with a non-zero status.
-func openEditor(filePath string) error {
+func openEditor(filePath string, executor domain.CommandExecutor) error {
 	editor := getEditor()
 
-	cmd := exec.Command(editor, filePath)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
+	cmd := domain.NewCommand(editor, []string{filePath}, "")
+	if err := executor.ExecuteInteractive(cmd); err != nil {
 		return fmt.Errorf("failed to run editor %s: %w", editor, err)
 	}
 

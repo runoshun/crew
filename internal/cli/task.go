@@ -648,7 +648,7 @@ func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error 
 	}
 
 	// Open editor
-	if editorErr := openEditor(tmpPath); editorErr != nil {
+	if editorErr := openEditor(tmpPath, c.Executor); editorErr != nil {
 		return editorErr
 	}
 

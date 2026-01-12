@@ -142,12 +142,13 @@ func New(dir string) (*Container, error) {
 }
 
 // NewWithDeps creates a new Container with custom dependencies for testing.
-func NewWithDeps(cfg Config, tasks domain.TaskRepository, storeInit domain.StoreInitializer, clock domain.Clock, logger domain.Logger) *Container {
+func NewWithDeps(cfg Config, tasks domain.TaskRepository, storeInit domain.StoreInitializer, clock domain.Clock, logger domain.Logger, executor domain.CommandExecutor) *Container {
 	return &Container{
 		Tasks:            tasks,
 		StoreInitializer: storeInit,
 		Clock:            clock,
 		Logger:           logger,
+		Executor:         executor,
 		Config:           cfg,
 	}
 }
@@ -288,7 +289,7 @@ func (c *Container) StartManagerUseCase() *usecase.StartManager {
 // ReviewTaskUseCase returns a new ReviewTask use case.
 // stdout and stderr are the writers for command output.
 func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewTask {
-	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Config.RepoRoot, stdout, stderr)
+	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Executor, c.Config.RepoRoot, stdout, stderr)
 }
 
 // PollTaskUseCase returns a new PollTask use case.

@@ -14,12 +14,14 @@ import (
 // newTestContainer creates an app.Container with mock dependencies.
 func newTestContainer(repo *testutil.MockTaskRepository) *app.Container {
 	logger := testutil.NewMockLogger()
+	executor := testutil.NewMockCommandExecutor()
 	container := app.NewWithDeps(
 		app.Config{},
 		repo,
 		&testutil.MockStoreInitializer{},
 		&testutil.MockClock{NowTime: time.Now()},
 		logger,
+		executor,
 	)
 	container.Git = &testutil.MockGit{}
 	return container

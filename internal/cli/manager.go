@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/runoshun/git-crew/v2/internal/app"
@@ -59,7 +58,7 @@ Examples:
 
 			// Execute the manager command
 			// We use a script file to properly handle the PROMPT variable
-			return executeManagerScript(out, c.Config.CrewDir)
+			return executeManagerScript(out, c.Config.CrewDir, c.Executor)
 		},
 	}
 
@@ -70,7 +69,7 @@ Examples:
 
 // executeManagerScript writes a script file and executes it.
 // This ensures proper handling of the PROMPT shell variable.
-func executeManagerScript(out *usecase.StartManagerOutput, crewDir string) error {
+func executeManagerScript(out *usecase.StartManagerOutput, crewDir string, executor domain.CommandExecutor) error {
 	// Create scripts directory if it doesn't exist
 	scriptsDir := filepath.Join(crewDir, "scripts")
 	if err := os.MkdirAll(scriptsDir, 0o750); err != nil {
@@ -89,11 +88,7 @@ func executeManagerScript(out *usecase.StartManagerOutput, crewDir string) error
 		return fmt.Errorf("write script file: %w", err)
 	}
 
-	// Execute the script
-	execCmd := exec.Command("bash", scriptPath)
-	execCmd.Stdin = os.Stdin
-	execCmd.Stdout = os.Stdout
-	execCmd.Stderr = os.Stderr
-
-	return execCmd.Run()
+	// Execute the script using CommandExecutor
+	execCmd := domain.NewCommand("bash", []string{scriptPath}, "")
+	return executor.ExecuteInteractive(execCmd)
 }
