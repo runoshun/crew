@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os/exec"
 	"text/template"
 	"time"
 
@@ -27,19 +26,21 @@ type PollTaskOutput struct {
 
 // PollTask is the use case for polling task status changes.
 type PollTask struct {
-	tasks  domain.TaskRepository
-	clock  domain.Clock
-	stdout io.Writer
-	stderr io.Writer
+	tasks    domain.TaskRepository
+	clock    domain.Clock
+	executor domain.CommandExecutor
+	stdout   io.Writer
+	stderr   io.Writer
 }
 
 // NewPollTask creates a new PollTask use case.
-func NewPollTask(tasks domain.TaskRepository, clock domain.Clock, stdout, stderr io.Writer) *PollTask {
+func NewPollTask(tasks domain.TaskRepository, clock domain.Clock, executor domain.CommandExecutor, stdout, stderr io.Writer) *PollTask {
 	return &PollTask{
-		tasks:  tasks,
-		clock:  clock,
-		stdout: stdout,
-		stderr: stderr,
+		tasks:    tasks,
+		clock:    clock,
+		executor: executor,
+		stdout:   stdout,
+		stderr:   stderr,
 	}
 }
 
@@ -113,7 +114,7 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 						OldStatus: string(previousStatus),
 						NewStatus: string(task.Status),
 					}
-					if err := uc.executeCommand(in.CommandTemplate, data); err != nil {
+					if err := uc.executeCommand(ctx, in.CommandTemplate, data); err != nil {
 						return nil, fmt.Errorf("execute command: %w", err)
 					}
 				}
@@ -134,7 +135,7 @@ func (uc *PollTask) isTerminalStatus(status domain.Status) bool {
 }
 
 // executeCommand executes the command template with the given data.
-func (uc *PollTask) executeCommand(cmdTemplate string, data CommandData) error {
+func (uc *PollTask) executeCommand(ctx context.Context, cmdTemplate string, data CommandData) error {
 	// Parse template
 	tmpl, err := template.New("command").Parse(cmdTemplate)
 	if err != nil {
@@ -147,12 +148,12 @@ func (uc *PollTask) executeCommand(cmdTemplate string, data CommandData) error {
 		return fmt.Errorf("execute template: %w", err)
 	}
 
-	// Run command
-	// #nosec G204 - Command template is user-controlled by design
-	cmd := exec.Command("sh", "-c", buf.String())
-	cmd.Stdout = uc.stdout
-	cmd.Stderr = uc.stderr
-	if err := cmd.Run(); err != nil {
+	// Run command via CommandExecutor
+	execCmd := &domain.ExecCommand{
+		Program: "sh",
+		Args:    []string{"-c", buf.String()},
+	}
+	if err := uc.executor.ExecuteWithContext(ctx, execCmd, uc.stdout, uc.stderr); err != nil {
 		return fmt.Errorf("run command: %w", err)
 	}
 
