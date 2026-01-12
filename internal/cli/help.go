@@ -24,7 +24,10 @@ func buildHelpData(cfg *domain.Config) domain.HelpData {
 	sort.Slice(workers, func(i, j int) bool {
 		return workers[i].Name < workers[j].Name
 	})
-	return domain.HelpData{Workers: workers}
+	return domain.HelpData{
+		Workers:        workers,
+		OnboardingDone: cfg.OnboardingDone,
+	}
 }
 
 func showManagerHelp(w io.Writer, cfg *domain.Config) error {
@@ -38,6 +41,15 @@ func showManagerHelp(w io.Writer, cfg *domain.Config) error {
 
 func showWorkerHelp(w io.Writer) error {
 	help, err := domain.RenderWorkerHelp()
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(w, help)
+	return err
+}
+
+func showManagerOnboardingHelp(w io.Writer) error {
+	help, err := domain.RenderManagerOnboardingHelp()
 	if err != nil {
 		return err
 	}
