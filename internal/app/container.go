@@ -286,6 +286,7 @@ func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewT
 }
 
 // PollTaskUseCase returns a new PollTask use case.
-func (c *Container) PollTaskUseCase() *usecase.PollTask {
-	return usecase.NewPollTask(c.Tasks, c.Clock)
+// stdout and stderr are the writers for command output.
+func (c *Container) PollTaskUseCase(stdout, stderr io.Writer) *usecase.PollTask {
+	return usecase.NewPollTask(c.Tasks, c.Clock, stdout, stderr)
 }
