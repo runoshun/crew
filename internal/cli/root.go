@@ -31,7 +31,8 @@ It combines git worktree + tmux to achieve a model where
 1 task = 1 worktree = 1 AI session, enabling fully parallel
 and isolated task execution.
 
-Use --help-worker or --help-manager for role-specific detailed help.`,
+Use --help-worker or --help-manager for role-specific detailed help.
+Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 		Version: version,
 		// SilenceUsage prevents usage from being printed on errors
 		SilenceUsage: true,
