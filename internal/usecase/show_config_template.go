@@ -29,6 +29,10 @@ func NewShowConfigTemplate() *ShowConfigTemplate {
 
 // Execute generates and returns a configuration template.
 func (uc *ShowConfigTemplate) Execute(_ context.Context, in ShowConfigTemplateInput) (*ShowConfigTemplateOutput, error) {
+	if in.Config == nil {
+		return nil, domain.ErrConfigNil
+	}
+
 	template := domain.RenderConfigTemplate(in.Config)
 
 	return &ShowConfigTemplateOutput{Template: template}, nil

@@ -116,24 +116,30 @@ func formatEffectiveConfig(w io.Writer, cfg *domain.Config) error {
 
 // newConfigTemplateCommand creates the config template subcommand.
 func newConfigTemplateCommand(c *app.Container) *cobra.Command {
-	var global bool
-
 	cmd := &cobra.Command{
 		Use:   "template",
 		Short: "Output configuration template",
 		Long: `Output a configuration file template to stdout.
 
-By default, outputs the repository configuration template.
-With --global, outputs the global configuration template.
-
 This command is useful for:
 - Piping template output for custom processing
 - Comparing against existing configuration files
-- Generating initial configuration without creating files`,
+- Generating initial configuration without creating files
+
+Note: This command outputs a base template with builtin agents registered.
+It does not depend on existing configuration files and will work even if they are broken.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Use NewDefaultConfig() to avoid dependency on existing config
-			// This ensures template output works even if config is broken
-			cfg := domain.NewDefaultConfig()
+			// Load config with all file sources ignored to get only builtin agents
+			// This ensures template output works even if config files are broken
+			cfg, err := c.ConfigLoader.LoadWithOptions(domain.LoadConfigOptions{
+				IgnoreGlobal:   true,
+				IgnoreOverride: true,
+				IgnoreRootRepo: true,
+				IgnoreRepo:     true,
+			})
+			if err != nil {
+				return err
+			}
 
 			uc := c.ShowConfigTemplateUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.ShowConfigTemplateInput{
@@ -147,8 +153,6 @@ This command is useful for:
 			return nil
 		},
 	}
-
-	cmd.Flags().BoolVar(&global, "global", false, "Output global configuration template")
 
 	return cmd
 }

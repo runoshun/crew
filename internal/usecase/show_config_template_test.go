@@ -58,3 +58,13 @@ func TestShowConfigTemplate_Execute(t *testing.T) {
 		})
 	}
 }
+
+func TestShowConfigTemplate_Execute_NilConfig(t *testing.T) {
+	uc := NewShowConfigTemplate()
+	out, err := uc.Execute(context.Background(), ShowConfigTemplateInput{
+		Config: nil,
+	})
+
+	assert.Nil(t, out)
+	assert.ErrorIs(t, err, domain.ErrConfigNil)
+}

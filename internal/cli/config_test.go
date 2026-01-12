@@ -40,12 +40,8 @@ func newConfigTestContainer(t *testing.T) *app.Container {
 	require.NoError(t, os.MkdirAll(crewDir, 0755))
 
 	// Set HOME to a temporary directory to isolate global config
-	oldHome := os.Getenv("HOME")
 	tempHome := t.TempDir()
-	require.NoError(t, os.Setenv("HOME", tempHome))
-	t.Cleanup(func() {
-		_ = os.Setenv("HOME", oldHome)
-	})
+	t.Setenv("HOME", tempHome)
 
 	// Create container using New (which sets up real config infrastructure)
 	container, err := app.New(repoRoot)
@@ -132,28 +128,6 @@ func TestConfigTemplateCommand_OutputsTemplate(t *testing.T) {
 	// Should not contain metadata headers (just template content)
 	assert.NotContains(t, output, "[Loaded from]")
 	assert.NotContains(t, output, "[Effective Config]")
-}
-
-func TestConfigTemplateCommand_WithGlobalFlag(t *testing.T) {
-	// Setup
-	container := newConfigTestContainer(t)
-
-	// Create command
-	cmd := newConfigCommand(container)
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"template", "--global"})
-
-	// Execute
-	err := cmd.Execute()
-
-	// Assert
-	require.NoError(t, err)
-	output := buf.String()
-
-	// Template should still contain config structure (global/repo templates are identical)
-	assert.Contains(t, output, "[agents]")
-	assert.Contains(t, output, "worker_default")
 }
 
 // =============================================================================
