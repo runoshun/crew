@@ -290,7 +290,7 @@ IMPORTANT: First run 'crew --help-worker' and follow the workflow instructions e
 // DefaultManagerSystemPrompt is the default system prompt template for managers.
 const DefaultManagerSystemPrompt = `You are a Manager agent for git-crew.
 
-IMPORTANT: Run 'crew --help-manager' for detailed usage instructions.
+IMPORTANT: First run 'crew --help-manager' and follow the usage instructions.
 
 Support users with task management as an assistant.
 - Understand current status and suggest next actions
