@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os/exec"
 	"strings"
 	"text/template"
 
@@ -34,7 +33,7 @@ type ShowDiff struct {
 	worktrees domain.WorktreeManager
 	git       domain.Git
 	config    domain.ConfigLoader
-	execCmd   func(name string, args ...string) *exec.Cmd
+	executor  domain.CommandExecutor
 	stdout    io.Writer
 	stderr    io.Writer
 }
@@ -45,6 +44,7 @@ func NewShowDiff(
 	worktrees domain.WorktreeManager,
 	git domain.Git,
 	config domain.ConfigLoader,
+	executor domain.CommandExecutor,
 	stdout io.Writer,
 	stderr io.Writer,
 ) *ShowDiff {
@@ -53,15 +53,10 @@ func NewShowDiff(
 		worktrees: worktrees,
 		git:       git,
 		config:    config,
-		execCmd:   exec.Command,
+		executor:  executor,
 		stdout:    stdout,
 		stderr:    stderr,
 	}
-}
-
-// SetExecCmd sets a custom exec.Cmd factory for testing.
-func (uc *ShowDiff) SetExecCmd(fn func(name string, args ...string) *exec.Cmd) {
-	uc.execCmd = fn
 }
 
 // DiffTemplateData contains the data for expanding diff command template.
@@ -155,14 +150,9 @@ func (uc *ShowDiff) Execute(ctx context.Context, in ShowDiffInput) (*ShowDiffOut
 		return nil, err
 	}
 
-	// Execute the diff command
-	cmd := uc.execCmd(execCmd.Program, execCmd.Args...)
-	cmd.Dir = execCmd.Dir
-	cmd.Stdout = uc.stdout
-	cmd.Stderr = uc.stderr
-
-	// Run the command - ignore exit code as diff can return non-zero when there are differences
-	_ = cmd.Run()
+	// Execute the diff command via CommandExecutor
+	// Ignore exit code as diff can return non-zero when there are differences
+	_ = uc.executor.ExecuteWithContext(ctx, execCmd, uc.stdout, uc.stderr)
 
 	return &ShowDiffOutput{
 		WorktreePath: execCmd.Dir,

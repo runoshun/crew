@@ -257,13 +257,13 @@ func (c *Container) MergeTaskUseCase() *usecase.MergeTask {
 // ShowDiffUseCase returns a new ShowDiff use case.
 // stdout and stderr are the writers for command output.
 func (c *Container) ShowDiffUseCase(stdout, stderr io.Writer) *usecase.ShowDiff {
-	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, stdout, stderr)
+	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Executor, stdout, stderr)
 }
 
 // ShowDiffUseCaseForCommand returns a new ShowDiff use case for GetCommand() only.
 // This is used by TUI which executes the command via tea.Exec.
 func (c *Container) ShowDiffUseCaseForCommand() *usecase.ShowDiff {
-	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, nil, nil)
+	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Executor, nil, nil)
 }
 
 // StopTaskUseCase returns a new StopTask use case.
@@ -295,5 +295,5 @@ func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewT
 // PollTaskUseCase returns a new PollTask use case.
 // stdout and stderr are the writers for command output.
 func (c *Container) PollTaskUseCase(stdout, stderr io.Writer) *usecase.PollTask {
-	return usecase.NewPollTask(c.Tasks, c.Clock, stdout, stderr)
+	return usecase.NewPollTask(c.Tasks, c.Clock, c.Executor, stdout, stderr)
 }

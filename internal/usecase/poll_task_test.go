@@ -66,7 +66,8 @@ func TestPollTask_Execute_StatusChange(t *testing.T) {
 		Status: domain.StatusTodo,
 	}
 
-	uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 	// Start a goroutine to change status after a short delay
 	go func() {
@@ -101,7 +102,8 @@ func TestPollTask_Execute_Timeout(t *testing.T) {
 		Status: domain.StatusTodo,
 	}
 
-	uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 	// Execute with timeout
 	ctx := context.Background()
@@ -123,7 +125,8 @@ func TestPollTask_Execute_TaskNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), PollTaskInput{
@@ -141,7 +144,8 @@ func TestPollTask_Execute_GetTaskError(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.GetErr = errors.New("database error")
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), PollTaskInput{
@@ -165,7 +169,8 @@ func TestPollTask_Execute_ContextCanceled(t *testing.T) {
 		Status: domain.StatusTodo,
 	}
 
-	uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 	// Create context that will be canceled
 	ctx, cancel := context.WithCancel(context.Background())
@@ -208,7 +213,8 @@ func TestPollTask_Execute_TerminalStates(t *testing.T) {
 				Status: domain.StatusTodo,
 			}
 
-			uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+			executor := testutil.NewMockCommandExecutor()
+			uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 			// Change to terminal status after short delay
 			go func() {
@@ -246,7 +252,8 @@ func TestPollTask_Execute_DefaultInterval(t *testing.T) {
 		Status: domain.StatusTodo,
 	}
 
-	uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 	// Change status to terminal after short delay
 	go func() {
@@ -289,7 +296,8 @@ func TestPollTask_Execute_ImmediateTerminalState(t *testing.T) {
 				Status: tt.status, // Already in terminal state
 			}
 
-			uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+			executor := testutil.NewMockCommandExecutor()
+			uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 			// Execute
 			ctx := context.Background()
@@ -311,7 +319,8 @@ func TestPollTask_Execute_ImmediateTerminalState(t *testing.T) {
 func TestPollTask_isTerminalStatus(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewPollTask(repo, clock, io.Discard, io.Discard)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
 	tests := []struct {
 		name     string
@@ -346,7 +355,8 @@ func TestPollTask_Execute_CommandOutput(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	uc := NewPollTask(repo, clock, &stdout, &stderr)
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, &stdout, &stderr)
 
 	// Start a goroutine to change status to terminal state after a delay
 	// Use delay longer than polling interval to ensure we catch the change
@@ -369,7 +379,11 @@ func TestPollTask_Execute_CommandOutput(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 
-	// Check that command output was captured (at least one status change)
-	output := stdout.String()
-	assert.Contains(t, output, "1: todo -> done")
+	// Check that command was executed with correct template expansion
+	assert.True(t, executor.ExecuteWithContextCalled)
+	assert.NotNil(t, executor.ExecutedCmd)
+	assert.Equal(t, "sh", executor.ExecutedCmd.Program)
+	assert.Len(t, executor.ExecutedCmd.Args, 2)
+	assert.Equal(t, "-c", executor.ExecutedCmd.Args[0])
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: todo -> done")
 }
