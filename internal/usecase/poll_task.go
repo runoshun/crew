@@ -114,7 +114,7 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 						OldStatus: string(previousStatus),
 						NewStatus: string(task.Status),
 					}
-					if err := uc.executeCommand(in.CommandTemplate, data); err != nil {
+					if err := uc.executeCommand(ctx, in.CommandTemplate, data); err != nil {
 						return nil, fmt.Errorf("execute command: %w", err)
 					}
 				}
@@ -135,7 +135,7 @@ func (uc *PollTask) isTerminalStatus(status domain.Status) bool {
 }
 
 // executeCommand executes the command template with the given data.
-func (uc *PollTask) executeCommand(cmdTemplate string, data CommandData) error {
+func (uc *PollTask) executeCommand(ctx context.Context, cmdTemplate string, data CommandData) error {
 	// Parse template
 	tmpl, err := template.New("command").Parse(cmdTemplate)
 	if err != nil {
@@ -153,7 +153,7 @@ func (uc *PollTask) executeCommand(cmdTemplate string, data CommandData) error {
 		Program: "sh",
 		Args:    []string{"-c", buf.String()},
 	}
-	if err := uc.executor.ExecuteWithContext(context.Background(), execCmd, uc.stdout, uc.stderr); err != nil {
+	if err := uc.executor.ExecuteWithContext(ctx, execCmd, uc.stdout, uc.stderr); err != nil {
 		return fmt.Errorf("run command: %w", err)
 	}
 
