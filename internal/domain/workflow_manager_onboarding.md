@@ -20,10 +20,10 @@ Set up the core crew configuration in `.git/crew/config.toml`:
 
 ```bash
 # View current config
-crew config show
+crew config
 
-# Edit config interactively
-crew config edit
+# Edit config manually
+$EDITOR .git/crew/config.toml
 ```
 
 **Settings to configure:**
@@ -168,9 +168,11 @@ After completing the checklist:
 1. Add `onboarding_done = true` to your config:
 
 ```bash
-# Edit config and add at the end:
+# Edit config file directly:
+$EDITOR .git/crew/config.toml
+
+# Add the following line at the end:
 # onboarding_done = true
-crew config edit
 ```
 
 2. Verify the configuration:
@@ -214,7 +216,7 @@ crew list-agents
 Check the `[worktree]` section in config:
 
 ```bash
-crew config show
+crew config
 ```
 
 ### Need more help
