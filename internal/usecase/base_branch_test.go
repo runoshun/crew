@@ -108,7 +108,7 @@ func TestResolveBaseBranch_Private(t *testing.T) {
 	}
 }
 
-// MockGitForNewTaskBaseBranch is a minimal mock for testing ResolveNewTaskBaseBranch.
+// MockGitForNewTaskBaseBranch is a minimal mock for testing resolveNewTaskBaseBranch.
 type MockGitForNewTaskBaseBranch struct {
 	newTaskBaseBranch string
 	err               error
@@ -190,7 +190,7 @@ func TestResolveNewTaskBaseBranch(t *testing.T) {
 				err:               tt.gitErr,
 			}
 
-			got, err := ResolveNewTaskBaseBranch(tt.baseBranch, mockGit)
+			got, err := resolveNewTaskBaseBranch(tt.baseBranch, mockGit)
 
 			if tt.wantErr {
 				require.Error(t, err)

@@ -27,14 +27,14 @@ func resolveBaseBranch(task *domain.Task, git domain.Git) (string, error) {
 	return defaultBranch, nil
 }
 
-// ResolveNewTaskBaseBranch resolves the base branch for a new task.
+// resolveNewTaskBaseBranch resolves the base branch for a new task.
 //
 // Resolution priority:
 //  1. baseBranch parameter (if not empty)
 //  2. git.GetNewTaskBaseBranch()
 //
 // This helper centralizes the BaseBranch resolution logic for new task creation.
-func ResolveNewTaskBaseBranch(baseBranch string, git domain.Git) (string, error) {
+func resolveNewTaskBaseBranch(baseBranch string, git domain.Git) (string, error) {
 	if baseBranch != "" {
 		return baseBranch, nil
 	}

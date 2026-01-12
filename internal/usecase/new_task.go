@@ -68,7 +68,7 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 
 	// Create task
 	now := uc.clock.Now()
-	baseBranch, err := ResolveNewTaskBaseBranch(in.BaseBranch, uc.git)
+	baseBranch, err := resolveNewTaskBaseBranch(in.BaseBranch, uc.git)
 	if err != nil {
 		return nil, err
 	}
