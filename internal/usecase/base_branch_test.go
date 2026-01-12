@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockGitForBaseBranch is a minimal mock for testing ResolveBaseBranch.
+// MockGitForBaseBranch is a minimal mock for testing resolveBaseBranch.
 type MockGitForBaseBranch struct {
 	defaultBranch string
 	err           error
@@ -51,7 +51,7 @@ func (m *MockGitForBaseBranch) ListBranches() ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
-func TestResolveBaseBranch(t *testing.T) {
+func TestResolveBaseBranch_Private(t *testing.T) {
 	tests := []struct {
 		name           string
 		taskBaseBranch string
@@ -96,7 +96,101 @@ func TestResolveBaseBranch(t *testing.T) {
 				err:           tt.gitErr,
 			}
 
-			got, err := ResolveBaseBranch(task, mockGit)
+			got, err := resolveBaseBranch(task, mockGit)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
+// MockGitForNewTaskBaseBranch is a minimal mock for testing ResolveNewTaskBaseBranch.
+type MockGitForNewTaskBaseBranch struct {
+	newTaskBaseBranch string
+	err               error
+}
+
+func (m *MockGitForNewTaskBaseBranch) GetDefaultBranch() (string, error) {
+	return "", errors.New("not implemented")
+}
+
+func (m *MockGitForNewTaskBaseBranch) GetNewTaskBaseBranch() (string, error) {
+	return m.newTaskBaseBranch, m.err
+}
+
+func (m *MockGitForNewTaskBaseBranch) CurrentBranch() (string, error) {
+	return "", errors.New("not implemented")
+}
+
+func (m *MockGitForNewTaskBaseBranch) BranchExists(branch string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (m *MockGitForNewTaskBaseBranch) HasUncommittedChanges(worktreePath string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (m *MockGitForNewTaskBaseBranch) HasMergeConflict(branch, target string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (m *MockGitForNewTaskBaseBranch) Merge(branch string, noFF bool) error {
+	return errors.New("not implemented")
+}
+
+func (m *MockGitForNewTaskBaseBranch) DeleteBranch(branch string, force bool) error {
+	return errors.New("not implemented")
+}
+
+func (m *MockGitForNewTaskBaseBranch) ListBranches() ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func TestResolveNewTaskBaseBranch(t *testing.T) {
+	tests := []struct {
+		name              string
+		baseBranch        string
+		newTaskBaseBranch string
+		gitErr            error
+		want              string
+		wantErr           bool
+	}{
+		{
+			name:              "baseBranch specified",
+			baseBranch:        "feature/test",
+			newTaskBaseBranch: "main",
+			want:              "feature/test",
+			wantErr:           false,
+		},
+		{
+			name:              "baseBranch empty, use GetNewTaskBaseBranch",
+			baseBranch:        "",
+			newTaskBaseBranch: "develop",
+			want:              "develop",
+			wantErr:           false,
+		},
+		{
+			name:              "baseBranch empty, GetNewTaskBaseBranch fails",
+			baseBranch:        "",
+			newTaskBaseBranch: "",
+			gitErr:            errors.New("git error"),
+			want:              "",
+			wantErr:           true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockGit := &MockGitForNewTaskBaseBranch{
+				newTaskBaseBranch: tt.newTaskBaseBranch,
+				err:               tt.gitErr,
+			}
+
+			got, err := ResolveNewTaskBaseBranch(tt.baseBranch, mockGit)
 
 			if tt.wantErr {
 				require.Error(t, err)

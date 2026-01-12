@@ -107,7 +107,7 @@ func (uc *ShowDiff) GetCommand(_ context.Context, in ShowDiffInput) (*domain.Exe
 	}
 
 	// Expand template with args and task info
-	baseBranch, err := ResolveBaseBranch(task, uc.git)
+	baseBranch, err := resolveBaseBranch(task, uc.git)
 	if err != nil {
 		return nil, err
 	}

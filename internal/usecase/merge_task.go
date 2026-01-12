@@ -76,7 +76,7 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	targetBaseBranch := in.BaseBranch
 	if targetBaseBranch == "" {
 		var resolveErr error
-		targetBaseBranch, resolveErr = ResolveBaseBranch(task, uc.git)
+		targetBaseBranch, resolveErr = resolveBaseBranch(task, uc.git)
 		if resolveErr != nil {
 			return nil, resolveErr
 		}

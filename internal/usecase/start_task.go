@@ -119,7 +119,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 	// Create or resolve worktree
 	branch := domain.BranchName(task.ID, task.Issue)
-	baseBranch, err := ResolveBaseBranch(task, uc.git)
+	baseBranch, err := resolveBaseBranch(task, uc.git)
 	if err != nil {
 		return nil, err
 	}

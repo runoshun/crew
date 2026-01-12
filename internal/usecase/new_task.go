@@ -68,13 +68,9 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 
 	// Create task
 	now := uc.clock.Now()
-	baseBranch := in.BaseBranch
-	if baseBranch == "" {
-		// Use GetNewTaskBaseBranch to dynamically resolve base branch
-		baseBranch, err = uc.git.GetNewTaskBaseBranch()
-		if err != nil {
-			return nil, fmt.Errorf("get new task base branch: %w", err)
-		}
+	baseBranch, err := ResolveNewTaskBaseBranch(in.BaseBranch, uc.git)
+	if err != nil {
+		return nil, err
 	}
 	task := &domain.Task{
 		ID:          id,
