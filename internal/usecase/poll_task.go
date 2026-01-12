@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os/exec"
 	"text/template"
 	"time"
@@ -26,15 +27,19 @@ type PollTaskOutput struct {
 
 // PollTask is the use case for polling task status changes.
 type PollTask struct {
-	tasks domain.TaskRepository
-	clock domain.Clock
+	tasks  domain.TaskRepository
+	clock  domain.Clock
+	stdout io.Writer
+	stderr io.Writer
 }
 
 // NewPollTask creates a new PollTask use case.
-func NewPollTask(tasks domain.TaskRepository, clock domain.Clock) *PollTask {
+func NewPollTask(tasks domain.TaskRepository, clock domain.Clock, stdout, stderr io.Writer) *PollTask {
 	return &PollTask{
-		tasks: tasks,
-		clock: clock,
+		tasks:  tasks,
+		clock:  clock,
+		stdout: stdout,
+		stderr: stderr,
 	}
 }
 
@@ -145,6 +150,8 @@ func (uc *PollTask) executeCommand(cmdTemplate string, data CommandData) error {
 	// Run command
 	// #nosec G204 - Command template is user-controlled by design
 	cmd := exec.Command("sh", "-c", buf.String())
+	cmd.Stdout = uc.stdout
+	cmd.Stderr = uc.stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("run command: %w", err)
 	}
