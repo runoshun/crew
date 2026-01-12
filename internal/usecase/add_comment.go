@@ -96,7 +96,7 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 		running, _ := uc.sessions.IsRunning(sessionName)
 		if running {
 			// Send notification to running session
-			notificationMsg := fmt.Sprintf("crew show %d でコメントを確認して修正してください", task.ID)
+			notificationMsg := fmt.Sprintf("crew show %d でコメントを確認して修正してください。修正完了後は crew complete %d を実行してください。", task.ID, task.ID)
 			_ = uc.sessions.Send(sessionName, notificationMsg)
 			_ = uc.sessions.Send(sessionName, "Enter")
 		} else if uc.sessionStarter != nil {
@@ -110,7 +110,7 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 
 			// After starting, send the notification
 			sessionName := domain.SessionName(task.ID)
-			notificationMsg := fmt.Sprintf("crew show %d でコメントを確認して修正してください", task.ID)
+			notificationMsg := fmt.Sprintf("crew show %d でコメントを確認して修正してください。修正完了後は crew complete %d を実行してください。", task.ID, task.ID)
 			_ = uc.sessions.Send(sessionName, notificationMsg)
 			_ = uc.sessions.Send(sessionName, "Enter")
 		}
