@@ -211,3 +211,118 @@ func TestReviewTask_Execute_TaskWithIssue(t *testing.T) {
 	expectedBranch := domain.BranchName(1, 123)
 	assert.Equal(t, "crew-1-gh-123", expectedBranch)
 }
+
+func TestReviewTask_Execute_WithReviewerPrompt(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = t.TempDir()
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set ReviewerPrompt in AgentsConfig
+	configLoader.Config.AgentsConfig.ReviewerPrompt = "Custom reviewer prompt from config"
+	// Use an agent without a custom prompt (so ReviewerPrompt should be used)
+	configLoader.Config.Agents["test-reviewer"] = domain.Agent{
+		Role:            domain.RoleReviewer,
+		CommandTemplate: "echo {{.Prompt}}",
+		// Prompt is empty, so ReviewerPrompt should be used
+	}
+
+	var stdout, stderr bytes.Buffer
+	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID: 1,
+		Agent:  "test-reviewer",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	// Verify Review output contains ReviewerPrompt
+	assert.Contains(t, out.Review, "Custom reviewer prompt from config")
+}
+
+func TestReviewTask_Execute_AgentPromptOverridesReviewerPrompt(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = t.TempDir()
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set both ReviewerPrompt and Agent.Prompt
+	configLoader.Config.AgentsConfig.ReviewerPrompt = "Reviewer prompt from config"
+	configLoader.Config.Agents["test-reviewer"] = domain.Agent{
+		Role:            domain.RoleReviewer,
+		CommandTemplate: "echo {{.Prompt}}",
+		Prompt:          "Agent-specific prompt", // This should take precedence
+	}
+
+	var stdout, stderr bytes.Buffer
+	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID: 1,
+		Agent:  "test-reviewer",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	// Verify Agent.Prompt takes precedence over ReviewerPrompt
+	assert.Contains(t, out.Review, "Agent-specific prompt")
+	assert.NotContains(t, out.Review, "Reviewer prompt from config")
+}
+
+func TestReviewTask_Execute_MessageOverridesReviewerPrompt(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = t.TempDir()
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set ReviewerPrompt in config
+	configLoader.Config.AgentsConfig.ReviewerPrompt = "Reviewer prompt from config"
+	// Use an agent without a custom prompt
+	configLoader.Config.Agents["test-reviewer"] = domain.Agent{
+		Role:            domain.RoleReviewer,
+		CommandTemplate: "echo {{.Prompt}}",
+	}
+
+	var stdout, stderr bytes.Buffer
+	uc := NewReviewTask(repo, worktrees, configLoader, "/repo", &stdout, &stderr)
+
+	// Execute with Message - should override ReviewerPrompt
+	out, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID:  1,
+		Agent:   "test-reviewer",
+		Message: "User-provided review message",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	// Verify Message takes precedence over ReviewerPrompt
+	assert.Contains(t, out.Review, "User-provided review message")
+	assert.NotContains(t, out.Review, "Reviewer prompt from config")
+}

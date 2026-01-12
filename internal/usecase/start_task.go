@@ -227,9 +227,16 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent d
 		Continue:    continueFlag,
 	}
 
+	// Load default prompts from config
+	// Priority: Agent.Prompt > AgentsConfig.WorkerPrompt > empty
+	cfg, err := uc.configLoader.Load()
+	if err != nil {
+		return "", fmt.Errorf("load config for prompt: %w", err)
+	}
+
 	// Determine default prompts: agent has its own SystemPrompt, or use default
 	defaultSystemPrompt := domain.DefaultSystemPrompt
-	defaultPrompt := ""
+	defaultPrompt := cfg.AgentsConfig.WorkerPrompt
 
 	// Render command and prompt using Agent.RenderCommand
 	// Pass shell variable reference as promptOverride - will be expanded at runtime

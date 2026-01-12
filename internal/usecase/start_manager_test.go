@@ -295,3 +295,57 @@ func TestSplitCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestStartManager_Execute_WithManagerPrompt(t *testing.T) {
+	repoRoot := t.TempDir()
+	gitDir := repoRoot + "/.git"
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set ManagerPrompt in AgentsConfig
+	configLoader.Config.AgentsConfig.ManagerPrompt = "Custom manager prompt from config"
+	// Use an agent without a custom prompt (so ManagerPrompt should be used)
+	configLoader.Config.Agents["test-manager"] = domain.Agent{
+		Role:            domain.RoleManager,
+		CommandTemplate: "test-cmd {{.Prompt}}",
+		// Prompt is empty, so ManagerPrompt should be used
+	}
+
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), StartManagerInput{
+		Name: "test-manager",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	// Verify output contains ManagerPrompt
+	assert.Contains(t, out.Prompt, "Custom manager prompt from config")
+}
+
+func TestStartManager_Execute_AgentPromptOverridesManagerPrompt(t *testing.T) {
+	repoRoot := t.TempDir()
+	gitDir := repoRoot + "/.git"
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set both ManagerPrompt and Agent.Prompt
+	configLoader.Config.AgentsConfig.ManagerPrompt = "Manager prompt from config"
+	configLoader.Config.Agents["test-manager"] = domain.Agent{
+		Role:            domain.RoleManager,
+		CommandTemplate: "test-cmd {{.Prompt}}",
+		Prompt:          "Agent-specific prompt", // This should take precedence
+	}
+
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), StartManagerInput{
+		Name: "test-manager",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	// Verify Agent.Prompt takes precedence over ManagerPrompt
+	assert.Contains(t, out.Prompt, "Agent-specific prompt")
+	assert.NotContains(t, out.Prompt, "Manager prompt from config")
+}
