@@ -765,3 +765,30 @@ func (m *MockScriptRunner) Run(dir, script string) error {
 	m.RunScript = script
 	return m.RunErr
 }
+
+// MockCommandExecutor is a test double for domain.CommandExecutor.
+// Fields are ordered to minimize memory padding.
+type MockCommandExecutor struct {
+	ExecutedCmd   *domain.ExecCommand
+	ExecuteErr    error
+	ExecuteOutput []byte
+	ExecuteCalled bool
+}
+
+// NewMockCommandExecutor creates a new MockCommandExecutor.
+func NewMockCommandExecutor() *MockCommandExecutor {
+	return &MockCommandExecutor{}
+}
+
+// Ensure MockCommandExecutor implements domain.CommandExecutor interface.
+var _ domain.CommandExecutor = (*MockCommandExecutor)(nil)
+
+// Execute records the call and returns configured output or error.
+func (m *MockCommandExecutor) Execute(cmd *domain.ExecCommand) ([]byte, error) {
+	m.ExecuteCalled = true
+	m.ExecutedCmd = cmd
+	if m.ExecuteErr != nil {
+		return m.ExecuteOutput, m.ExecuteErr
+	}
+	return m.ExecuteOutput, nil
+}

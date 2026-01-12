@@ -326,3 +326,12 @@ type ScriptRunner interface {
 	// Returns an error if the script execution fails.
 	Run(dir, script string) error
 }
+
+// CommandExecutor executes external commands.
+// This interface abstracts the execution of shell commands, enabling
+// different implementations for CLI (direct execution) and testing (mocking).
+type CommandExecutor interface {
+	// Execute runs a command and returns its combined output.
+	// The command is executed in the specified working directory.
+	Execute(cmd *ExecCommand) (output []byte, err error)
+}

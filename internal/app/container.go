@@ -9,6 +9,7 @@ import (
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/infra/config"
+	"github.com/runoshun/git-crew/v2/internal/infra/executor"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
 	"github.com/runoshun/git-crew/v2/internal/infra/gitstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
@@ -57,6 +58,7 @@ type Container struct {
 	ConfigManager    domain.ConfigManager
 	Logger           domain.Logger
 	Runner           domain.ScriptRunner
+	Executor         domain.CommandExecutor
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 
 	// Configuration
@@ -120,6 +122,9 @@ func New(dir string) (*Container, error) {
 	// Create script runner
 	scriptRunner := runner.NewClient()
 
+	// Create command executor
+	commandExecutor := executor.NewClient()
+
 	return &Container{
 		Tasks:            taskRepo,
 		StoreInitializer: storeInit,
@@ -131,6 +136,7 @@ func New(dir string) (*Container, error) {
 		ConfigManager:    configManager,
 		Logger:           logger,
 		Runner:           scriptRunner,
+		Executor:         commandExecutor,
 		Config:           cfg,
 	}, nil
 }
@@ -239,7 +245,7 @@ func (c *Container) InitConfigUseCase() *usecase.InitConfig {
 
 // CompleteTaskUseCase returns a new CompleteTask use case.
 func (c *Container) CompleteTaskUseCase() *usecase.CompleteTask {
-	return usecase.NewCompleteTask(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Clock, c.Logger)
+	return usecase.NewCompleteTask(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Clock, c.Logger, c.Executor)
 }
 
 // MergeTaskUseCase returns a new MergeTask use case.
