@@ -17,10 +17,7 @@ func newConfigCommand(c *app.Container) *cobra.Command {
 		Use:   "config",
 		Short: "Manage configuration",
 		Long:  `Manage git-crew configuration files and settings.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// For backward compatibility: if called without subcommand, run show
-			return newConfigShowCommand(c).RunE(cmd, args)
-		},
+		// No RunE: shows subcommand list when called without arguments
 	}
 
 	// Add subcommands
@@ -91,7 +88,9 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 
 			// Display effective config in TOML format
 			_, _ = fmt.Fprintln(w, "[Effective Config]")
-			formatEffectiveConfig(w, out.EffectiveConfig)
+			if err := formatEffectiveConfig(w, out.EffectiveConfig); err != nil {
+				return err
+			}
 
 			return nil
 		},
@@ -106,13 +105,13 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 }
 
 // formatEffectiveConfig formats the effective config in TOML format.
-func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
+func formatEffectiveConfig(w io.Writer, cfg *domain.Config) error {
 	data, err := toml.Marshal(cfg)
 	if err != nil {
-		_, _ = fmt.Fprintf(w, "Error marshaling config: %v\n", err)
-		return
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 	_, _ = w.Write(data)
+	return nil
 }
 
 // newConfigTemplateCommand creates the config template subcommand.
@@ -132,16 +131,13 @@ This command is useful for:
 - Comparing against existing configuration files
 - Generating initial configuration without creating files`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Load config to get registered builtins for template generation
-			cfg, err := c.ConfigLoader.Load()
-			if err != nil {
-				return err
-			}
+			// Use NewDefaultConfig() to avoid dependency on existing config
+			// This ensures template output works even if config is broken
+			cfg := domain.NewDefaultConfig()
 
 			uc := c.ShowConfigTemplateUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.ShowConfigTemplateInput{
 				Config: cfg,
-				Global: global,
 			})
 			if err != nil {
 				return err

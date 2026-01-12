@@ -58,7 +58,7 @@ func newConfigTestContainer(t *testing.T) *app.Container {
 // Config Command Tests
 // =============================================================================
 
-func TestConfigCommand_NoSubcommand_RunsShow(t *testing.T) {
+func TestConfigCommand_NoSubcommand_ShowsHelp(t *testing.T) {
 	// Setup
 	container := newConfigTestContainer(t)
 
@@ -71,10 +71,13 @@ func TestConfigCommand_NoSubcommand_RunsShow(t *testing.T) {
 	// Execute
 	err := cmd.Execute()
 
-	// Assert - should show config output (backward compatibility)
+	// Assert - should show help with subcommand list
 	require.NoError(t, err)
-	assert.Contains(t, buf.String(), "[Loaded from]")
-	assert.Contains(t, buf.String(), "[Effective Config]")
+	output := buf.String()
+	assert.Contains(t, output, "Available Commands:")
+	assert.Contains(t, output, "show")
+	assert.Contains(t, output, "template")
+	assert.Contains(t, output, "init")
 }
 
 // =============================================================================

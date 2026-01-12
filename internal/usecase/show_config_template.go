@@ -10,7 +10,6 @@ import (
 // ShowConfigTemplateInput contains the input for the ShowConfigTemplate use case.
 type ShowConfigTemplateInput struct {
 	Config *domain.Config // Config with builtin agents registered (for template generation)
-	Global bool           // If true, show global template; otherwise repository template
 }
 
 // ShowConfigTemplateOutput contains the output of the ShowConfigTemplate use case.
@@ -30,8 +29,6 @@ func NewShowConfigTemplate() *ShowConfigTemplate {
 
 // Execute generates and returns a configuration template.
 func (uc *ShowConfigTemplate) Execute(_ context.Context, in ShowConfigTemplateInput) (*ShowConfigTemplateOutput, error) {
-	// Both global and repo templates are identical in content
-	// The difference is only in where they would be written (handled by caller)
 	template := domain.RenderConfigTemplate(in.Config)
 
 	return &ShowConfigTemplateOutput{Template: template}, nil

@@ -17,26 +17,11 @@ func TestShowConfigTemplate_Execute(t *testing.T) {
 		wantNotContain []string
 	}{
 		{
-			name: "repository template with builtin agents",
+			name: "template with builtin agents",
 			input: ShowConfigTemplateInput{
 				Config: &domain.Config{
 					Agents: domain.NewDefaultConfig().Agents,
 				},
-				Global: false,
-			},
-			wantContains: []string{
-				"[agents]",
-				"worker_default",
-				"manager_default",
-			},
-		},
-		{
-			name: "global template with builtin agents",
-			input: ShowConfigTemplateInput{
-				Config: &domain.Config{
-					Agents: domain.NewDefaultConfig().Agents,
-				},
-				Global: true,
 			},
 			wantContains: []string{
 				"[agents]",
@@ -48,7 +33,6 @@ func TestShowConfigTemplate_Execute(t *testing.T) {
 			name: "template with empty config",
 			input: ShowConfigTemplateInput{
 				Config: &domain.Config{},
-				Global: false,
 			},
 			wantContains: []string{
 				"[agents]",
