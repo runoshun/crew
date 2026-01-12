@@ -12,6 +12,9 @@ var workflowManagerTmpl string
 //go:embed workflow_worker.md
 var workflowWorkerTmpl string
 
+//go:embed workflow_manager_onboarding.md
+var workflowManagerOnboardingTmpl string
+
 // WorkerInfo holds information about a worker for help display.
 type WorkerInfo struct {
 	Name        string
@@ -21,7 +24,8 @@ type WorkerInfo struct {
 
 // HelpData holds data for rendering help templates.
 type HelpData struct {
-	Workers []WorkerInfo
+	Workers        []WorkerInfo
+	OnboardingDone bool
 }
 
 // RenderManagerHelp renders the manager help with worker information.
@@ -32,6 +36,11 @@ func RenderManagerHelp(data HelpData) (string, error) {
 // RenderWorkerHelp renders the worker help.
 func RenderWorkerHelp() (string, error) {
 	return renderTemplate(workflowWorkerTmpl, nil)
+}
+
+// RenderManagerOnboardingHelp renders the manager onboarding help.
+func RenderManagerOnboardingHelp() (string, error) {
+	return renderTemplate(workflowManagerOnboardingTmpl, nil)
 }
 
 func renderTemplate(tmplStr string, data any) (string, error) {

@@ -297,3 +297,20 @@ crew poll <id> --command 'echo "{{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.OldStatus{{"}}
 - Do not edit files directly (read-only mode)
 - Do not write code directly
 - Delegate work to worker agents
+
+---
+{{if not .OnboardingDone}}
+
+## Onboarding
+
+**Onboarding has not been completed for this project.**
+
+Run `crew --help-manager-onboarding` and suggest to the user that they complete the onboarding checklist for optimal crew usage.
+
+Onboarding helps with:
+- Configuring default agents (worker, manager, reviewer)
+- Setting up project-specific AI instructions (CLAUDE.md / AGENTS.md)
+- Customizing development workflows
+
+After completing onboarding, set `onboarding_done = true` in `.git/crew/config.toml`.
+{{end}}

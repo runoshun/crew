@@ -14,16 +14,18 @@ import (
 var configTemplateContent string
 
 // Config represents the application configuration.
+// Fields are ordered to minimize memory padding.
 type Config struct {
-	Agents       map[string]Agent `toml:"agents"` // Agent definitions from [agents.<name>]
-	AgentsConfig AgentsConfig     `toml:"agents"` // Common [agents] settings
-	Complete     CompleteConfig   `toml:"complete"`
-	Diff         DiffConfig       `toml:"diff"`
-	Log          LogConfig        `toml:"log"`
-	Tasks        TasksConfig      `toml:"tasks"`
-	TUI          TUIConfig        `toml:"tui"`
-	Worktree     WorktreeConfig   `toml:"worktree"`
-	Warnings     []string         `toml:"-"`
+	Agents         map[string]Agent `toml:"agents"` // Agent definitions from [agents.<name>]
+	Warnings       []string         `toml:"-"`
+	AgentsConfig   AgentsConfig     `toml:"agents"` // Common [agents] settings
+	Complete       CompleteConfig   `toml:"complete"`
+	Diff           DiffConfig       `toml:"diff"`
+	Log            LogConfig        `toml:"log"`
+	Tasks          TasksConfig      `toml:"tasks"`
+	TUI            TUIConfig        `toml:"tui"`
+	Worktree       WorktreeConfig   `toml:"worktree"`
+	OnboardingDone bool             `toml:"onboarding_done,omitempty"` // Whether onboarding has been completed
 }
 
 // MarshalTOML overrides the TOML marshaling for Config to merge Agents and AgentsConfig.
@@ -40,13 +42,14 @@ func (c *Config) MarshalTOML() (any, error) {
 	}
 
 	return struct {
-		Agents   agentsSection  `toml:"agents"`
-		Complete CompleteConfig `toml:"complete"`
-		Diff     DiffConfig     `toml:"diff"`
-		Log      LogConfig      `toml:"log"`
-		Tasks    TasksConfig    `toml:"tasks"`
-		TUI      TUIConfig      `toml:"tui"`
-		Worktree WorktreeConfig `toml:"worktree"`
+		Agents         agentsSection  `toml:"agents"`
+		Complete       CompleteConfig `toml:"complete"`
+		Diff           DiffConfig     `toml:"diff"`
+		Log            LogConfig      `toml:"log"`
+		Tasks          TasksConfig    `toml:"tasks"`
+		TUI            TUIConfig      `toml:"tui"`
+		Worktree       WorktreeConfig `toml:"worktree"`
+		OnboardingDone bool           `toml:"onboarding_done,omitempty"`
 	}{
 		Agents: agentsSection{
 			DefaultWorker:   c.AgentsConfig.DefaultWorker,
@@ -58,12 +61,13 @@ func (c *Config) MarshalTOML() (any, error) {
 			DisabledAgents:  c.AgentsConfig.DisabledAgents,
 			Agents:          c.Agents,
 		},
-		Complete: c.Complete,
-		Diff:     c.Diff,
-		Log:      c.Log,
-		Tasks:    c.Tasks,
-		TUI:      c.TUI,
-		Worktree: c.Worktree,
+		Complete:       c.Complete,
+		Diff:           c.Diff,
+		Log:            c.Log,
+		Tasks:          c.Tasks,
+		TUI:            c.TUI,
+		Worktree:       c.Worktree,
+		OnboardingDone: c.OnboardingDone,
 	}, nil
 }
 

@@ -67,6 +67,10 @@
 ## Log settings
 # level = "<<.LogLevel>>"  # debug, info, warn, error
 
+## Onboarding completion flag
+## Set to true after completing the onboarding process
+# onboarding_done = false
+
 [tui]
 ## Custom keybindings (list view only)
 ## - command: Command to execute (supports template variables)
