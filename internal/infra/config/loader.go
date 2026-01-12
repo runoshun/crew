@@ -355,6 +355,10 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 					}
 				}
 			}
+		case "onboarding_done":
+			if b, ok := value.(bool); ok {
+				res.OnboardingDone = b
+			}
 		default:
 			warnings = append(warnings, fmt.Sprintf("unknown section: %s", section))
 		}
@@ -573,6 +577,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		for key, binding := range override.TUI.Keybindings {
 			result.TUI.Keybindings[key] = binding
 		}
+	}
+	if override.OnboardingDone {
+		result.OnboardingDone = override.OnboardingDone
 	}
 
 	// Merge agents: override individual fields, not entire agent

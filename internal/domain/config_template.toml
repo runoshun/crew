@@ -67,7 +67,6 @@
 ## Log settings
 # level = "<<.LogLevel>>"  # debug, info, warn, error
 
-[onboarding]
 ## Onboarding completion flag
 ## Set to true after completing the onboarding process
 # onboarding_done = false

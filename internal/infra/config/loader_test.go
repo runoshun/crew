@@ -646,3 +646,46 @@ worker_default = "claude"
 	// Verify override was ignored, global config is used
 	assert.Equal(t, "opencode", cfg.AgentsConfig.DefaultWorker)
 }
+
+func TestLoader_Load_OnboardingDone(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config with onboarding_done
+	repoConfig := `
+onboarding_done = true
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify onboarding_done is true
+	assert.True(t, cfg.OnboardingDone)
+}
+
+func TestLoader_Load_OnboardingDone_DefaultFalse(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config without onboarding_done
+	repoConfig := `
+[log]
+level = "debug"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify onboarding_done defaults to false
+	assert.False(t, cfg.OnboardingDone)
+}
