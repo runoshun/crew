@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -325,4 +326,21 @@ type ScriptRunner interface {
 	// Run executes a script in the given directory.
 	// Returns an error if the script execution fails.
 	Run(dir, script string) error
+}
+
+// CommandExecutor executes external commands.
+// This interface abstracts the execution of shell commands, enabling
+// different implementations for CLI (direct execution) and testing (mocking).
+type CommandExecutor interface {
+	// Execute runs a command and returns its combined output.
+	// The command is executed in the specified working directory.
+	Execute(cmd *ExecCommand) (output []byte, err error)
+
+	// ExecuteInteractive runs a command with stdin/stdout/stderr connected.
+	// This is used for interactive commands that need terminal access.
+	ExecuteInteractive(cmd *ExecCommand) error
+
+	// ExecuteWithContext runs a command with context and custom stdout/stderr writers.
+	// This is used for commands that need streaming output.
+	ExecuteWithContext(ctx context.Context, cmd *ExecCommand, stdout, stderr io.Writer) error
 }

@@ -3,6 +3,7 @@ package testutil
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -764,4 +765,49 @@ func (m *MockScriptRunner) Run(dir, script string) error {
 	m.RunDir = dir
 	m.RunScript = script
 	return m.RunErr
+}
+
+// MockCommandExecutor is a test double for domain.CommandExecutor.
+// Fields are ordered to minimize memory padding.
+type MockCommandExecutor struct {
+	ExecutedCmd              *domain.ExecCommand
+	ExecuteErr               error
+	ExecuteInteractiveErr    error
+	ExecuteWithContextErr    error
+	ExecuteOutput            []byte
+	ExecuteCalled            bool
+	ExecuteInteractiveCalled bool
+	ExecuteWithContextCalled bool
+}
+
+// NewMockCommandExecutor creates a new MockCommandExecutor.
+func NewMockCommandExecutor() *MockCommandExecutor {
+	return &MockCommandExecutor{}
+}
+
+// Ensure MockCommandExecutor implements domain.CommandExecutor interface.
+var _ domain.CommandExecutor = (*MockCommandExecutor)(nil)
+
+// Execute records the call and returns configured output or error.
+func (m *MockCommandExecutor) Execute(cmd *domain.ExecCommand) ([]byte, error) {
+	m.ExecuteCalled = true
+	m.ExecutedCmd = cmd
+	if m.ExecuteErr != nil {
+		return m.ExecuteOutput, m.ExecuteErr
+	}
+	return m.ExecuteOutput, nil
+}
+
+// ExecuteInteractive records the call and returns configured error.
+func (m *MockCommandExecutor) ExecuteInteractive(cmd *domain.ExecCommand) error {
+	m.ExecuteInteractiveCalled = true
+	m.ExecutedCmd = cmd
+	return m.ExecuteInteractiveErr
+}
+
+// ExecuteWithContext records the call and returns configured error.
+func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.ExecCommand, _, _ io.Writer) error {
+	m.ExecuteWithContextCalled = true
+	m.ExecutedCmd = cmd
+	return m.ExecuteWithContextErr
 }

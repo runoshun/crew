@@ -102,11 +102,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.showDiff(msg.TaskID)
 
 	case execDiffMsg:
-		// Execute the diff command using ExecCommand from domain
-		return m, tea.Exec(&diffExecCmd{
-			worktreePath: msg.cmd.Dir,
-			diffCommand:  msg.cmd.Args[1], // Args is ["−c", "expanded_command"]
-		}, func(err error) tea.Msg {
+		// Execute the diff command using domainExecCmd wrapper
+		// diff can return non-zero when there are differences, so ignore errors
+		return m, tea.Exec(&domainExecCmd{cmd: msg.cmd, ignoreErrors: true}, func(err error) tea.Msg {
 			return MsgReloadTasks{}
 		})
 

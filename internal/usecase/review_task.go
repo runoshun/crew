@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -35,6 +34,7 @@ type ReviewTask struct {
 	tasks        domain.TaskRepository
 	worktrees    domain.WorktreeManager
 	configLoader domain.ConfigLoader
+	executor     domain.CommandExecutor
 	stdout       io.Writer
 	stderr       io.Writer
 	repoRoot     string
@@ -45,6 +45,7 @@ func NewReviewTask(
 	tasks domain.TaskRepository,
 	worktrees domain.WorktreeManager,
 	configLoader domain.ConfigLoader,
+	executor domain.CommandExecutor,
 	repoRoot string,
 	stdout, stderr io.Writer,
 ) *ReviewTask {
@@ -52,6 +53,7 @@ func NewReviewTask(
 		tasks:        tasks,
 		worktrees:    worktrees,
 		configLoader: configLoader,
+		executor:     executor,
 		repoRoot:     repoRoot,
 		stdout:       stdout,
 		stderr:       stderr,
@@ -144,30 +146,30 @@ END_OF_PROMPT
 %s
 `, result.Prompt, result.Command)
 
-	// Execute the command synchronously
-	cmd := exec.CommandContext(ctx, "bash", "-c", script)
-	cmd.Dir = wtPath
+	// Build command
+	execCmd := domain.NewBashCommand(script, wtPath)
 
 	// Capture output
-	var stdout, stderr bytes.Buffer
+	var stdoutBuf, stderrBuf bytes.Buffer
 
 	// In verbose mode, stream output in real-time
 	// In normal mode, buffer everything and extract result after completion
+	var stdoutWriter, stderrWriter io.Writer
 	if in.Verbose && uc.stdout != nil {
-		cmd.Stdout = io.MultiWriter(&stdout, uc.stdout)
+		stdoutWriter = io.MultiWriter(&stdoutBuf, uc.stdout)
 	} else {
-		cmd.Stdout = &stdout
+		stdoutWriter = &stdoutBuf
 	}
 	if in.Verbose && uc.stderr != nil {
-		cmd.Stderr = io.MultiWriter(&stderr, uc.stderr)
+		stderrWriter = io.MultiWriter(&stderrBuf, uc.stderr)
 	} else {
-		cmd.Stderr = &stderr
+		stderrWriter = &stderrBuf
 	}
 
-	// Run the command
-	if err := cmd.Run(); err != nil {
+	// Run the command using CommandExecutor
+	if err := uc.executor.ExecuteWithContext(ctx, execCmd, stdoutWriter, stderrWriter); err != nil {
 		// Include stderr in error message for debugging
-		errMsg := strings.TrimSpace(stderr.String())
+		errMsg := strings.TrimSpace(stderrBuf.String())
 		if errMsg != "" {
 			return nil, fmt.Errorf("run reviewer: %w: %s", err, errMsg)
 		}
@@ -184,7 +186,7 @@ END_OF_PROMPT
 	}
 
 	// Extract final review result if not verbose mode
-	review := stdout.String()
+	review := stdoutBuf.String()
 	if !in.Verbose {
 		review = extractReviewResult(review)
 	}
