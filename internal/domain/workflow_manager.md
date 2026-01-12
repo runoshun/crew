@@ -130,7 +130,7 @@ crew show <id>         # Task details
 ### "Update the binary"
 
 ```bash
-crew exec <id> -- go build -o /path/to/binary ./cmd/...
+crew exec <id> -- <build command>
 ```
 
 ### "Fix the conflict"
@@ -180,18 +180,18 @@ crew start <id> opencode
 
 | File | Changes |
 |------|---------|
-| internal/cli/task.go | --desc -> --body |
-| internal/cli/task_test.go | Update tests |
+| src/feature.ts | Update component logic |
+| src/feature.test.ts | Update tests |
 
 ## Implementation Plan
 
-1. Change CLI flag definition
+1. Change the component implementation
 2. Update tests
 3. Run CI
 
 ## Completion Criteria
 
-- [ ] --body flag works
+- [ ] Feature works as expected
 - [ ] All tests pass
 ```
 

@@ -21,7 +21,7 @@ func TestShowWorkerHelp(t *testing.T) {
 	assert.Contains(t, content, "# git-crew Worker Guide")
 	assert.Contains(t, content, "crew show")
 	assert.Contains(t, content, "crew complete")
-	assert.Contains(t, content, "mise run ci")
+	assert.Contains(t, content, "CLAUDE.md")
 	assert.Contains(t, content, "git push") // in prohibited actions section
 }
 
