@@ -223,18 +223,28 @@ crew start <id> opencode
 
 ## Monitoring for Action
 
-A short one-liner collection for managers to wait for user actions.
+Use `crew poll` to monitor task status changes and trigger actions.
 
 ```bash
-# Wait until needs_input or in_review appears (5m timeout)
-timeout 5m sh -c 'while ! crew list | grep -qE "needs_input|in_review"; do sleep 5; done' && echo "Action needed"
+# Basic polling (checks every 10s, no timeout)
+crew poll <id>
 
-# With notification (uses Linux notify-send)
-timeout 5m sh -c 'while ! crew list | grep -qE "needs_input|in_review"; do sleep 5; done' && notify-send "crew: Action needed"
+# Poll with custom interval and timeout
+crew poll <id> --interval 5 --timeout 300
 
-# Continuous watch (update display every 10s)
-watch -n 10 'crew list | grep -E "needs_input|in_review"'
+# Execute notification on status change
+crew poll <id> --command 'notify-send "Task {{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.NewStatus{{"}}"}}"'
+
+# Run in background
+crew poll <id> --command 'echo "{{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.OldStatus{{"}}"}} → {{"{{"}}.NewStatus{{"}}"}}"' &
 ```
+
+**Command template variables**:
+- `{{"{{"}}.TaskID{{"}}"}}` - Task ID
+- `{{"{{"}}.OldStatus{{"}}"}}` - Previous status
+- `{{"{{"}}.NewStatus{{"}}"}}` - New status
+
+**Auto-exit**: Polling stops when the task reaches a terminal state (done, closed, error) or timeout.
 
 ## Available Commands
 
@@ -256,6 +266,7 @@ watch -n 10 'crew list | grep -E "needs_input|in_review"'
 | `crew peek` | Check session output |
 | `crew send` | Send key input |
 | `crew attach` | Attach to session |
+| `crew poll` | Monitor status changes |
 
 ### Worktree Operations
 | Command | Description |
