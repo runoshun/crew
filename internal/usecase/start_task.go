@@ -119,14 +119,9 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 	// Create or resolve worktree
 	branch := domain.BranchName(task.ID, task.Issue)
-	baseBranch := task.BaseBranch
-	if baseBranch == "" {
-		// Use GetDefaultBranch for backward compatibility
-		defaultBranch, defaultErr := uc.git.GetDefaultBranch()
-		if defaultErr != nil {
-			return nil, fmt.Errorf("get default branch: %w", defaultErr)
-		}
-		baseBranch = defaultBranch
+	baseBranch, err := ResolveBaseBranch(task, uc.git)
+	if err != nil {
+		return nil, err
 	}
 
 	wtPath, err := uc.worktrees.Create(branch, baseBranch)

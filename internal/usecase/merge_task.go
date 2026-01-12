@@ -75,13 +75,10 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	// Priority: in.BaseBranch > task.BaseBranch > GetDefaultBranch()
 	targetBaseBranch := in.BaseBranch
 	if targetBaseBranch == "" {
-		targetBaseBranch = task.BaseBranch
-		if targetBaseBranch == "" {
-			defaultBranch, defaultErr := uc.git.GetDefaultBranch()
-			if defaultErr != nil {
-				return nil, fmt.Errorf("get default branch: %w", defaultErr)
-			}
-			targetBaseBranch = defaultBranch
+		var resolveErr error
+		targetBaseBranch, resolveErr = ResolveBaseBranch(task, uc.git)
+		if resolveErr != nil {
+			return nil, resolveErr
 		}
 	}
 

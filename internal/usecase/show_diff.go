@@ -107,14 +107,9 @@ func (uc *ShowDiff) GetCommand(_ context.Context, in ShowDiffInput) (*domain.Exe
 	}
 
 	// Expand template with args and task info
-	baseBranch := task.BaseBranch
-	if baseBranch == "" {
-		// Use GetDefaultBranch for backward compatibility
-		defaultBranch, defaultErr := uc.git.GetDefaultBranch()
-		if defaultErr != nil {
-			return nil, fmt.Errorf("get default branch: %w", defaultErr)
-		}
-		baseBranch = defaultBranch
+	baseBranch, err := ResolveBaseBranch(task, uc.git)
+	if err != nil {
+		return nil, err
 	}
 	data := DiffTemplateData{
 		Args:       strings.Join(in.Args, " "),
