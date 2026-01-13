@@ -90,7 +90,52 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 
 // formatEffectiveConfig formats the effective config in TOML format.
 func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
-	data, err := toml.Marshal(cfg)
+	// go-toml/v2 does not support MarshalTOML interface, so we need to manually
+	// construct the structure that merges Agents and AgentsConfig under [agents].
+	//nolint:govet // fieldalignment: readability prioritized over memory optimization in local struct
+	type agentsSection struct {
+		Agents          map[string]domain.Agent `toml:",inline"`
+		DisabledAgents  []string                `toml:"disabled_agents,omitempty"`
+		DefaultWorker   string                  `toml:"worker_default,omitempty"`
+		DefaultManager  string                  `toml:"manager_default,omitempty"`
+		DefaultReviewer string                  `toml:"reviewer_default,omitempty"`
+		WorkerPrompt    string                  `toml:"worker_prompt,omitempty"`
+		ManagerPrompt   string                  `toml:"manager_prompt,omitempty"`
+		ReviewerPrompt  string                  `toml:"reviewer_prompt,omitempty"`
+	}
+
+	type effectiveConfig struct {
+		Agents         agentsSection         `toml:"agents"`
+		Complete       domain.CompleteConfig `toml:"complete"`
+		Diff           domain.DiffConfig     `toml:"diff"`
+		Log            domain.LogConfig      `toml:"log"`
+		Tasks          domain.TasksConfig    `toml:"tasks"`
+		TUI            domain.TUIConfig      `toml:"tui"`
+		Worktree       domain.WorktreeConfig `toml:"worktree"`
+		OnboardingDone bool                  `toml:"onboarding_done,omitempty"`
+	}
+
+	output := effectiveConfig{
+		Agents: agentsSection{
+			Agents:          cfg.Agents,
+			DisabledAgents:  cfg.AgentsConfig.DisabledAgents,
+			DefaultWorker:   cfg.AgentsConfig.DefaultWorker,
+			DefaultManager:  cfg.AgentsConfig.DefaultManager,
+			DefaultReviewer: cfg.AgentsConfig.DefaultReviewer,
+			WorkerPrompt:    cfg.AgentsConfig.WorkerPrompt,
+			ManagerPrompt:   cfg.AgentsConfig.ManagerPrompt,
+			ReviewerPrompt:  cfg.AgentsConfig.ReviewerPrompt,
+		},
+		Complete:       cfg.Complete,
+		Diff:           cfg.Diff,
+		Log:            cfg.Log,
+		Tasks:          cfg.Tasks,
+		TUI:            cfg.TUI,
+		Worktree:       cfg.Worktree,
+		OnboardingDone: cfg.OnboardingDone,
+	}
+
+	data, err := toml.Marshal(output)
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "Error marshaling config: %v\n", err)
 		return
