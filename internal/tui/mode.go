@@ -15,6 +15,9 @@ const (
 	ModeHelp                     // Help overlay mode
 	ModeChangeStatus             // Status change mode
 	ModeExec                     // Execute command mode
+	ModeReviewing                // Review in progress mode
+	ModeReviewResult             // Review result display mode
+	ModeReviewAction             // Review action selection mode (notify, merge, etc.)
 )
 
 // String returns the string representation of the mode.
@@ -40,6 +43,12 @@ func (m Mode) String() string {
 		return "change_status"
 	case ModeExec:
 		return "exec"
+	case ModeReviewing:
+		return "reviewing"
+	case ModeReviewResult:
+		return "review_result"
+	case ModeReviewAction:
+		return "review_action"
 	default:
 		return "unknown"
 	}
@@ -61,11 +70,21 @@ func (m Mode) IsInputMode() bool {
 	switch m {
 	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec:
 		return true
-	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeChangeStatus:
+	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeChangeStatus, ModeReviewing, ModeReviewResult, ModeReviewAction:
 		return false
 	}
 	return false
 }
+
+// ReviewAction represents the action to take after reviewing.
+type ReviewAction int
+
+const (
+	ReviewActionNone         ReviewAction = iota
+	ReviewActionNotifyWorker              // Send review result as comment to worker
+	ReviewActionMerge                     // Merge the task (LGTM)
+	ReviewActionClose                     // Close the task
+)
 
 // NewTaskField represents the currently focused field in the new task form.
 type NewTaskField int

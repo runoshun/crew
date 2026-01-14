@@ -39,6 +39,7 @@ type Model struct {
 	agentCommands   map[string]string
 	customKeybinds  map[string]domain.TUIKeybinding
 	keybindWarnings []string
+	reviewResult    string // Review result text
 
 	// Components (structs with pointers)
 	keys                KeyMap
@@ -56,18 +57,20 @@ type Model struct {
 	execInput   textinput.Model
 
 	// Numeric state (smaller types last)
-	mode             Mode
-	confirmAction    ConfirmAction
-	sortMode         SortMode
-	newTaskField     NewTaskField
-	width            int
-	height           int
-	confirmTaskID    int
-	agentCursor      int
-	statusCursor     int
-	startFocusCustom bool
-	showAll          bool
-	detailFocused    bool // Right pane is focused for scrolling
+	mode               Mode
+	confirmAction      ConfirmAction
+	sortMode           SortMode
+	newTaskField       NewTaskField
+	width              int
+	height             int
+	confirmTaskID      int
+	agentCursor        int
+	statusCursor       int
+	reviewTaskID       int // Task being reviewed
+	reviewActionCursor int // Cursor for action selection
+	startFocusCustom   bool
+	showAll            bool
+	detailFocused      bool // Right pane is focused for scrolling
 }
 
 // New creates a new TUI Model with the given container.
@@ -647,4 +650,35 @@ func renderTemplate(tmpl string, data map[string]interface{}) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+// reviewTask returns a command that reviews a task using the AI reviewer.
+func (m *Model) reviewTask(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		uc := m.container.ReviewTaskUseCase(io.Discard, io.Discard)
+		out, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
+			TaskID:  taskID,
+			Verbose: false,
+		})
+		if err != nil {
+			return MsgReviewError{TaskID: taskID, Err: err}
+		}
+		return MsgReviewCompleted{TaskID: taskID, Review: out.Review}
+	}
+}
+
+// notifyWorker returns a command that sends a review comment to the worker.
+func (m *Model) notifyWorker(taskID int, message string, requestChanges bool) tea.Cmd {
+	return func() tea.Msg {
+		uc := m.container.AddCommentUseCase()
+		_, err := uc.Execute(context.Background(), usecase.AddCommentInput{
+			TaskID:         taskID,
+			Message:        message,
+			RequestChanges: requestChanges,
+		})
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionNotifyWorker}
+	}
 }
