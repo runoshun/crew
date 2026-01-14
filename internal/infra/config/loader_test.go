@@ -759,5 +759,4 @@ level = "debug"
 
 	// Verify onboarding_done defaults to false
 	assert.False(t, cfg.OnboardingDone)
->>>>>>> main
 }

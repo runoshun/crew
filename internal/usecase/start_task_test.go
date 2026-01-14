@@ -912,44 +912,6 @@ func TestStartTask_Execute_OpencodeWithModelOverride(t *testing.T) {
 	assert.Contains(t, script, "-m gpt-4o")
 }
 
-func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
-	crewDir := t.TempDir()
-	repoRoot := t.TempDir()
-	worktreeDir := setupTestWorktree(t)
-
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Test task",
-		Status:     domain.StatusTodo,
-		BaseBranch: "main",
-	}
-	sessions := testutil.NewMockSessionManager()
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.CreatePath = worktreeDir
-	configLoader := testutil.NewMockConfigLoader()
-	// Set WorkerPrompt in AgentsConfig
-	configLoader.Config.AgentsConfig.WorkerPrompt = "Custom worker prompt from config"
-	git := &testutil.MockGit{}
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
-
-	// Execute
-	_, err := uc.Execute(context.Background(), StartTaskInput{
-		TaskID: 1,
-		Agent:  "claude",
-	})
-
-	// Assert
-	require.NoError(t, err)
-
-	// Verify script contains WorkerPrompt
-	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
-	require.NoError(t, err)
-	assert.Contains(t, string(scriptContent), "Custom worker prompt from config")
-}
-
 func TestStartTask_Execute_WithSetupScript(t *testing.T) {
 	// Setup temp directories
 	crewDir := t.TempDir()
@@ -1061,9 +1023,10 @@ func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
 		CommandTemplate: "test-cmd {{.Prompt}}",
 		// Prompt is empty, so WorkerPrompt should be used
 	}
+	git := &testutil.MockGit{}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -1103,9 +1066,10 @@ func TestStartTask_Execute_AgentPromptOverridesWorkerPrompt(t *testing.T) {
 		CommandTemplate: "test-cmd {{.Prompt}}",
 		Prompt:          "Agent-specific prompt", // This should take precedence
 	}
+	git := &testutil.MockGit{}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -1148,9 +1112,10 @@ func TestStartTask_Execute_WorktreeConfigPassed(t *testing.T) {
 		Copy:         []string{"node_modules", ".env"},
 	}
 
+	git := &testutil.MockGit{}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{
@@ -1188,9 +1153,10 @@ func TestStartTask_Execute_WorktreeSetupError(t *testing.T) {
 	worktrees.SetupErr = assert.AnError // Simulate setup failure
 
 	configLoader := testutil.NewMockConfigLoader()
+	git := &testutil.MockGit{}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartTaskInput{

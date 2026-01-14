@@ -187,26 +187,6 @@ func TestStartManager_Execute_DefaultManager(t *testing.T) {
 	assert.Contains(t, out.Command, "opencode")
 }
 
-func TestStartManager_Execute_WithManagerPrompt(t *testing.T) {
-	repoRoot := t.TempDir()
-	gitDir := repoRoot + "/.git"
-
-	configLoader := testutil.NewMockConfigLoader()
-	// Set ManagerPrompt in AgentsConfig
-	configLoader.Config.AgentsConfig.ManagerPrompt = "Custom manager prompt from config"
-
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
-
-	// Execute
-	out, err := uc.Execute(context.Background(), StartManagerInput{
-		Name: "claude-manager",
-	})
-
-	// Assert
-	require.NoError(t, err)
-	assert.Contains(t, out.Prompt, "Custom manager prompt from config")
-}
-
 func TestStartManagerOutput_GetCommand(t *testing.T) {
 	tests := []struct {
 		name         string

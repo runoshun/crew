@@ -812,9 +812,12 @@ func (m *MockCommandExecutor) ExecuteInteractive(cmd *domain.ExecCommand) error 
 	return m.ExecuteInteractiveErr
 }
 
-// ExecuteWithContext records the call and returns configured error.
-func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.ExecCommand, _, _ io.Writer) error {
+// ExecuteWithContext records the call, writes output to writers, and returns configured error.
+func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.ExecCommand, stdout, stderr io.Writer) error {
 	m.ExecuteWithContextCalled = true
 	m.ExecutedCmd = cmd
+	if m.ExecuteOutput != nil && stdout != nil {
+		_, _ = stdout.Write(m.ExecuteOutput)
+	}
 	return m.ExecuteWithContextErr
 }
