@@ -126,27 +126,32 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case MsgReviewCompleted:
-		// If user cancelled, ignore the result
-		if m.reviewCancelled {
-			m.reviewCancelled = false
-			m.reviewTaskID = 0
-			m.reviewResult = ""
+		// Ignore if cancelled or TaskID mismatch (stale result from previous review)
+		if m.reviewCancelled || m.reviewTaskID == 0 || m.reviewTaskID != msg.TaskID {
+			// Clear review state if this was a cancelled review
+			if m.reviewCancelled && m.reviewTaskID == msg.TaskID {
+				m.reviewCancelled = false
+				m.reviewTaskID = 0
+				m.reviewResult = ""
+			}
 			return m, nil
 		}
 		m.mode = ModeReviewResult
 		m.reviewResult = msg.Review
-		m.reviewTaskID = msg.TaskID
 		// Initialize viewport with review content
 		m.reviewViewport.SetContent(msg.Review)
 		m.reviewViewport.GotoTop()
 		return m, m.loadTasks()
 
 	case MsgReviewError:
-		// If user cancelled, don't show error
-		if m.reviewCancelled {
-			m.reviewCancelled = false
-			m.reviewTaskID = 0
-			m.reviewResult = ""
+		// Ignore if cancelled or TaskID mismatch (stale error from previous review)
+		if m.reviewCancelled || m.reviewTaskID == 0 || m.reviewTaskID != msg.TaskID {
+			// Clear review state if this was a cancelled review
+			if m.reviewCancelled && m.reviewTaskID == msg.TaskID {
+				m.reviewCancelled = false
+				m.reviewTaskID = 0
+				m.reviewResult = ""
+			}
 			return m, nil
 		}
 		m.err = msg.Err

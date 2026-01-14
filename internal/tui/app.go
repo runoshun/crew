@@ -113,6 +113,9 @@ func New(c *app.Container) *Model {
 	taskList.SetFilteringEnabled(true)
 	taskList.DisableQuitKeybindings()
 
+	// Initialize review viewport (size will be updated in WindowSizeMsg)
+	reviewVp := viewport.New(0, 0)
+
 	return &Model{
 		container:        c,
 		mode:             ModeNormal,
@@ -127,6 +130,7 @@ func New(c *app.Container) *Model {
 		filterInput:      fi,
 		customInput:      ci,
 		execInput:        ei,
+		reviewViewport:   reviewVp,
 		builtinAgents:    []string{"claude", "opencode", "codex"},
 		customAgents:     nil,
 		agentCommands:    make(map[string]string),

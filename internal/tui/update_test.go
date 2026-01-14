@@ -160,3 +160,61 @@ func TestUpdate_MsgReviewActionCompleted(t *testing.T) {
 	assert.Equal(t, "", result.reviewResult)
 	assert.Equal(t, 0, result.reviewActionCursor)
 }
+
+func TestUpdate_MsgReviewCompleted_StaleResult(t *testing.T) {
+	// Scenario: User cancelled task 42's review and started task 99's review
+	// Then stale result from task 42 arrives - should be ignored
+	m := &Model{
+		mode:         ModeReviewing, // Currently reviewing task 99
+		reviewTaskID: 99,            // New task being reviewed
+	}
+
+	// Stale result from task 42 arrives
+	msg := MsgReviewCompleted{TaskID: 42, Review: "Old review for task 42"}
+
+	updatedModel, _ := m.Update(msg)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	// Should stay in reviewing mode, waiting for task 99's result
+	assert.Equal(t, ModeReviewing, result.mode)
+	assert.Equal(t, 99, result.reviewTaskID)
+	assert.Equal(t, "", result.reviewResult) // Old result not stored
+}
+
+func TestUpdate_MsgReviewError_StaleError(t *testing.T) {
+	// Scenario: User cancelled task 42's review and started task 99's review
+	// Then stale error from task 42 arrives - should be ignored
+	m := &Model{
+		mode:         ModeReviewing, // Currently reviewing task 99
+		reviewTaskID: 99,            // New task being reviewed
+	}
+
+	// Stale error from task 42 arrives
+	msg := MsgReviewError{TaskID: 42, Err: assert.AnError}
+
+	updatedModel, _ := m.Update(msg)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	// Should stay in reviewing mode, waiting for task 99's result
+	assert.Equal(t, ModeReviewing, result.mode)
+	assert.Equal(t, 99, result.reviewTaskID)
+	assert.Nil(t, result.err) // Old error not shown
+}
+
+func TestUpdate_MsgReviewCompleted_NoActiveReview(t *testing.T) {
+	// Scenario: Review completed but no active review (reviewTaskID is 0)
+	m := &Model{
+		mode:         ModeNormal,
+		reviewTaskID: 0, // No active review
+	}
+
+	msg := MsgReviewCompleted{TaskID: 42, Review: "Orphan review"}
+
+	updatedModel, _ := m.Update(msg)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	// Should stay in normal mode
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Equal(t, 0, result.reviewTaskID)
+	assert.Equal(t, "", result.reviewResult)
+}
