@@ -56,6 +56,9 @@ type Model struct {
 	customInput textinput.Model
 	execInput   textinput.Model
 
+	// Review components
+	reviewViewport viewport.Model // For scrollable review result
+
 	// Numeric state (smaller types last)
 	mode               Mode
 	confirmAction      ConfirmAction
@@ -71,6 +74,7 @@ type Model struct {
 	startFocusCustom   bool
 	showAll            bool
 	detailFocused      bool // Right pane is focused for scrolling
+	reviewCancelled    bool // True if review was cancelled by user
 }
 
 // New creates a new TUI Model with the given container.
@@ -248,6 +252,22 @@ func (m *Model) updateLayoutSizes() {
 	listW := m.headerFooterContentWidth()
 	m.taskList.SetSize(listW, m.height-8)
 	m.updateDetailPanelViewport()
+	m.updateReviewViewport()
+}
+
+// updateReviewViewport updates the review viewport size based on dialog dimensions.
+func (m *Model) updateReviewViewport() {
+	dialogW := m.dialogWidth() - 8 // Account for padding
+	// Leave space for title, task line, hint, and padding (approximately 8 lines)
+	dialogH := m.height - 16
+	if dialogH < 5 {
+		dialogH = 5
+	}
+	if dialogH > 20 {
+		dialogH = 20
+	}
+	m.reviewViewport.Width = dialogW
+	m.reviewViewport.Height = dialogH
 }
 
 func (m *Model) dialogWidth() int {

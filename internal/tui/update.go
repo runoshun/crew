@@ -125,18 +125,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateTaskList()
 		return m, nil
 
-	case MsgReviewStarted:
-		m.mode = ModeReviewing
-		m.reviewTaskID = msg.TaskID
-		return m, nil
-
 	case MsgReviewCompleted:
+		// If user cancelled, ignore the result
+		if m.reviewCancelled {
+			m.reviewCancelled = false
+			m.reviewTaskID = 0
+			m.reviewResult = ""
+			return m, nil
+		}
 		m.mode = ModeReviewResult
 		m.reviewResult = msg.Review
 		m.reviewTaskID = msg.TaskID
+		// Initialize viewport with review content
+		m.reviewViewport.SetContent(msg.Review)
+		m.reviewViewport.GotoTop()
 		return m, m.loadTasks()
 
 	case MsgReviewError:
+		// If user cancelled, don't show error
+		if m.reviewCancelled {
+			m.reviewCancelled = false
+			m.reviewTaskID = 0
+			m.reviewResult = ""
+			return m, nil
+		}
 		m.err = msg.Err
 		m.mode = ModeNormal
 		m.reviewTaskID = 0
@@ -271,13 +283,19 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// Check if worktree exists
 		branch := domain.BranchName(task.ID, task.Issue)
-		if exists, _ := m.container.Worktrees.Exists(branch); !exists {
+		exists, err := m.container.Worktrees.Exists(branch)
+		if err != nil {
+			m.err = fmt.Errorf("check worktree: %w", err)
+			return m, nil
+		}
+		if !exists {
 			m.err = fmt.Errorf("task worktree not found - cannot review")
 			return m, nil
 		}
 		m.mode = ModeReviewing
 		m.reviewTaskID = task.ID
 		m.reviewResult = ""
+		m.reviewCancelled = false
 		return m, m.reviewTask(task.ID)
 
 	case key.Matches(msg, m.keys.New):
@@ -807,11 +825,12 @@ func (m *Model) handleExecMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleReviewingMode handles keys while review is in progress.
 func (m *Model) handleReviewingMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Allow escaping during review (cancel will happen when result arrives)
+	// Allow escaping during review
 	if key.Matches(msg, m.keys.Escape) {
-		// Note: The review continues in background but we return to normal mode
-		// The result message will be handled when it arrives
+		// Mark as cancelled so completion message will be ignored
+		m.reviewCancelled = true
 		m.mode = ModeNormal
+		m.reviewTaskID = 0
 		return m, nil
 	}
 	// Ignore other keys while reviewing
@@ -832,14 +851,23 @@ func (m *Model) handleReviewResultMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeReviewAction
 		m.reviewActionCursor = 0
 		return m, nil
+
+	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down):
+		// Scroll the review viewport
+		var cmd tea.Cmd
+		m.reviewViewport, cmd = m.reviewViewport.Update(msg)
+		return m, cmd
 	}
 
-	return m, nil
+	// Forward other keys to viewport for page up/down
+	var cmd tea.Cmd
+	m.reviewViewport, cmd = m.reviewViewport.Update(msg)
+	return m, cmd
 }
 
 // handleReviewActionMode handles keys when selecting a review action.
 func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	const numActions = 3 // NotifyWorker, Merge, Close
+	const numActions = 4 // NotifyWorker (restart), NotifyWorker (no restart), Merge, Close
 
 	switch {
 	case key.Matches(msg, m.keys.Escape):
@@ -862,14 +890,20 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.Type == tea.KeyEnter:
 		// Execute selected action
 		switch m.reviewActionCursor {
-		case 0: // NotifyWorker
+		case 0: // NotifyWorker with restart
 			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, true)
-		case 1: // Merge
-			m.mode = ModeNormal
-			return m, m.mergeTask(m.reviewTaskID)
-		case 2: // Close
-			m.mode = ModeNormal
-			return m, m.closeTask(m.reviewTaskID)
+		case 1: // NotifyWorker without restart (just send comment)
+			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, false)
+		case 2: // Merge - use confirm dialog
+			m.mode = ModeConfirm
+			m.confirmAction = ConfirmMerge
+			m.confirmTaskID = m.reviewTaskID
+			return m, nil
+		case 3: // Close - use confirm dialog
+			m.mode = ModeConfirm
+			m.confirmAction = ConfirmClose
+			m.confirmTaskID = m.reviewTaskID
+			return m, nil
 		}
 	}
 

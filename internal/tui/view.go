@@ -982,36 +982,27 @@ func (m *Model) viewReviewResultDialog() string {
 
 	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", m.reviewTaskID, taskTitle)))
 
-	// Truncate review result for dialog display (show first ~10 lines)
-	reviewLines := strings.Split(m.reviewResult, "\n")
-	maxLines := 15
-	displayLines := reviewLines
-	truncated := false
-	if len(reviewLines) > maxLines {
-		displayLines = reviewLines[:maxLines]
-		truncated = true
-	}
-	reviewText := strings.Join(displayLines, "\n")
-	if truncated {
-		reviewText += "\n..."
-	}
+	// Use viewport for scrollable review content
+	viewportContent := m.reviewViewport.View()
 
-	resultStyle := lipgloss.NewStyle().
-		Background(ds.bg).
-		Foreground(Colors.TitleNormal).
-		Width(ds.width)
-	reviewDisplay := resultStyle.Render(reviewText)
+	// Add scroll indicator
+	scrollInfo := ""
+	if m.reviewViewport.TotalLineCount() > m.reviewViewport.VisibleLineCount() {
+		scrollInfo = fmt.Sprintf(" %d%%", int(m.reviewViewport.ScrollPercent()*100))
+	}
 
 	hint := ds.renderLine(
-		ds.key.Render("enter") + ds.text.Render(" actions  ") +
-			ds.key.Render("esc") + ds.text.Render(" close"))
+		ds.key.Render("j/k") + ds.text.Render(" scroll  ") +
+			ds.key.Render("enter") + ds.text.Render(" actions  ") +
+			ds.key.Render("esc") + ds.text.Render(" close") +
+			ds.muted.Render(scrollInfo))
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title,
 		ds.emptyLine(),
 		taskLine,
 		ds.emptyLine(),
-		reviewDisplay,
+		viewportContent,
 		ds.emptyLine(),
 		hint,
 	)
@@ -1039,17 +1030,17 @@ func (m *Model) viewReviewActionDialog() string {
 
 	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
 
-	// Action options
+	// Action options (4 options)
 	type actionOption struct {
-		label  string
-		desc   string
-		action ReviewAction
+		label string
+		desc  string
 	}
 
 	options := []actionOption{
-		{"Notify Worker", "Send review as comment and restart task", ReviewActionNotifyWorker},
-		{"Merge", "Approve and merge the task (LGTM)", ReviewActionMerge},
-		{"Close", "Close the task without merging", ReviewActionClose},
+		{"Request Changes", "Send review and restart task (needs_changes)"},
+		{"Comment Only", "Send review as comment without restarting"},
+		{"Merge", "Approve and merge the task (LGTM)"},
+		{"Close", "Close the task without merging"},
 	}
 
 	var actionRows []string
@@ -1068,7 +1059,7 @@ func (m *Model) viewReviewActionDialog() string {
 			baseStyle.Render("  ") +
 				cursorStyle.Render(cursor) +
 				baseStyle.Render(" ") +
-				labelStyle.Render(fmt.Sprintf("%-15s", opt.label)) +
+				labelStyle.Render(fmt.Sprintf("%-16s", opt.label)) +
 				baseStyle.Render(" ") +
 				descStyle.Render(opt.desc))
 		actionRows = append(actionRows, row)

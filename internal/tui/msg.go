@@ -136,13 +136,6 @@ type MsgCommentCountsLoaded struct {
 
 func (MsgCommentCountsLoaded) sealed() {}
 
-// MsgReviewStarted is sent when a review is started for a task.
-type MsgReviewStarted struct {
-	TaskID int
-}
-
-func (MsgReviewStarted) sealed() {}
-
 // MsgReviewCompleted is sent when a review is completed.
 type MsgReviewCompleted struct {
 	Review string // Review result from the agent

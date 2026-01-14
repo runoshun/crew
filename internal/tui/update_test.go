@@ -70,20 +70,6 @@ func TestUpdate_MsgConfigLoaded_Warnings(t *testing.T) {
 	assert.Equal(t, []string{"unknown key: xxx"}, result.warnings)
 }
 
-func TestUpdate_MsgReviewStarted(t *testing.T) {
-	m := &Model{
-		mode: ModeNormal,
-	}
-
-	msg := MsgReviewStarted{TaskID: 42}
-
-	updatedModel, _ := m.Update(msg)
-	result, ok := updatedModel.(*Model)
-	assert.True(t, ok)
-	assert.Equal(t, ModeReviewing, result.mode)
-	assert.Equal(t, 42, result.reviewTaskID)
-}
-
 func TestUpdate_MsgReviewCompleted(t *testing.T) {
 	m := &Model{
 		mode:         ModeReviewing,
@@ -98,6 +84,25 @@ func TestUpdate_MsgReviewCompleted(t *testing.T) {
 	assert.Equal(t, ModeReviewResult, result.mode)
 	assert.Equal(t, "LGTM - code looks good!", result.reviewResult)
 	assert.Equal(t, 42, result.reviewTaskID)
+}
+
+func TestUpdate_MsgReviewCompleted_Cancelled(t *testing.T) {
+	m := &Model{
+		mode:            ModeNormal, // Already returned to normal
+		reviewCancelled: true,       // User cancelled
+		reviewTaskID:    42,
+	}
+
+	msg := MsgReviewCompleted{TaskID: 42, Review: "LGTM - code looks good!"}
+
+	updatedModel, _ := m.Update(msg)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	// Should stay in normal mode and clear state
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.False(t, result.reviewCancelled)
+	assert.Equal(t, 0, result.reviewTaskID)
+	assert.Equal(t, "", result.reviewResult)
 }
 
 func TestUpdate_MsgReviewError(t *testing.T) {
@@ -116,6 +121,25 @@ func TestUpdate_MsgReviewError(t *testing.T) {
 	assert.Equal(t, assert.AnError, result.err)
 	assert.Equal(t, 0, result.reviewTaskID)
 	assert.Equal(t, "", result.reviewResult)
+}
+
+func TestUpdate_MsgReviewError_Cancelled(t *testing.T) {
+	m := &Model{
+		mode:            ModeNormal, // Already returned to normal
+		reviewCancelled: true,       // User cancelled
+		reviewTaskID:    42,
+	}
+
+	msg := MsgReviewError{TaskID: 42, Err: assert.AnError}
+
+	updatedModel, _ := m.Update(msg)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	// Should stay in normal mode, no error shown
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Nil(t, result.err)
+	assert.False(t, result.reviewCancelled)
+	assert.Equal(t, 0, result.reviewTaskID)
 }
 
 func TestUpdate_MsgReviewActionCompleted(t *testing.T) {
