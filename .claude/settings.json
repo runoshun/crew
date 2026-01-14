@@ -1,9 +1,4 @@
 {
-  "sandbox": {
-    "enabled": true,
-    "autoAllowBashIfSandboxed": true,
-    "excludedCommands": ["docker"]
-  },
   "permissions": {
     "allow": [
       "Bash(mise run:*)",
@@ -13,7 +8,22 @@
       "Bash(go mod tidy:*)",
       "Bash(golangci-lint:*)",
       "Bash(fieldalignment:*)",
-      "Bash(gofmt:*)"
+      "Bash(gofmt:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(sort:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git branch:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git describe:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git cat-file:*)",
+      "Bash(git remote:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)"
     ],
     "deny": [
       "Read(.envrc)",
