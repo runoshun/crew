@@ -175,11 +175,17 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 				if ac.DefaultManager != "" {
 					res.AgentsConfig.DefaultManager = ac.DefaultManager
 				}
+				if ac.DefaultReviewer != "" {
+					res.AgentsConfig.DefaultReviewer = ac.DefaultReviewer
+				}
 				if ac.WorkerPrompt != "" {
 					res.AgentsConfig.WorkerPrompt = ac.WorkerPrompt
 				}
 				if ac.ManagerPrompt != "" {
 					res.AgentsConfig.ManagerPrompt = ac.ManagerPrompt
+				}
+				if ac.ReviewerPrompt != "" {
+					res.AgentsConfig.ReviewerPrompt = ac.ReviewerPrompt
 				}
 				for name, def := range ac.Defs {
 					res.Agents[name] = domain.Agent{
@@ -338,12 +344,14 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 
 // agentsConfig holds the parsed [agents] section.
 type agentsConfig struct {
-	Defs           map[string]agentDef // Per-agent definitions from [agents.<name>]
-	DefaultWorker  string              // Default worker agent name
-	DefaultManager string              // Default manager agent name
-	WorkerPrompt   string              // Default prompt for all worker agents
-	ManagerPrompt  string              // Default prompt for all manager agents
-	Unknowns       []string            // Unknown keys in [agents]
+	Defs            map[string]agentDef // Per-agent definitions from [agents.<name>]
+	DefaultWorker   string              // Default worker agent name
+	DefaultManager  string              // Default manager agent name
+	DefaultReviewer string              // Default reviewer agent name
+	WorkerPrompt    string              // Default prompt for all worker agents
+	ManagerPrompt   string              // Default prompt for all manager agents
+	ReviewerPrompt  string              // Default prompt for all reviewer agents
+	Unknowns        []string            // Unknown keys in [agents]
 }
 
 type agentDef struct {
@@ -376,6 +384,10 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 			if s, ok := value.(string); ok {
 				result.DefaultManager = s
 			}
+		case "reviewer_default":
+			if s, ok := value.(string); ok {
+				result.DefaultReviewer = s
+			}
 		case "worker_prompt":
 			if s, ok := value.(string); ok {
 				result.WorkerPrompt = s
@@ -383,6 +395,10 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 		case "manager_prompt":
 			if s, ok := value.(string); ok {
 				result.ManagerPrompt = s
+			}
+		case "reviewer_prompt":
+			if s, ok := value.(string); ok {
+				result.ReviewerPrompt = s
 			}
 		default:
 			if subMap, ok := value.(map[string]any); ok {
@@ -474,11 +490,17 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	if override.AgentsConfig.DefaultManager != "" {
 		result.AgentsConfig.DefaultManager = override.AgentsConfig.DefaultManager
 	}
+	if override.AgentsConfig.DefaultReviewer != "" {
+		result.AgentsConfig.DefaultReviewer = override.AgentsConfig.DefaultReviewer
+	}
 	if override.AgentsConfig.WorkerPrompt != "" {
 		result.AgentsConfig.WorkerPrompt = override.AgentsConfig.WorkerPrompt
 	}
 	if override.AgentsConfig.ManagerPrompt != "" {
 		result.AgentsConfig.ManagerPrompt = override.AgentsConfig.ManagerPrompt
+	}
+	if override.AgentsConfig.ReviewerPrompt != "" {
+		result.AgentsConfig.ReviewerPrompt = override.AgentsConfig.ReviewerPrompt
 	}
 
 	// Override other sections

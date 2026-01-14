@@ -530,3 +530,74 @@ args = "root"
 	Register(defaultCfg)
 	assert.Equal(t, defaultCfg.Agents["claude"].Args, cfg.Agents["claude"].Args)
 }
+
+func TestLoader_Load_AgentsConfig_ReviewerPromptAndDefault(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write config with reviewer_prompt and reviewer_default
+	config := `
+[agents]
+reviewer_prompt = "Custom reviewer prompt"
+reviewer_default = "custom-reviewer"
+
+[agents.custom-reviewer]
+command_template = "my-reviewer {{.Prompt}}"
+role = "reviewer"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify
+	assert.Equal(t, "Custom reviewer prompt", cfg.AgentsConfig.ReviewerPrompt)
+	assert.Equal(t, "custom-reviewer", cfg.AgentsConfig.DefaultReviewer)
+	assert.Equal(t, "my-reviewer {{.Prompt}}", cfg.Agents["custom-reviewer"].CommandTemplate)
+	assert.Equal(t, domain.RoleReviewer, cfg.Agents["custom-reviewer"].Role)
+}
+
+func TestLoader_Load_AgentsConfig_Merge(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config with all prompts
+	globalConfig := `
+[agents]
+worker_prompt = "Global worker prompt"
+manager_prompt = "Global manager prompt"
+reviewer_prompt = "Global reviewer prompt"
+worker_default = "global-worker"
+manager_default = "global-manager"
+reviewer_default = "global-reviewer"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write repo config that overrides some values
+	repoConfig := `
+[agents]
+worker_prompt = "Repo worker prompt"
+reviewer_default = "repo-reviewer"
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify merging: repo overrides global
+	assert.Equal(t, "Repo worker prompt", cfg.AgentsConfig.WorkerPrompt)       // Overridden
+	assert.Equal(t, "Global manager prompt", cfg.AgentsConfig.ManagerPrompt)   // From global
+	assert.Equal(t, "Global reviewer prompt", cfg.AgentsConfig.ReviewerPrompt) // From global
+	assert.Equal(t, "global-worker", cfg.AgentsConfig.DefaultWorker)           // From global
+	assert.Equal(t, "global-manager", cfg.AgentsConfig.DefaultManager)         // From global
+	assert.Equal(t, "repo-reviewer", cfg.AgentsConfig.DefaultReviewer)         // Overridden
+}
