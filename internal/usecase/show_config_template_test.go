@@ -17,11 +17,9 @@ func TestShowConfigTemplate_Execute(t *testing.T) {
 		wantNotContain []string
 	}{
 		{
-			name: "template with builtin agents",
+			name: "template with default config structure",
 			input: ShowConfigTemplateInput{
-				Config: &domain.Config{
-					Agents: domain.NewDefaultConfig().Agents,
-				},
+				Config: domain.NewDefaultConfig(),
 			},
 			wantContains: []string{
 				"[agents]",
@@ -30,9 +28,11 @@ func TestShowConfigTemplate_Execute(t *testing.T) {
 			},
 		},
 		{
-			name: "template with empty config",
+			name: "template with empty agents map",
 			input: ShowConfigTemplateInput{
-				Config: &domain.Config{},
+				Config: &domain.Config{
+					Agents: make(map[string]domain.Agent),
+				},
 			},
 			wantContains: []string{
 				"[agents]",

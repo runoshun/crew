@@ -125,6 +125,19 @@ func TestConfigTemplateCommand_OutputsTemplate(t *testing.T) {
 	assert.Contains(t, output, "worker_default")
 	assert.Contains(t, output, "manager_default")
 
+	// Verify builtin agents are actually registered with their sections
+	// Check for worker agents (claude, opencode, codex)
+	assert.Contains(t, output, "[agents.claude]", "claude worker agent should be in template")
+	assert.Contains(t, output, "[agents.opencode]", "opencode worker agent should be in template")
+	assert.Contains(t, output, "[agents.codex]", "codex worker agent should be in template")
+
+	// Check for manager agents
+	assert.Contains(t, output, "[agents.claude-manager]", "claude manager agent should be in template")
+
+	// Check for role field in agent sections
+	assert.Contains(t, output, `role = "worker"`, "worker role should be present")
+	assert.Contains(t, output, `role = "manager"`, "manager role should be present")
+
 	// Should not contain metadata headers (just template content)
 	assert.NotContains(t, output, "[Loaded from]")
 	assert.NotContains(t, output, "[Effective Config]")
