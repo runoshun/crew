@@ -1049,3 +1049,85 @@ func TestStartTask_Execute_AgentPromptOverridesWorkerPrompt(t *testing.T) {
 	assert.Contains(t, script, "Agent-specific prompt")
 	assert.NotContains(t, script, "Worker prompt from config")
 }
+
+func TestStartTask_Execute_WorktreeConfigPassed(t *testing.T) {
+	// Setup temp directory for script generation
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set WorktreeConfig in config
+	configLoader.Config.Worktree = domain.WorktreeConfig{
+		SetupCommand: "npm install",
+		Copy:         []string{"node_modules", ".env"},
+	}
+
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify SetupWorktree was called with correct config
+	assert.True(t, worktrees.SetupCalled, "SetupWorktree should be called")
+	assert.Equal(t, worktreeDir, worktrees.SetupWorktreePath)
+	require.NotNil(t, worktrees.SetupWorktreeConfig)
+	assert.Equal(t, "npm install", worktrees.SetupWorktreeConfig.SetupCommand)
+	assert.Equal(t, []string{"node_modules", ".env"}, worktrees.SetupWorktreeConfig.Copy)
+}
+
+func TestStartTask_Execute_WorktreeSetupError(t *testing.T) {
+	// Setup temp directory for script generation
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	worktrees.SetupErr = assert.AnError // Simulate setup failure
+
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, clock, crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+	})
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "setup worktree")
+
+	// Verify worktree was cleaned up after error
+	assert.True(t, worktrees.RemoveCalled, "Worktree should be removed after setup error")
+}
