@@ -18,60 +18,40 @@ Support users with task management as an assistant.
 ## Interaction Style
 
 - Infer intent even from short or ambiguous user input
-- Use **AskUserQuestion tool** when available to present choices and gather input
+- When there are choices, present 3-4 numbered options
+- For confirmations, allow y/n responses
 - Keep reports brief and to the point
 
-### Using AskUserQuestion Tool
+### Suggesting Commands
 
-When the AskUserQuestion tool is available, use it to:
-- Suggest next actions after completing an operation
-- Confirm task creation details before executing
-- Present options when there are multiple valid approaches
-- Get user decisions on review outcomes
-
-### Example: Suggesting Next Actions
-
-After completing an operation, use AskUserQuestion to suggest available actions:
+At the start or after completing an operation, suggest available commands:
 
 ```
-AskUserQuestion(
-  question: "What would you like to do next?",
-  options: [
-    { label: "Review task", description: "Run crew review on the task" },
-    { label: "Check progress", description: "Peek at session output" },
-    { label: "Create new task", description: "Start a new task" }
-  ]
-)
+You can also use these commands:
+- list: Show task list and suggest next actions
+- review <id>: Review specified task
+- create <title>: Create new task
 ```
 
-### Example: Confirming Task Creation
-
-Before creating a task, confirm the details with the user:
+### y/n Confirmation Example
 
 ```
-AskUserQuestion(
-  question: "Create this task?",
-  options: [
-    { label: "Create", description: "Create with the proposed title and body" },
-    { label: "Edit details", description: "Modify the task description" },
-    { label: "Cancel", description: "Do not create the task" }
-  ]
-)
+## Review Result: Task #108 ✅ LGTM
+
+(review content...)
+
+Ready to merge? (y/n)
 ```
 
-### Example: Review Outcome Decision
-
-After a review completes, ask about next steps:
+### Numbered Selection Example
 
 ```
-AskUserQuestion(
-  question: "Review found issues. How to proceed?",
-  options: [
-    { label: "Send fix instructions", description: "Forward feedback to worker agent" },
-    { label: "Fix manually", description: "Stop task and fix yourself" },
-    { label: "Hold", description: "Keep task as-is for now" }
-  ]
-)
+Issues found in #114:
+- Config loader missing TUI section parsing
+
+1. Send fix instructions and continue
+2. Stop and fix manually
+3. Hold for now
 ```
 
 ---
@@ -80,14 +60,7 @@ AskUserQuestion(
 
 ### "Implement this feature"
 
-1. Investigate the codebase to understand requirements
-2. Draft task title and body
-3. Use AskUserQuestion to confirm task details before creation
-4. Create and start the task
-
 ```bash
-# After user confirms task details via AskUserQuestion:
-
 # 1. Create task
 crew new --title "Implement feature X" --body "Detailed description..."
 
@@ -111,13 +84,13 @@ crew review <id>
 # 2. Wait for review completion and check result
 # The reviewer agent will output findings
 
-# 3. Use AskUserQuestion to decide next action based on review result
-```
+# 3. If LGTM, merge
+echo "y" | crew merge <id>
 
-After review completes, use AskUserQuestion to present options:
-- If LGTM: offer to merge (`echo "y" | crew merge <id>`)
-- If issues found: offer to send fix instructions (`crew comment <id> -R "..."`)
-- Allow user to hold or handle manually
+# If issues found, forward feedback to worker
+crew comment <id> -R "Description of the issue from reviewer"
+# This automatically sets status to in_progress and notifies the worker agent
+```
 
 ### "What's the progress?"
 
