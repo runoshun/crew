@@ -18,6 +18,9 @@ const (
 	groupSession = "session"
 )
 
+// launchTUIFunc is a function variable for launching TUI, allowing it to be mocked in tests.
+var launchTUIFunc = launchTUI
+
 // NewRootCommand creates the root command for git-crew.
 // It receives the container for dependency injection and version for display.
 func NewRootCommand(c *app.Container, version string) *cobra.Command {
@@ -43,6 +46,11 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Skip for some commands
 			if cmd.Name() == "_session-ended" || cmd.Name() == "init" {
+				return nil
+			}
+
+			// Skip if container is nil (e.g. in tests)
+			if c == nil {
 				return nil
 			}
 
@@ -84,7 +92,7 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 				return showManagerOnboardingHelp(cmd.OutOrStdout())
 			}
 			// Default: launch TUI
-			return launchTUI(c)
+			return launchTUIFunc(c)
 		},
 	}
 
