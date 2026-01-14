@@ -257,14 +257,9 @@ func TestClient_GetDefaultBranch_FromOriginHEAD(t *testing.T) {
 	// Set up remote
 	runGit(t, dir, "remote", "add", "origin", remoteDir)
 
-	// Check if 'main' branch already exists
+	// Get current branch name (depends on git init.defaultBranch setting)
 	currentBranch, _ := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
 	branch := strings.TrimSpace(string(currentBranch))
-
-	// If not on 'main', create it
-	if branch != "main" {
-		runGit(t, dir, "checkout", "-b", "main")
-	}
 
 	// Push to origin
 	runGit(t, dir, "push", "-u", "origin", branch)
