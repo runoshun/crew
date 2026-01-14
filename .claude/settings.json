@@ -1,14 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mise run ci)",
-      "Bash(mise run test)",
-      "Bash(mise run test:cover)",
-      "Bash(mise run test:integration)",
-      "Bash(mise run test:integration:cover)",
-      "Bash(mise run vuln)",
-      "Bash(mise run lint)",
-      "Bash(mise run build)",
+      "Bash(mise run ciL:*)",
+      "Bash(mise run test:*)",
+      "Bash(mise run test:cover:*)",
+      "Bash(mise run test:integration:*)",
+      "Bash(mise run test:integration:cover:*)",
+      "Bash(mise run vuln:*)",
+      "Bash(mise run lint:*)",
+      "Bash(mise run build:*)",
       "Bash(go build:*)",
       "Bash(go test:*)",
       "Bash(go tool:*)",
@@ -17,6 +17,7 @@
       "Bash(fieldalignment:*)",
       "Bash(gofmt:*)",
       "Bash(ls:*)",
+      "Bash(mkdir:*)",
       "Bash(sort:*)"
     ]
   }
