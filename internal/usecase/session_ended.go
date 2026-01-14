@@ -52,20 +52,25 @@ func (uc *SessionEnded) Execute(_ context.Context, in SessionEndedInput) (*Sessi
 		return &SessionEndedOutput{Ignored: true}, nil
 	}
 
-	// Clear agent info
-	task.Agent = ""
-	task.Session = ""
-
-	// Update status based on exit code
-	// - Normal exit (0): maintain current status (keep in_review if already)
-	// - Abnormal exit (non-zero): transition to error
+	// Update status based on exit code and determine whether to clear session info
+	// - Normal exit (0) from in_progress: transition to in_review and keep session
+	// - Normal exit (0) from other states: maintain current status and keep session
+	// - Abnormal exit (non-zero): transition to error and clear session
+	shouldClearSession := false
 	if in.ExitCode != 0 && task.Status == domain.StatusInProgress {
 		task.Status = domain.StatusError
+		shouldClearSession = true
 	} else if task.Status == domain.StatusInProgress {
-		// Normal exit from in_progress -> in_review
+		// Normal exit from in_progress -> in_review (keep session for review/merge)
 		task.Status = domain.StatusInReview
 	}
-	// If already in_review, done, or closed, don't change status
+	// If already in_review, done, or closed, don't change status or session
+
+	// Clear agent info only if abnormal exit
+	if shouldClearSession {
+		task.Agent = ""
+		task.Session = ""
+	}
 
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {

@@ -40,8 +40,9 @@ func TestSessionEnded_Execute_NormalExit(t *testing.T) {
 	// Verify task updated
 	task := repo.Tasks[1]
 	assert.Equal(t, domain.StatusInReview, task.Status)
-	assert.Empty(t, task.Agent)
-	assert.Empty(t, task.Session)
+	// Session info should be kept for review/merge operations
+	assert.Equal(t, "claude", task.Agent)
+	assert.Equal(t, "crew-1", task.Session)
 
 	// Verify script file cleaned up
 	assert.NoFileExists(t, domain.ScriptPath(crewDir, 1))
@@ -179,11 +180,11 @@ func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, out.Ignored)
 
-	// Status should remain in_review
+	// Status should remain in_review and session info should be kept
 	task := repo.Tasks[1]
 	assert.Equal(t, domain.StatusInReview, task.Status)
-	assert.Empty(t, task.Agent)
-	assert.Empty(t, task.Session)
+	assert.Equal(t, "claude", task.Agent)
+	assert.Equal(t, "crew-1", task.Session)
 }
 
 func TestSessionEnded_Execute_DoneStatusUnchanged(t *testing.T) {
