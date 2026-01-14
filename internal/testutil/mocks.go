@@ -3,6 +3,7 @@ package testutil
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -231,17 +232,22 @@ func (m *MockTaskRepositoryWithUpdateCommentError) UpdateComment(_ int, _ int, _
 // MockGit is a test double for domain.Git.
 // Fields are ordered to minimize memory padding.
 type MockGit struct {
-	CurrentBranchErr       error
-	HasUncommittedErr      error
-	MergeErr               error
-	DeleteBranchErr        error
-	CurrentBranchName      string
-	MergeBranch            string
-	DeletedBranch          string
-	HasUncommittedChangesV bool
-	MergeNoFF              bool
-	MergeCalled            bool
-	DeleteBranchCalled     bool
+	CurrentBranchErr        error
+	HasUncommittedErr       error
+	MergeErr                error
+	DeleteBranchErr         error
+	GetDefaultBranchErr     error
+	GetNewTaskBaseBranchErr error
+	CurrentBranchName       string
+	DefaultBranchName       string
+	NewTaskBaseBranchName   string
+	MergeBranch             string
+	DeletedBranch           string
+	HasUncommittedChangesV  bool
+	MergeNoFF               bool
+	MergeCalled             bool
+	DeleteBranchCalled      bool
+	GetDefaultBranchCalled  bool
 }
 
 // Ensure MockGit implements domain.Git interface.
@@ -294,6 +300,29 @@ func (m *MockGit) DeleteBranch(branch string, force bool) error {
 	m.DeletedBranch = branch
 	// force is ignored in mock for now, or we could add a field to verify it
 	return m.DeleteBranchErr
+}
+
+// GetDefaultBranch returns the configured default branch name or error.
+func (m *MockGit) GetDefaultBranch() (string, error) {
+	m.GetDefaultBranchCalled = true
+	if m.GetDefaultBranchErr != nil {
+		return "", m.GetDefaultBranchErr
+	}
+	if m.DefaultBranchName != "" {
+		return m.DefaultBranchName, nil
+	}
+	return "main", nil
+}
+
+// GetNewTaskBaseBranch returns the configured new task base branch name or error.
+func (m *MockGit) GetNewTaskBaseBranch() (string, error) {
+	if m.GetNewTaskBaseBranchErr != nil {
+		return "", m.GetNewTaskBaseBranchErr
+	}
+	if m.NewTaskBaseBranchName != "" {
+		return m.NewTaskBaseBranchName, nil
+	}
+	return m.GetDefaultBranch()
 }
 
 // MockSessionManager is a test double for domain.SessionManager.
@@ -518,11 +547,14 @@ func (m *MockConfigLoader) LoadWithOptions(opts domain.LoadConfigOptions) (*doma
 type MockConfigManager struct {
 	InitRepoErr        error
 	InitGlobalErr      error
+	InitOverrideErr    error
 	RepoConfigInfo     domain.ConfigInfo
 	GlobalConfigInfo   domain.ConfigInfo
 	RootRepoConfigInfo domain.ConfigInfo
+	OverrideConfigInfo domain.ConfigInfo
 	InitRepoCalled     bool
 	InitGlobalCalled   bool
+	InitOverrideCalled bool
 }
 
 // NewMockConfigManager creates a new MockConfigManager.
@@ -538,6 +570,10 @@ func NewMockConfigManager() *MockConfigManager {
 		},
 		RootRepoConfigInfo: domain.ConfigInfo{
 			Path:   "/test/.crew.toml",
+			Exists: false,
+		},
+		OverrideConfigInfo: domain.ConfigInfo{
+			Path:   "/home/test/.config/git-crew/config.override.toml",
 			Exists: false,
 		},
 	}
@@ -561,6 +597,11 @@ func (m *MockConfigManager) GetRootRepoConfigInfo() domain.ConfigInfo {
 	return m.RootRepoConfigInfo
 }
 
+// GetOverrideConfigInfo returns the configured override config info.
+func (m *MockConfigManager) GetOverrideConfigInfo() domain.ConfigInfo {
+	return m.OverrideConfigInfo
+}
+
 // InitRepoConfig records the call and returns configured error.
 func (m *MockConfigManager) InitRepoConfig(_ *domain.Config) error {
 	m.InitRepoCalled = true
@@ -571,6 +612,12 @@ func (m *MockConfigManager) InitRepoConfig(_ *domain.Config) error {
 func (m *MockConfigManager) InitGlobalConfig(_ *domain.Config) error {
 	m.InitGlobalCalled = true
 	return m.InitGlobalErr
+}
+
+// InitOverrideConfig records the call and returns configured error.
+func (m *MockConfigManager) InitOverrideConfig(_ *domain.Config) error {
+	m.InitOverrideCalled = true
+	return m.InitOverrideErr
 }
 
 // === Snapshot methods (no-op for mock) ===
@@ -650,4 +697,124 @@ func (m *MockTaskRepositoryWithUpdateCommentError) Push() error                 
 func (m *MockTaskRepositoryWithUpdateCommentError) Fetch(_ string) error               { return nil }
 func (m *MockTaskRepositoryWithUpdateCommentError) ListNamespaces() ([]string, error) {
 	return nil, nil
+}
+
+// MockLogger is a test double for domain.Logger.
+// It captures all log calls for verification in tests.
+type MockLogger struct {
+	Entries []LogEntry
+}
+
+// LogEntry represents a single log entry.
+// Fields are ordered to minimize memory padding.
+type LogEntry struct {
+	Level    string
+	Category string
+	Msg      string
+	TaskID   int
+}
+
+// NewMockLogger creates a new MockLogger.
+func NewMockLogger() *MockLogger {
+	return &MockLogger{
+		Entries: make([]LogEntry, 0),
+	}
+}
+
+// Ensure MockLogger implements domain.Logger interface.
+var _ domain.Logger = (*MockLogger)(nil)
+
+// Info logs an info message.
+func (m *MockLogger) Info(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "INFO", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Debug logs a debug message.
+func (m *MockLogger) Debug(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "DEBUG", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Warn logs a warning message.
+func (m *MockLogger) Warn(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "WARN", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Error logs an error message.
+func (m *MockLogger) Error(taskID int, category, msg string) {
+	m.Entries = append(m.Entries, LogEntry{Level: "ERROR", TaskID: taskID, Category: category, Msg: msg})
+}
+
+// Close closes the logger (no-op for mock).
+func (m *MockLogger) Close() error {
+	return nil
+}
+
+// MockScriptRunner is a test double for domain.ScriptRunner.
+// Fields are ordered to minimize memory padding.
+type MockScriptRunner struct {
+	RunErr    error
+	RunDir    string
+	RunScript string
+	RunCalled bool
+}
+
+// NewMockScriptRunner creates a new MockScriptRunner.
+func NewMockScriptRunner() *MockScriptRunner {
+	return &MockScriptRunner{}
+}
+
+// Ensure MockScriptRunner implements domain.ScriptRunner interface.
+var _ domain.ScriptRunner = (*MockScriptRunner)(nil)
+
+// Run records the call and returns configured error.
+func (m *MockScriptRunner) Run(dir, script string) error {
+	m.RunCalled = true
+	m.RunDir = dir
+	m.RunScript = script
+	return m.RunErr
+}
+
+// MockCommandExecutor is a test double for domain.CommandExecutor.
+// Fields are ordered to minimize memory padding.
+type MockCommandExecutor struct {
+	ExecutedCmd              *domain.ExecCommand
+	ExecuteErr               error
+	ExecuteInteractiveErr    error
+	ExecuteWithContextErr    error
+	ExecuteOutput            []byte
+	ExecuteCalled            bool
+	ExecuteInteractiveCalled bool
+	ExecuteWithContextCalled bool
+}
+
+// NewMockCommandExecutor creates a new MockCommandExecutor.
+func NewMockCommandExecutor() *MockCommandExecutor {
+	return &MockCommandExecutor{}
+}
+
+// Ensure MockCommandExecutor implements domain.CommandExecutor interface.
+var _ domain.CommandExecutor = (*MockCommandExecutor)(nil)
+
+// Execute records the call and returns configured output or error.
+func (m *MockCommandExecutor) Execute(cmd *domain.ExecCommand) ([]byte, error) {
+	m.ExecuteCalled = true
+	m.ExecutedCmd = cmd
+	if m.ExecuteErr != nil {
+		return m.ExecuteOutput, m.ExecuteErr
+	}
+	return m.ExecuteOutput, nil
+}
+
+// ExecuteInteractive records the call and returns configured error.
+func (m *MockCommandExecutor) ExecuteInteractive(cmd *domain.ExecCommand) error {
+	m.ExecuteInteractiveCalled = true
+	m.ExecutedCmd = cmd
+	return m.ExecuteInteractiveErr
+}
+
+// ExecuteWithContext records the call and returns configured error.
+func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.ExecCommand, _, _ io.Writer) error {
+	m.ExecuteWithContextCalled = true
+	m.ExecutedCmd = cmd
+	return m.ExecuteWithContextErr
 }

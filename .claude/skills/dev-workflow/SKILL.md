@@ -20,7 +20,7 @@ Register ALL TODOs at once when starting Phase 1:
 ```
 # Phase 1: Setup
 - [ ] Read docs/README.md, core-concepts.md, architecture.md
-- [ ] Check current task with `./crew list` and `./crew show <id>`
+- [ ] Check current task with `crew list` and `crew show <id>`
 - [ ] Ensure on feature branch
 # Phase 2: Implementation
 - [ ] Plan implementation and update TODOs (add specific steps here)
@@ -55,13 +55,11 @@ Register ALL TODOs at once when starting Phase 1:
      - docs/README.md - Project overview
      - docs/core-concepts.md - Design principles
      - docs/architecture.md - Code structure
-     - docs/spec-cli.md - CLI command specs
-     - docs/spec-tui.md - TUI screen specs
 
 2. **Check current task**
-   - **MUST execute** `./crew list` to see all tasks
-   - **MUST execute** `./crew show <id>` to view task details
-   - If `./crew` is not available or returns error, ask the user which task to work on
+   - **MUST execute** `crew list` to see all tasks
+   - **MUST execute** `crew show <id>` to view task details
+   - If `crew` is not available or returns error, ask the user which task to work on
    - Do NOT look for TASKS.md - this project uses git-crew for task management
 
 3. **Ensure feature branch**
@@ -87,7 +85,7 @@ Register ALL TODOs at once when starting Phase 1:
    - Fix any issues before proceeding
 
 4. **Update task status**
-   - Use `./crew edit <id> --status <status>` to update task status as you progress
+   - Use `crew edit <id> --status <status>` to update task status as you progress
 
 ### Phase 3: Wrap-up
 
@@ -107,7 +105,7 @@ Register ALL TODOs at once when starting Phase 1:
    - Follow commit message format from AGENTS.md
 
 4. **Complete task**
-   - Run `./crew complete <id>` to merge to main and close task
+   - Run `crew complete <id>` to merge to main and close task
 
 5. **Summary report**
    - Output a consolidated report with the following sections:

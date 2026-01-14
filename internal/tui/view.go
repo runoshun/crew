@@ -461,6 +461,21 @@ func (m *Model) viewFooter() string {
 	innerWidth := contentWidth - 2
 	contentLen := lipgloss.Width(content)
 	paginationLen := lipgloss.Width(pagination)
+
+	// Truncate content if too wide
+	maxContentWidth := innerWidth - paginationLen - 1 // 1 for spacing
+	if contentLen > maxContentWidth {
+		if maxContentWidth <= 3 {
+			// When space is very limited, show only "..."
+			content = "..."
+		} else {
+			// Truncate content and append "..."
+			truncateStyle := lipgloss.NewStyle().MaxWidth(maxContentWidth - 3)
+			content = truncateStyle.Render(content) + "..."
+		}
+		contentLen = lipgloss.Width(content)
+	}
+
 	spacing := innerWidth - contentLen - paginationLen
 	if spacing < 1 {
 		spacing = 1
@@ -475,6 +490,7 @@ func (m *Model) viewHelp() string {
 	ds := m.newDialogStyles()
 	keyStyleWide := ds.key.Width(8)
 	sectionStyle := lipgloss.NewStyle().Background(ds.bg).Foreground(Colors.Muted).Bold(true)
+	baseStyle := lipgloss.NewStyle().Background(ds.bg)
 
 	title := ds.renderLine(ds.label.Render("KEYBOARD SHORTCUTS"))
 
@@ -529,33 +545,65 @@ func (m *Model) viewHelp() string {
 		},
 	}
 
-	var col1, col2 strings.Builder
-
-	renderSection := func(b *strings.Builder, sectionIdx int) {
+	// Build section columns as arrays of lines
+	renderSection := func(sectionIdx int) []string {
 		section := sections[sectionIdx]
-		b.WriteString(sectionStyle.Render(section.name))
-		b.WriteString("\n")
+		lines := make([]string, 0, len(section.binds)+2)
+		lines = append(lines, sectionStyle.Render(section.name))
 		for _, bind := range section.binds {
 			key := keyStyleWide.Render(bind.key)
 			desc := ds.muted.Render(bind.desc)
-			fmt.Fprintf(b, "%s %s\n", key, desc)
+			lines = append(lines, key+baseStyle.Render(" ")+desc)
 		}
-		b.WriteString("\n")
+		return lines
 	}
 
-	renderSection(&col1, 0)
-	renderSection(&col2, 1)
-	renderSection(&col2, 2)
+	col1Lines := renderSection(0)
+	col2Lines := renderSection(1)
+	col2Lines = append(col2Lines, "") // Empty line between ACTIONS and GENERAL
+	col2Lines = append(col2Lines, renderSection(2)...)
 
-	content := lipgloss.JoinHorizontal(lipgloss.Top,
-		col1.String(),
-		"    ",
-		col2.String(),
-	)
+	// Pad columns to same length
+	maxLines := len(col1Lines)
+	if len(col2Lines) > maxLines {
+		maxLines = len(col2Lines)
+	}
+	for len(col1Lines) < maxLines {
+		col1Lines = append(col1Lines, "")
+	}
+	for len(col2Lines) < maxLines {
+		col2Lines = append(col2Lines, "")
+	}
+
+	// Calculate column widths
+	col1Width := 0
+	for _, line := range col1Lines {
+		if w := lipgloss.Width(line); w > col1Width {
+			col1Width = w
+		}
+	}
+	gapWidth := 4
+	col2Width := ds.width - col1Width - gapWidth
+	if col2Width < 20 {
+		col2Width = 20
+	}
+
+	// Build merged lines with background
+	col1Style := baseStyle.Width(col1Width)
+	gapStyle := baseStyle.Width(gapWidth)
+	col2Style := baseStyle.Width(col2Width)
+
+	var contentLines []string
+	for i := 0; i < maxLines; i++ {
+		line := col1Style.Render(col1Lines[i]) + gapStyle.Render("") + col2Style.Render(col2Lines[i])
+		contentLines = append(contentLines, ds.renderLine(line))
+	}
+
+	content := lipgloss.JoinVertical(lipgloss.Left, contentLines...)
 
 	hint := ds.renderLine(ds.key.Render("esc") + ds.muted.Render(" close"))
 
-	return m.dialogStyle().Render(lipgloss.JoinVertical(lipgloss.Left, title, ds.emptyLine(), ds.renderLine(content), hint))
+	return m.dialogStyle().Render(lipgloss.JoinVertical(lipgloss.Left, title, ds.emptyLine(), content, hint))
 }
 
 func (m *Model) showDetailPanel() bool {

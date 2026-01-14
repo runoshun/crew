@@ -12,12 +12,14 @@ type ShowConfigInput struct {
 	IgnoreGlobal   bool // Skip loading global config
 	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
 	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
+	IgnoreOverride bool // Skip loading override config (config.override.toml)
 }
 
 // ShowConfigOutput contains the output of the ShowConfig use case.
 type ShowConfigOutput struct {
 	EffectiveConfig *domain.Config    // Merged effective configuration
 	GlobalConfig    domain.ConfigInfo // Global config file info
+	OverrideConfig  domain.ConfigInfo // Override config file info (config.override.toml)
 	RepoConfig      domain.ConfigInfo // Repository config file info (.git/crew/config.toml)
 	RootRepoConfig  domain.ConfigInfo // Root repository config file info (.crew.toml)
 }
@@ -44,6 +46,9 @@ func (uc *ShowConfig) Execute(_ context.Context, input ShowConfigInput) (*ShowCo
 	if !input.IgnoreGlobal {
 		output.GlobalConfig = uc.configManager.GetGlobalConfigInfo()
 	}
+	if !input.IgnoreOverride {
+		output.OverrideConfig = uc.configManager.GetOverrideConfigInfo()
+	}
 	if !input.IgnoreRepo {
 		output.RepoConfig = uc.configManager.GetRepoConfigInfo()
 	}
@@ -56,6 +61,7 @@ func (uc *ShowConfig) Execute(_ context.Context, input ShowConfigInput) (*ShowCo
 		IgnoreGlobal:   input.IgnoreGlobal,
 		IgnoreRepo:     input.IgnoreRepo,
 		IgnoreRootRepo: input.IgnoreRootRepo,
+		IgnoreOverride: input.IgnoreOverride,
 	})
 	if err != nil {
 		return nil, err

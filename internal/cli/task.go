@@ -47,22 +47,14 @@ Examples:
   # Create a task with labels
   git crew new --title "Add feature" --label feature --label urgent`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Resolve base branch
-			baseBranch := opts.Base
-			if baseBranch == "" {
-				baseBranch, _ = c.Git.CurrentBranch()
-				if baseBranch == "" {
-					baseBranch = "main" // fallback
-				}
-			}
-
 			// Build input
+			// BaseBranch: if --base is provided, use it; otherwise empty (let UseCase decide)
 			input := usecase.NewTaskInput{
 				Title:       opts.Title,
 				Description: opts.Description,
 				Issue:       opts.Issue,
 				Labels:      opts.Labels,
-				BaseBranch:  baseBranch,
+				BaseBranch:  opts.Base,
 			}
 
 			// Set parent ID if specified
@@ -498,6 +490,7 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		Labels       string
 		AddLabels    []string
 		RemoveLabels []string
+		IfStatus     []string
 	}
 
 	cmd := &cobra.Command{
@@ -523,6 +516,12 @@ Examples:
 
   # Change task status
   git crew edit 1 --status in_review
+
+  # Conditional status change (only if current status matches)
+  git crew edit 1 --status needs_input --if-status in_progress
+
+  # Multiple conditions (status change only if current status is one of these)
+  git crew edit 1 --status needs_input --if-status in_progress --if-status needs_input
 
   # Replace all labels (comma-separated)
   git crew edit 1 --labels bug,urgent
@@ -552,7 +551,8 @@ Examples:
 				cmd.Flags().Changed("status") ||
 				cmd.Flags().Changed("labels") ||
 				len(opts.AddLabels) > 0 ||
-				len(opts.RemoveLabels) > 0
+				len(opts.RemoveLabels) > 0 ||
+				len(opts.IfStatus) > 0
 
 			if !hasFlags {
 				// Editor mode: open task in editor
@@ -584,6 +584,13 @@ Examples:
 					input.Labels = strings.Split(opts.Labels, ",")
 				}
 			}
+			if len(opts.IfStatus) > 0 {
+				statuses := make([]domain.Status, len(opts.IfStatus))
+				for i, s := range opts.IfStatus {
+					statuses[i] = domain.Status(s)
+				}
+				input.IfStatus = statuses
+			}
 
 			// Execute use case
 			uc := c.EditTaskUseCase()
@@ -601,6 +608,7 @@ Examples:
 	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
 	cmd.Flags().StringVar(&opts.Description, "body", "", "New task description")
 	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, in_review, error, done, closed)")
+	cmd.Flags().StringArrayVar(&opts.IfStatus, "if-status", nil, "Only update status if current status matches (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")
 	cmd.Flags().StringArrayVar(&opts.RemoveLabels, "rm-label", nil, "Labels to remove (can specify multiple)")
@@ -640,7 +648,7 @@ func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error 
 	}
 
 	// Open editor
-	if editorErr := openEditor(tmpPath); editorErr != nil {
+	if editorErr := openEditor(tmpPath, c.Executor); editorErr != nil {
 		return editorErr
 	}
 

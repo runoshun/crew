@@ -21,7 +21,7 @@ func TestShowWorkerHelp(t *testing.T) {
 	assert.Contains(t, content, "# git-crew Worker Guide")
 	assert.Contains(t, content, "crew show")
 	assert.Contains(t, content, "crew complete")
-	assert.Contains(t, content, "mise run ci")
+	assert.Contains(t, content, "CLAUDE.md")
 	assert.Contains(t, content, "git push") // in prohibited actions section
 }
 
@@ -54,4 +54,52 @@ func TestShowManagerHelp(t *testing.T) {
 	assert.Contains(t, content, "## Available Workers")
 	assert.Contains(t, content, "| worker1 | model1 | desc1 |")
 	assert.Contains(t, content, "| worker2 | model2 | desc2 |")
+}
+
+func TestShowManagerHelp_OnboardingSection(t *testing.T) {
+	t.Run("shows onboarding section when not done", func(t *testing.T) {
+		var buf bytes.Buffer
+		cfg := &domain.Config{
+			OnboardingDone: false,
+		}
+
+		err := showManagerHelp(&buf, cfg)
+
+		require.NoError(t, err)
+		content := buf.String()
+		assert.Contains(t, content, "## Onboarding")
+		assert.Contains(t, content, "Onboarding has not been completed")
+		assert.Contains(t, content, "crew --help-manager-onboarding")
+	})
+
+	t.Run("hides onboarding section when done", func(t *testing.T) {
+		var buf bytes.Buffer
+		cfg := &domain.Config{
+			OnboardingDone: true,
+		}
+
+		err := showManagerHelp(&buf, cfg)
+
+		require.NoError(t, err)
+		content := buf.String()
+		assert.NotContains(t, content, "## Onboarding")
+		assert.NotContains(t, content, "Onboarding has not been completed")
+	})
+}
+
+func TestShowManagerOnboardingHelp(t *testing.T) {
+	var buf bytes.Buffer
+
+	err := showManagerOnboardingHelp(&buf)
+
+	require.NoError(t, err)
+	content := buf.String()
+
+	// Check that content contains key sections
+	assert.Contains(t, content, "# git-crew Onboarding Guide")
+	assert.Contains(t, content, "## Onboarding Checklist")
+	assert.Contains(t, content, "### 1. Basic Configuration")
+	assert.Contains(t, content, "### 2. Project Information for AI")
+	assert.Contains(t, content, "CLAUDE.md")
+	assert.Contains(t, content, "onboarding_done = true")
 }

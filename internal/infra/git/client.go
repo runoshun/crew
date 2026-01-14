@@ -92,6 +92,7 @@ func (c *Client) HasMergeConflict(_, _ string) (bool, error) {
 
 // Merge merges a branch into the current branch.
 // If noFF is true, a merge commit is always created (--no-ff).
+// On conflict, automatically runs git merge --abort to restore clean state.
 func (c *Client) Merge(branch string, noFF bool) error {
 	args := []string{"merge"}
 	if noFF {
@@ -102,6 +103,11 @@ func (c *Client) Merge(branch string, noFF bool) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = c.repoRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
+		// On merge failure (including conflicts), abort the merge to restore clean state
+		abortCmd := exec.Command("git", "merge", "--abort")
+		abortCmd.Dir = c.repoRoot
+		_ = abortCmd.Run() // Ignore abort errors - merge may have failed before creating merge state
+
 		return fmt.Errorf("failed to merge branch %s: %w: %s", branch, err, string(out))
 	}
 	return nil
@@ -139,6 +145,59 @@ func (c *Client) ListBranches() ([]string, error) {
 		}
 	}
 	return branches, nil
+}
+
+// GetDefaultBranch returns the default branch name.
+// Priority: git config crew.defaultBranch > refs/remotes/origin/HEAD > "main"
+func (c *Client) GetDefaultBranch() (string, error) {
+	// 1. Try git config crew.defaultBranch
+	cmd := exec.Command("git", "config", "crew.defaultBranch")
+	cmd.Dir = c.repoRoot
+	if out, err := cmd.Output(); err == nil {
+		branch := strings.TrimSpace(string(out))
+		if branch != "" {
+			return branch, nil
+		}
+	}
+
+	// 2. Try refs/remotes/origin/HEAD
+	cmd = exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	cmd.Dir = c.repoRoot
+	if out, err := cmd.Output(); err == nil {
+		ref := strings.TrimSpace(string(out))
+		// Extract branch name from refs/remotes/origin/xxx
+		if strings.HasPrefix(ref, "refs/remotes/origin/") {
+			branch := strings.TrimPrefix(ref, "refs/remotes/origin/")
+			if branch != "" {
+				return branch, nil
+			}
+		}
+	}
+
+	// 3. Fallback to "main"
+	return "main", nil
+}
+
+// GetNewTaskBaseBranch returns the base branch for new tasks.
+// Priority: git config crew.newTaskBase == "current" ? current branch : GetDefaultBranch()
+func (c *Client) GetNewTaskBaseBranch() (string, error) {
+	// Check git config crew.newTaskBase
+	cmd := exec.Command("git", "config", "crew.newTaskBase")
+	cmd.Dir = c.repoRoot
+	if out, err := cmd.Output(); err == nil {
+		setting := strings.TrimSpace(string(out))
+		if setting == "current" {
+			// Use current branch
+			currentBranch, err := c.CurrentBranch()
+			if err != nil {
+				return "", fmt.Errorf("get current branch: %w", err)
+			}
+			return currentBranch, nil
+		}
+	}
+
+	// Otherwise, use default branch
+	return c.GetDefaultBranch()
 }
 
 // Ensure Client implements domain.Git interface.

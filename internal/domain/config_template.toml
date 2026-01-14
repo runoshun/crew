@@ -6,6 +6,8 @@
 #
 # manager_default = "<<.DefaultManagerName>>" # Default agent for starting manager tasks
 # manager_prompt = ""                         # Default prompt for all manager agents
+#
+# disabled_agents = ["agent1", "oc-*", "!oc-medium"]  # Supports exact match, wildcards (*), and exclusion (!)
 
 ## Fields for all agents:
 ## [agents.<name>]
@@ -65,6 +67,10 @@
 ## Log settings
 # level = "<<.LogLevel>>"  # debug, info, warn, error
 
+## Onboarding completion flag
+## Set to true after completing the onboarding process
+# onboarding_done = false
+
 [tui]
 ## Custom keybindings (list view only)
 ## - command: Command to execute (supports template variables)
@@ -77,3 +83,20 @@
 # [tui.keybindings]
 # "ctrl+p" = { command = "crew peek {{.TaskID}}", description = "Peek task" }
 
+## Override Configuration
+##
+## For environment-specific settings (e.g., when using chezmoi), create:
+##   ~/.config/git-crew/config.override.toml
+##
+## This file is loaded after global config and before repository configs:
+##   Merge order: default <- global <- override <- rootRepo <- repo
+##
+## Example use cases:
+##   - Disable agents not available on specific machines
+##   - Override default models per environment
+##   - Add machine-specific prompts
+##
+## Example ~/.config/git-crew/config.override.toml:
+##   [agents]
+##   disabled_agents = ["codex"]  # Disable codex on this machine
+##   worker_default = "claude"    # Override default worker

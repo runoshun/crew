@@ -561,6 +561,35 @@ role = "reviewer"
 	assert.Equal(t, domain.RoleReviewer, cfg.Agents["custom-reviewer"].Role)
 }
 
+func TestLoader_Load_ReviewerDefault(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config with reviewer_default and reviewer_prompt
+	repoConfig := `
+[agents]
+reviewer_default = "claude-reviewer"
+reviewer_prompt = "Please review this code."
+
+[agents.claude-reviewer]
+role = "reviewer"
+args = "--model claude-opus-4"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify reviewer config
+	assert.Equal(t, "claude-reviewer", cfg.AgentsConfig.DefaultReviewer)
+	assert.Equal(t, "Please review this code.", cfg.AgentsConfig.ReviewerPrompt)
+	assert.Len(t, cfg.Warnings, 0, "should have no warnings for valid config")
+}
+
 func TestLoader_Load_AgentsConfig_Merge(t *testing.T) {
 	// Setup
 	crewDir := t.TempDir()
@@ -600,4 +629,135 @@ reviewer_default = "repo-reviewer"
 	assert.Equal(t, "global-worker", cfg.AgentsConfig.DefaultWorker)           // From global
 	assert.Equal(t, "global-manager", cfg.AgentsConfig.DefaultManager)         // From global
 	assert.Equal(t, "repo-reviewer", cfg.AgentsConfig.DefaultReviewer)         // Overridden
+}
+
+func TestLoader_Load_OverrideConfig(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config
+	globalConfig := `
+[agents]
+worker_default = "opencode"
+
+[agents.opencode]
+args = "--verbose"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write override config
+	overrideConfig := `
+[agents]
+worker_default = "claude"
+disabled_agents = ["opencode", "codex"]
+`
+	err = os.WriteFile(filepath.Join(globalDir, domain.ConfigOverrideFileName), []byte(overrideConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify override takes precedence
+	assert.Equal(t, "claude", cfg.AgentsConfig.DefaultWorker)
+	assert.Equal(t, []string{"opencode", "codex"}, cfg.AgentsConfig.DisabledAgents)
+}
+
+func TestLoader_Load_DisabledAgents(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config with disabled_agents
+	repoConfig := `
+[agents]
+disabled_agents = ["agent1", "agent2"]
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify disabled_agents
+	assert.Equal(t, []string{"agent1", "agent2"}, cfg.AgentsConfig.DisabledAgents)
+}
+
+func TestLoader_Load_IgnoreOverride(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config
+	globalConfig := `
+[agents]
+worker_default = "opencode"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write override config
+	overrideConfig := `
+[agents]
+worker_default = "claude"
+`
+	err = os.WriteFile(filepath.Join(globalDir, domain.ConfigOverrideFileName), []byte(overrideConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config with IgnoreOverride option
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreOverride: true})
+	require.NoError(t, err)
+
+	// Verify override was ignored, global config is used
+	assert.Equal(t, "opencode", cfg.AgentsConfig.DefaultWorker)
+}
+
+func TestLoader_Load_OnboardingDone(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config with onboarding_done
+	repoConfig := `
+onboarding_done = true
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify onboarding_done is true
+	assert.True(t, cfg.OnboardingDone)
+}
+
+func TestLoader_Load_OnboardingDone_DefaultFalse(t *testing.T) {
+	// Setup: create temp directories
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config without onboarding_done
+	repoConfig := `
+[log]
+level = "debug"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify onboarding_done defaults to false
+	assert.False(t, cfg.OnboardingDone)
+>>>>>>> main
 }

@@ -73,22 +73,23 @@ crew peek <id>
 
 ### "Review this"
 
+Delegate reviews to a dedicated reviewer agent via `crew review`.
+The manager should NOT review code directly.
+
 ```bash
-# 1. Run AI review
+# 1. Delegate review to reviewer agent
 crew review <id>
+# This spawns a reviewer agent that analyzes the diff and provides feedback
 
-# 2. Check diff manually
-crew diff <id>
+# 2. Wait for review completion and check result
+# The reviewer agent will output findings
 
-# 3. Run CI (using crew exec)
-crew exec <id> -- mise run ci
-
-# 4. Merge if OK
+# 3. If LGTM, merge
 echo "y" | crew merge <id>
 
-# If issues found, request changes
-crew comment <id> -R "Description of the issue"
-# This automatically sets status to in_progress and notifies the agent
+# If issues found, forward feedback to worker
+crew comment <id> -R "Description of the issue from reviewer"
+# This automatically sets status to in_progress and notifies the worker agent
 ```
 
 ### "What's the progress?"
@@ -102,7 +103,7 @@ crew show <id>         # Task details
 ### "Update the binary"
 
 ```bash
-crew exec <id> -- go build -o /path/to/binary ./cmd/...
+crew exec <id> -- <build command>
 ```
 
 ### "Fix the conflict"
@@ -152,18 +153,18 @@ crew start <id> opencode
 
 | File | Changes |
 |------|---------|
-| internal/cli/task.go | --desc -> --body |
-| internal/cli/task_test.go | Update tests |
+| src/feature.ts | Update component logic |
+| src/feature.test.ts | Update tests |
 
 ## Implementation Plan
 
-1. Change CLI flag definition
+1. Change the component implementation
 2. Update tests
 3. Run CI
 
 ## Completion Criteria
 
-- [ ] --body flag works
+- [ ] Feature works as expected
 - [ ] All tests pass
 ```
 
@@ -195,18 +196,28 @@ crew start <id> opencode
 
 ## Monitoring for Action
 
-A short one-liner collection for managers to wait for user actions.
+Use `crew poll` to monitor task status changes and trigger actions.
 
 ```bash
-# Wait until needs_input or in_review appears (5m timeout)
-timeout 5m sh -c 'while ! crew list | grep -qE "needs_input|in_review"; do sleep 5; done' && echo "Action needed"
+# Basic polling (checks every 10s, no timeout)
+crew poll <id>
 
-# With notification (uses Linux notify-send)
-timeout 5m sh -c 'while ! crew list | grep -qE "needs_input|in_review"; do sleep 5; done' && notify-send "crew: Action needed"
+# Poll with custom interval and timeout
+crew poll <id> --interval 5 --timeout 300
 
-# Continuous watch (update display every 10s)
-watch -n 10 'crew list | grep -E "needs_input|in_review"'
+# Execute notification on status change
+crew poll <id> --command 'notify-send "Task {{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.NewStatus{{"}}"}}"'
+
+# Run in background
+crew poll <id> --command 'echo "{{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.OldStatus{{"}}"}} → {{"{{"}}.NewStatus{{"}}"}}"' &
 ```
+
+**Command template variables**:
+- `{{"{{"}}.TaskID{{"}}"}}` - Task ID
+- `{{"{{"}}.OldStatus{{"}}"}}` - Previous status
+- `{{"{{"}}.NewStatus{{"}}"}}` - New status
+
+**Auto-exit**: Polling stops when the task reaches a terminal state (done, closed, error) or timeout.
 
 ## Available Commands
 
@@ -228,6 +239,7 @@ watch -n 10 'crew list | grep -E "needs_input|in_review"'
 | `crew peek` | Check session output |
 | `crew send` | Send key input |
 | `crew attach` | Attach to session |
+| `crew poll` | Monitor status changes |
 
 ### Worktree Operations
 | Command | Description |
@@ -258,3 +270,20 @@ watch -n 10 'crew list | grep -E "needs_input|in_review"'
 - Do not edit files directly (read-only mode)
 - Do not write code directly
 - Delegate work to worker agents
+
+---
+{{if not .OnboardingDone}}
+
+## Onboarding
+
+**Onboarding has not been completed for this project.**
+
+Run `crew --help-manager-onboarding` and suggest to the user that they complete the onboarding checklist for optimal crew usage.
+
+Onboarding helps with:
+- Configuring default agents (worker, manager, reviewer)
+- Setting up project-specific AI instructions (CLAUDE.md / AGENTS.md)
+- Customizing development workflows
+
+After completing onboarding, set `onboarding_done = true` in `.git/crew/config.toml`.
+{{end}}

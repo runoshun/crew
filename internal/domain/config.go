@@ -14,55 +14,18 @@ import (
 var configTemplateContent string
 
 // Config represents the application configuration.
+// Fields are ordered to minimize memory padding.
 type Config struct {
-	Agents       map[string]Agent `toml:"agents"` // Agent definitions from [agents.<name>]
-	AgentsConfig AgentsConfig     `toml:"agents"` // Common [agents] settings
-	Complete     CompleteConfig   `toml:"complete"`
-	Diff         DiffConfig       `toml:"diff"`
-	Log          LogConfig        `toml:"log"`
-	Tasks        TasksConfig      `toml:"tasks"`
-	TUI          TUIConfig        `toml:"tui"`
-	Worktree     WorktreeConfig   `toml:"worktree"`
-	Warnings     []string         `toml:"-"`
-}
-
-// MarshalTOML overrides the TOML marshaling for Config to merge Agents and AgentsConfig.
-func (c *Config) MarshalTOML() (any, error) {
-	type agentsSection struct {
-		Agents          map[string]Agent `toml:",inline"`
-		DefaultWorker   string           `toml:"worker_default,omitempty"`
-		DefaultManager  string           `toml:"manager_default,omitempty"`
-		DefaultReviewer string           `toml:"reviewer_default,omitempty"`
-		WorkerPrompt    string           `toml:"worker_prompt,omitempty"`
-		ManagerPrompt   string           `toml:"manager_prompt,omitempty"`
-		ReviewerPrompt  string           `toml:"reviewer_prompt,omitempty"`
-	}
-
-	return struct {
-		Agents   agentsSection  `toml:"agents"`
-		Complete CompleteConfig `toml:"complete"`
-		Diff     DiffConfig     `toml:"diff"`
-		Log      LogConfig      `toml:"log"`
-		Tasks    TasksConfig    `toml:"tasks"`
-		TUI      TUIConfig      `toml:"tui"`
-		Worktree WorktreeConfig `toml:"worktree"`
-	}{
-		Agents: agentsSection{
-			DefaultWorker:   c.AgentsConfig.DefaultWorker,
-			DefaultManager:  c.AgentsConfig.DefaultManager,
-			DefaultReviewer: c.AgentsConfig.DefaultReviewer,
-			WorkerPrompt:    c.AgentsConfig.WorkerPrompt,
-			ManagerPrompt:   c.AgentsConfig.ManagerPrompt,
-			ReviewerPrompt:  c.AgentsConfig.ReviewerPrompt,
-			Agents:          c.Agents,
-		},
-		Complete: c.Complete,
-		Diff:     c.Diff,
-		Log:      c.Log,
-		Tasks:    c.Tasks,
-		TUI:      c.TUI,
-		Worktree: c.Worktree,
-	}, nil
+	Agents         map[string]Agent `toml:"agents"` // Agent definitions from [agents.<name>]
+	Warnings       []string         `toml:"-"`
+	AgentsConfig   AgentsConfig     `toml:"agents"` // Common [agents] settings
+	Complete       CompleteConfig   `toml:"complete"`
+	Diff           DiffConfig       `toml:"diff"`
+	Log            LogConfig        `toml:"log"`
+	Tasks          TasksConfig      `toml:"tasks"`
+	TUI            TUIConfig        `toml:"tui"`
+	Worktree       WorktreeConfig   `toml:"worktree"`
+	OnboardingDone bool             `toml:"onboarding_done,omitempty"` // Whether onboarding has been completed
 }
 
 // TasksConfig holds settings for task storage from [tasks] section.
@@ -74,12 +37,13 @@ type TasksConfig struct {
 
 // AgentsConfig holds common settings for all agents from [agents] section.
 type AgentsConfig struct {
-	DefaultWorker   string `toml:"worker_default,omitempty"`   // Default worker agent name
-	DefaultManager  string `toml:"manager_default,omitempty"`  // Default manager agent name
-	DefaultReviewer string `toml:"reviewer_default,omitempty"` // Default reviewer agent name
-	WorkerPrompt    string `toml:"worker_prompt,omitempty"`    // Default prompt for all worker agents
-	ManagerPrompt   string `toml:"manager_prompt,omitempty"`   // Default prompt for all manager agents
-	ReviewerPrompt  string `toml:"reviewer_prompt,omitempty"`  // Default prompt for all reviewer agents
+	DefaultWorker   string   `toml:"worker_default,omitempty"`   // Default worker agent name
+	DefaultManager  string   `toml:"manager_default,omitempty"`  // Default manager agent name
+	DefaultReviewer string   `toml:"reviewer_default,omitempty"` // Default reviewer agent name
+	WorkerPrompt    string   `toml:"worker_prompt,omitempty"`    // Default prompt for all worker agents
+	ManagerPrompt   string   `toml:"manager_prompt,omitempty"`   // Default prompt for all manager agents
+	ReviewerPrompt  string   `toml:"reviewer_prompt,omitempty"`  // Default prompt for all reviewer agents
+	DisabledAgents  []string `toml:"disabled_agents,omitempty"`  // List of agent names to disable
 }
 
 // Role represents the role of an agent.
@@ -287,7 +251,7 @@ IMPORTANT: First run 'crew --help-worker' and follow the workflow instructions e
 // DefaultManagerSystemPrompt is the default system prompt template for managers.
 const DefaultManagerSystemPrompt = `You are a Manager agent for git-crew.
 
-IMPORTANT: Run 'crew --help-manager' for detailed usage instructions.
+IMPORTANT: First run 'crew --help-manager' and follow the usage instructions.
 
 Support users with task management as an assistant.
 - Understand current status and suggest next actions
@@ -321,9 +285,10 @@ Then list specific issues with file:line references.`
 
 // Directory and file names for git-crew.
 const (
-	CrewDirName        = "crew"        // Directory name for crew data
-	ConfigFileName     = "config.toml" // Config file name
-	RootConfigFileName = ".crew.toml"  // Config file name in repository root
+	CrewDirName            = "crew"                 // Directory name for crew data
+	ConfigFileName         = "config.toml"          // Config file name
+	ConfigOverrideFileName = "config.override.toml" // Override config file name
+	RootConfigFileName     = ".crew.toml"           // Config file name in repository root
 )
 
 // RepoCrewDir returns the crew directory path for a repository.
@@ -351,6 +316,12 @@ func GlobalCrewDir(configHome string) string {
 // configHome is typically XDG_CONFIG_HOME or ~/.config (resolved by caller).
 func GlobalConfigPath(configHome string) string {
 	return filepath.Join(GlobalCrewDir(configHome), ConfigFileName)
+}
+
+// GlobalOverrideConfigPath returns the global override config path.
+// configHome is typically XDG_CONFIG_HOME or ~/.config (resolved by caller).
+func GlobalOverrideConfigPath(configHome string) string {
+	return filepath.Join(GlobalCrewDir(configHome), ConfigOverrideFileName)
 }
 
 // NewDefaultConfig returns a Config with default values.
@@ -461,6 +432,18 @@ func formatPromptForTemplate(prompt string) string {
 	buf.WriteString("\n# \"\"\"")
 
 	return buf.String()
+}
+
+// EnabledAgents returns a map of agents that are not disabled.
+// It filters out agents that match any pattern in DisabledAgents.
+func (c *Config) EnabledAgents() map[string]Agent {
+	result := make(map[string]Agent)
+	for name, agent := range c.Agents {
+		if !IsAgentDisabled(name, c.AgentsConfig.DisabledAgents) {
+			result[name] = agent
+		}
+	}
+	return result
 }
 
 // ResolveInheritance resolves agent inheritance by applying parent agent settings

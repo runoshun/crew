@@ -9,7 +9,6 @@ coverage.html
 # IDE
 .idea/
 .vscode/
-.opencode/
 *.swp
 *.swo
 *~
@@ -23,3 +22,4 @@ Thumbs.db
 *.log
 
 .playwright-mcp/
+.e2e-test/

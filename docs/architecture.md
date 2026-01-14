@@ -194,7 +194,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 ```go
 func (c *Container) StartTask() *usecase.StartTask {
-    return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.Config, c.Clock)
+    return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Git, c.Clock, c.Logger, c.Runner, c.Config.CrewDir, c.Config.RepoRoot)
 }
 ```
 
@@ -225,7 +225,7 @@ type MockTaskRepository struct {
     tasks map[int]*domain.Task
 }
 
-uc := usecase.NewStartTask(mockRepo, mockSessions, ...)
+uc := usecase.NewStartTask(mockRepo, mockSessions, mockWorktrees, mockConfigLoader, mockGit, mockClock, mockLogger, mockRunner, crewDir, repoRoot)
 out, err := uc.Execute(ctx, input)
 ```
 
@@ -291,4 +291,48 @@ client.SetExecFunc(func(argv0 string, argv []string, envv []string) error {
 client.Attach("session-1")
 assert.Equal(t, expectedArgs, capturedArgs)
 ```
+
+---
+
+## Logging
+
+git-crew provides file-based logging for debugging and auditing purposes. Logs are written to both a global log file and task-specific log files.
+
+### Log Files
+
+| File | Location | Purpose |
+|------|----------|---------|
+| Global log | `.git/crew/logs/crew.log` | All operations across all tasks |
+| Task log | `.git/crew/logs/task-N.log` | Operations for a specific task |
+
+### Log Format
+
+```
+[2025-12-30 09:32:51] [INFO] [task-1] [task] created: "test"
+```
+
+Format: `[timestamp] [level] [task-id] [category] message`
+
+- **timestamp**: ISO 8601 formatted date and time
+- **level**: DEBUG, INFO, WARN, or ERROR
+- **task-id**: `task-N` for task-specific logs, `global` for global operations
+- **category**: Component category (task, session, etc.)
+- **message**: Human-readable log message
+
+### Configuration
+
+Log level can be configured in `config.toml`:
+
+```toml
+[log]
+level = "info"  # debug, info, warn, error
+```
+
+### Implementation
+
+- `domain.Logger` interface defines the logging contract
+- `infra/logging.Logger` implements file-based logging
+- Logs are appended to files (not rotated)
+- Task logs contain only entries for that specific task
+- Global log contains all entries
 

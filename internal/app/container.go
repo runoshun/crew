@@ -4,15 +4,17 @@ package app
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/infra/config"
+	"github.com/runoshun/git-crew/v2/internal/infra/executor"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
 	"github.com/runoshun/git-crew/v2/internal/infra/gitstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
+	"github.com/runoshun/git-crew/v2/internal/infra/logging"
+	"github.com/runoshun/git-crew/v2/internal/infra/runner"
 	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
 	"github.com/runoshun/git-crew/v2/internal/infra/worktree"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
@@ -54,10 +56,10 @@ type Container struct {
 	Sessions         domain.SessionManager
 	ConfigLoader     domain.ConfigLoader
 	ConfigManager    domain.ConfigManager
+	Logger           domain.Logger
+	Runner           domain.ScriptRunner
+	Executor         domain.CommandExecutor
 	// GitHub    domain.GitHub          // TODO: implement in later phase
-
-	// Pointer fields
-	Logger *slog.Logger
 
 	// Configuration
 	Config Config
@@ -105,9 +107,8 @@ func New(dir string) (*Container, error) {
 	}
 
 	// Create logger
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
+	logLevel := logging.ParseLevel(appConfig.Log.Level)
+	logger := logging.New(cfg.CrewDir, logLevel)
 
 	// Create worktree manager
 	worktreeClient := worktree.NewClient(cfg.RepoRoot, cfg.WorktreeDir)
@@ -117,6 +118,12 @@ func New(dir string) (*Container, error) {
 
 	// Create config manager
 	configManager := config.NewManager(cfg.CrewDir, cfg.RepoRoot)
+
+	// Create script runner
+	scriptRunner := runner.NewClient()
+
+	// Create command executor
+	commandExecutor := executor.NewClient()
 
 	return &Container{
 		Tasks:            taskRepo,
@@ -128,17 +135,20 @@ func New(dir string) (*Container, error) {
 		ConfigLoader:     configLoader,
 		ConfigManager:    configManager,
 		Logger:           logger,
+		Runner:           scriptRunner,
+		Executor:         commandExecutor,
 		Config:           cfg,
 	}, nil
 }
 
 // NewWithDeps creates a new Container with custom dependencies for testing.
-func NewWithDeps(cfg Config, tasks domain.TaskRepository, storeInit domain.StoreInitializer, clock domain.Clock, logger *slog.Logger) *Container {
+func NewWithDeps(cfg Config, tasks domain.TaskRepository, storeInit domain.StoreInitializer, clock domain.Clock, logger domain.Logger, executor domain.CommandExecutor) *Container {
 	return &Container{
 		Tasks:            tasks,
 		StoreInitializer: storeInit,
 		Clock:            clock,
 		Logger:           logger,
+		Executor:         executor,
 		Config:           cfg,
 	}
 }
@@ -152,7 +162,7 @@ func (c *Container) InitRepoUseCase() *usecase.InitRepo {
 
 // NewTaskUseCase returns a new NewTask use case.
 func (c *Container) NewTaskUseCase() *usecase.NewTask {
-	return usecase.NewNewTask(c.Tasks, c.Clock)
+	return usecase.NewNewTask(c.Tasks, c.Git, c.Clock, c.Logger)
 }
 
 // ListTasksUseCase returns a new ListTasks use case.
@@ -201,7 +211,7 @@ func (c *Container) CloseTaskUseCase() *usecase.CloseTask {
 
 // StartTaskUseCase returns a new StartTask use case.
 func (c *Container) StartTaskUseCase() *usecase.StartTask {
-	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Clock, c.Config.CrewDir, c.Config.RepoRoot)
+	return usecase.NewStartTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Git, c.Clock, c.Logger, c.Runner, c.Config.CrewDir, c.Config.RepoRoot)
 }
 
 // AttachSessionUseCase returns a new AttachSession use case.
@@ -236,7 +246,7 @@ func (c *Container) InitConfigUseCase() *usecase.InitConfig {
 
 // CompleteTaskUseCase returns a new CompleteTask use case.
 func (c *Container) CompleteTaskUseCase() *usecase.CompleteTask {
-	return usecase.NewCompleteTask(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Clock)
+	return usecase.NewCompleteTask(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Clock, c.Logger, c.Executor)
 }
 
 // MergeTaskUseCase returns a new MergeTask use case.
@@ -247,13 +257,13 @@ func (c *Container) MergeTaskUseCase() *usecase.MergeTask {
 // ShowDiffUseCase returns a new ShowDiff use case.
 // stdout and stderr are the writers for command output.
 func (c *Container) ShowDiffUseCase(stdout, stderr io.Writer) *usecase.ShowDiff {
-	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.ConfigLoader, stdout, stderr)
+	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Executor, stdout, stderr)
 }
 
 // ShowDiffUseCaseForCommand returns a new ShowDiff use case for GetCommand() only.
 // This is used by TUI which executes the command via tea.Exec.
 func (c *Container) ShowDiffUseCaseForCommand() *usecase.ShowDiff {
-	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.ConfigLoader, nil, nil)
+	return usecase.NewShowDiff(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Executor, nil, nil)
 }
 
 // StopTaskUseCase returns a new StopTask use case.
@@ -279,5 +289,11 @@ func (c *Container) StartManagerUseCase() *usecase.StartManager {
 // ReviewTaskUseCase returns a new ReviewTask use case.
 // stdout and stderr are the writers for command output.
 func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewTask {
-	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Config.RepoRoot, stdout, stderr)
+	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Executor, c.Config.RepoRoot, stdout, stderr)
+}
+
+// PollTaskUseCase returns a new PollTask use case.
+// stdout and stderr are the writers for command output.
+func (c *Container) PollTaskUseCase(stdout, stderr io.Writer) *usecase.PollTask {
+	return usecase.NewPollTask(c.Tasks, c.Clock, c.Executor, stdout, stderr)
 }

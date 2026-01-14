@@ -208,3 +208,100 @@ func TestViewDetailPanel_TitleWrapping(t *testing.T) {
 	renderedHeight := lipgloss.Height(result)
 	assert.LessOrEqual(t, renderedHeight, 13, "Height should not exceed panel height even with title wrapping")
 }
+
+func TestViewFooter_Truncation(t *testing.T) {
+	tests := []struct {
+		name        string
+		width       int
+		expectedHas string
+		description string
+	}{
+		{
+			name:        "Wide screen - full footer displayed",
+			width:       120,
+			expectedHas: "quit",
+			description: "Footer should display full content on wide screen",
+		},
+		{
+			name:        "Narrow screen - footer truncated with ellipsis",
+			width:       60,
+			expectedHas: "...",
+			description: "Footer should be truncated with ... when width is limited",
+		},
+		{
+			name:        "Very narrow screen - minimal footer with ellipsis",
+			width:       40,
+			expectedHas: "...",
+			description: "Footer should show ... when space is very limited",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			styles := DefaultStyles()
+			delegate := newTaskDelegate(styles)
+			taskList := list.New([]list.Item{}, delegate, tt.width, 20)
+
+			// Create a simple task to populate the list
+			task := &domain.Task{
+				ID:      1,
+				Title:   "Test task",
+				Status:  domain.StatusTodo,
+				Created: time.Now(),
+			}
+			taskList.SetItems([]list.Item{taskItem{task: task}})
+
+			m := &Model{
+				width:    tt.width,
+				height:   20,
+				tasks:    []*domain.Task{task},
+				styles:   styles,
+				taskList: taskList,
+				mode:     ModeNormal,
+			}
+
+			result := m.viewFooter()
+
+			// Verify the result is not empty
+			assert.NotEmpty(t, result, "viewFooter should return non-empty string")
+
+			// Check for expected content
+			assert.Contains(t, result, tt.expectedHas, tt.description)
+		})
+	}
+}
+
+func TestViewFooter_MinimalWidth(t *testing.T) {
+	// Test the edge case where maxContentWidth <= 3
+	// This should show only "..." for the content
+	styles := DefaultStyles()
+	delegate := newTaskDelegate(styles)
+
+	// Use a very narrow width to force minimal content display
+	width := 30
+	taskList := list.New([]list.Item{}, delegate, width, 20)
+
+	task := &domain.Task{
+		ID:      1,
+		Title:   "Test task",
+		Status:  domain.StatusTodo,
+		Created: time.Now(),
+	}
+	taskList.SetItems([]list.Item{taskItem{task: task}})
+
+	m := &Model{
+		width:    width,
+		height:   20,
+		tasks:    []*domain.Task{task},
+		styles:   styles,
+		taskList: taskList,
+		mode:     ModeNormal,
+	}
+
+	result := m.viewFooter()
+
+	// With very limited space, footer should still render properly
+	assert.NotEmpty(t, result, "viewFooter should return non-empty string even with minimal width")
+	// When space is very limited, the content should be truncated (possibly to just "...")
+	assert.Contains(t, result, "...", "Footer should contain ellipsis when truncated")
+}

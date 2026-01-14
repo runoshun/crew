@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"os/exec"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -27,7 +26,8 @@ type CompleteTask struct {
 	git       domain.Git
 	config    domain.ConfigLoader
 	clock     domain.Clock
-	execCmd   func(name string, args ...string) *exec.Cmd
+	logger    domain.Logger
+	executor  domain.CommandExecutor
 }
 
 // NewCompleteTask creates a new CompleteTask use case.
@@ -37,6 +37,8 @@ func NewCompleteTask(
 	git domain.Git,
 	config domain.ConfigLoader,
 	clock domain.Clock,
+	logger domain.Logger,
+	executor domain.CommandExecutor,
 ) *CompleteTask {
 	return &CompleteTask{
 		tasks:     tasks,
@@ -44,13 +46,9 @@ func NewCompleteTask(
 		git:       git,
 		config:    config,
 		clock:     clock,
-		execCmd:   exec.Command,
+		logger:    logger,
+		executor:  executor,
 	}
-}
-
-// SetExecCmd sets a custom exec.Cmd factory for testing.
-func (uc *CompleteTask) SetExecCmd(fn func(name string, args ...string) *exec.Cmd) {
-	uc.execCmd = fn
 }
 
 // Execute marks a task as complete.
@@ -99,10 +97,9 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 	}
 
 	if cfg != nil && cfg.Complete.Command != "" {
-		// Execute the complete command
-		cmd := uc.execCmd("sh", "-c", cfg.Complete.Command)
-		cmd.Dir = worktreePath
-		output, err := cmd.CombinedOutput()
+		// Execute the complete command using CommandExecutor
+		cmd := domain.NewShellCommand(cfg.Complete.Command, worktreePath)
+		output, err := uc.executor.Execute(cmd)
 		if err != nil {
 			return nil, fmt.Errorf("[complete].command failed: %s: %w", string(output), err)
 		}
@@ -125,6 +122,11 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {
 		return nil, fmt.Errorf("save task: %w", err)
+	}
+
+	// Log task completion
+	if uc.logger != nil {
+		uc.logger.Info(task.ID, "task", "completed (status: in_review)")
 	}
 
 	return &CompleteTaskOutput{Task: task}, nil

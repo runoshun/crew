@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
@@ -185,6 +186,14 @@ type Git interface {
 
 	// ListBranches returns a list of all local branches.
 	ListBranches() ([]string, error)
+
+	// GetDefaultBranch returns the default branch name.
+	// Priority: git config crew.defaultBranch > refs/remotes/origin/HEAD > "main"
+	GetDefaultBranch() (string, error)
+
+	// GetNewTaskBaseBranch returns the base branch for new tasks.
+	// Priority: git config crew.newTaskBase > current branch (if "current") > GetDefaultBranch()
+	GetNewTaskBaseBranch() (string, error)
 }
 
 // GitHub provides GitHub integration via gh CLI.
@@ -239,6 +248,7 @@ type LoadConfigOptions struct {
 	IgnoreGlobal   bool // Skip loading global config
 	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
 	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
+	IgnoreOverride bool // Skip loading override config (config.override.toml)
 }
 
 // ConfigInfo holds information about a config file.
@@ -259,6 +269,9 @@ type ConfigManager interface {
 	// GetRootRepoConfigInfo returns information about the root repository config file (.crew.toml).
 	GetRootRepoConfigInfo() ConfigInfo
 
+	// GetOverrideConfigInfo returns information about the global override config file (config.override.toml).
+	GetOverrideConfigInfo() ConfigInfo
+
 	// InitRepoConfig creates a repository config file with default template.
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
@@ -268,6 +281,11 @@ type ConfigManager interface {
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
 	InitGlobalConfig(cfg *Config) error
+
+	// InitOverrideConfig creates a global override config file with default template.
+	// The cfg parameter should have builtin agents registered (via builtin.Register).
+	// Returns error if file already exists.
+	InitOverrideConfig(cfg *Config) error
 }
 
 // Clock provides time operations for testability.
@@ -282,4 +300,47 @@ type RealClock struct{}
 // Now returns the current time.
 func (RealClock) Now() time.Time {
 	return time.Now()
+}
+
+// Logger provides structured logging with task-aware output.
+// Logs are written to both a global log file and task-specific log files.
+type Logger interface {
+	// Info logs an info message.
+	Info(taskID int, category, msg string)
+
+	// Debug logs a debug message.
+	Debug(taskID int, category, msg string)
+
+	// Warn logs a warning message.
+	Warn(taskID int, category, msg string)
+
+	// Error logs an error message.
+	Error(taskID int, category, msg string)
+
+	// Close closes any open log files.
+	Close() error
+}
+
+// ScriptRunner executes shell scripts in a specified directory.
+type ScriptRunner interface {
+	// Run executes a script in the given directory.
+	// Returns an error if the script execution fails.
+	Run(dir, script string) error
+}
+
+// CommandExecutor executes external commands.
+// This interface abstracts the execution of shell commands, enabling
+// different implementations for CLI (direct execution) and testing (mocking).
+type CommandExecutor interface {
+	// Execute runs a command and returns its combined output.
+	// The command is executed in the specified working directory.
+	Execute(cmd *ExecCommand) (output []byte, err error)
+
+	// ExecuteInteractive runs a command with stdin/stdout/stderr connected.
+	// This is used for interactive commands that need terminal access.
+	ExecuteInteractive(cmd *ExecCommand) error
+
+	// ExecuteWithContext runs a command with context and custom stdout/stderr writers.
+	// This is used for commands that need streaming output.
+	ExecuteWithContext(ctx context.Context, cmd *ExecCommand, stdout, stderr io.Writer) error
 }

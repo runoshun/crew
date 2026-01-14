@@ -187,6 +187,26 @@ func TestStartManager_Execute_DefaultManager(t *testing.T) {
 	assert.Contains(t, out.Command, "opencode")
 }
 
+func TestStartManager_Execute_WithManagerPrompt(t *testing.T) {
+	repoRoot := t.TempDir()
+	gitDir := repoRoot + "/.git"
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set ManagerPrompt in AgentsConfig
+	configLoader.Config.AgentsConfig.ManagerPrompt = "Custom manager prompt from config"
+
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), StartManagerInput{
+		Name: "claude-manager",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Contains(t, out.Prompt, "Custom manager prompt from config")
+}
+
 func TestStartManagerOutput_GetCommand(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -348,4 +368,32 @@ func TestStartManager_Execute_AgentPromptOverridesManagerPrompt(t *testing.T) {
 	// Verify Agent.Prompt takes precedence over ManagerPrompt
 	assert.Contains(t, out.Prompt, "Agent-specific prompt")
 	assert.NotContains(t, out.Prompt, "Manager prompt from config")
+}
+
+func TestStartManager_Execute_WithDisabledAgent(t *testing.T) {
+	// Mock config with disabled agent
+	cfg := &domain.Config{
+		Agents: map[string]domain.Agent{
+			"opencode-manager": {
+				CommandTemplate: "opencode {{.Args}} --prompt {{.Prompt}}",
+				Role:            domain.RoleManager,
+			},
+		},
+		AgentsConfig: domain.AgentsConfig{
+			DisabledAgents: []string{"opencode-manager"},
+		},
+	}
+	mockLoader := &testutil.MockConfigLoader{Config: cfg}
+
+	uc := NewStartManager(mockLoader, "/test", "/test/.git")
+
+	// Execute with disabled agent
+	_, err := uc.Execute(context.Background(), StartManagerInput{
+		Name: "opencode-manager",
+	})
+
+	// Assert - disabled agents should return ErrAgentDisabled
+	assert.ErrorIs(t, err, domain.ErrAgentDisabled)
+	assert.Contains(t, err.Error(), "opencode-manager")
+	assert.Contains(t, err.Error(), "disabled")
 }

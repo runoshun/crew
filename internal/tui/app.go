@@ -443,9 +443,10 @@ func (m *Model) updateAgents() {
 	m.agentCommands = make(map[string]string)
 
 	// Filter agents: only show worker-role agents that are not hidden
+	// EnabledAgents() already filters out disabled agents
 	m.builtinAgents = []string{}
 	m.customAgents = []string{}
-	for name, agentDef := range m.config.Agents {
+	for name, agentDef := range m.config.EnabledAgents() {
 		// Skip hidden agents and non-worker roles
 		if agentDef.Hidden || (agentDef.Role != "" && agentDef.Role != domain.RoleWorker) {
 			continue
@@ -507,27 +508,36 @@ func (m *Model) loadCustomKeybindings() {
 	}
 }
 
-// tmuxAttachCmd implements tea.ExecCommand for attaching to a tmux session.
-type tmuxAttachCmd struct {
-	stdin       io.Reader
-	stdout      io.Writer
-	stderr      io.Writer
-	socketPath  string
-	sessionName string
+// domainExecCmd wraps domain.ExecCommand to implement tea.ExecCommand.
+// This allows using the domain type for command construction while
+// satisfying the tea.ExecCommand interface for TUI execution.
+type domainExecCmd struct {
+	cmd          *domain.ExecCommand
+	stdin        io.Reader
+	stdout       io.Writer
+	stderr       io.Writer
+	ignoreErrors bool // If true, Run() always returns nil
 }
 
-func (c *tmuxAttachCmd) Run() error {
-	// #nosec G204 - socketPath and sessionName are trusted internal values
-	cmd := exec.Command("tmux", "-S", c.socketPath, "attach", "-t", c.sessionName)
-	cmd.Stdin = c.stdin
-	cmd.Stdout = c.stdout
-	cmd.Stderr = c.stderr
-	return cmd.Run()
+func (c *domainExecCmd) Run() error {
+	// #nosec G204 - cmd.Program and cmd.Args come from trusted internal values
+	execCmd := exec.Command(c.cmd.Program, c.cmd.Args...)
+	if c.cmd.Dir != "" {
+		execCmd.Dir = c.cmd.Dir
+	}
+	execCmd.Stdin = c.stdin
+	execCmd.Stdout = c.stdout
+	execCmd.Stderr = c.stderr
+	if c.ignoreErrors {
+		_ = execCmd.Run()
+		return nil
+	}
+	return execCmd.Run()
 }
 
-func (c *tmuxAttachCmd) SetStdin(r io.Reader)  { c.stdin = r }
-func (c *tmuxAttachCmd) SetStdout(w io.Writer) { c.stdout = w }
-func (c *tmuxAttachCmd) SetStderr(w io.Writer) { c.stderr = w }
+func (c *domainExecCmd) SetStdin(r io.Reader)  { c.stdin = r }
+func (c *domainExecCmd) SetStdout(w io.Writer) { c.stdout = w }
+func (c *domainExecCmd) SetStderr(w io.Writer) { c.stderr = w }
 
 // attachToSession returns a tea.Cmd that attaches to a tmux session.
 // After the attach completes (user detaches), it triggers a task reload.
@@ -535,39 +545,12 @@ func (m *Model) attachToSession(taskID int) tea.Cmd {
 	socketPath := m.container.Config.SocketPath
 	sessionName := domain.SessionName(taskID)
 
-	return tea.Exec(&tmuxAttachCmd{
-		socketPath:  socketPath,
-		sessionName: sessionName,
-	}, func(err error) tea.Msg {
+	cmd := domain.NewCommand("tmux", []string{"-S", socketPath, "attach", "-t", sessionName}, "")
+	return tea.Exec(&domainExecCmd{cmd: cmd}, func(err error) tea.Msg {
 		// Reload tasks after detaching from the session
 		return MsgReloadTasks{}
 	})
 }
-
-// diffExecCmd implements tea.ExecCommand for showing diff.
-type diffExecCmd struct {
-	stdin        io.Reader
-	stdout       io.Writer
-	stderr       io.Writer
-	worktreePath string
-	diffCommand  string
-}
-
-func (c *diffExecCmd) Run() error {
-	// #nosec G204 - diffCommand is from config, trusted
-	cmd := exec.Command("sh", "-c", c.diffCommand)
-	cmd.Dir = c.worktreePath
-	cmd.Stdin = c.stdin
-	cmd.Stdout = c.stdout
-	cmd.Stderr = c.stderr
-	// Ignore exit code as diff can return non-zero when there are differences
-	_ = cmd.Run()
-	return nil
-}
-
-func (c *diffExecCmd) SetStdin(r io.Reader)  { c.stdin = r }
-func (c *diffExecCmd) SetStdout(w io.Writer) { c.stdout = w }
-func (c *diffExecCmd) SetStderr(w io.Writer) { c.stderr = w }
 
 // showDiff returns a tea.Cmd that shows the diff for a task.
 // After the diff viewer closes, it triggers a task reload.
@@ -591,29 +574,6 @@ type execDiffMsg struct {
 	cmd *domain.ExecCommand
 }
 
-// execCmd implements tea.ExecCommand for executing a command in a worktree.
-type execCmd struct {
-	stdin        io.Reader
-	stdout       io.Writer
-	stderr       io.Writer
-	worktreePath string
-	command      string
-}
-
-func (c *execCmd) Run() error {
-	// #nosec G204 - command is user-provided, trusted in this context
-	cmd := exec.Command("sh", "-c", c.command)
-	cmd.Dir = c.worktreePath
-	cmd.Stdin = c.stdin
-	cmd.Stdout = c.stdout
-	cmd.Stderr = c.stderr
-	return cmd.Run()
-}
-
-func (c *execCmd) SetStdin(r io.Reader)  { c.stdin = r }
-func (c *execCmd) SetStdout(w io.Writer) { c.stdout = w }
-func (c *execCmd) SetStderr(w io.Writer) { c.stderr = w }
-
 // executeCommand returns a tea.Cmd that executes a command in a task's worktree.
 func (m *Model) executeCommand(command string) tea.Cmd {
 	task := m.SelectedTask()
@@ -631,10 +591,8 @@ func (m *Model) executeCommand(command string) tea.Cmd {
 		}
 	}
 
-	return tea.Exec(&execCmd{
-		worktreePath: wtPath,
-		command:      command,
-	}, func(err error) tea.Msg {
+	cmd := domain.NewShellCommand(command, wtPath)
+	return tea.Exec(&domainExecCmd{cmd: cmd}, func(err error) tea.Msg {
 		return MsgReloadTasks{}
 	})
 }

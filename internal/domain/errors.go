@@ -27,4 +27,5 @@ var (
 	ErrInheritParentNotFound = errors.New("inherit parent worker not found")
 	ErrCommentNotFound       = errors.New("comment not found")
 	ErrAgentNotFound         = errors.New("agent not found")
+	ErrAgentDisabled         = errors.New("agent is disabled")
 )

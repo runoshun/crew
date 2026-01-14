@@ -12,16 +12,17 @@ import (
 // EditTaskInput contains the parameters for editing a task.
 // All fields except TaskID are optional. Only non-nil/non-empty fields will be updated.
 type EditTaskInput struct {
-	Title        *string        // New title (nil = no change)
-	Description  *string        // New description (nil = no change)
-	Status       *domain.Status // New status (nil = no change)
-	EditorText   string         // Markdown text from editor (only used when EditorEdit is true)
-	Labels       []string       // Labels to set (replaces all existing labels, nil = no change)
-	AddLabels    []string       // Labels to add
-	RemoveLabels []string       // Labels to remove
-	TaskID       int            // Task ID to edit (required)
-	LabelsSet    bool           // True if Labels was explicitly set (to distinguish nil from empty)
-	EditorEdit   bool           // True if editing via editor (title/description from markdown)
+	Title        *string         // New title (nil = no change)
+	Description  *string         // New description (nil = no change)
+	Status       *domain.Status  // New status (nil = no change)
+	EditorText   string          // Markdown text from editor (only used when EditorEdit is true)
+	Labels       []string        // Labels to set (replaces all existing labels, nil = no change)
+	AddLabels    []string        // Labels to add
+	RemoveLabels []string        // Labels to remove
+	IfStatus     []domain.Status // Conditional status update: only update if current status is in this list
+	TaskID       int             // Task ID to edit (required)
+	LabelsSet    bool            // True if Labels was explicitly set (to distinguish nil from empty)
+	EditorEdit   bool            // True if editing via editor (title/description from markdown)
 }
 
 // EditTaskOutput contains the result of editing a task.
@@ -63,6 +64,13 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 		return nil, domain.ErrInvalidStatus
 	}
 
+	// Validate IfStatus values are valid if provided
+	for _, status := range in.IfStatus {
+		if !status.IsValid() {
+			return nil, domain.ErrInvalidStatus
+		}
+	}
+
 	// Get existing task
 	task, err := uc.tasks.Get(in.TaskID)
 	if err != nil {
@@ -80,8 +88,26 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 		task.Description = *in.Description
 	}
 	if in.Status != nil {
-		// Manual status change via edit bypasses transition rules
-		task.Status = *in.Status
+		// Check if conditional status update is requested
+		if len(in.IfStatus) > 0 {
+			// Only update status if current status matches one of the conditions
+			matched := false
+			for _, allowedStatus := range in.IfStatus {
+				if task.Status == allowedStatus {
+					matched = true
+					break
+				}
+			}
+			if matched {
+				// Manual status change via edit bypasses transition rules
+				task.Status = *in.Status
+			}
+			// If condition not met, skip status update but continue with other fields
+		} else {
+			// No condition specified, update status unconditionally
+			// Manual status change via edit bypasses transition rules
+			task.Status = *in.Status
+		}
 	}
 
 	// Handle labels

@@ -2,8 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"log/slog"
-	"os"
 	"testing"
 	"time"
 
@@ -15,13 +13,15 @@ import (
 
 // newTestContainer creates an app.Container with mock dependencies.
 func newTestContainer(repo *testutil.MockTaskRepository) *app.Container {
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	logger := testutil.NewMockLogger()
+	executor := testutil.NewMockCommandExecutor()
 	container := app.NewWithDeps(
 		app.Config{},
 		repo,
 		&testutil.MockStoreInitializer{},
 		&testutil.MockClock{NowTime: time.Now()},
 		logger,
+		executor,
 	)
 	container.Git = &testutil.MockGit{}
 	return container
@@ -170,8 +170,8 @@ func TestNewNewCommand_DefaultBaseBranch(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
-	// Mock git to return current branch
-	container.Git = &testutil.MockGit{CurrentBranchName: "feature-branch"}
+	// Mock git to return feature-branch as new task base branch
+	container.Git = &testutil.MockGit{NewTaskBaseBranchName: "feature-branch"}
 
 	// Create command
 	cmd := newNewCommand(container)

@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -34,7 +33,10 @@ type StartTask struct {
 	sessions     domain.SessionManager
 	worktrees    domain.WorktreeManager
 	configLoader domain.ConfigLoader
+	git          domain.Git
 	clock        domain.Clock
+	logger       domain.Logger
+	runner       domain.ScriptRunner
 	crewDir      string // Path to .git/crew directory
 	repoRoot     string // Repository root path
 }
@@ -45,7 +47,10 @@ func NewStartTask(
 	sessions domain.SessionManager,
 	worktrees domain.WorktreeManager,
 	configLoader domain.ConfigLoader,
+	git domain.Git,
 	clock domain.Clock,
+	logger domain.Logger,
+	runner domain.ScriptRunner,
 	crewDir string,
 	repoRoot string,
 ) *StartTask {
@@ -54,7 +59,10 @@ func NewStartTask(
 		sessions:     sessions,
 		worktrees:    worktrees,
 		configLoader: configLoader,
+		git:          git,
 		clock:        clock,
+		logger:       logger,
+		runner:       runner,
 		crewDir:      crewDir,
 		repoRoot:     repoRoot,
 	}
@@ -93,9 +101,13 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		agentName = cfg.AgentsConfig.DefaultWorker
 	}
 
-	// Get agent configuration
-	agent, ok := cfg.Agents[agentName]
+	// Get agent configuration from enabled agents only
+	agent, ok := cfg.EnabledAgents()[agentName]
 	if !ok {
+		// Check if agent exists but is disabled
+		if _, exists := cfg.Agents[agentName]; exists {
+			return nil, fmt.Errorf("agent %q is disabled: %w", agentName, domain.ErrAgentDisabled)
+		}
 		return nil, fmt.Errorf("agent %q: %w", agentName, domain.ErrAgentNotFound)
 	}
 
@@ -107,9 +119,9 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 	// Create or resolve worktree
 	branch := domain.BranchName(task.ID, task.Issue)
-	baseBranch := task.BaseBranch
-	if baseBranch == "" {
-		baseBranch = "main"
+	baseBranch, err := resolveBaseBranch(task, uc.git)
+	if err != nil {
+		return nil, err
 	}
 
 	wtPath, err := uc.worktrees.Create(branch, baseBranch)
@@ -162,6 +174,11 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		uc.cleanupScript(task.ID)
 		_ = uc.worktrees.Remove(branch)
 		return nil, fmt.Errorf("save task: %w", err)
+	}
+
+	// Log task start
+	if uc.logger != nil {
+		uc.logger.Info(task.ID, "task", fmt.Sprintf("started with agent %q", agentName))
 	}
 
 	return &StartTaskOutput{
@@ -331,13 +348,9 @@ func (uc *StartTask) runSetupScript(task *domain.Task, wtPath, scriptTemplate st
 		return fmt.Errorf("expand setup script template: %w", err)
 	}
 
-	// Execute the script
-	// G204: Script content is from built-in agent config or user config (trusted source)
-	cmd := exec.Command("sh", "-c", script.String()) //nolint:gosec // Script from trusted config
-	cmd.Dir = wtPath
-
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("execute setup script: %w: %s", err, string(out))
+	// Execute the script using ScriptRunner
+	if err := uc.runner.Run(wtPath, script.String()); err != nil {
+		return fmt.Errorf("run setup script: %w", err)
 	}
 
 	return nil

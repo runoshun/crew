@@ -57,8 +57,13 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 	if name == "" {
 		name = cfg.AgentsConfig.DefaultManager
 	}
-	agent, ok := cfg.Agents[name]
+	// Get agent configuration from enabled agents only
+	agent, ok := cfg.EnabledAgents()[name]
 	if !ok {
+		// Check if agent exists but is disabled
+		if _, exists := cfg.Agents[name]; exists {
+			return nil, fmt.Errorf("agent %q is disabled: %w", name, domain.ErrAgentDisabled)
+		}
 		return nil, fmt.Errorf("agent %q: %w", name, domain.ErrAgentNotFound)
 	}
 

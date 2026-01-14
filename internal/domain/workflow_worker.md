@@ -3,8 +3,8 @@
 ## IMPORTANT: Follow This Workflow
 
 1. **Read task**: `crew show` - Understand the requirements
-2. **Implement**: Make changes following the task description  
-3. **Test**: `mise run ci` - Ensure all tests pass
+2. **Implement**: Make changes following the task description
+3. **Test**: Run CI - Ensure all tests pass
 4. **Commit**: `git add && git commit`
 5. **Complete**: `crew complete` - Mark task as done
 
@@ -56,11 +56,9 @@ git commit
 
 ## CI Tests
 
-Run CI after making changes:
+Run the project's CI checks after making changes. The specific CI command depends on your project configuration.
 
-```bash
-mise run ci            # Run tests, lint, and build
-```
+Check your project's **CLAUDE.md** or **AGENTS.md** for the exact CI command to use.
 
 ---
 
@@ -72,8 +70,7 @@ crew show
 
 # 2. Implement changes
 
-# 3. Run CI
-mise run ci
+# 3. Run CI (see "CI Tests" section for your project's specific command)
 
 # 4. Commit changes
 git add <files>

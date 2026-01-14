@@ -21,16 +21,18 @@ const (
 func NewRootCommand(c *app.Container, version string) *cobra.Command {
 	var fullWorker bool
 	var fullManager bool
+	var managerOnboarding bool
 
 	root := &cobra.Command{
 		Use:   "crew",
 		Short: "AI agent task management CLI",
 		Long: `git-crew is a CLI tool for managing AI coding agent tasks.
-It combines git worktree + tmux to achieve a model where 
-1 task = 1 worktree = 1 AI session, enabling fully parallel 
+It combines git worktree + tmux to achieve a model where
+1 task = 1 worktree = 1 AI session, enabling fully parallel
 and isolated task execution.
 
-Use --help-worker or --help-manager for role-specific detailed help.`,
+Use --help-worker or --help-manager for role-specific detailed help.
+Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 		Version: version,
 		// SilenceUsage prevents usage from being printed on errors
 		SilenceUsage: true,
@@ -55,8 +57,18 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Handle role-specific help flags
-			if fullWorker && fullManager {
-				return errors.New("cannot use both --help-worker and --help-manager")
+			flagCount := 0
+			if fullWorker {
+				flagCount++
+			}
+			if fullManager {
+				flagCount++
+			}
+			if managerOnboarding {
+				flagCount++
+			}
+			if flagCount > 1 {
+				return errors.New("cannot use multiple help flags together")
 			}
 
 			if fullWorker {
@@ -66,6 +78,9 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 				cfg, _ := c.ConfigLoader.Load()
 				return showManagerHelp(cmd.OutOrStdout(), cfg)
 			}
+			if managerOnboarding {
+				return showManagerOnboardingHelp(cmd.OutOrStdout())
+			}
 			// Default: show standard help
 			return cmd.Help()
 		},
@@ -74,6 +89,7 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	// Add role-specific help flags
 	root.Flags().BoolVar(&fullWorker, "help-worker", false, "Show detailed help for worker agents")
 	root.Flags().BoolVar(&fullManager, "help-manager", false, "Show detailed help for manager agents")
+	root.Flags().BoolVar(&managerOnboarding, "help-manager-onboarding", false, "Show onboarding guide for setting up crew")
 
 	// Define command groups
 	root.AddGroup(
@@ -145,6 +161,9 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	reviewCmd := newReviewCommand(c)
 	reviewCmd.GroupID = groupSession
 
+	pollCmd := newPollCommand(c)
+	pollCmd.GroupID = groupSession
+
 	pruneCmd := newPruneCommand(c)
 	pruneCmd.GroupID = groupTask
 
@@ -159,6 +178,10 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	// Snapshot commands
 	snapshotCmd := newSnapshotCmd(c)
 
+	// Agent list command
+	listAgentsCmd := newListAgentsCommand(c)
+	listAgentsCmd.GroupID = groupSetup
+
 	// Internal commands (hidden)
 	sessionEndedCmd := newSessionEndedCommand(c)
 
@@ -166,6 +189,7 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 	root.AddCommand(
 		initCmd,
 		configCmd,
+		listAgentsCmd,
 		newCmd,
 		listCmd,
 		showCmd,
@@ -184,6 +208,7 @@ Use --help-worker or --help-manager for role-specific detailed help.`,
 		completeCmd,
 		mergeCmd,
 		reviewCmd,
+		pollCmd,
 		pruneCmd,
 		tuiCmd,
 		managerCmd,
