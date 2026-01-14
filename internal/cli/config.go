@@ -140,10 +140,11 @@ func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
 		_, _ = fmt.Fprintf(w, "Error marshaling config: %v\n", err)
 		return
 	}
-	_, _ = w.Write(data)
+	if _, err := w.Write(data); err != nil {
+		_, _ = fmt.Fprintf(w, "Error writing config: %v\n", err)
+	}
 }
 
-// formatMultilineString formats a string for TOML output.
 // newConfigInitCommand creates the config init subcommand.
 func newConfigInitCommand(c *app.Container) *cobra.Command {
 	var global bool
