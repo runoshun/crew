@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"io"
+	"reflect"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/runoshun/git-crew/v2/internal/app"
@@ -105,12 +107,64 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 }
 
 // formatEffectiveConfig formats the effective config in TOML format.
+// Uses reflection to automatically handle domain.Config structure changes.
 func formatEffectiveConfig(w io.Writer, cfg *domain.Config) error {
-	data, err := toml.Marshal(cfg)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
+	output := make(map[string]any)
+
+	// 1. Merge Agents and AgentsConfig under [agents]
+	agentsMap := make(map[string]any)
+
+	// Extract AgentsConfig fields dynamically from toml tags
+	acVal := reflect.ValueOf(cfg.AgentsConfig)
+	acType := acVal.Type()
+	for i := 0; i < acVal.NumField(); i++ {
+		field := acType.Field(i)
+		tag := field.Tag.Get("toml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		tagName := strings.Split(tag, ",")[0]
+		val := acVal.Field(i).Interface()
+		// omitempty: skip zero values
+		if !reflect.ValueOf(val).IsZero() {
+			agentsMap[tagName] = val
+		}
 	}
-	_, _ = w.Write(data)
+
+	// Add Agents as inline entries
+	for name, agent := range cfg.Agents {
+		agentsMap[name] = agent
+	}
+	output["agents"] = agentsMap
+
+	// 2. Extract other Config fields automatically from toml tags
+	cfgVal := reflect.ValueOf(cfg).Elem()
+	cfgType := cfgVal.Type()
+	for i := 0; i < cfgVal.NumField(); i++ {
+		field := cfgType.Field(i)
+		tag := field.Tag.Get("toml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		tagName := strings.Split(tag, ",")[0]
+		// Skip special fields already handled
+		if tagName == "agents" || field.Name == "Agents" || field.Name == "AgentsConfig" || field.Name == "Warnings" {
+			continue
+		}
+		fieldVal := cfgVal.Field(i)
+		// omitempty: skip zero values for bool fields
+		if field.Type.Kind() == reflect.Bool && !fieldVal.Bool() {
+			if strings.Contains(tag, "omitempty") {
+				continue
+			}
+		}
+		output[tagName] = fieldVal.Interface()
+	}
+
+	// Encode to TOML
+	if err := toml.NewEncoder(w).Encode(output); err != nil {
+		return fmt.Errorf("failed to encode config: %w", err)
+	}
 	return nil
 }
 
@@ -157,7 +211,6 @@ It does not depend on existing configuration files and will work even if they ar
 	return cmd
 }
 
-// formatMultilineString formats a string for TOML output.
 // newConfigInitCommand creates the config init subcommand.
 func newConfigInitCommand(c *app.Container) *cobra.Command {
 	var global bool

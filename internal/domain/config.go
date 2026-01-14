@@ -28,49 +28,6 @@ type Config struct {
 	OnboardingDone bool             `toml:"onboarding_done,omitempty"` // Whether onboarding has been completed
 }
 
-// MarshalTOML overrides the TOML marshaling for Config to merge Agents and AgentsConfig.
-func (c *Config) MarshalTOML() (any, error) {
-	type agentsSection struct {
-		Agents          map[string]Agent `toml:",inline"`
-		DefaultWorker   string           `toml:"worker_default,omitempty"`
-		DefaultManager  string           `toml:"manager_default,omitempty"`
-		DefaultReviewer string           `toml:"reviewer_default,omitempty"`
-		WorkerPrompt    string           `toml:"worker_prompt,omitempty"`
-		ManagerPrompt   string           `toml:"manager_prompt,omitempty"`
-		ReviewerPrompt  string           `toml:"reviewer_prompt,omitempty"`
-		DisabledAgents  []string         `toml:"disabled_agents,omitempty"`
-	}
-
-	return struct {
-		Agents         agentsSection  `toml:"agents"`
-		Complete       CompleteConfig `toml:"complete"`
-		Diff           DiffConfig     `toml:"diff"`
-		Log            LogConfig      `toml:"log"`
-		Tasks          TasksConfig    `toml:"tasks"`
-		TUI            TUIConfig      `toml:"tui"`
-		Worktree       WorktreeConfig `toml:"worktree"`
-		OnboardingDone bool           `toml:"onboarding_done,omitempty"`
-	}{
-		Agents: agentsSection{
-			DefaultWorker:   c.AgentsConfig.DefaultWorker,
-			DefaultManager:  c.AgentsConfig.DefaultManager,
-			DefaultReviewer: c.AgentsConfig.DefaultReviewer,
-			WorkerPrompt:    c.AgentsConfig.WorkerPrompt,
-			ManagerPrompt:   c.AgentsConfig.ManagerPrompt,
-			ReviewerPrompt:  c.AgentsConfig.ReviewerPrompt,
-			DisabledAgents:  c.AgentsConfig.DisabledAgents,
-			Agents:          c.Agents,
-		},
-		Complete:       c.Complete,
-		Diff:           c.Diff,
-		Log:            c.Log,
-		Tasks:          c.Tasks,
-		TUI:            c.TUI,
-		Worktree:       c.Worktree,
-		OnboardingDone: c.OnboardingDone,
-	}, nil
-}
-
 // TasksConfig holds settings for task storage from [tasks] section.
 type TasksConfig struct {
 	Store     string `toml:"store,omitempty"`     // Storage backend: "git" (default) or "json"
