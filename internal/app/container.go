@@ -244,6 +244,11 @@ func (c *Container) InitConfigUseCase() *usecase.InitConfig {
 	return usecase.NewInitConfig(c.ConfigManager)
 }
 
+// ShowConfigTemplateUseCase returns a new ShowConfigTemplate use case.
+func (c *Container) ShowConfigTemplateUseCase() *usecase.ShowConfigTemplate {
+	return usecase.NewShowConfigTemplate()
+}
+
 // CompleteTaskUseCase returns a new CompleteTask use case.
 func (c *Container) CompleteTaskUseCase() *usecase.CompleteTask {
 	return usecase.NewCompleteTask(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Clock, c.Logger, c.Executor)

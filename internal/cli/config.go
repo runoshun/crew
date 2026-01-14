@@ -15,10 +15,27 @@ import (
 
 // newConfigCommand creates the config command.
 func newConfigCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "config",
+		Short: "Manage configuration",
+		Long:  `Manage git-crew configuration files and settings.`,
+		// No RunE: shows subcommand list when called without arguments
+	}
+
+	// Add subcommands
+	cmd.AddCommand(newConfigShowCommand(c))
+	cmd.AddCommand(newConfigTemplateCommand(c))
+	cmd.AddCommand(newConfigInitCommand(c))
+
+	return cmd
+}
+
+// newConfigShowCommand creates the config show subcommand.
+func newConfigShowCommand(c *app.Container) *cobra.Command {
 	var ignoreGlobal, ignoreOverride, ignoreRepo, ignoreRootRepo bool
 
 	cmd := &cobra.Command{
-		Use:   "config",
+		Use:   "show",
 		Short: "Display effective configuration",
 		Long: `Display effective configuration after merging all sources.
 
@@ -73,7 +90,9 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 
 			// Display effective config in TOML format
 			_, _ = fmt.Fprintln(w, "[Effective Config]")
-			formatEffectiveConfig(w, out.EffectiveConfig)
+			if err := formatEffectiveConfig(w, out.EffectiveConfig); err != nil {
+				return err
+			}
 
 			return nil
 		},
@@ -84,15 +103,12 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 	cmd.Flags().BoolVar(&ignoreRepo, "ignore-repo", false, "Ignore repository configuration (.git/crew/config.toml)")
 	cmd.Flags().BoolVar(&ignoreRootRepo, "ignore-root-repo", false, "Ignore root repository configuration (.crew.toml)")
 
-	// Add init subcommand
-	cmd.AddCommand(newConfigInitCommand(c))
-
 	return cmd
 }
 
 // formatEffectiveConfig formats the effective config in TOML format.
 // Uses reflection to automatically handle domain.Config structure changes.
-func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
+func formatEffectiveConfig(w io.Writer, cfg *domain.Config) error {
 	output := make(map[string]any)
 
 	// 1. Merge Agents and AgentsConfig under [agents]
@@ -147,8 +163,52 @@ func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
 
 	// Encode to TOML
 	if err := toml.NewEncoder(w).Encode(output); err != nil {
-		_, _ = fmt.Fprintf(w, "Error encoding config: %v\n", err)
+		return fmt.Errorf("failed to encode config: %w", err)
 	}
+	return nil
+}
+
+// newConfigTemplateCommand creates the config template subcommand.
+func newConfigTemplateCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "template",
+		Short: "Output configuration template",
+		Long: `Output a configuration file template to stdout.
+
+This command is useful for:
+- Piping template output for custom processing
+- Comparing against existing configuration files
+- Generating initial configuration without creating files
+
+Note: This command outputs a base template with builtin agents registered.
+It does not depend on existing configuration files and will work even if they are broken.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Load config with all file sources ignored to get only builtin agents
+			// This ensures template output works even if config files are broken
+			cfg, err := c.ConfigLoader.LoadWithOptions(domain.LoadConfigOptions{
+				IgnoreGlobal:   true,
+				IgnoreOverride: true,
+				IgnoreRootRepo: true,
+				IgnoreRepo:     true,
+			})
+			if err != nil {
+				return err
+			}
+
+			uc := c.ShowConfigTemplateUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.ShowConfigTemplateInput{
+				Config: cfg,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), out.Template)
+			return nil
+		},
+	}
+
+	return cmd
 }
 
 // newConfigInitCommand creates the config init subcommand.

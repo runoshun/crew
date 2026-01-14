@@ -12,7 +12,7 @@
 ## Fields for all agents:
 ## [agents.<name>]
 ## inherit = "..."        # Name of agent to inherit from (copies all fields, allows overrides)
-## role = "worker"        # Agent role ("worker", "manager")
+## role = "worker"        # Agent role ("worker", "manager", or "reviewer")
 ## command_template = "xxx --model {{.Model}} {{.Args}}{{if .Continue}} -c{{end}} --prompt {{.Prompt}} {{.Args}}"  # Full command template
 ## system_prompt = "..."  # (optional) System prompt template.
 ## prompt = "..."         # (optional) User prompt template (added after system_prompt)
