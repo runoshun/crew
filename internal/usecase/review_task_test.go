@@ -152,6 +152,62 @@ func TestReviewTask_Execute_UsesDefaultReviewer(t *testing.T) {
 	cfg, _ := configLoader.Load()
 	require.NotEmpty(t, cfg.AgentsConfig.DefaultReviewer)
 	require.Contains(t, cfg.Agents, cfg.AgentsConfig.DefaultReviewer)
+
+	var stdout, stderr bytes.Buffer
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+
+	// Execute without specifying agent - should use DefaultReviewer
+	_, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID: 1,
+		Agent:  "", // Empty - should use DefaultReviewer
+	})
+
+	// Assert that execution used DefaultReviewer (command was built successfully)
+	assert.NoError(t, err)
+	assert.True(t, executor.ExecuteWithContextCalled, "ExecuteWithContext should have been called")
+	assert.NotNil(t, executor.ExecutedCmd, "Command should have been executed")
+}
+
+func TestReviewTask_Execute_EmptyDefaultReviewer(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	// Create config with empty DefaultReviewer
+	cfg := &domain.Config{
+		Agents: map[string]domain.Agent{
+			"test-reviewer": {
+				CommandTemplate: "test {{.Args}} --prompt {{.Prompt}}",
+				Role:            domain.RoleReviewer,
+			},
+		},
+		AgentsConfig: domain.AgentsConfig{
+			DefaultReviewer: "", // Empty default reviewer
+		},
+	}
+	configLoader := &testutil.MockConfigLoader{Config: cfg}
+
+	var stdout, stderr bytes.Buffer
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+
+	// Execute without specifying agent - should fail with empty DefaultReviewer
+	_, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID: 1,
+		Agent:  "", // Empty - should try to use DefaultReviewer (which is also empty)
+	})
+
+	// Assert that execution failed with agent not found error
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrAgentNotFound)
 }
 
 func TestReviewTask_Execute_UsesSpecifiedAgent(t *testing.T) {
