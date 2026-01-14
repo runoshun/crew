@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/app"
+	"github.com/runoshun/git-crew/v2/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -81,8 +83,8 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 			if managerOnboarding {
 				return showManagerOnboardingHelp(cmd.OutOrStdout())
 			}
-			// Default: show standard help
-			return cmd.Help()
+			// Default: launch TUI
+			return launchTUI(c)
 		},
 	}
 
@@ -218,4 +220,12 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 	)
 
 	return root
+}
+
+// launchTUI launches the interactive TUI.
+func launchTUI(c *app.Container) error {
+	model := tui.New(c)
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	_, err := p.Run()
+	return err
 }
