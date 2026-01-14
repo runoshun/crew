@@ -176,6 +176,7 @@ crew start <id> opencode
 2. **Use crew exec for worktree operations**: `crew exec <id> -- <command>` runs command in worktree
 3. **Use main (NOT origin/main)**: In worktree, use `git merge main`
 4. **Use echo "y" for merge**: Skip interactive confirmation
+5. **Run review in background**: `crew review <id> &` - Reviews take time, run in background to continue other work
 
 ---
 
