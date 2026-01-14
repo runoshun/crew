@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/app"
+	"github.com/runoshun/git-crew/v2/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -15,6 +17,9 @@ const (
 	groupTask    = "task"
 	groupSession = "session"
 )
+
+// launchTUIFunc is a function variable for launching TUI, allowing it to be mocked in tests.
+var launchTUIFunc = launchTUI
 
 // NewRootCommand creates the root command for git-crew.
 // It receives the container for dependency injection and version for display.
@@ -41,6 +46,11 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Skip for some commands
 			if cmd.Name() == "_session-ended" || cmd.Name() == "init" {
+				return nil
+			}
+
+			// Skip if container is nil (e.g. in tests)
+			if c == nil {
 				return nil
 			}
 
@@ -81,8 +91,8 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 			if managerOnboarding {
 				return showManagerOnboardingHelp(cmd.OutOrStdout())
 			}
-			// Default: show standard help
-			return cmd.Help()
+			// Default: launch TUI
+			return launchTUIFunc(c)
 		},
 	}
 
@@ -218,4 +228,12 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 	)
 
 	return root
+}
+
+// launchTUI launches the interactive TUI.
+func launchTUI(c *app.Container) error {
+	model := tui.New(c)
+	p := tea.NewProgram(model, tea.WithAltScreen())
+	_, err := p.Run()
+	return err
 }
