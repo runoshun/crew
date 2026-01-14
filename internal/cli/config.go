@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"io"
+	"reflect"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 	"github.com/runoshun/git-crew/v2/internal/app"
@@ -89,59 +91,63 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 }
 
 // formatEffectiveConfig formats the effective config in TOML format.
+// Uses reflection to automatically handle domain.Config structure changes.
 func formatEffectiveConfig(w io.Writer, cfg *domain.Config) {
-	// go-toml/v2 does not support MarshalTOML interface, so we need to manually
-	// construct the structure that merges Agents and AgentsConfig under [agents].
-	//nolint:govet // fieldalignment: readability prioritized over memory optimization in local struct
-	type agentsSection struct {
-		Agents          map[string]domain.Agent `toml:",inline"`
-		DisabledAgents  []string                `toml:"disabled_agents,omitempty"`
-		DefaultWorker   string                  `toml:"worker_default,omitempty"`
-		DefaultManager  string                  `toml:"manager_default,omitempty"`
-		DefaultReviewer string                  `toml:"reviewer_default,omitempty"`
-		WorkerPrompt    string                  `toml:"worker_prompt,omitempty"`
-		ManagerPrompt   string                  `toml:"manager_prompt,omitempty"`
-		ReviewerPrompt  string                  `toml:"reviewer_prompt,omitempty"`
+	output := make(map[string]any)
+
+	// 1. Merge Agents and AgentsConfig under [agents]
+	agentsMap := make(map[string]any)
+
+	// Extract AgentsConfig fields dynamically from toml tags
+	acVal := reflect.ValueOf(cfg.AgentsConfig)
+	acType := acVal.Type()
+	for i := 0; i < acVal.NumField(); i++ {
+		field := acType.Field(i)
+		tag := field.Tag.Get("toml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		tagName := strings.Split(tag, ",")[0]
+		val := acVal.Field(i).Interface()
+		// omitempty: skip zero values
+		if !reflect.ValueOf(val).IsZero() {
+			agentsMap[tagName] = val
+		}
 	}
 
-	type effectiveConfig struct {
-		Agents         agentsSection         `toml:"agents"`
-		Complete       domain.CompleteConfig `toml:"complete"`
-		Diff           domain.DiffConfig     `toml:"diff"`
-		Log            domain.LogConfig      `toml:"log"`
-		Tasks          domain.TasksConfig    `toml:"tasks"`
-		TUI            domain.TUIConfig      `toml:"tui"`
-		Worktree       domain.WorktreeConfig `toml:"worktree"`
-		OnboardingDone bool                  `toml:"onboarding_done,omitempty"`
+	// Add Agents as inline entries
+	for name, agent := range cfg.Agents {
+		agentsMap[name] = agent
+	}
+	output["agents"] = agentsMap
+
+	// 2. Extract other Config fields automatically from toml tags
+	cfgVal := reflect.ValueOf(cfg).Elem()
+	cfgType := cfgVal.Type()
+	for i := 0; i < cfgVal.NumField(); i++ {
+		field := cfgType.Field(i)
+		tag := field.Tag.Get("toml")
+		if tag == "" || tag == "-" {
+			continue
+		}
+		tagName := strings.Split(tag, ",")[0]
+		// Skip special fields already handled
+		if tagName == "agents" || field.Name == "Agents" || field.Name == "AgentsConfig" || field.Name == "Warnings" {
+			continue
+		}
+		fieldVal := cfgVal.Field(i)
+		// omitempty: skip zero values for bool fields
+		if field.Type.Kind() == reflect.Bool && !fieldVal.Bool() {
+			if strings.Contains(tag, "omitempty") {
+				continue
+			}
+		}
+		output[tagName] = fieldVal.Interface()
 	}
 
-	output := effectiveConfig{
-		Agents: agentsSection{
-			Agents:          cfg.Agents,
-			DisabledAgents:  cfg.AgentsConfig.DisabledAgents,
-			DefaultWorker:   cfg.AgentsConfig.DefaultWorker,
-			DefaultManager:  cfg.AgentsConfig.DefaultManager,
-			DefaultReviewer: cfg.AgentsConfig.DefaultReviewer,
-			WorkerPrompt:    cfg.AgentsConfig.WorkerPrompt,
-			ManagerPrompt:   cfg.AgentsConfig.ManagerPrompt,
-			ReviewerPrompt:  cfg.AgentsConfig.ReviewerPrompt,
-		},
-		Complete:       cfg.Complete,
-		Diff:           cfg.Diff,
-		Log:            cfg.Log,
-		Tasks:          cfg.Tasks,
-		TUI:            cfg.TUI,
-		Worktree:       cfg.Worktree,
-		OnboardingDone: cfg.OnboardingDone,
-	}
-
-	data, err := toml.Marshal(output)
-	if err != nil {
-		_, _ = fmt.Fprintf(w, "Error marshaling config: %v\n", err)
-		return
-	}
-	if _, err := w.Write(data); err != nil {
-		_, _ = fmt.Fprintf(w, "Error writing config: %v\n", err)
+	// Encode to TOML
+	if err := toml.NewEncoder(w).Encode(output); err != nil {
+		_, _ = fmt.Fprintf(w, "Error encoding config: %v\n", err)
 	}
 }
 
