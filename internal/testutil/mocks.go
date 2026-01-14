@@ -408,15 +408,19 @@ func (m *MockSessionManager) GetPaneProcesses(_ string) ([]domain.ProcessInfo, e
 // MockWorktreeManager is a test double for domain.WorktreeManager.
 // Fields are ordered to minimize memory padding.
 type MockWorktreeManager struct {
-	CreateErr    error
-	ResolveErr   error
-	RemoveErr    error
-	ExistsErr    error
-	CreatePath   string
-	ResolvePath  string
-	ExistsVal    bool
-	CreateCalled bool
-	RemoveCalled bool
+	SetupWorktreeConfig *domain.WorktreeConfig // Captured config from SetupWorktree call
+	CreateErr           error
+	ResolveErr          error
+	RemoveErr           error
+	ExistsErr           error
+	SetupErr            error
+	CreatePath          string
+	ResolvePath         string
+	SetupWorktreePath   string // Captured path from SetupWorktree call
+	ExistsVal           bool
+	CreateCalled        bool
+	RemoveCalled        bool
+	SetupCalled         bool
 }
 
 // NewMockWorktreeManager creates a new MockWorktreeManager.
@@ -438,9 +442,12 @@ func (m *MockWorktreeManager) Create(_, _ string) (string, error) {
 	return m.CreatePath, nil
 }
 
-// SetupWorktree is a no-op mock implementation.
-func (m *MockWorktreeManager) SetupWorktree(_ string, _ *domain.WorktreeConfig) error {
-	return nil
+// SetupWorktree captures the arguments and returns configured error.
+func (m *MockWorktreeManager) SetupWorktree(path string, config *domain.WorktreeConfig) error {
+	m.SetupCalled = true
+	m.SetupWorktreePath = path
+	m.SetupWorktreeConfig = config
+	return m.SetupErr
 }
 
 // Resolve returns the configured path or error.
@@ -805,9 +812,12 @@ func (m *MockCommandExecutor) ExecuteInteractive(cmd *domain.ExecCommand) error 
 	return m.ExecuteInteractiveErr
 }
 
-// ExecuteWithContext records the call and returns configured error.
-func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.ExecCommand, _, _ io.Writer) error {
+// ExecuteWithContext records the call, writes output to writers, and returns configured error.
+func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.ExecCommand, stdout, stderr io.Writer) error {
 	m.ExecuteWithContextCalled = true
 	m.ExecutedCmd = cmd
+	if m.ExecuteOutput != nil && stdout != nil {
+		_, _ = stdout.Write(m.ExecuteOutput)
+	}
 	return m.ExecuteWithContextErr
 }

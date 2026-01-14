@@ -245,6 +245,7 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent d
 	}
 
 	// Determine default prompts: agent has its own SystemPrompt, or use default
+	// Priority: Agent.Prompt > AgentsConfig.WorkerPrompt > empty
 	defaultSystemPrompt := domain.DefaultSystemPrompt
 	defaultPrompt := cfg.AgentsConfig.WorkerPrompt
 

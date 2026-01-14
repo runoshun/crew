@@ -119,7 +119,9 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		Model:       model,
 	}
 
-	// Build user prompt
+	// Build user prompt (fallback for when Agent.Prompt is empty)
+	// Final priority: Agent.Prompt > in.Message > AgentsConfig.ReviewerPrompt > default
+	// Note: Agent.Prompt is applied in agent.RenderCommand() and overrides this userPrompt
 	userPrompt := in.Message
 	if userPrompt == "" {
 		userPrompt = cfg.AgentsConfig.ReviewerPrompt

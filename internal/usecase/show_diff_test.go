@@ -496,3 +496,75 @@ func TestShowDiff_Execute_UseTUICommandFalse(t *testing.T) {
 	assert.Contains(t, executor.ExecutedCmd.Args[1], "delta")
 	assert.NotContains(t, executor.ExecutedCmd.Args[1], "less -R")
 }
+
+func TestShowDiff_Execute_WithCustomDiffCommand(t *testing.T) {
+	// Setup
+	task := &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = task
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set custom diff.command
+	configLoader.Config.Diff.Command = "git diff {{.BaseBranch}}... --color=always | my-custom-diff-viewer"
+
+	executor := testutil.NewMockCommandExecutor()
+
+	var stdout, stderr bytes.Buffer
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, executor, &stdout, &stderr)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), ShowDiffInput{
+		TaskID:        1,
+		UseTUICommand: false,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.True(t, executor.ExecuteWithContextCalled)
+	// Verify custom diff.command was used
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "my-custom-diff-viewer")
+}
+
+func TestShowDiff_Execute_WithCustomTUICommand(t *testing.T) {
+	// Setup
+	task := &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = task
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set custom diff.tui_command
+	configLoader.Config.Diff.Command = "git diff {{.BaseBranch}}... | delta"
+	configLoader.Config.Diff.TUICommand = "git diff {{.BaseBranch}}... | my-tui-viewer"
+
+	executor := testutil.NewMockCommandExecutor()
+
+	var stdout, stderr bytes.Buffer
+	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, executor, &stdout, &stderr)
+
+	// Execute with UseTUICommand = true
+	_, err := uc.Execute(context.Background(), ShowDiffInput{
+		TaskID:        1,
+		UseTUICommand: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.True(t, executor.ExecuteWithContextCalled)
+	// Verify tui_command was used (not Command) when UseTUICommand is true
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "my-tui-viewer")
+	assert.NotContains(t, executor.ExecutedCmd.Args[1], "delta")
+}

@@ -912,44 +912,6 @@ func TestStartTask_Execute_OpencodeWithModelOverride(t *testing.T) {
 	assert.Contains(t, script, "-m gpt-4o")
 }
 
-func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
-	crewDir := t.TempDir()
-	repoRoot := t.TempDir()
-	worktreeDir := setupTestWorktree(t)
-
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Test task",
-		Status:     domain.StatusTodo,
-		BaseBranch: "main",
-	}
-	sessions := testutil.NewMockSessionManager()
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.CreatePath = worktreeDir
-	configLoader := testutil.NewMockConfigLoader()
-	// Set WorkerPrompt in AgentsConfig
-	configLoader.Config.AgentsConfig.WorkerPrompt = "Custom worker prompt from config"
-	git := &testutil.MockGit{}
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-
-	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
-
-	// Execute
-	_, err := uc.Execute(context.Background(), StartTaskInput{
-		TaskID: 1,
-		Agent:  "claude",
-	})
-
-	// Assert
-	require.NoError(t, err)
-
-	// Verify script contains WorkerPrompt
-	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
-	require.NoError(t, err)
-	assert.Contains(t, string(scriptContent), "Custom worker prompt from config")
-}
-
 func TestStartTask_Execute_WithSetupScript(t *testing.T) {
 	// Setup temp directories
 	crewDir := t.TempDir()
@@ -1035,4 +997,177 @@ func TestStartTask_Execute_WithDisabledAgent(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrAgentDisabled)
 	assert.Contains(t, err.Error(), "claude")
 	assert.Contains(t, err.Error(), "disabled")
+}
+
+func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	configLoader := testutil.NewMockConfigLoader()
+	// Set WorkerPrompt in AgentsConfig
+	configLoader.Config.AgentsConfig.WorkerPrompt = "Custom worker prompt from config"
+	// Use an agent without a custom prompt (so WorkerPrompt should be used)
+	configLoader.Config.Agents["test-agent"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "test-cmd {{.Prompt}}",
+		// Prompt is empty, so WorkerPrompt should be used
+	}
+	git := &testutil.MockGit{}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "test-agent",
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify script contains WorkerPrompt
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	assert.Contains(t, string(scriptContent), "Custom worker prompt from config")
+}
+
+func TestStartTask_Execute_AgentPromptOverridesWorkerPrompt(t *testing.T) {
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	configLoader := testutil.NewMockConfigLoader()
+	// Set both WorkerPrompt and Agent.Prompt
+	configLoader.Config.AgentsConfig.WorkerPrompt = "Worker prompt from config"
+	configLoader.Config.Agents["test-agent"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "test-cmd {{.Prompt}}",
+		Prompt:          "Agent-specific prompt", // This should take precedence
+	}
+	git := &testutil.MockGit{}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "test-agent",
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify Agent.Prompt takes precedence over WorkerPrompt
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	assert.Contains(t, script, "Agent-specific prompt")
+	assert.NotContains(t, script, "Worker prompt from config")
+}
+
+func TestStartTask_Execute_WorktreeConfigPassed(t *testing.T) {
+	// Setup temp directory for script generation
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Set WorktreeConfig in config
+	configLoader.Config.Worktree = domain.WorktreeConfig{
+		SetupCommand: "npm install",
+		Copy:         []string{"node_modules", ".env"},
+	}
+
+	git := &testutil.MockGit{}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify SetupWorktree was called with correct config
+	assert.True(t, worktrees.SetupCalled, "SetupWorktree should be called")
+	assert.Equal(t, worktreeDir, worktrees.SetupWorktreePath)
+	require.NotNil(t, worktrees.SetupWorktreeConfig)
+	assert.Equal(t, "npm install", worktrees.SetupWorktreeConfig.SetupCommand)
+	assert.Equal(t, []string{"node_modules", ".env"}, worktrees.SetupWorktreeConfig.Copy)
+}
+
+func TestStartTask_Execute_WorktreeSetupError(t *testing.T) {
+	// Setup temp directory for script generation
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	worktrees.SetupErr = assert.AnError // Simulate setup failure
+
+	configLoader := testutil.NewMockConfigLoader()
+	git := &testutil.MockGit{}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, git, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+	})
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "setup worktree")
+
+	// Verify worktree was cleaned up after error
+	assert.True(t, worktrees.RemoveCalled, "Worktree should be removed after setup error")
 }
