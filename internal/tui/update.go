@@ -124,6 +124,48 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.commentCounts = msg.CommentCounts
 		m.updateTaskList()
 		return m, nil
+
+	case MsgReviewCompleted:
+		// Ignore if cancelled or TaskID mismatch (stale result from previous review)
+		if m.reviewCancelled || m.reviewTaskID == 0 || m.reviewTaskID != msg.TaskID {
+			// Clear review state if this was a cancelled review
+			if m.reviewCancelled && m.reviewTaskID == msg.TaskID {
+				m.reviewCancelled = false
+				m.reviewTaskID = 0
+				m.reviewResult = ""
+			}
+			return m, nil
+		}
+		m.mode = ModeReviewResult
+		m.reviewResult = msg.Review
+		// Initialize viewport with review content
+		m.reviewViewport.SetContent(msg.Review)
+		m.reviewViewport.GotoTop()
+		return m, m.loadTasks()
+
+	case MsgReviewError:
+		// Ignore if cancelled or TaskID mismatch (stale error from previous review)
+		if m.reviewCancelled || m.reviewTaskID == 0 || m.reviewTaskID != msg.TaskID {
+			// Clear review state if this was a cancelled review
+			if m.reviewCancelled && m.reviewTaskID == msg.TaskID {
+				m.reviewCancelled = false
+				m.reviewTaskID = 0
+				m.reviewResult = ""
+			}
+			return m, nil
+		}
+		m.err = msg.Err
+		m.mode = ModeNormal
+		m.reviewTaskID = 0
+		m.reviewResult = ""
+		return m, nil
+
+	case MsgReviewActionCompleted:
+		m.mode = ModeNormal
+		m.reviewTaskID = 0
+		m.reviewResult = ""
+		m.reviewActionCursor = 0
+		return m, m.loadTasks()
 	}
 
 	return m, nil
@@ -157,6 +199,12 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEditStatusMode(msg)
 	case ModeExec:
 		return m.handleExecMode(msg)
+	case ModeReviewing:
+		return m.handleReviewingMode(msg)
+	case ModeReviewResult:
+		return m.handleReviewResultMode(msg)
+	case ModeReviewAction:
+		return m.handleReviewActionMode(msg)
 	}
 
 	return m, nil
@@ -232,6 +280,28 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeExec
 		m.execInput.Focus()
 		return m, nil
+
+	case key.Matches(msg, m.keys.Review):
+		task := m.SelectedTask()
+		if task == nil {
+			return m, nil
+		}
+		// Check if worktree exists
+		branch := domain.BranchName(task.ID, task.Issue)
+		exists, err := m.container.Worktrees.Exists(branch)
+		if err != nil {
+			m.err = fmt.Errorf("check worktree: %w", err)
+			return m, nil
+		}
+		if !exists {
+			m.err = fmt.Errorf("task worktree not found - cannot review")
+			return m, nil
+		}
+		m.mode = ModeReviewing
+		m.reviewTaskID = task.ID
+		m.reviewResult = ""
+		m.reviewCancelled = false
+		return m, m.reviewTask(task.ID)
 
 	case key.Matches(msg, m.keys.New):
 		m.mode = ModeNewTask
@@ -756,4 +826,91 @@ func (m *Model) handleExecMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.execInput, cmd = m.execInput.Update(msg)
 	return m, cmd
+}
+
+// handleReviewingMode handles keys while review is in progress.
+func (m *Model) handleReviewingMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Allow escaping during review
+	if key.Matches(msg, m.keys.Escape) {
+		// Mark as cancelled so completion message will be ignored
+		m.reviewCancelled = true
+		m.mode = ModeNormal
+		m.reviewTaskID = 0
+		return m, nil
+	}
+	// Ignore other keys while reviewing
+	return m, nil
+}
+
+// handleReviewResultMode handles keys when viewing review results.
+func (m *Model) handleReviewResultMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		m.reviewResult = ""
+		m.reviewTaskID = 0
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Move to action selection
+		m.mode = ModeReviewAction
+		m.reviewActionCursor = 0
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down):
+		// Scroll the review viewport
+		var cmd tea.Cmd
+		m.reviewViewport, cmd = m.reviewViewport.Update(msg)
+		return m, cmd
+	}
+
+	// Forward other keys to viewport for page up/down
+	var cmd tea.Cmd
+	m.reviewViewport, cmd = m.reviewViewport.Update(msg)
+	return m, cmd
+}
+
+// handleReviewActionMode handles keys when selecting a review action.
+func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	const numActions = 4 // NotifyWorker (restart), NotifyWorker (no restart), Merge, Close
+
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		// Go back to review result
+		m.mode = ModeReviewResult
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		if m.reviewActionCursor > 0 {
+			m.reviewActionCursor--
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		if m.reviewActionCursor < numActions-1 {
+			m.reviewActionCursor++
+		}
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Execute selected action
+		switch m.reviewActionCursor {
+		case 0: // NotifyWorker with restart
+			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, true)
+		case 1: // NotifyWorker without restart (just send comment)
+			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, false)
+		case 2: // Merge - use confirm dialog
+			m.mode = ModeConfirm
+			m.confirmAction = ConfirmMerge
+			m.confirmTaskID = m.reviewTaskID
+			return m, nil
+		case 3: // Close - use confirm dialog
+			m.mode = ModeConfirm
+			m.confirmAction = ConfirmClose
+			m.confirmTaskID = m.reviewTaskID
+			return m, nil
+		}
+	}
+
+	return m, nil
 }

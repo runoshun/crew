@@ -14,6 +14,9 @@ func TestMode_String(t *testing.T) {
 		{ModeInputDesc, "input_desc"},
 		{ModeStart, "start"},
 		{ModeHelp, "help"},
+		{ModeReviewing, "reviewing"},
+		{ModeReviewResult, "review_result"},
+		{ModeReviewAction, "review_action"},
 	}
 
 	for _, tt := range tests {
@@ -37,6 +40,9 @@ func TestMode_IsInputMode(t *testing.T) {
 		{ModeInputDesc, true},
 		{ModeStart, false},
 		{ModeHelp, false},
+		{ModeReviewing, false},
+		{ModeReviewResult, false},
+		{ModeReviewAction, false},
 	}
 
 	for _, tt := range tests {

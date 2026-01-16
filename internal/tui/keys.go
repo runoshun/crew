@@ -14,6 +14,7 @@ type KeyMap struct {
 	Stop   key.Binding // Stop running session
 	Attach key.Binding // Attach to session
 	Exec   key.Binding // Execute command
+	Review key.Binding // Run review on task
 
 	// Task management
 	New        key.Binding // Create new task
@@ -70,6 +71,10 @@ func DefaultKeyMap() KeyMap {
 		Exec: key.NewBinding(
 			key.WithKeys("x"),
 			key.WithHelp("x", "execute"),
+		),
+		Review: key.NewBinding(
+			key.WithKeys("R"),
+			key.WithHelp("R", "review"),
 		),
 		New: key.NewBinding(
 			key.WithKeys("n"),
@@ -147,7 +152,7 @@ func (k KeyMap) ShortHelp() []key.Binding {
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.Up, k.Down, k.Enter},                         // Navigation
-		{k.Start, k.Stop, k.Attach, k.Exec},             // Session
+		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},   // Session
 		{k.New, k.Copy, k.Delete, k.EditStatus},         // Task management
 		{k.Merge, k.Close},                              // Workflow
 		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
@@ -173,6 +178,7 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.Stop)
 	addKeys(k.Attach)
 	addKeys(k.Exec)
+	addKeys(k.Review)
 	addKeys(k.New)
 	addKeys(k.Copy)
 	addKeys(k.Delete)
