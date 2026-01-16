@@ -23,7 +23,8 @@
       "Bash(git cat-file:*)",
       "Bash(git remote:*)",
       "Bash(grep:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(crew:*)"
     ],
     "deny": [
       "Read(.envrc)",
