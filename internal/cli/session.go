@@ -139,6 +139,8 @@ Examples:
 
 // newAttachCommand creates the attach command for attaching to a session.
 func newAttachCommand(c *app.Container) *cobra.Command {
+	var review bool
+
 	cmd := &cobra.Command{
 		Use:   "attach <id>",
 		Short: "Attach to a running session",
@@ -147,13 +149,19 @@ func newAttachCommand(c *app.Container) *cobra.Command {
 This replaces the current process with the tmux session.
 Use Ctrl+G to detach from the session (configured in .git/crew/tmux.conf).
 
+By default, attaches to the work session (crew-<id>).
+Use --review to attach to the review session (crew-<id>-review).
+
 Preconditions:
   - Task must exist
   - Session must be running
 
 Examples:
-  # Attach to session for task #1
-  git crew attach 1`,
+  # Attach to work session for task #1
+  git crew attach 1
+
+  # Attach to review session for task #1
+  git crew attach 1 --review`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -166,6 +174,7 @@ Examples:
 			uc := c.AttachSessionUseCase()
 			_, err = uc.Execute(cmd.Context(), usecase.AttachSessionInput{
 				TaskID: taskID,
+				Review: review,
 			})
 			if err != nil {
 				return err
@@ -175,6 +184,8 @@ Examples:
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&review, "review", false, "Attach to review session instead of work session")
 
 	return cmd
 }
