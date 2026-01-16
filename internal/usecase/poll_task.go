@@ -68,19 +68,23 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Check if task is already in terminal state (immediate exit)
-	if uc.isTerminalStatus(task.Status) {
-		return &PollTaskOutput{}, nil
-	}
-
 	// Check if current status matches expected statuses (immediate notification if different)
+	// This must come before terminal check to ensure notification even for terminal states
 	if len(in.ExpectedStatuses) > 0 {
 		if !uc.containsStatus(in.ExpectedStatuses, task.Status) {
 			// Current status differs from expected - notify immediately
 			if in.CommandTemplate != "" {
+				// Join expected statuses for display
+				expectedStr := ""
+				for i, s := range in.ExpectedStatuses {
+					if i > 0 {
+						expectedStr += ","
+					}
+					expectedStr += string(s)
+				}
 				data := CommandData{
 					TaskID:    in.TaskID,
-					OldStatus: string(in.ExpectedStatuses[0]), // Use first expected status as "old"
+					OldStatus: expectedStr, // Show all expected statuses
 					NewStatus: string(task.Status),
 				}
 				if err := uc.executeCommand(ctx, in.CommandTemplate, data); err != nil {
@@ -89,6 +93,11 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 			}
 			return &PollTaskOutput{}, nil
 		}
+	}
+
+	// Check if task is already in terminal state (immediate exit)
+	if uc.isTerminalStatus(task.Status) {
+		return &PollTaskOutput{}, nil
 	}
 
 	previousStatus := task.Status

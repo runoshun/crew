@@ -118,5 +118,8 @@ Examples:
 	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 0, "Timeout in seconds (0 = no timeout)")
 	cmd.Flags().StringVarP(&opts.Command, "command", "c", "", "Command template to execute on status change")
 
+	// Mark --expect as required (ignore error as flag is guaranteed to exist)
+	_ = cmd.MarkFlagRequired("expect")
+
 	return cmd
 }
