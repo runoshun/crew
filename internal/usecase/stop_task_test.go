@@ -115,7 +115,7 @@ func TestStopTask_Execute_AlreadyInReview(t *testing.T) {
 	// Assert - should succeed and maintain status
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusForReview, out.Task.Status, "status should remain in_review")
+	assert.Equal(t, domain.StatusForReview, out.Task.Status, "status should remain for_review")
 }
 
 func TestStopTask_Execute_ErrorStatus(t *testing.T) {

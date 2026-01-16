@@ -10,7 +10,7 @@ import (
 type ListTasksInput struct {
 	ParentID         *int     // Filter by parent task ID (nil = all tasks)
 	Labels           []string // Filter by labels (AND condition)
-	IncludeTerminal  bool     // Include terminal status tasks (closed/done)
+	IncludeTerminal  bool     // Include terminal status tasks (closed)
 	IncludeSessions  bool     // Include session information
 	IncludeProcesses bool     // Include process information (implies IncludeSessions)
 }

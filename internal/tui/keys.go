@@ -33,7 +33,7 @@ type KeyMap struct {
 	Sort          key.Binding // Toggle sort mode
 	Help          key.Binding // Show help
 	Detail        key.Binding // Toggle detail view
-	ToggleShowAll key.Binding // Toggle show all (including closed/done)
+	ToggleShowAll key.Binding // Toggle show all (including closed)
 
 	// General
 	Quit    key.Binding // Quit application

@@ -60,7 +60,7 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 	// 2. Identify branches to delete
 	// Rules:
 	// - Must match crew branch pattern
-	// - Task either doesn't exist OR has closed/done status (in cleanup set)
+	// - Task either doesn't exist OR has closed status (in cleanup set)
 	branches, err := uc.git.ListBranches()
 	if err != nil {
 		return nil, fmt.Errorf("list branches: %w", err)
@@ -100,7 +100,7 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 			continue
 		}
 
-		// Also check for orphan crew worktrees (branch doesn't match deletion list but task is gone/done)
+		// Also check for orphan crew worktrees (branch doesn't match deletion list but task is gone/closed)
 		taskID, isCrewBranch := domain.ParseBranchTaskID(wt.Branch)
 		if !isCrewBranch {
 			continue

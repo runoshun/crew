@@ -163,7 +163,7 @@ func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Test task",
-		Status:  domain.StatusForReview, // Already in_review
+		Status:  domain.StatusForReview, // Already for_review
 		Agent:   "claude",
 		Session: "crew-1",
 	}
@@ -180,7 +180,7 @@ func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, out.Ignored)
 
-	// Status should remain in_review and session info should be kept
+	// Status should remain for_review and session info should be kept
 	task := repo.Tasks[1]
 	assert.Equal(t, domain.StatusForReview, task.Status)
 	assert.Equal(t, "claude", task.Agent)
