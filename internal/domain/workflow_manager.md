@@ -92,6 +92,22 @@ crew comment <id> -R "Description of the issue from reviewer"
 # This automatically sets status to in_progress and notifies the worker agent
 ```
 
+### Review Result Handling
+
+**Important**: Do NOT automatically forward all review findings to the worker.
+
+When the reviewer agent completes the review:
+
+1. **Review findings**: The reviewer provides feedback on code quality, architecture, errors, etc.
+2. **Filter and validate**: Manager (task creator) reviews the findings and assesses validity
+3. **Selective forwarding**: Only forward valid issues via `crew comment`
+4. **Clarify misunderstandings**: If reviewer misunderstood the context or requirements:
+   - Update task description or add supplementary comment
+   - Explain the valid reasoning behind the current implementation
+   - Do NOT just send the raw review findings to the worker
+
+**Manager responsibility**: The task creator is responsible for filtering review feedback and ensuring the worker receives only actionable, valid feedback.
+
 ### "What's the progress?"
 
 ```bash
