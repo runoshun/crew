@@ -375,7 +375,7 @@ func newReviewSessionEndedCommand(c *app.Container) *cobra.Command {
 			}
 
 			// Execute use case
-			uc := c.ReviewSessionEndedUseCase()
+			uc := c.ReviewSessionEndedUseCase(cmd.ErrOrStderr())
 			_, err = uc.Execute(cmd.Context(), usecase.ReviewSessionEndedInput{
 				TaskID:   taskID,
 				ExitCode: exitCode,

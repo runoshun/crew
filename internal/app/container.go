@@ -298,8 +298,9 @@ func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewT
 }
 
 // ReviewSessionEndedUseCase returns a new ReviewSessionEnded use case.
-func (c *Container) ReviewSessionEndedUseCase() *usecase.ReviewSessionEnded {
-	return usecase.NewReviewSessionEnded(c.Tasks, c.Clock, c.Config.CrewDir)
+// stderr is the writer for warning messages.
+func (c *Container) ReviewSessionEndedUseCase(stderr io.Writer) *usecase.ReviewSessionEnded {
+	return usecase.NewReviewSessionEnded(c.Tasks, c.Clock, c.Config.CrewDir, stderr)
 }
 
 // PollTaskUseCase returns a new PollTask use case.

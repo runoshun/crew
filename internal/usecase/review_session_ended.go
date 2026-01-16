@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -26,14 +27,16 @@ type ReviewSessionEndedOutput struct {
 type ReviewSessionEnded struct {
 	tasks   domain.TaskRepository
 	clock   domain.Clock
+	stderr  io.Writer
 	crewDir string
 }
 
 // NewReviewSessionEnded creates a new ReviewSessionEnded use case.
-func NewReviewSessionEnded(tasks domain.TaskRepository, clock domain.Clock, crewDir string) *ReviewSessionEnded {
+func NewReviewSessionEnded(tasks domain.TaskRepository, clock domain.Clock, crewDir string, stderr io.Writer) *ReviewSessionEnded {
 	return &ReviewSessionEnded{
 		tasks:   tasks,
 		clock:   clock,
+		stderr:  stderr,
 		crewDir: crewDir,
 	}
 }
@@ -73,7 +76,7 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 		}
 		if err := uc.tasks.AddComment(task.ID, comment); err != nil {
 			// Log but don't fail - the review session completed
-			_, _ = fmt.Fprintf(os.Stderr, "warning: failed to add review comment: %v\n", err)
+			_, _ = fmt.Fprintf(uc.stderr, "warning: failed to add review comment: %v\n", err)
 		}
 	}
 

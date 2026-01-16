@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,7 +26,7 @@ func TestReviewSessionEnded_Execute_Success(t *testing.T) {
 		Status: domain.StatusReviewing,
 	}
 
-	uc := NewReviewSessionEnded(repo, clock, crewDir)
+	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ReviewSessionEndedInput{
@@ -57,7 +58,7 @@ func TestReviewSessionEnded_Execute_TaskNotFound(t *testing.T) {
 	clock := &testutil.MockClock{NowTime: time.Now()}
 	crewDir := t.TempDir()
 
-	uc := NewReviewSessionEnded(repo, clock, crewDir)
+	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ReviewSessionEndedInput{
@@ -84,7 +85,7 @@ func TestReviewSessionEnded_Execute_NotReviewing(t *testing.T) {
 		Status: domain.StatusInProgress,
 	}
 
-	uc := NewReviewSessionEnded(repo, clock, crewDir)
+	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ReviewSessionEndedInput{
@@ -115,7 +116,7 @@ func TestReviewSessionEnded_Execute_NonZeroExitCode(t *testing.T) {
 		Status: domain.StatusReviewing,
 	}
 
-	uc := NewReviewSessionEnded(repo, clock, crewDir)
+	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
 
 	// Execute with non-zero exit code
 	out, err := uc.Execute(context.Background(), ReviewSessionEndedInput{
@@ -160,7 +161,7 @@ func TestReviewSessionEnded_Execute_CleanupsScriptFiles(t *testing.T) {
 		Status: domain.StatusReviewing,
 	}
 
-	uc := NewReviewSessionEnded(repo, clock, crewDir)
+	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ReviewSessionEndedInput{

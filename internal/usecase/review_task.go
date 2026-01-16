@@ -228,7 +228,7 @@ END_OF_PROMPT
 		}
 		if err := uc.tasks.AddComment(task.ID, comment); err != nil {
 			// Log but don't fail - the review was successful
-			_, _ = fmt.Fprintf(os.Stderr, "warning: failed to add review comment: %v\n", err)
+			_, _ = fmt.Fprintf(uc.stderr, "warning: failed to add review comment: %v\n", err)
 		}
 	}
 
@@ -236,7 +236,7 @@ END_OF_PROMPT
 	task.Status = domain.StatusReviewed
 	if err := uc.tasks.Save(task); err != nil {
 		// Log but don't fail - the review was successful
-		_, _ = fmt.Fprintf(os.Stderr, "warning: failed to update task status: %v\n", err)
+		_, _ = fmt.Fprintf(uc.stderr, "warning: failed to update task status: %v\n", err)
 	}
 
 	return &ReviewTaskOutput{

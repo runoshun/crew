@@ -70,7 +70,7 @@ Examples:
 			defer cancel()
 
 			// Execute use case
-			uc := c.PollTaskUseCase(cmd.OutOrStdout(), cmd.OutOrStderr())
+			uc := c.PollTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 			_, err := uc.Execute(ctx, usecase.PollTaskInput{
 				TaskID:          taskID,
 				Interval:        opts.Interval,
