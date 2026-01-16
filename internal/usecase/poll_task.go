@@ -13,10 +13,11 @@ import (
 
 // PollTaskInput contains the parameters for polling a task.
 type PollTaskInput struct {
-	CommandTemplate string // Command template to execute on status change
-	TaskID          int    // Task ID to poll
-	Interval        int    // Polling interval in seconds (default: 10)
-	Timeout         int    // Timeout in seconds (0 = no timeout)
+	CommandTemplate  string          // Command template to execute on status change
+	ExpectedStatuses []domain.Status // Expected statuses (if current status differs, notify immediately)
+	TaskID           int             // Task ID to poll
+	Interval         int             // Polling interval in seconds (default: 10)
+	Timeout          int             // Timeout in seconds (0 = no timeout)
 }
 
 // PollTaskOutput contains the result of polling a task.
@@ -70,6 +71,24 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 	// Check if task is already in terminal state (immediate exit)
 	if uc.isTerminalStatus(task.Status) {
 		return &PollTaskOutput{}, nil
+	}
+
+	// Check if current status matches expected statuses (immediate notification if different)
+	if len(in.ExpectedStatuses) > 0 {
+		if !uc.containsStatus(in.ExpectedStatuses, task.Status) {
+			// Current status differs from expected - notify immediately
+			if in.CommandTemplate != "" {
+				data := CommandData{
+					TaskID:    in.TaskID,
+					OldStatus: string(in.ExpectedStatuses[0]), // Use first expected status as "old"
+					NewStatus: string(task.Status),
+				}
+				if err := uc.executeCommand(ctx, in.CommandTemplate, data); err != nil {
+					return nil, fmt.Errorf("execute command: %w", err)
+				}
+			}
+			return &PollTaskOutput{}, nil
+		}
 	}
 
 	previousStatus := task.Status
@@ -132,6 +151,16 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 // isTerminalStatus returns true if the status is a terminal state.
 func (uc *PollTask) isTerminalStatus(status domain.Status) bool {
 	return status == domain.StatusDone || status == domain.StatusClosed || status == domain.StatusError
+}
+
+// containsStatus returns true if the slice contains the specified status.
+func (uc *PollTask) containsStatus(statuses []domain.Status, target domain.Status) bool {
+	for _, s := range statuses {
+		if s == target {
+			return true
+		}
+	}
+	return false
 }
 
 // executeCommand executes the command template with the given data.

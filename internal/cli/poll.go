@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/runoshun/git-crew/v2/internal/app"
+	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 	"github.com/spf13/cobra"
 )
@@ -15,6 +17,7 @@ import (
 func newPollCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		Command  string
+		Expect   string
 		Interval int
 		Timeout  int
 	}
@@ -29,10 +32,16 @@ a command template when a status change is detected. It automatically exits
 when the task reaches a terminal state (done, closed, error) or when the
 timeout is reached.
 
+Expected Status Check:
+  Use --expect to specify expected status(es). If the current status differs
+  from the expected status(es), the command will be executed immediately and
+  the poll command will exit. This is useful to avoid waiting when the status
+  has already changed.
+
 Command Template:
   The command template can use the following variables:
     {{.TaskID}}    - Task ID
-    {{.OldStatus}} - Previous status
+    {{.OldStatus}} - Previous status (or expected status if --expect is used)
     {{.NewStatus}} - New status
 
 Terminal States:
@@ -44,6 +53,12 @@ Terminal States:
 Examples:
   # Basic polling (default interval: 10s, no timeout)
   git crew poll 175
+
+  # Poll with expected status (notify immediately if different)
+  git crew poll 199 --expect in_progress
+
+  # Multiple expected statuses (OR condition)
+  git crew poll 199 --expect in_progress,needs_input
 
   # Poll with custom interval and timeout
   git crew poll 175 --interval 5 --timeout 300
@@ -61,6 +76,19 @@ Examples:
 				return fmt.Errorf("invalid task ID: %s", args[0])
 			}
 
+			// Parse expected statuses
+			var expectedStatuses []domain.Status
+			if opts.Expect != "" {
+				parts := strings.Split(opts.Expect, ",")
+				for _, part := range parts {
+					status := domain.Status(strings.TrimSpace(part))
+					if !status.IsValid() {
+						return fmt.Errorf("invalid status: %s", part)
+					}
+					expectedStatuses = append(expectedStatuses, status)
+				}
+			}
+
 			// Set default command if not specified
 			if opts.Command == "" {
 				opts.Command = `echo "{{.TaskID}}: {{.OldStatus}} → {{.NewStatus}}"`
@@ -73,10 +101,11 @@ Examples:
 			// Execute use case
 			uc := c.PollTaskUseCase(cmd.OutOrStdout(), cmd.OutOrStderr())
 			_, err := uc.Execute(ctx, usecase.PollTaskInput{
-				TaskID:          taskID,
-				Interval:        opts.Interval,
-				Timeout:         opts.Timeout,
-				CommandTemplate: opts.Command,
+				TaskID:           taskID,
+				ExpectedStatuses: expectedStatuses,
+				Interval:         opts.Interval,
+				Timeout:          opts.Timeout,
+				CommandTemplate:  opts.Command,
 			})
 
 			return err
@@ -84,6 +113,7 @@ Examples:
 	}
 
 	// Flags
+	cmd.Flags().StringVarP(&opts.Expect, "expect", "e", "", "Expected status(es) - comma-separated (e.g., 'in_progress' or 'in_progress,needs_input')")
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", 10, "Polling interval in seconds")
 	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 0, "Timeout in seconds (0 = no timeout)")
 	cmd.Flags().StringVarP(&opts.Command, "command", "c", "", "Command template to execute on status change")

@@ -387,3 +387,239 @@ func TestPollTask_Execute_CommandOutput(t *testing.T) {
 	assert.Equal(t, "-c", executor.ExecutedCmd.Args[0])
 	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: todo -> done")
 }
+
+func TestPollTask_Execute_ExpectedStatus_Match(t *testing.T) {
+	// Setup - task is in expected status
+	repo := NewThreadSafeTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress, // Current status matches expected
+	}
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Change to terminal state after short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		repo.UpdateStatus(1, domain.StatusDone)
+	}()
+
+	// Execute with expected status that matches current status
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := uc.Execute(ctx, PollTaskInput{
+		TaskID:           1,
+		ExpectedStatuses: []domain.Status{domain.StatusInProgress},
+		Interval:         1,
+		Timeout:          0,
+		CommandTemplate:  "",
+	})
+
+	// Assert - should continue polling (not exit immediately)
+	require.NoError(t, err)
+}
+
+func TestPollTask_Execute_ExpectedStatus_Mismatch(t *testing.T) {
+	// Setup - task is NOT in expected status
+	repo := NewThreadSafeTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInReview, // Current status differs from expected
+	}
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Execute with expected status that differs from current status
+	ctx := context.Background()
+	start := time.Now()
+
+	_, err := uc.Execute(ctx, PollTaskInput{
+		TaskID:           1,
+		ExpectedStatuses: []domain.Status{domain.StatusInProgress},
+		Interval:         1,
+		Timeout:          0,
+		CommandTemplate:  `echo "{{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"`,
+	})
+
+	// Assert - should exit immediately (not wait for polling interval)
+	require.NoError(t, err)
+	elapsed := time.Since(start)
+	assert.Less(t, elapsed, 100*time.Millisecond)
+
+	// Check that command was executed
+	assert.True(t, executor.ExecuteWithContextCalled)
+	assert.NotNil(t, executor.ExecutedCmd)
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: in_progress -> in_review")
+}
+
+func TestPollTask_Execute_ExpectedStatus_Multiple(t *testing.T) {
+	tests := []struct {
+		name          string
+		currentStatus domain.Status
+		expected      []domain.Status
+		shouldMatch   bool
+	}{
+		{
+			name:          "matches first expected status",
+			currentStatus: domain.StatusInProgress,
+			expected:      []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
+			shouldMatch:   true,
+		},
+		{
+			name:          "matches second expected status",
+			currentStatus: domain.StatusNeedsInput,
+			expected:      []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
+			shouldMatch:   true,
+		},
+		{
+			name:          "does not match any expected status",
+			currentStatus: domain.StatusInReview,
+			expected:      []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
+			shouldMatch:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			repo := NewThreadSafeTaskRepository()
+			clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+			repo.Tasks[1] = &domain.Task{
+				ID:     1,
+				Title:  "Test task",
+				Status: tt.currentStatus,
+			}
+
+			executor := testutil.NewMockCommandExecutor()
+			uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+			// Change to terminal state after short delay if should match
+			if tt.shouldMatch {
+				go func() {
+					time.Sleep(50 * time.Millisecond)
+					repo.UpdateStatus(1, domain.StatusDone)
+				}()
+			}
+
+			// Execute
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			start := time.Now()
+			_, err := uc.Execute(ctx, PollTaskInput{
+				TaskID:           1,
+				ExpectedStatuses: tt.expected,
+				Interval:         1,
+				Timeout:          0,
+				CommandTemplate:  `echo "{{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"`,
+			})
+
+			// Assert
+			require.NoError(t, err)
+
+			if tt.shouldMatch {
+				// Should continue polling (not exit immediately)
+				elapsed := time.Since(start)
+				assert.GreaterOrEqual(t, elapsed, 50*time.Millisecond)
+			} else {
+				// Should exit immediately
+				elapsed := time.Since(start)
+				assert.Less(t, elapsed, 100*time.Millisecond)
+				assert.True(t, executor.ExecuteWithContextCalled)
+			}
+		})
+	}
+}
+
+func TestPollTask_Execute_ExpectedStatus_Empty(t *testing.T) {
+	// Setup - empty expected statuses (should behave like before)
+	repo := NewThreadSafeTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Change to terminal state after short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		repo.UpdateStatus(1, domain.StatusDone)
+	}()
+
+	// Execute with empty expected statuses
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := uc.Execute(ctx, PollTaskInput{
+		TaskID:           1,
+		ExpectedStatuses: []domain.Status{}, // Empty
+		Interval:         1,
+		Timeout:          0,
+	})
+
+	// Assert - should behave like normal polling
+	require.NoError(t, err)
+}
+
+func TestPollTask_containsStatus(t *testing.T) {
+	repo := testutil.NewMockTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	tests := []struct {
+		name     string
+		statuses []domain.Status
+		target   domain.Status
+		expected bool
+	}{
+		{
+			name:     "contains status",
+			statuses: []domain.Status{domain.StatusTodo, domain.StatusInProgress, domain.StatusDone},
+			target:   domain.StatusInProgress,
+			expected: true,
+		},
+		{
+			name:     "does not contain status",
+			statuses: []domain.Status{domain.StatusTodo, domain.StatusInProgress},
+			target:   domain.StatusDone,
+			expected: false,
+		},
+		{
+			name:     "empty slice",
+			statuses: []domain.Status{},
+			target:   domain.StatusTodo,
+			expected: false,
+		},
+		{
+			name:     "single element match",
+			statuses: []domain.Status{domain.StatusInProgress},
+			target:   domain.StatusInProgress,
+			expected: true,
+		},
+		{
+			name:     "single element no match",
+			statuses: []domain.Status{domain.StatusInProgress},
+			target:   domain.StatusTodo,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := uc.containsStatus(tt.statuses, tt.target)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
