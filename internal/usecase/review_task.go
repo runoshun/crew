@@ -347,17 +347,17 @@ set -o pipefail
 
 # Output capture file
 OUTPUT_FILE=$(mktemp)
-trap 'rm -f "$OUTPUT_FILE"' EXIT
 
 # Embedded prompt
 read -r -d '' PROMPT << 'END_OF_PROMPT'
 {{.Prompt}}
 END_OF_PROMPT
 
-# Callback on session termination
+# Callback on session termination (also cleans up temp file)
 REVIEW_SESSION_ENDED() {
   local code=$?
   "{{.CrewBin}}" _review-session-ended {{.TaskID}} "$code" "$OUTPUT_FILE" || true
+  rm -f "$OUTPUT_FILE"
 }
 
 # Signal handling

@@ -91,7 +91,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgAttachSession:
 		// Use tea.Exec to attach to tmux session, returning to TUI after detach
-		return m, m.attachToSession(msg.TaskID)
+		return m, m.attachToSession(msg.TaskID, msg.Review)
 
 	case MsgReloadTasks:
 		// Reload tasks after returning from external commands
@@ -420,7 +420,7 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 	case domain.StatusReviewing:
 		// Attach to review session
 		return m, func() tea.Msg {
-			return MsgAttachSession{TaskID: task.ID}
+			return MsgAttachSession{TaskID: task.ID, Review: true}
 		}
 
 	case domain.StatusForReview, domain.StatusReviewed:

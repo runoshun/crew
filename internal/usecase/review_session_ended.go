@@ -81,7 +81,7 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 	if in.ExitCode == 0 {
 		task.Status = domain.StatusReviewed
 	} else {
-		// Keep as reviewing or set error? Let's keep as for_review to allow retry
+		// Revert to for_review to allow retry
 		task.Status = domain.StatusForReview
 	}
 

@@ -9,7 +9,8 @@ import (
 
 // AttachSessionInput contains the parameters for attaching to a session.
 type AttachSessionInput struct {
-	TaskID int // Task ID to attach to
+	TaskID int  // Task ID to attach to
+	Review bool // If true, attach to review session instead of work session
 }
 
 // AttachSessionOutput contains the result of attaching to a session.
@@ -45,8 +46,13 @@ func (uc *AttachSession) Execute(_ context.Context, in AttachSessionInput) (*Att
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Get session name
-	sessionName := domain.SessionName(task.ID)
+	// Get session name based on mode
+	var sessionName string
+	if in.Review {
+		sessionName = domain.ReviewSessionName(task.ID)
+	} else {
+		sessionName = domain.SessionName(task.ID)
+	}
 
 	// Check if session is running
 	running, err := uc.sessions.IsRunning(sessionName)

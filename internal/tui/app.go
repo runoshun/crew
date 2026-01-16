@@ -568,9 +568,15 @@ func (c *domainExecCmd) SetStderr(w io.Writer) { c.stderr = w }
 
 // attachToSession returns a tea.Cmd that attaches to a tmux session.
 // After the attach completes (user detaches), it triggers a task reload.
-func (m *Model) attachToSession(taskID int) tea.Cmd {
+// If review is true, attaches to the review session instead of the work session.
+func (m *Model) attachToSession(taskID int, review bool) tea.Cmd {
 	socketPath := m.container.Config.SocketPath
-	sessionName := domain.SessionName(taskID)
+	var sessionName string
+	if review {
+		sessionName = domain.ReviewSessionName(taskID)
+	} else {
+		sessionName = domain.SessionName(taskID)
+	}
 
 	cmd := domain.NewCommand("tmux", []string{"-S", socketPath, "attach", "-t", sessionName}, "")
 	return tea.Exec(&domainExecCmd{cmd: cmd}, func(err error) tea.Msg {
