@@ -12,65 +12,63 @@ func TestStatus_CanTransitionTo(t *testing.T) {
 		// From todo
 		{"todo -> in_progress", StatusTodo, StatusInProgress, true},
 		{"todo -> closed", StatusTodo, StatusClosed, true},
-		{"todo -> done", StatusTodo, StatusDone, false},
-		{"todo -> in_review", StatusTodo, StatusInReview, false},
+		{"todo -> for_review", StatusTodo, StatusForReview, false},
 		{"todo -> error", StatusTodo, StatusError, false},
 
 		// From in_progress
-		{"in_progress -> in_review", StatusInProgress, StatusInReview, true},
-		{"in_progress -> needs_changes", StatusInProgress, StatusNeedsChanges, true},
+		{"in_progress -> for_review", StatusInProgress, StatusForReview, true},
+		{"in_progress -> needs_input", StatusInProgress, StatusNeedsInput, true},
 		{"in_progress -> stopped", StatusInProgress, StatusStopped, true},
 		{"in_progress -> error", StatusInProgress, StatusError, true},
 		{"in_progress -> closed", StatusInProgress, StatusClosed, true},
-		{"in_progress -> done", StatusInProgress, StatusDone, false},
+		{"in_progress -> reviewed", StatusInProgress, StatusReviewed, false},
 		{"in_progress -> todo", StatusInProgress, StatusTodo, false},
-
-		// From in_review
-		{"in_review -> in_progress", StatusInReview, StatusInProgress, true},
-		{"in_review -> done", StatusInReview, StatusDone, true},
-		{"in_review -> closed", StatusInReview, StatusClosed, true},
-		{"in_review -> error", StatusInReview, StatusError, false},
-		{"in_review -> todo", StatusInReview, StatusTodo, false},
 
 		// From needs_input
 		{"needs_input -> in_progress", StatusNeedsInput, StatusInProgress, true},
-		{"needs_input -> in_review", StatusNeedsInput, StatusInReview, true},
+		{"needs_input -> for_review", StatusNeedsInput, StatusForReview, true},
 		{"needs_input -> closed", StatusNeedsInput, StatusClosed, true},
 		{"needs_input -> todo", StatusNeedsInput, StatusTodo, false},
-		{"needs_input -> done", StatusNeedsInput, StatusDone, false},
+		{"needs_input -> reviewed", StatusNeedsInput, StatusReviewed, false},
 
-		// From needs_changes
-		{"needs_changes -> in_progress", StatusNeedsChanges, StatusInProgress, true},
-		{"needs_changes -> closed", StatusNeedsChanges, StatusClosed, true},
-		{"needs_changes -> todo", StatusNeedsChanges, StatusTodo, false},
-		{"needs_changes -> done", StatusNeedsChanges, StatusDone, false},
+		// From for_review
+		{"for_review -> reviewing", StatusForReview, StatusReviewing, true},
+		{"for_review -> in_progress", StatusForReview, StatusInProgress, true},
+		{"for_review -> closed", StatusForReview, StatusClosed, true},
+		{"for_review -> todo", StatusForReview, StatusTodo, false},
+		{"for_review -> reviewed", StatusForReview, StatusReviewed, false},
+
+		// From reviewing
+		{"reviewing -> reviewed", StatusReviewing, StatusReviewed, true},
+		{"reviewing -> in_progress", StatusReviewing, StatusInProgress, true},
+		{"reviewing -> closed", StatusReviewing, StatusClosed, true},
+		{"reviewing -> for_review", StatusReviewing, StatusForReview, false},
+		{"reviewing -> todo", StatusReviewing, StatusTodo, false},
+
+		// From reviewed
+		{"reviewed -> in_progress", StatusReviewed, StatusInProgress, true},
+		{"reviewed -> closed", StatusReviewed, StatusClosed, true},
+		{"reviewed -> for_review", StatusReviewed, StatusForReview, false},
+		{"reviewed -> todo", StatusReviewed, StatusTodo, false},
 
 		// From stopped
 		{"stopped -> in_progress", StatusStopped, StatusInProgress, true},
 		{"stopped -> closed", StatusStopped, StatusClosed, true},
 		{"stopped -> todo", StatusStopped, StatusTodo, false},
-		{"stopped -> done", StatusStopped, StatusDone, false},
+		{"stopped -> reviewed", StatusStopped, StatusReviewed, false},
 
 		// From error
 		{"error -> in_progress", StatusError, StatusInProgress, true},
 		{"error -> closed", StatusError, StatusClosed, true},
 		{"error -> todo", StatusError, StatusTodo, false},
-		{"error -> in_review", StatusError, StatusInReview, false},
-		{"error -> done", StatusError, StatusDone, false},
-
-		// From done
-		{"done -> closed", StatusDone, StatusClosed, true},
-		{"done -> todo", StatusDone, StatusTodo, false},
-		{"done -> in_progress", StatusDone, StatusInProgress, false},
-		{"done -> in_review", StatusDone, StatusInReview, false},
-		{"done -> error", StatusDone, StatusError, false},
+		{"error -> for_review", StatusError, StatusForReview, false},
+		{"error -> reviewed", StatusError, StatusReviewed, false},
 
 		// From closed (terminal)
 		{"closed -> todo", StatusClosed, StatusTodo, false},
 		{"closed -> in_progress", StatusClosed, StatusInProgress, false},
-		{"closed -> in_review", StatusClosed, StatusInReview, false},
+		{"closed -> for_review", StatusClosed, StatusForReview, false},
 		{"closed -> error", StatusClosed, StatusError, false},
-		{"closed -> done", StatusClosed, StatusDone, false},
 		{"closed -> closed", StatusClosed, StatusClosed, false},
 	}
 
@@ -98,12 +96,12 @@ func TestStatus_IsTerminal(t *testing.T) {
 	}{
 		{StatusTodo, false},
 		{StatusInProgress, false},
-		{StatusInReview, false},
 		{StatusNeedsInput, false},
-		{StatusNeedsChanges, false},
+		{StatusForReview, false},
+		{StatusReviewing, false},
+		{StatusReviewed, false},
 		{StatusStopped, false},
 		{StatusError, false},
-		{StatusDone, false},
 		{StatusClosed, true},
 	}
 
@@ -123,12 +121,12 @@ func TestStatus_CanStart(t *testing.T) {
 	}{
 		{StatusTodo, true},
 		{StatusInProgress, false},
-		{StatusInReview, true},
 		{StatusNeedsInput, false},
-		{StatusNeedsChanges, false},
+		{StatusForReview, true},
+		{StatusReviewing, false},
+		{StatusReviewed, true},
 		{StatusStopped, true},
 		{StatusError, true},
-		{StatusDone, false},
 		{StatusClosed, false},
 	}
 
@@ -148,12 +146,12 @@ func TestStatus_Display(t *testing.T) {
 	}{
 		{StatusTodo, "To Do"},
 		{StatusInProgress, "In Progress"},
-		{StatusInReview, "In Review"},
 		{StatusNeedsInput, "Needs Input"},
-		{StatusNeedsChanges, "Needs Changes"},
+		{StatusForReview, "For Review"},
+		{StatusReviewing, "Reviewing"},
+		{StatusReviewed, "Reviewed"},
 		{StatusStopped, "Stopped"},
 		{StatusError, "Error"},
-		{StatusDone, "Done"},
 		{StatusClosed, "Closed"},
 		{Status("unknown"), "unknown"},
 	}
@@ -174,12 +172,12 @@ func TestStatus_IsValid(t *testing.T) {
 	}{
 		{StatusTodo, true},
 		{StatusInProgress, true},
-		{StatusInReview, true},
 		{StatusNeedsInput, true},
-		{StatusNeedsChanges, true},
+		{StatusForReview, true},
+		{StatusReviewing, true},
+		{StatusReviewed, true},
 		{StatusStopped, true},
 		{StatusError, true},
-		{StatusDone, true},
 		{StatusClosed, true},
 		{Status("unknown"), false},
 		{Status(""), false},
@@ -199,12 +197,12 @@ func TestAllStatuses(t *testing.T) {
 	expected := []Status{
 		StatusTodo,
 		StatusInProgress,
-		StatusInReview,
 		StatusNeedsInput,
-		StatusNeedsChanges,
+		StatusForReview,
+		StatusReviewing,
+		StatusReviewed,
 		StatusStopped,
 		StatusError,
-		StatusDone,
 		StatusClosed,
 	}
 

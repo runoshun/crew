@@ -100,7 +100,7 @@ func TestStopTask_Execute_AlreadyInReview(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Task in review",
-		Status:  domain.StatusInReview,
+		Status:  domain.StatusForReview,
 		Agent:   "",
 		Session: "",
 	}
@@ -115,7 +115,7 @@ func TestStopTask_Execute_AlreadyInReview(t *testing.T) {
 	// Assert - should succeed and maintain status
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusInReview, out.Task.Status, "status should remain in_review")
+	assert.Equal(t, domain.StatusForReview, out.Task.Status, "status should remain in_review")
 }
 
 func TestStopTask_Execute_ErrorStatus(t *testing.T) {
@@ -253,7 +253,7 @@ func TestStopTask_Execute_ClearsAgentInfo(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Task with agent info",
-		Status:  domain.StatusInReview, // Not in_progress
+		Status:  domain.StatusForReview, // Not in_progress
 		Agent:   "claude",
 		Session: "crew-1",
 	}

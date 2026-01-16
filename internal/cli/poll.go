@@ -26,7 +26,7 @@ func newPollCommand(c *app.Container) *cobra.Command {
 
 The poll command checks the task status at regular intervals and executes
 a command template when a status change is detected. It automatically exits
-when the task reaches a terminal state (done, closed, error) or when the
+when the task reaches a terminal state (closed, error) or when the
 timeout is reached.
 
 Command Template:
@@ -37,8 +37,7 @@ Command Template:
 
 Terminal States:
   The following states are considered terminal and will stop polling:
-    - done   - Task merged successfully
-    - closed - Task closed without merging
+    - closed - Task closed (merged or abandoned)
     - error  - Task session terminated with error
 
 Examples:

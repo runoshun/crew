@@ -286,15 +286,15 @@ func (m *Model) dialogWidth() int {
 }
 
 var statusPriority = map[domain.Status]int{
-	domain.StatusInReview:     0,
-	domain.StatusInProgress:   1,
-	domain.StatusNeedsInput:   1,
-	domain.StatusNeedsChanges: 1,
-	domain.StatusError:        2,
-	domain.StatusStopped:      2,
-	domain.StatusTodo:         3,
-	domain.StatusDone:         4,
-	domain.StatusClosed:       5,
+	domain.StatusReviewing:  0, // Review in progress
+	domain.StatusInProgress: 1, // Work in progress
+	domain.StatusNeedsInput: 1, // Waiting for input
+	domain.StatusForReview:  2, // Awaiting review
+	domain.StatusReviewed:   2, // Review complete
+	domain.StatusError:      3,
+	domain.StatusStopped:    3,
+	domain.StatusTodo:       4,
+	domain.StatusClosed:     5,
 }
 
 func (m *Model) sortedTasks() []*domain.Task {
@@ -681,8 +681,8 @@ func (m *Model) reviewTask(taskID int) tea.Cmd {
 	return func() tea.Msg {
 		uc := m.container.ReviewTaskUseCase(io.Discard, io.Discard)
 		out, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
-			TaskID:  taskID,
-			Verbose: false,
+			TaskID: taskID,
+			Wait:   true, // TUI uses synchronous execution
 		})
 		if err != nil {
 			return MsgReviewError{TaskID: taskID, Err: err}

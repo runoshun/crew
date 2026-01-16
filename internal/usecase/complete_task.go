@@ -105,8 +105,8 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 		}
 	}
 
-	// Update status to in_review
-	task.Status = domain.StatusInReview
+	// Update status to for_review
+	task.Status = domain.StatusForReview
 
 	// Add comment if provided
 	if in.Comment != "" {
@@ -126,7 +126,7 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 
 	// Log task completion
 	if uc.logger != nil {
-		uc.logger.Info(task.ID, "task", "completed (status: in_review)")
+		uc.logger.Info(task.ID, "task", "completed (status: for_review)")
 	}
 
 	return &CompleteTaskOutput{Task: task}, nil

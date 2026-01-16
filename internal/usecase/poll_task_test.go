@@ -74,7 +74,7 @@ func TestPollTask_Execute_StatusChange(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		repo.UpdateStatus(1, domain.StatusInProgress)
 		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusDone)
+		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with short interval
@@ -197,7 +197,7 @@ func TestPollTask_Execute_TerminalStates(t *testing.T) {
 		name   string
 		status domain.Status
 	}{
-		{"done", domain.StatusDone},
+		{"done", domain.StatusClosed},
 		{"closed", domain.StatusClosed},
 		{"error", domain.StatusError},
 	}
@@ -258,7 +258,7 @@ func TestPollTask_Execute_DefaultInterval(t *testing.T) {
 	// Change status to terminal after short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusDone)
+		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with interval <= 0 (should use default)
@@ -280,7 +280,7 @@ func TestPollTask_Execute_ImmediateTerminalState(t *testing.T) {
 		name   string
 		status domain.Status
 	}{
-		{"done", domain.StatusDone},
+		{"done", domain.StatusClosed},
 		{"closed", domain.StatusClosed},
 		{"error", domain.StatusError},
 	}
@@ -327,7 +327,7 @@ func TestPollTask_isTerminalStatus(t *testing.T) {
 		status   domain.Status
 		expected bool
 	}{
-		{"done is terminal", domain.StatusDone, true},
+		{"done is terminal", domain.StatusClosed, true},
 		{"closed is terminal", domain.StatusClosed, true},
 		{"error is terminal", domain.StatusError, true},
 		{"todo is not terminal", domain.StatusTodo, false},
@@ -362,7 +362,7 @@ func TestPollTask_Execute_CommandOutput(t *testing.T) {
 	// Use delay longer than polling interval to ensure we catch the change
 	go func() {
 		time.Sleep(1500 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusDone)
+		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with command template
@@ -385,5 +385,5 @@ func TestPollTask_Execute_CommandOutput(t *testing.T) {
 	assert.Equal(t, "sh", executor.ExecutedCmd.Program)
 	assert.Len(t, executor.ExecutedCmd.Args, 2)
 	assert.Equal(t, "-c", executor.ExecutedCmd.Args[0])
-	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: todo -> done")
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: todo -> closed")
 }

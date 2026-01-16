@@ -131,7 +131,7 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 
 // isTerminalStatus returns true if the status is a terminal state.
 func (uc *PollTask) isTerminalStatus(status domain.Status) bool {
-	return status == domain.StatusDone || status == domain.StatusClosed || status == domain.StatusError
+	return status == domain.StatusClosed || status == domain.StatusError
 }
 
 // executeCommand executes the command template with the given data.

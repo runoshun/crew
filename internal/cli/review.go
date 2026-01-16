@@ -15,8 +15,8 @@ import (
 // newReviewCommand creates the review command for reviewing task changes with AI.
 func newReviewCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		model   string
-		verbose bool
+		model string
+		wait  bool
 	}
 
 	cmd := &cobra.Command{
@@ -27,26 +27,34 @@ func newReviewCommand(c *app.Container) *cobra.Command {
 The reviewer analyzes the diff and provides feedback on code quality,
 correctness, and adherence to best practices.
 
+By default, the review runs in background (similar to crew start).
+Use --wait for synchronous execution.
+
+The review result is saved as a comment with author "reviewer".
+
 Arguments:
-  <id>      Task ID to review
+  <id>      Task ID to review (must be in for_review status)
   [agent]   Reviewer agent name (optional, uses default if not specified)
   [-- message...]  Additional instructions for the reviewer (optional)
 
 The message can also be provided via stdin.
 
 Examples:
-  # Basic review
+  # Start background review
   crew review 1
 
   # Review with specific agent
   crew review 1 claude-reviewer
+
+  # Wait for review to complete
+  crew review 1 --wait
 
   # Review with additional instructions
   crew review 1 -- "Focus on the last commit only"
   crew review 1 claude-reviewer -- "Check security aspects carefully"
 
   # Review with message from stdin
-  echo "Focus on performance" | crew review 1`,
+  echo "Focus on performance" | crew review 1 --wait`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -74,15 +82,21 @@ Examples:
 				Agent:   agent,
 				Model:   opts.model,
 				Message: message,
-				Verbose: opts.verbose,
+				Wait:    opts.wait,
 			})
 			if err != nil {
 				return err
 			}
 
-			// Print the review result (in non-verbose mode, this is the extracted result)
-			if !opts.verbose && out.Review != "" {
-				_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.Review)
+			if opts.wait {
+				// Synchronous mode: print the review result
+				if out.Review != "" {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.Review)
+				}
+			} else {
+				// Background mode: print session info
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Review started in session %s\n", out.SessionName)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Use 'crew attach %d --review' to view progress\n", taskID)
 			}
 
 			return nil
@@ -90,7 +104,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
-	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "Show full output including intermediate steps")
+	cmd.Flags().BoolVarP(&opts.wait, "wait", "w", false, "Wait for review to complete (synchronous mode)")
 
 	return cmd
 }

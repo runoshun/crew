@@ -305,7 +305,7 @@ func TestSnapshot(t *testing.T) {
 	assert.Equal(t, 1, snapshots[0].Seq)
 
 	// Modify tasks
-	task1.Status = domain.StatusDone
+	task1.Status = domain.StatusClosed
 	require.NoError(t, store.Save(task1))
 	require.NoError(t, store.Delete(2))
 
@@ -313,7 +313,7 @@ func TestSnapshot(t *testing.T) {
 	tasks, err := store.List(domain.TaskFilter{})
 	require.NoError(t, err)
 	require.Len(t, tasks, 1)
-	assert.Equal(t, domain.StatusDone, tasks[0].Status)
+	assert.Equal(t, domain.StatusClosed, tasks[0].Status)
 
 	// Restore snapshot
 	require.NoError(t, store.RestoreSnapshot(snapshots[0].Ref))
@@ -349,7 +349,7 @@ func TestSnapshotMultipleSequence(t *testing.T) {
 	task.Status = domain.StatusInProgress
 	require.NoError(t, store.Save(task))
 	require.NoError(t, store.SaveSnapshot(mainSHA))
-	task.Status = domain.StatusDone
+	task.Status = domain.StatusClosed
 	require.NoError(t, store.Save(task))
 	require.NoError(t, store.SaveSnapshot(mainSHA))
 

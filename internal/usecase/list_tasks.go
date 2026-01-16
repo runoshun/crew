@@ -100,11 +100,11 @@ func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOu
 	return &ListTasksOutput{TasksWithInfo: tasksWithInfo}, nil
 }
 
-// filterActiveOnly removes tasks with terminal status (closed/done).
+// filterActiveOnly removes tasks with terminal status (closed).
 func filterActiveOnly(tasks []*domain.Task) []*domain.Task {
 	var result []*domain.Task
 	for _, t := range tasks {
-		if t.Status != domain.StatusClosed && t.Status != domain.StatusDone {
+		if t.Status != domain.StatusClosed {
 			result = append(result, t)
 		}
 	}

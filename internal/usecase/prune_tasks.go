@@ -9,7 +9,7 @@ import (
 
 // PruneTasksInput contains the parameters for pruning tasks.
 type PruneTasksInput struct {
-	All    bool // If true, also prune 'done' tasks (in addition to 'closed')
+	All    bool // Unused (kept for backward compatibility)
 	DryRun bool // If true, only list what would be pruned
 }
 
@@ -42,7 +42,7 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 		DeletedWorktrees: []string{},
 	}
 
-	// 1. Identify tasks with closed/done status (for branch/worktree deletion criteria)
+	// 1. Identify tasks with closed status (for branch/worktree deletion criteria)
 	// NOTE: Tasks themselves are NOT deleted, only branches and worktrees
 	tasks, err := uc.tasks.List(domain.TaskFilter{})
 	if err != nil {
@@ -53,8 +53,6 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 	shouldCleanup := make(map[int]bool)
 	for _, task := range tasks {
 		if task.Status == domain.StatusClosed {
-			shouldCleanup[task.ID] = true
-		} else if in.All && task.Status == domain.StatusDone {
 			shouldCleanup[task.ID] = true
 		}
 	}

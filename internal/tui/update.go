@@ -339,7 +339,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Merge):
 		task := m.SelectedTask()
-		if task == nil || task.Status != domain.StatusInReview {
+		if task == nil || (task.Status != domain.StatusForReview && task.Status != domain.StatusReviewed) {
 			return m, nil
 		}
 		m.mode = ModeConfirm
@@ -411,19 +411,25 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 		m.mode = ModeStart
 		return m, nil
 
-	case domain.StatusInProgress, domain.StatusNeedsInput, domain.StatusNeedsChanges:
-		// Attach to session (needs_input/needs_changes - task is running but waiting)
+	case domain.StatusInProgress, domain.StatusNeedsInput:
+		// Attach to session (needs_input - task is running but waiting)
 		return m, func() tea.Msg {
 			return MsgAttachSession{TaskID: task.ID}
 		}
 
-	case domain.StatusInReview:
+	case domain.StatusReviewing:
+		// Attach to review session
+		return m, func() tea.Msg {
+			return MsgAttachSession{TaskID: task.ID}
+		}
+
+	case domain.StatusForReview, domain.StatusReviewed:
 		// Show diff for review (attach is available via 'a' key)
 		return m, func() tea.Msg {
 			return MsgShowDiff{TaskID: task.ID}
 		}
 
-	case domain.StatusDone, domain.StatusClosed:
+	case domain.StatusClosed:
 		// Show detail view for terminal states
 		m.detailFocused = true
 		m.updateLayoutSizes()

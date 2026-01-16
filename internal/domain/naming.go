@@ -22,6 +22,12 @@ func SessionName(taskID int) string {
 	return fmt.Sprintf("crew-%d", taskID)
 }
 
+// ReviewSessionName returns the tmux session name for a review.
+// Format: crew-<id>-review
+func ReviewSessionName(taskID int) string {
+	return fmt.Sprintf("crew-%d-review", taskID)
+}
+
 // ScriptPath returns the path to the task script.
 func ScriptPath(crewDir string, taskID int) string {
 	return filepath.Join(crewDir, "scripts", fmt.Sprintf("task-%d.sh", taskID))

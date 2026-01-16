@@ -294,7 +294,12 @@ func (c *Container) StartManagerUseCase() *usecase.StartManager {
 // ReviewTaskUseCase returns a new ReviewTask use case.
 // stdout and stderr are the writers for command output.
 func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewTask {
-	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Executor, c.Config.RepoRoot, stdout, stderr)
+	return usecase.NewReviewTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Executor, c.Clock, c.Logger, c.Config.CrewDir, c.Config.RepoRoot, stdout, stderr)
+}
+
+// ReviewSessionEndedUseCase returns a new ReviewSessionEnded use case.
+func (c *Container) ReviewSessionEndedUseCase() *usecase.ReviewSessionEnded {
+	return usecase.NewReviewSessionEnded(c.Tasks, c.Clock, c.Config.CrewDir)
 }
 
 // PollTaskUseCase returns a new PollTask use case.

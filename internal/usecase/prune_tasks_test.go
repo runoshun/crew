@@ -93,7 +93,7 @@ func TestPruneTasks_Execute_Real(t *testing.T) {
 			},
 			tasks: []*domain.Task{
 				{ID: 1, Status: domain.StatusClosed},
-				{ID: 2, Status: domain.StatusDone},
+				{ID: 2, Status: domain.StatusClosed},
 				{ID: 3, Status: domain.StatusInProgress},
 			},
 			branches:          []string{"crew-1", "crew-2", "crew-3"},

@@ -241,7 +241,7 @@ func (m *Model) viewConfirmDialog() string {
 	case ConfirmMerge:
 		action = "Merge"
 		target = fmt.Sprintf("task #%d", m.confirmTaskID)
-		color = Colors.Done
+		color = Colors.Reviewed
 	}
 
 	// Find task title

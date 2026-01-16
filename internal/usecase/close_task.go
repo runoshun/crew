@@ -83,8 +83,9 @@ func (uc *CloseTask) Execute(_ context.Context, in CloseTaskInput) (*CloseTaskOu
 		}
 	}
 
-	// Update status
+	// Update status with abandoned reason
 	task.Status = domain.StatusClosed
+	task.CloseReason = domain.CloseReasonAbandoned
 
 	// Clear agent info
 	task.Agent = ""

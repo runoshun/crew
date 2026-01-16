@@ -17,9 +17,11 @@ func TestCloseTask_Execute_Success(t *testing.T) {
 	}{
 		{"from todo", domain.StatusTodo},
 		{"from in_progress", domain.StatusInProgress},
-		{"from in_review", domain.StatusInReview},
+		{"from for_review", domain.StatusForReview},
+		{"from reviewing", domain.StatusReviewing},
+		{"from reviewed", domain.StatusReviewed},
+		{"from stopped", domain.StatusStopped},
 		{"from error", domain.StatusError},
-		{"from done", domain.StatusDone},
 	}
 
 	for _, tt := range tests {
@@ -89,7 +91,7 @@ func TestCloseTask_Execute_DeletesWorktree(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Task with worktree",
-		Status:  domain.StatusInReview,
+		Status:  domain.StatusForReview,
 		Agent:   "",
 		Session: "",
 	}

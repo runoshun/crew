@@ -103,8 +103,8 @@ func newListCommand(c *app.Container) *cobra.Command {
 		Short: "List tasks",
 		Long: `Display a list of tasks.
 
-By default, tasks with terminal status (closed/done) are hidden.
-Use --all to show all tasks including closed and done tasks.
+By default, tasks with terminal status (closed) are hidden.
+Use --all to show all tasks including closed tasks.
 
 Output format is tab-separated with columns:
   ID, PARENT, STATUS, AGENT, LABELS, [ELAPSED], TITLE
@@ -115,10 +115,10 @@ With --sessions (-s), SESSION column is added showing the session name.
 With --processes (-p), process details are shown instead of the task list.
 
 Examples:
-  # List active tasks (default: exclude closed/done)
+  # List active tasks (default: exclude closed)
   git crew list
 
-  # List all tasks including closed/done
+  # List all tasks including closed
   git crew list --all
   git crew list -a
 
@@ -171,7 +171,7 @@ Examples:
 	// Optional flags
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Show only children of this task")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Filter by labels (AND condition)")
-	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all tasks including closed/done")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all tasks including closed")
 	cmd.Flags().BoolVarP(&opts.Sessions, "sessions", "s", false, "Include session information")
 	cmd.Flags().BoolVarP(&opts.Processes, "processes", "p", false, "Show process details")
 
@@ -515,7 +515,7 @@ Examples:
   git crew edit 1 --body "Updated description text"
 
   # Change task status
-  git crew edit 1 --status in_review
+  git crew edit 1 --status for_review
 
   # Conditional status change (only if current status matches)
   git crew edit 1 --status needs_input --if-status in_progress
@@ -607,7 +607,7 @@ Examples:
 	// Optional flags
 	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
 	cmd.Flags().StringVar(&opts.Description, "body", "", "New task description")
-	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, in_review, error, done, closed)")
+	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, needs_input, for_review, reviewing, reviewed, stopped, error, closed)")
 	cmd.Flags().StringArrayVar(&opts.IfStatus, "if-status", nil, "Only update status if current status matches (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")

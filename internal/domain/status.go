@@ -4,15 +4,15 @@ package domain
 type Status string
 
 const (
-	StatusTodo         Status = "todo"          // Created, awaiting start
-	StatusInProgress   Status = "in_progress"   // Agent working
-	StatusInReview     Status = "in_review"     // Work complete, awaiting review
-	StatusNeedsInput   Status = "needs_input"   // Agent is waiting for user input
-	StatusNeedsChanges Status = "needs_changes" // Reviewer requested changes
-	StatusError        Status = "error"         // Session terminated abnormally
-	StatusDone         Status = "done"          // Merge complete
-	StatusClosed       Status = "closed"        // Discarded without merge
-	StatusStopped      Status = "stopped"       // Manually stopped
+	StatusTodo       Status = "todo"        // Created, awaiting start
+	StatusInProgress Status = "in_progress" // Agent working
+	StatusNeedsInput Status = "needs_input" // Agent is waiting for user input
+	StatusForReview  Status = "for_review"  // Work complete, awaiting review
+	StatusReviewing  Status = "reviewing"   // Review in progress
+	StatusReviewed   Status = "reviewed"    // Review complete, results available
+	StatusStopped    Status = "stopped"     // Manually stopped
+	StatusError      Status = "error"       // Session terminated abnormally
+	StatusClosed     Status = "closed"      // Closed (CloseReason specifies why)
 )
 
 // AllStatuses returns all valid status values.
@@ -20,27 +20,31 @@ func AllStatuses() []Status {
 	return []Status{
 		StatusTodo,
 		StatusInProgress,
-		StatusInReview,
 		StatusNeedsInput,
-		StatusNeedsChanges,
+		StatusForReview,
+		StatusReviewing,
+		StatusReviewed,
 		StatusStopped,
 		StatusError,
-		StatusDone,
 		StatusClosed,
 	}
 }
 
 // transitions defines the allowed status transitions.
+// Flow: in_progress → for_review → reviewing → reviewed → closed
+//
+//	↑               ↑                         ↓
+//	└───────────────┴──────── (on changes) ───┘
 var transitions = map[Status][]Status{
-	StatusTodo:         {StatusInProgress, StatusClosed},
-	StatusInProgress:   {StatusInReview, StatusNeedsInput, StatusNeedsChanges, StatusStopped, StatusError, StatusClosed},
-	StatusInReview:     {StatusInProgress, StatusDone, StatusClosed},
-	StatusNeedsInput:   {StatusInProgress, StatusInReview, StatusClosed},
-	StatusNeedsChanges: {StatusInProgress, StatusClosed},
-	StatusStopped:      {StatusInProgress, StatusClosed},
-	StatusError:        {StatusInProgress, StatusClosed},
-	StatusDone:         {StatusClosed},
-	StatusClosed:       {},
+	StatusTodo:       {StatusInProgress, StatusClosed},
+	StatusInProgress: {StatusForReview, StatusNeedsInput, StatusStopped, StatusError, StatusClosed},
+	StatusNeedsInput: {StatusInProgress, StatusForReview, StatusClosed},
+	StatusForReview:  {StatusReviewing, StatusInProgress, StatusClosed},
+	StatusReviewing:  {StatusReviewed, StatusInProgress, StatusClosed},
+	StatusReviewed:   {StatusInProgress, StatusClosed},
+	StatusStopped:    {StatusInProgress, StatusClosed},
+	StatusError:      {StatusInProgress, StatusClosed},
+	StatusClosed:     {},
 }
 
 // CanTransitionTo returns true if the status can transition to the target status.
@@ -64,7 +68,7 @@ func (s Status) IsTerminal() bool {
 
 // CanStart returns true if a task in this status can be started.
 func (s Status) CanStart() bool {
-	return s == StatusTodo || s == StatusInReview || s == StatusStopped || s == StatusError
+	return s == StatusTodo || s == StatusForReview || s == StatusReviewed || s == StatusStopped || s == StatusError
 }
 
 // Display returns a human-readable representation of the status.
@@ -74,18 +78,18 @@ func (s Status) Display() string {
 		return "To Do"
 	case StatusInProgress:
 		return "In Progress"
-	case StatusInReview:
-		return "In Review"
 	case StatusNeedsInput:
 		return "Needs Input"
-	case StatusNeedsChanges:
-		return "Needs Changes"
+	case StatusForReview:
+		return "For Review"
+	case StatusReviewing:
+		return "Reviewing"
+	case StatusReviewed:
+		return "Reviewed"
 	case StatusStopped:
 		return "Stopped"
 	case StatusError:
 		return "Error"
-	case StatusDone:
-		return "Done"
 	case StatusClosed:
 		return "Closed"
 	default:
@@ -96,7 +100,7 @@ func (s Status) Display() string {
 // IsValid returns true if the status is a known valid value.
 func (s Status) IsValid() bool {
 	switch s {
-	case StatusTodo, StatusInProgress, StatusInReview, StatusNeedsInput, StatusNeedsChanges, StatusStopped, StatusError, StatusDone, StatusClosed:
+	case StatusTodo, StatusInProgress, StatusNeedsInput, StatusForReview, StatusReviewing, StatusReviewed, StatusStopped, StatusError, StatusClosed:
 		return true
 	default:
 		return false

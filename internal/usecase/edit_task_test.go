@@ -576,14 +576,14 @@ func TestEditTask_Execute_StatusTransitions(t *testing.T) {
 	}{
 		// Valid transitions
 		{"todo to in_progress", domain.StatusTodo, domain.StatusInProgress, false},
-		{"in_progress to in_review", domain.StatusInProgress, domain.StatusInReview, false},
-		{"in_review to done", domain.StatusInReview, domain.StatusDone, false},
+		{"in_progress to in_review", domain.StatusInProgress, domain.StatusForReview, false},
+		{"in_review to done", domain.StatusForReview, domain.StatusClosed, false},
 		{"any to closed", domain.StatusTodo, domain.StatusClosed, false},
 		// Same status (no change)
 		{"todo to todo", domain.StatusTodo, domain.StatusTodo, false},
 		// Backward transitions (allowed for manual edit)
 		{"in_progress to todo", domain.StatusInProgress, domain.StatusTodo, false},
-		{"done to in_progress", domain.StatusDone, domain.StatusInProgress, false},
+		{"done to in_progress", domain.StatusClosed, domain.StatusInProgress, false},
 	}
 
 	for _, tt := range tests {

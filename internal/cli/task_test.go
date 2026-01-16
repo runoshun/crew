@@ -306,7 +306,7 @@ func TestNewShowCommand_WithSubtasks(t *testing.T) {
 		ID:         3,
 		ParentID:   &parentID,
 		Title:      "Child task 2",
-		Status:     domain.StatusDone,
+		Status:     domain.StatusClosed,
 		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 		BaseBranch: "main",
 	}
@@ -593,7 +593,7 @@ func TestPrintTaskList_MultipleTasks(t *testing.T) {
 		{
 			ID:     3,
 			Title:  "Done task",
-			Status: domain.StatusDone,
+			Status: domain.StatusClosed,
 		},
 	}
 
@@ -607,7 +607,7 @@ func TestPrintTaskList_MultipleTasks(t *testing.T) {
 	// Verify statuses
 	assert.Contains(t, output, "in_progress")
 	assert.Contains(t, output, "todo")
-	assert.Contains(t, output, "done")
+	assert.Contains(t, output, "closed")
 }
 
 func TestNewEditCommand_UpdateTitle(t *testing.T) {
