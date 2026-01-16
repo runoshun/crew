@@ -1037,7 +1037,7 @@ func (m *Model) viewReviewActionDialog() string {
 	}
 
 	options := []actionOption{
-		{"Request Changes", "Send review and restart task (needs_changes)"},
+		{"Request Changes", "Send review and restart task (back to in_progress)"},
 		{"Comment Only", "Send review as comment without restarting"},
 		{"Merge", "Approve and merge the task (LGTM)"},
 		{"Close", "Close the task without merging"},

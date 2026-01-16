@@ -96,7 +96,7 @@ Examples:
 			} else {
 				// Background mode: print session info
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Review started in session %s\n", out.SessionName)
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Use 'crew attach %d --review' to view progress\n", taskID)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Use 'tmux attach -t %s' to view progress\n", out.SessionName)
 			}
 
 			return nil

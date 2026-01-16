@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 
@@ -71,8 +72,8 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 			Author: "reviewer",
 		}
 		if err := uc.tasks.AddComment(task.ID, comment); err != nil {
-			// Log but don't fail
-			_ = err
+			// Log but don't fail - the review session completed
+			_, _ = fmt.Fprintf(os.Stderr, "warning: failed to add review comment: %v\n", err)
 		}
 	}
 
