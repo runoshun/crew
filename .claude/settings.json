@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Skill(dev-workflow)",
       "Bash(mise run:*)",
       "Bash(go build:*)",
       "Bash(go test:*)",
@@ -23,8 +24,7 @@
       "Bash(git cat-file:*)",
       "Bash(git remote:*)",
       "Bash(grep:*)",
-      "Bash(rg:*)",
-      "Bash(crew:*)"
+      "Bash(rg:*)"
     ],
     "deny": [
       "Read(.envrc)",
