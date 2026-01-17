@@ -112,3 +112,23 @@ func TestUpdate_MsgPrepareEditComment(t *testing.T) {
 	assert.Equal(t, 0, result.editCommentIndex)
 	assert.Equal(t, "Original review comment", result.editCommentInput.Value())
 }
+
+func TestUpdate_MsgReviewResultLoaded(t *testing.T) {
+	m := &Model{
+		mode:         ModeNormal,
+		reviewTaskID: 0,
+		reviewResult: "",
+	}
+
+	msg := MsgReviewResultLoaded{
+		TaskID: 42,
+		Review: "Review content here",
+	}
+
+	updatedModel, _ := m.Update(msg)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeReviewResult, result.mode)
+	assert.Equal(t, 42, result.reviewTaskID)
+	assert.Equal(t, "Review content here", result.reviewResult)
+}

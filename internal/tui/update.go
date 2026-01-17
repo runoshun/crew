@@ -138,6 +138,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.editCommentInput.SetValue(msg.Message)
 		m.editCommentInput.Focus()
 		return m, nil
+
+	case MsgReviewResultLoaded:
+		m.reviewTaskID = msg.TaskID
+		m.reviewResult = msg.Review
+		m.mode = ModeReviewResult
+		m.reviewViewport.SetContent(msg.Review)
+		m.updateReviewViewport()
+		return m, nil
 	}
 
 	return m, nil
@@ -394,11 +402,15 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 			return MsgAttachSession{TaskID: task.ID, Review: true}
 		}
 
-	case domain.StatusForReview, domain.StatusReviewed:
+	case domain.StatusForReview:
 		// Show diff for review (attach is available via 'a' key)
 		return m, func() tea.Msg {
 			return MsgShowDiff{TaskID: task.ID}
 		}
+
+	case domain.StatusReviewed:
+		// Load and show review result, then allow actions (merge, request changes, etc.)
+		return m, m.loadReviewResult(task.ID)
 
 	case domain.StatusClosed:
 		// Show detail view for terminal states

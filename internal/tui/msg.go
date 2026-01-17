@@ -153,3 +153,11 @@ type MsgPrepareEditComment struct {
 }
 
 func (MsgPrepareEditComment) sealed() {}
+
+// MsgReviewResultLoaded is sent when review result (reviewer comment) is loaded for display.
+type MsgReviewResultLoaded struct {
+	Review string
+	TaskID int
+}
+
+func (MsgReviewResultLoaded) sealed() {}

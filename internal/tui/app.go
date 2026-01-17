@@ -786,3 +786,31 @@ func (m *Model) prepareEditReviewComment() tea.Cmd {
 		}
 	}
 }
+
+// loadReviewResult loads the latest reviewer comment for display in ModeReviewResult.
+func (m *Model) loadReviewResult(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		comments, err := m.container.Tasks.GetComments(taskID)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+
+		// Find the last reviewer comment
+		var reviewText string
+		for i := len(comments) - 1; i >= 0; i-- {
+			if comments[i].Author == "reviewer" {
+				reviewText = comments[i].Text
+				break
+			}
+		}
+
+		if reviewText == "" {
+			return MsgError{Err: fmt.Errorf("no review result found for task #%d", taskID)}
+		}
+
+		return MsgReviewResultLoaded{
+			TaskID: taskID,
+			Review: reviewText,
+		}
+	}
+}
