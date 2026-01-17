@@ -76,21 +76,52 @@ crew peek <id>
 Delegate reviews to a dedicated reviewer agent via `crew review`.
 The manager should NOT review code directly.
 
+#### Standard Review Workflow
+
+1. **Start review**: `crew review <id> &` (run in background)
+2. **Check progress**: Use `crew attach <id> --review` to monitor the reviewer's output (Note: `crew peek` does not support `--review`)
+3. **Wait for completion**: Monitor task status until it becomes `reviewed`
+4. **Check result**: `crew show <id>` and verify the presence of reviewer comments
+5. **Take action**:
+   - ✅ **LGTM**: `echo "y" | crew merge <id>`
+   - ❌ **Needs changes**:
+     - **If reviewer comments exist**: Forward feedback using `crew comment <id> -R "..."`. Provide a brief instruction referring to the reviewer's comments; do NOT transcribe the full findings.
+     - **If no reviewer comments**: If the review failed to save or encountered an error, re-run the review or manually paste the reviewer's output.
+
+**Important clarifications**:
+- **Reviewer comments (author=reviewer)** are stored in task comments as a record, NOT as a notification. The worker agent is not automatically notified when reviewer comments are saved.
+- **To notify and restart the worker**, you MUST use `crew comment <id> -R "..."`. This command:
+  - Sets task status to `in_progress`
+  - Notifies the running worker session with your message
+  - Triggers the worker to check and address the reviewer's feedback
+- **Completion from `reviewed` state**: You CANNOT use `crew complete` when a task is in `reviewed` status. To finalize a task:
+  - ✅ LGTM → Use `crew merge <id>` to merge and close
+  - ❌ Needs changes → Use `crew comment <id> -R "..."` to restart work, then review again
+  - 🚫 Abandon → Use `crew close <id>` to close without merging
+
+#### Needs Changes Template
+
+When the review identifies issues, use this template to forward concise, actionable instructions:
+
 ```bash
-# 1. Delegate review to reviewer agent
-crew review <id>
-# This spawns a reviewer agent that analyzes the diff and provides feedback
+crew comment <id> -R "$(cat <<'MSG'
+Please address the reviewer's feedback (see task comments, author=reviewer).
 
-# 2. Wait for review completion and check result
-# The reviewer agent will output findings
+Priority issues:
+1. [Brief description of first issue]
+2. [Brief description of second issue]
+3. [Brief description of third issue]
 
-# 3. If LGTM, merge
-echo "y" | crew merge <id>
-
-# If issues found, forward feedback to worker
-crew comment <id> -R "Description of the issue from reviewer"
-# This automatically sets status to in_progress and notifies the worker agent
+After fixing, set status to for_review for re-review.
+MSG
+)"
 ```
+
+**Best practices**:
+- Reference reviewer comments instead of copying them verbatim
+- Highlight top 3-5 priority issues
+- Keep the message concise and actionable
+- Avoid duplicate information already in reviewer comments
 
 ### Review Result Handling
 
