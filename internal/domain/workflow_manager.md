@@ -117,6 +117,124 @@ MSG
 )"
 ```
 
+---
+
+## Command Input Guidelines: Using HEREDOC for Safe Input
+
+When passing multi-line text or commands with special characters (backticks, `$()`, `<id>`, etc.) to crew commands, **always use HEREDOC syntax**. This prevents shell interpretation errors and ensures reliable command execution.
+
+### Why HEREDOC?
+
+- `crew comment` and `crew new --body` interpret shell metacharacters, causing:
+  - Lost text when `<id>` patterns are present
+  - Command substitution errors with `$(...)` or backticks
+  - Unpredictable behavior with quotes and escape sequences
+- HEREDOC syntax safely passes literal text while preserving formatting
+
+### Template: crew comment
+
+Use this template for sending plain comments to tasks:
+
+```bash
+crew comment TASK_ID "$(cat <<'MSG'
+Your comment text here.
+Multiple lines are supported.
+MSG
+)"
+```
+
+**Example**:
+```bash
+crew comment 42 "$(cat <<'MSG'
+Fixed the build error in src/main.go.
+Run tests to verify: make test
+MSG
+)"
+```
+
+### Template: crew comment -R (Reviewer feedback)
+
+Use this template for sending reviewer feedback or requested changes:
+
+```bash
+crew comment TASK_ID -R "$(cat <<'MSG'
+## Review Summary
+
+Please address the following issues:
+
+1. Issue 1: Description
+2. Issue 2: Description
+
+Run tests after fixing.
+MSG
+)"
+```
+
+**Example**:
+```bash
+crew comment 42 -R "$(cat <<'MSG'
+## Review Summary
+
+Please fix these issues:
+
+1. Add error handling in fetchData()
+2. Update tests for new validation logic
+
+After fixing, set status to for_review.
+MSG
+)"
+```
+
+### Template: crew new --body
+
+Use this template for creating tasks with detailed descriptions:
+
+```bash
+crew new --title "Feature: Description" --body "$(cat <<'BODY'
+## Summary
+- Brief description of the feature
+
+## Files to Change
+- src/component.ts
+- src/component.test.ts
+
+## Implementation Steps
+1. Step 1
+2. Step 2
+3. Step 3
+
+## Acceptance Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
+BODY
+)"
+```
+
+**Example**:
+```bash
+crew new --title "Add user authentication" --body "$(cat <<'BODY'
+## Summary
+- Implement JWT-based authentication for the API
+
+## Files to Change
+- src/auth.ts
+- src/auth.test.ts
+- src/middleware.ts
+
+## Implementation Steps
+1. Create JWT token generation function
+2. Add authentication middleware
+3. Update API endpoints to use middleware
+
+## Acceptance Criteria
+- [ ] Tokens are properly validated
+- [ ] All tests pass
+BODY
+)"
+```
+
+---
+
 **Best practices**:
 - Reference reviewer comments instead of copying them verbatim
 - Highlight top 3-5 priority issues
