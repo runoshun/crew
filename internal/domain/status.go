@@ -13,6 +13,9 @@ const (
 	StatusStopped    Status = "stopped"     // Manually stopped
 	StatusError      Status = "error"       // Session terminated abnormally
 	StatusClosed     Status = "closed"      // Closed (CloseReason specifies why)
+
+	// Legacy status (for backward compatibility with old data)
+	statusDoneLegacy Status = "done" // Legacy: renamed to closed
 )
 
 // AllStatuses returns all valid status values.
@@ -63,7 +66,7 @@ func (s Status) CanTransitionTo(target Status) bool {
 
 // IsTerminal returns true if the status is a terminal state.
 func (s Status) IsTerminal() bool {
-	return s == StatusClosed
+	return s == StatusClosed || s == statusDoneLegacy
 }
 
 // CanStart returns true if a task in this status can be started.
@@ -90,7 +93,7 @@ func (s Status) Display() string {
 		return "Stopped"
 	case StatusError:
 		return "Error"
-	case StatusClosed:
+	case StatusClosed, statusDoneLegacy:
 		return "Closed"
 	default:
 		return string(s)
@@ -98,11 +101,20 @@ func (s Status) Display() string {
 }
 
 // IsValid returns true if the status is a known valid value.
+// Note: Legacy status "done" is not considered valid for new tasks.
 func (s Status) IsValid() bool {
 	switch s {
 	case StatusTodo, StatusInProgress, StatusNeedsInput, StatusForReview, StatusReviewing, StatusReviewed, StatusStopped, StatusError, StatusClosed:
 		return true
+	case statusDoneLegacy:
+		return false // Legacy status is not valid for new tasks
 	default:
 		return false
 	}
+}
+
+// IsLegacyDone returns true if this is the legacy "done" status.
+// Used for backward compatibility when displaying old tasks.
+func (s Status) IsLegacyDone() bool {
+	return s == statusDoneLegacy
 }

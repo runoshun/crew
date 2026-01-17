@@ -415,6 +415,10 @@ func (s Styles) StatusStyle(status domain.Status) lipgloss.Style {
 	case domain.StatusClosed:
 		return s.StatusClosed
 	default:
+		// Handle legacy "done" status as closed
+		if status.IsLegacyDone() {
+			return s.StatusClosed
+		}
 		return s.StatusTodo
 	}
 }
@@ -441,6 +445,10 @@ func (s Styles) StatusStyleSelected(status domain.Status) lipgloss.Style {
 	case domain.StatusClosed:
 		return s.StatusClosedSelected
 	default:
+		// Handle legacy "done" status as closed
+		if status.IsLegacyDone() {
+			return s.StatusClosedSelected
+		}
 		return s.StatusTodoSelected
 	}
 }
@@ -467,6 +475,10 @@ func StatusText(status domain.Status) string {
 	case domain.StatusClosed:
 		return "Clsd"
 	default:
+		// Handle legacy "done" status as closed
+		if status.IsLegacyDone() {
+			return "Clsd"
+		}
 		return "?"
 	}
 }
@@ -493,6 +505,10 @@ func StatusIcon(status domain.Status) string {
 	case domain.StatusClosed:
 		return "−"
 	default:
+		// Handle legacy "done" status as closed
+		if status.IsLegacyDone() {
+			return "−"
+		}
 		return "?"
 	}
 }
