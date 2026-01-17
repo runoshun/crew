@@ -76,20 +76,21 @@ crew peek <id>
 Delegate reviews to a dedicated reviewer agent via `crew review`.
 The manager should NOT review code directly.
 
+#### Standard Review Workflow
+
+1. **Start review**: `crew review <id> &` (run in background)
+2. **Check progress**: Use `crew attach <id> --review` to monitor the reviewer's output (Note: `crew peek` does not support `--review`)
+3. **Wait for completion**: Monitor task status until it becomes `reviewed`
+4. **Check result**: `crew show <id>` and verify the presence of reviewer comments
+5. **Take action**:
+   - ✅ **LGTM**: `echo "y" | crew merge <id>`
+   - ❌ **Needs changes**:
+     - **If reviewer comments exist**: Forward feedback using `crew comment <id> -R "..."`. Provide a brief instruction referring to the reviewer's comments; do NOT transcribe the full findings.
+     - **If no reviewer comments**: If the review failed to save or encountered an error, re-run the review or manually paste the reviewer's output.
+
 ```bash
-# 1. Delegate review to reviewer agent
-crew review <id>
-# This spawns a reviewer agent that analyzes the diff and provides feedback
-
-# 2. Wait for review completion and check result
-# The reviewer agent will output findings
-
-# 3. If LGTM, merge
-echo "y" | crew merge <id>
-
-# If issues found, forward feedback to worker
-crew comment <id> -R "Description of the issue from reviewer"
-# This automatically sets status to in_progress and notifies the worker agent
+# Example: Requesting fixes based on reviewer comments
+crew comment <id> -R "Please address the issues pointed out by the reviewer in the task comments."
 ```
 
 ### Review Result Handling
