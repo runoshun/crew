@@ -194,10 +194,19 @@ crew list-agents
 
 | Task | Command |
 |------|---------|
-| Create a task | `crew new --title "Task title"` |
+| Create a task | See below |
 | Start working | `crew start <id>` |
 | Check progress | `crew peek <id>` |
 | Complete task | `crew complete` (run inside worktree) |
+
+**Example: Create a task with HEREDOC**
+```bash
+crew new --title "..." --body "$(cat <<'EOF'
+## Summary
+- ...
+EOF
+)"
+```
 
 ---
 
