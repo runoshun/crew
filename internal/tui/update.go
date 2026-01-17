@@ -166,6 +166,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reviewResult = ""
 		m.reviewActionCursor = 0
 		return m, m.loadTasks()
+
+	case MsgPrepareEditComment:
+		m.mode = ModeEditReviewComment
+		m.editCommentIndex = msg.Index
+		m.editCommentInput.SetValue(msg.Message)
+		m.editCommentInput.Focus()
+		return m, nil
 	}
 
 	return m, nil
@@ -207,6 +214,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleReviewActionMode(msg)
 	case ModeReviewMessage:
 		return m.handleReviewMessageMode(msg)
+	case ModeEditReviewComment:
+		return m.handleEditReviewCommentMode(msg)
 	}
 
 	return m, nil
@@ -888,7 +897,7 @@ func (m *Model) handleReviewResultMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleReviewActionMode handles keys when selecting a review action.
 func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	const numActions = 4 // NotifyWorker (restart), NotifyWorker (no restart), Merge, Close
+	const numActions = 5 // NotifyWorker (restart), NotifyWorker (no restart), Merge, Close, EditComment
 
 	switch {
 	case key.Matches(msg, m.keys.Escape):
@@ -928,6 +937,8 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmAction = ConfirmClose
 			m.confirmTaskID = m.reviewTaskID
 			return m, nil
+		case 4: // Edit Comment - enter edit mode
+			return m, m.prepareEditReviewComment()
 		}
 	}
 
@@ -959,5 +970,31 @@ func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Update text input
 	var cmd tea.Cmd
 	m.reviewMessageInput, cmd = m.reviewMessageInput.Update(msg)
+	return m, cmd
+}
+
+// handleEditReviewCommentMode handles keys when editing a review comment.
+func (m *Model) handleEditReviewCommentMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		// Cancel and go back to review action selection
+		m.mode = ModeReviewAction
+		m.editCommentInput.Blur()
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Save the edited comment
+		message := m.editCommentInput.Value()
+		if message == "" {
+			// Don't allow empty comments
+			return m, nil
+		}
+		m.editCommentInput.Blur()
+		return m, m.editComment(m.reviewTaskID, m.editCommentIndex, message)
+	}
+
+	// Update text input
+	var cmd tea.Cmd
+	m.editCommentInput, cmd = m.editCommentInput.Update(msg)
 	return m, cmd
 }
