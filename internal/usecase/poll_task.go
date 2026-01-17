@@ -146,11 +146,7 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 						return nil, fmt.Errorf("execute command: %w", err)
 					}
 				}
-				previousStatus = task.Status
-			}
-
-			// Check if task is in terminal state
-			if uc.isTerminalStatus(task.Status) {
+				// Exit immediately after one change detection
 				return &PollTaskOutput{}, nil
 			}
 		}
