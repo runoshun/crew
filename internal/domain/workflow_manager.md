@@ -61,11 +61,14 @@ Issues found in #114:
 ### "Implement this feature"
 
 ```bash
-# 1. Create task
-crew new --title "Implement feature X" --body "Detailed description..."
+# 1. Create task (Use HEREDOC for --body to avoid shell escaping issues)
+crew new --title "Implement feature X" --body "$(cat <<'EOF'
+Detailed description...
+EOF
+)"
 
 # 2. Start agent
-crew start <id> opencode -m anthropic/claude-sonnet-4-5
+crew start <id> <worker>
 
 # 3. Monitor progress
 crew peek <id>
@@ -257,6 +260,8 @@ When the reviewer agent completes the review:
 
 **Manager responsibility**: The task creator is responsible for filtering review feedback and ensuring the worker receives only actionable, valid feedback.
 
+---
+
 ### "What's the progress?"
 
 ```bash
@@ -311,6 +316,17 @@ crew start <id> opencode
 2. **Implementation plan**: Break down into steps
 3. **Completion criteria**: Clear checklist format
 4. **References**: Pointers to related existing implementations
+
+**Note: Use HEREDOC for --body**
+When using `--body`, it is strongly recommended to use HEREDOC to prevent the shell from interpreting characters like backticks, quotes, or dollar signs.
+
+```bash
+crew new --title "..." --body "$(cat <<'EOF'
+## Summary
+- ...
+EOF
+)"
+```
 
 **Good example**:
 ```markdown
