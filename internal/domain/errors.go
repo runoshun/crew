@@ -14,7 +14,7 @@ var (
 	ErrUncommittedChanges    = errors.New("uncommitted changes exist")
 	ErrMergeConflict         = errors.New("merge conflict exists")
 	ErrAlreadyInitialized    = errors.New("crew already initialized")
-	ErrNotInitialized        = errors.New("crew not initialized (run 'crew init' first)")
+	ErrNotInitialized        = errors.New("crew not initialized (run 'git crew init' first)")
 	ErrEmptyTitle            = errors.New("title cannot be empty")
 	ErrEmptyMessage          = errors.New("message cannot be empty")
 	ErrNotOnMainBranch       = errors.New("not on main branch")
