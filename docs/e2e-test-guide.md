@@ -349,20 +349,23 @@ crew start <id> cc-small  # Second time
 crew new --title "E2E: poll test"
 crew start <id> cc-small
 
-# 2. poll in background
-crew poll <id> --timeout 120 &
+# 2. poll in background (detects first change and exits)
+# Use --expect (required) to specify current status
+crew poll <id> --expect todo --command 'echo "Change detected!"' &
 
 # 3. Verify status change detection
-# Should output when needs_input is reached
+# Should output when status changes from todo (to in_progress) and process should exit
 
-# 4. Stop poll after verification
-kill %1
+# 4. Verify timeout behavior (optional)
+# Default timeout is 300s. Can be shortened for testing:
+# crew poll <id> --expect todo --timeout 5
 ```
 
 **Verification Points:**
-- [ ] Outputs on status change
-- [ ] Exits on timeout
-- [ ] Exits on terminal state
+- [ ] Exits immediately after first status change
+- [ ] Executes command on change
+- [ ] Exits on timeout (default: 300s)
+- [ ] Exits if current status differs from --expect on startup
 
 ---
 
