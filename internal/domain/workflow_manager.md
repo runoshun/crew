@@ -68,79 +68,11 @@ EOF
 )"
 
 # 2. Start agent
-crew start <id> opencode -m anthropic/claude-sonnet-4-5
+crew start <id> <worker>
 
 # 3. Monitor progress
 crew peek <id>
 ```
-
-### "Review this"
-
-Delegate reviews to a dedicated reviewer agent via `crew review`.
-The manager should NOT review code directly.
-
-#### Standard Review Workflow
-
-1. **Start review**: `crew review <id> &` (run in background)
-2. **Check progress**: Use `crew attach <id> --review` to monitor the reviewer's output (Note: `crew peek` does not support `--review`)
-3. **Wait for completion**: Monitor task status until it becomes `reviewed`
-4. **Check result**: `crew show <id>` and verify the presence of reviewer comments
-5. **Take action**:
-   - ✅ **LGTM**: `echo "y" | crew merge <id>`
-   - ❌ **Needs changes**:
-     - **If reviewer comments exist**: Forward feedback using `crew comment <id> -R "..."`. Provide a brief instruction referring to the reviewer's comments; do NOT transcribe the full findings.
-     - **If no reviewer comments**: If the review failed to save or encountered an error, re-run the review or manually paste the reviewer's output.
-
-**Important clarifications**:
-- **Reviewer comments (author=reviewer)** are stored in task comments as a record, NOT as a notification. The worker agent is not automatically notified when reviewer comments are saved.
-- **To notify and restart the worker**, you MUST use `crew comment <id> -R "..."`. This command:
-  - Sets task status to `in_progress`
-  - Notifies the running worker session with your message
-  - Triggers the worker to check and address the reviewer's feedback
-- **Completion from `reviewed` state**: You CANNOT use `crew complete` when a task is in `reviewed` status. To finalize a task:
-  - ✅ LGTM → Use `crew merge <id>` to merge and close
-  - ❌ Needs changes → Use `crew comment <id> -R "..."` to restart work, then review again
-  - 🚫 Abandon → Use `crew close <id>` to close without merging
-
-#### Needs Changes Template
-
-When the review identifies issues, use this template to forward concise, actionable instructions:
-
-```bash
-crew comment <id> -R "$(cat <<'MSG'
-Please address the reviewer's feedback (see task comments, author=reviewer).
-
-Priority issues:
-1. [Brief description of first issue]
-2. [Brief description of second issue]
-3. [Brief description of third issue]
-
-After fixing, set status to for_review for re-review.
-MSG
-)"
-```
-
-**Best practices**:
-- Reference reviewer comments instead of copying them verbatim
-- Highlight top 3-5 priority issues
-- Keep the message concise and actionable
-- Avoid duplicate information already in reviewer comments
-
-### Review Result Handling
-
-**Important**: Do NOT automatically forward all review findings to the worker.
-
-When the reviewer agent completes the review:
-
-1. **Review findings**: The reviewer provides feedback on code quality, architecture, errors, etc.
-2. **Filter and validate**: Manager (task creator) reviews the findings and assesses validity
-3. **Selective forwarding**: Only forward valid issues via `crew comment`
-4. **Clarify misunderstandings**: If reviewer misunderstood the context or requirements:
-   - Update task description or add supplementary comment
-   - Explain the valid reasoning behind the current implementation
-   - Do NOT just send the raw review findings to the worker
-
-**Manager responsibility**: The task creator is responsible for filtering review feedback and ensuring the worker receives only actionable, valid feedback.
 
 ### "What's the progress?"
 
@@ -184,6 +116,25 @@ crew stop <id>
 crew exec <id> -- git reset --hard main
 crew start <id> opencode
 ```
+
+### "Review this"
+
+Delegate reviews to a dedicated reviewer agent via `crew review`.
+The manager should NOT review code directly.
+
+#### Standard Review Workflow
+
+1. **Start review**: `crew review <id>`
+2. **Wait for completion**: Monitor task status until it becomes `reviewed`
+3. **Check result**: `crew show <id>` and verify the presence of reviewer comments
+4. **Take action**:
+   - ❌ **Needs changes**:
+     - Forward feedback using `crew comment <id> -R "..."`. Provide a brief instruction referring to the reviewer's comments; do NOT transcribe the full findings.
+
+**Important clarifications**:
+- **Reviewer comments (author=reviewer)** are stored in task comments as a record, NOT as a notification. The worker agent is not automatically notified when reviewer comments are saved.
+- **To notify and restart the worker**, you MUST use `crew comment <id> -R "..."`. This command:
+- **Manager responsibility**: The Manager is responsible for filtering review feedback and ensuring the worker receives only actionable, valid feedback.
 
 ---
 
