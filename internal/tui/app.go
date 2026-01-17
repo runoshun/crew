@@ -58,7 +58,8 @@ type Model struct {
 	reviewMessageInput textinput.Model
 
 	// Review components
-	reviewViewport viewport.Model // For scrollable review result
+	reviewViewport   viewport.Model // For scrollable review result
+	editCommentInput textinput.Model
 
 	// Numeric state (smaller types last)
 	mode               Mode
@@ -72,6 +73,7 @@ type Model struct {
 	statusCursor       int
 	reviewTaskID       int // Task being reviewed
 	reviewActionCursor int // Cursor for action selection
+	editCommentIndex   int // Index of comment being edited
 	startFocusCustom   bool
 	showAll            bool
 	detailFocused      bool // Right pane is focused for scrolling
@@ -108,6 +110,10 @@ func New(c *app.Container) *Model {
 	ri.Placeholder = "Message to worker (optional, Enter to skip)"
 	ri.CharLimit = 500
 
+	eci := textinput.New()
+	eci.Placeholder = "Edit review comment..."
+	eci.CharLimit = 2000
+
 	styles := DefaultStyles()
 	delegate := newTaskDelegate(styles)
 	taskList := list.New([]list.Item{}, delegate, 0, 0)
@@ -136,6 +142,7 @@ func New(c *app.Container) *Model {
 		customInput:        ci,
 		execInput:          ei,
 		reviewMessageInput: ri,
+		editCommentInput:   eci,
 		reviewViewport:     reviewVp,
 		builtinAgents:      []string{"claude", "opencode", "codex"},
 		customAgents:       nil,
@@ -730,5 +737,53 @@ func (m *Model) notifyWorker(taskID int, message string, requestChanges bool) te
 			return MsgError{Err: err}
 		}
 		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionNotifyWorker}
+	}
+}
+
+// editComment returns a command that updates an existing comment.
+func (m *Model) editComment(taskID int, index int, message string) tea.Cmd {
+	return func() tea.Msg {
+		uc := m.container.EditCommentUseCase()
+		err := uc.Execute(context.Background(), usecase.EditCommentInput{
+			TaskID:  taskID,
+			Index:   index,
+			Message: message,
+		})
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionEditComment}
+	}
+}
+
+// prepareEditReviewComment loads the review comment and enters edit mode.
+func (m *Model) prepareEditReviewComment() tea.Cmd {
+	return func() tea.Msg {
+		// Load comments for the task
+		comments, err := m.container.Tasks.GetComments(m.reviewTaskID)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+
+		// Find the last reviewer comment (most recent review result)
+		var reviewComment *domain.Comment
+		var reviewIndex int
+		for i := len(comments) - 1; i >= 0; i-- {
+			if comments[i].Author == "reviewer" {
+				reviewComment = &comments[i]
+				reviewIndex = i
+				break
+			}
+		}
+
+		if reviewComment == nil {
+			return MsgError{Err: fmt.Errorf("no review comment found")}
+		}
+
+		return MsgPrepareEditComment{
+			TaskID:  m.reviewTaskID,
+			Index:   reviewIndex,
+			Message: reviewComment.Text,
+		}
 	}
 }
