@@ -29,6 +29,9 @@ type SessionStarter interface {
 	Start(ctx context.Context, taskID int, continueFlag bool) error
 }
 
+// requestChangesNotification is the notification message template for request-changes.
+const requestChangesNotification = "Please check the comment with 'crew show %d' and address the requested changes. When finished, run 'crew complete %d'."
+
 // AddComment is the use case for adding a comment to a task.
 type AddComment struct {
 	tasks          domain.TaskRepository
@@ -96,7 +99,7 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 		running, _ := uc.sessions.IsRunning(sessionName)
 		if running {
 			// Send notification to running session
-			notificationMsg := fmt.Sprintf("Please check the comment with 'crew show %d' and address the requested changes. When finished, run 'crew complete %d'.", task.ID, task.ID)
+			notificationMsg := fmt.Sprintf(requestChangesNotification, task.ID, task.ID)
 			_ = uc.sessions.Send(sessionName, notificationMsg)
 			_ = uc.sessions.Send(sessionName, "Enter")
 		} else if uc.sessionStarter != nil {
@@ -110,7 +113,7 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 
 			// After starting, send the notification
 			sessionName := domain.SessionName(task.ID)
-			notificationMsg := fmt.Sprintf("Please check the comment with 'crew show %d' and address the requested changes. When finished, run 'crew complete %d'.", task.ID, task.ID)
+			notificationMsg := fmt.Sprintf(requestChangesNotification, task.ID, task.ID)
 			_ = uc.sessions.Send(sessionName, notificationMsg)
 			_ = uc.sessions.Send(sessionName, "Enter")
 		}
