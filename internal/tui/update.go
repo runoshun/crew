@@ -205,6 +205,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleReviewResultMode(msg)
 	case ModeReviewAction:
 		return m.handleReviewActionMode(msg)
+	case ModeReviewMessage:
+		return m.handleReviewMessageMode(msg)
 	}
 
 	return m, nil
@@ -901,8 +903,11 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.Type == tea.KeyEnter:
 		// Execute selected action
 		switch m.reviewActionCursor {
-		case 0: // NotifyWorker with restart
-			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, true)
+		case 0: // Request Changes - enter message input mode
+			m.mode = ModeReviewMessage
+			m.reviewMessageInput.Reset()
+			m.reviewMessageInput.Focus()
+			return m, nil
 		case 1: // NotifyWorker without restart (just send comment)
 			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, false)
 		case 2: // Merge - use confirm dialog
@@ -919,4 +924,32 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// defaultReviewMessage is the default message when the user leaves the input empty.
+const defaultReviewMessage = "Please address the review comments above."
+
+// handleReviewMessageMode handles keys when entering a message for Request Changes.
+func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		// Go back to review action selection
+		m.mode = ModeReviewAction
+		m.reviewMessageInput.Blur()
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Submit the message (or use default if empty)
+		message := m.reviewMessageInput.Value()
+		if message == "" {
+			message = defaultReviewMessage
+		}
+		m.reviewMessageInput.Blur()
+		return m, m.notifyWorker(m.reviewTaskID, message, true)
+	}
+
+	// Update text input
+	var cmd tea.Cmd
+	m.reviewMessageInput, cmd = m.reviewMessageInput.Update(msg)
+	return m, cmd
 }

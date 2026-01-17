@@ -95,6 +95,8 @@ func (m *Model) View() string {
 		dialog = m.viewReviewResultDialog()
 	case ModeReviewAction:
 		dialog = m.viewReviewActionDialog()
+	case ModeReviewMessage:
+		dialog = m.viewReviewMessageDialog()
 	}
 
 	if dialog != "" {
@@ -454,7 +456,7 @@ func (m *Model) viewFooter() string {
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeReviewing, ModeReviewResult, ModeReviewAction:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeReviewing, ModeReviewResult, ModeReviewAction, ModeReviewMessage:
 		return ""
 	default:
 		return ""
@@ -1037,7 +1039,7 @@ func (m *Model) viewReviewActionDialog() string {
 	}
 
 	options := []actionOption{
-		{"Request Changes", "Send review and restart task (back to in_progress)"},
+		{"Request Changes", "Send message and restart task (back to in_progress)"},
 		{"Comment Only", "Send review as comment without restarting"},
 		{"Merge", "Approve and merge the task (LGTM)"},
 		{"Close", "Close the task without merging"},
@@ -1076,5 +1078,46 @@ func (m *Model) viewReviewActionDialog() string {
 	lines = append(lines, ds.emptyLine(), hint)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return m.dialogStyle().Render(content)
+}
+
+func (m *Model) viewReviewMessageDialog() string {
+	ds := m.newDialogStyles()
+
+	title := ds.renderLine(ds.label.Render("Request Changes"))
+
+	// Find task
+	var task *domain.Task
+	for _, t := range m.tasks {
+		if t.ID == m.reviewTaskID {
+			task = t
+			break
+		}
+	}
+	if task == nil {
+		return ""
+	}
+
+	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+
+	description := ds.renderLine(ds.text.Render("Enter a message for the worker (optional):"))
+
+	inputLine := ds.renderLine(m.reviewMessageInput.View())
+
+	defaultHint := ds.renderLine(ds.muted.Render("Leave empty to use: \"Please address the review comments above.\""))
+
+	hint := ds.renderLine(
+		ds.key.Render("enter") + ds.text.Render(" send  ") +
+			ds.key.Render("esc") + ds.text.Render(" back"))
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title, ds.emptyLine(),
+		taskLine, ds.emptyLine(),
+		description,
+		inputLine,
+		defaultHint, ds.emptyLine(),
+		hint,
+	)
+
 	return m.dialogStyle().Render(content)
 }

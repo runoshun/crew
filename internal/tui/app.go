@@ -49,12 +49,13 @@ type Model struct {
 	detailPanelViewport viewport.Model // For right pane detail panel
 
 	// Input state (large structs)
-	titleInput  textinput.Model
-	descInput   textinput.Model
-	parentInput textinput.Model
-	filterInput textinput.Model
-	customInput textinput.Model
-	execInput   textinput.Model
+	titleInput         textinput.Model
+	descInput          textinput.Model
+	parentInput        textinput.Model
+	filterInput        textinput.Model
+	customInput        textinput.Model
+	execInput          textinput.Model
+	reviewMessageInput textinput.Model
 
 	// Review components
 	reviewViewport viewport.Model // For scrollable review result
@@ -103,6 +104,10 @@ func New(c *app.Container) *Model {
 	ei.Placeholder = "Enter command to execute..."
 	ei.CharLimit = 500
 
+	ri := textinput.New()
+	ri.Placeholder = "Message to worker (optional, Enter to skip)"
+	ri.CharLimit = 500
+
 	styles := DefaultStyles()
 	delegate := newTaskDelegate(styles)
 	taskList := list.New([]list.Item{}, delegate, 0, 0)
@@ -117,28 +122,29 @@ func New(c *app.Container) *Model {
 	reviewVp := viewport.New(0, 0)
 
 	return &Model{
-		container:        c,
-		mode:             ModeNormal,
-		tasks:            nil,
-		keys:             DefaultKeyMap(),
-		styles:           styles,
-		help:             help.New(),
-		taskList:         taskList,
-		titleInput:       ti,
-		descInput:        di,
-		parentInput:      pi,
-		filterInput:      fi,
-		customInput:      ci,
-		execInput:        ei,
-		reviewViewport:   reviewVp,
-		builtinAgents:    []string{"claude", "opencode", "codex"},
-		customAgents:     nil,
-		agentCommands:    make(map[string]string),
-		customKeybinds:   make(map[string]domain.TUIKeybinding),
-		keybindWarnings:  nil,
-		commentCounts:    make(map[int]int),
-		agentCursor:      0,
-		startFocusCustom: false,
+		container:          c,
+		mode:               ModeNormal,
+		tasks:              nil,
+		keys:               DefaultKeyMap(),
+		styles:             styles,
+		help:               help.New(),
+		taskList:           taskList,
+		titleInput:         ti,
+		descInput:          di,
+		parentInput:        pi,
+		filterInput:        fi,
+		customInput:        ci,
+		execInput:          ei,
+		reviewMessageInput: ri,
+		reviewViewport:     reviewVp,
+		builtinAgents:      []string{"claude", "opencode", "codex"},
+		customAgents:       nil,
+		agentCommands:      make(map[string]string),
+		customKeybinds:     make(map[string]domain.TUIKeybinding),
+		keybindWarnings:    nil,
+		commentCounts:      make(map[int]int),
+		agentCursor:        0,
+		startFocusCustom:   false,
 	}
 }
 
