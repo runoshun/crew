@@ -124,6 +124,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.commentCounts = msg.CommentCounts
 		m.updateTaskList()
 		return m, nil
+
+	case MsgReviewActionCompleted:
+		m.mode = ModeNormal
+		m.reviewTaskID = 0
+		m.reviewResult = ""
+		m.reviewActionCursor = 0
+		return m, m.loadTasks()
+
+	case MsgPrepareEditComment:
+		m.mode = ModeEditReviewComment
+		m.editCommentIndex = msg.Index
+		m.editCommentInput.SetValue(msg.Message)
+		m.editCommentInput.Focus()
+		return m, nil
 	}
 
 	return m, nil
@@ -157,6 +171,14 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEditStatusMode(msg)
 	case ModeExec:
 		return m.handleExecMode(msg)
+	case ModeReviewResult:
+		return m.handleReviewResultMode(msg)
+	case ModeReviewAction:
+		return m.handleReviewActionMode(msg)
+	case ModeReviewMessage:
+		return m.handleReviewMessageMode(msg)
+	case ModeEditReviewComment:
+		return m.handleEditReviewCommentMode(msg)
 	}
 
 	return m, nil
@@ -788,5 +810,137 @@ func (m *Model) handleExecMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.execInput, cmd = m.execInput.Update(msg)
+	return m, cmd
+}
+
+// handleReviewResultMode handles keys when viewing review results.
+func (m *Model) handleReviewResultMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		m.reviewResult = ""
+		m.reviewTaskID = 0
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Move to action selection
+		m.mode = ModeReviewAction
+		m.reviewActionCursor = 0
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down):
+		// Scroll the review viewport
+		var cmd tea.Cmd
+		m.reviewViewport, cmd = m.reviewViewport.Update(msg)
+		return m, cmd
+	}
+
+	// Forward other keys to viewport for page up/down
+	var cmd tea.Cmd
+	m.reviewViewport, cmd = m.reviewViewport.Update(msg)
+	return m, cmd
+}
+
+// handleReviewActionMode handles keys when selecting a review action.
+func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	const numActions = 5 // NotifyWorker (restart), NotifyWorker (no restart), Merge, Close, EditComment
+
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		// Go back to review result
+		m.mode = ModeReviewResult
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		if m.reviewActionCursor > 0 {
+			m.reviewActionCursor--
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		if m.reviewActionCursor < numActions-1 {
+			m.reviewActionCursor++
+		}
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Execute selected action
+		switch m.reviewActionCursor {
+		case 0: // Request Changes - enter message input mode
+			m.mode = ModeReviewMessage
+			m.reviewMessageInput.Reset()
+			m.reviewMessageInput.Focus()
+			return m, nil
+		case 1: // NotifyWorker without restart (just send comment)
+			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, false)
+		case 2: // Merge - use confirm dialog
+			m.mode = ModeConfirm
+			m.confirmAction = ConfirmMerge
+			m.confirmTaskID = m.reviewTaskID
+			return m, nil
+		case 3: // Close - use confirm dialog
+			m.mode = ModeConfirm
+			m.confirmAction = ConfirmClose
+			m.confirmTaskID = m.reviewTaskID
+			return m, nil
+		case 4: // Edit Comment - enter edit mode
+			return m, m.prepareEditReviewComment()
+		}
+	}
+
+	return m, nil
+}
+
+// defaultReviewMessage is the default message when the user leaves the input empty.
+const defaultReviewMessage = "Please address the review comments above."
+
+// handleReviewMessageMode handles keys when entering a message for Request Changes.
+func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		// Go back to review action selection
+		m.mode = ModeReviewAction
+		m.reviewMessageInput.Blur()
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Submit the message (or use default if empty)
+		message := m.reviewMessageInput.Value()
+		if message == "" {
+			message = defaultReviewMessage
+		}
+		m.reviewMessageInput.Blur()
+		return m, m.notifyWorker(m.reviewTaskID, message, true)
+	}
+
+	// Update text input
+	var cmd tea.Cmd
+	m.reviewMessageInput, cmd = m.reviewMessageInput.Update(msg)
+	return m, cmd
+}
+
+// handleEditReviewCommentMode handles keys when editing a review comment.
+func (m *Model) handleEditReviewCommentMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		// Cancel and go back to review action selection
+		m.mode = ModeReviewAction
+		m.editCommentInput.Blur()
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Save the edited comment
+		message := m.editCommentInput.Value()
+		if message == "" {
+			// Don't allow empty comments
+			return m, nil
+		}
+		m.editCommentInput.Blur()
+		return m, m.editComment(m.reviewTaskID, m.editCommentIndex, message)
+	}
+
+	// Update text input
+	var cmd tea.Cmd
+	m.editCommentInput, cmd = m.editCommentInput.Update(msg)
 	return m, cmd
 }

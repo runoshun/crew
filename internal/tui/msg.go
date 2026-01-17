@@ -136,3 +136,20 @@ type MsgCommentCountsLoaded struct {
 }
 
 func (MsgCommentCountsLoaded) sealed() {}
+
+// MsgReviewActionCompleted is sent when a review action is completed.
+type MsgReviewActionCompleted struct {
+	TaskID int
+	Action ReviewAction
+}
+
+func (MsgReviewActionCompleted) sealed() {}
+
+// MsgPrepareEditComment is sent when preparing to edit a review comment.
+type MsgPrepareEditComment struct {
+	Message string
+	TaskID  int
+	Index   int
+}
+
+func (MsgPrepareEditComment) sealed() {}

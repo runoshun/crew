@@ -39,6 +39,7 @@ type Model struct {
 	agentCommands   map[string]string
 	customKeybinds  map[string]domain.TUIKeybinding
 	keybindWarnings []string
+	reviewResult    string // Review result text
 
 	// Components (structs with pointers)
 	keys                KeyMap
@@ -48,26 +49,34 @@ type Model struct {
 	detailPanelViewport viewport.Model // For right pane detail panel
 
 	// Input state (large structs)
-	titleInput  textinput.Model
-	descInput   textinput.Model
-	parentInput textinput.Model
-	filterInput textinput.Model
-	customInput textinput.Model
-	execInput   textinput.Model
+	titleInput         textinput.Model
+	descInput          textinput.Model
+	parentInput        textinput.Model
+	filterInput        textinput.Model
+	customInput        textinput.Model
+	execInput          textinput.Model
+	reviewMessageInput textinput.Model
+
+	// Review components
+	reviewViewport   viewport.Model // For scrollable review result
+	editCommentInput textinput.Model
 
 	// Numeric state (smaller types last)
-	mode             Mode
-	confirmAction    ConfirmAction
-	sortMode         SortMode
-	newTaskField     NewTaskField
-	width            int
-	height           int
-	confirmTaskID    int
-	agentCursor      int
-	statusCursor     int
-	startFocusCustom bool
-	showAll          bool
-	detailFocused    bool // Right pane is focused for scrolling
+	mode               Mode
+	confirmAction      ConfirmAction
+	sortMode           SortMode
+	newTaskField       NewTaskField
+	width              int
+	height             int
+	confirmTaskID      int
+	agentCursor        int
+	statusCursor       int
+	reviewTaskID       int // Task being reviewed
+	reviewActionCursor int // Cursor for action selection
+	editCommentIndex   int // Index of comment being edited
+	startFocusCustom   bool
+	showAll            bool
+	detailFocused      bool // Right pane is focused for scrolling
 }
 
 // New creates a new TUI Model with the given container.
@@ -96,6 +105,14 @@ func New(c *app.Container) *Model {
 	ei.Placeholder = "Enter command to execute..."
 	ei.CharLimit = 500
 
+	ri := textinput.New()
+	ri.Placeholder = "Message to worker (optional, Enter to skip)"
+	ri.CharLimit = 500
+
+	eci := textinput.New()
+	eci.Placeholder = "Edit review comment..."
+	eci.CharLimit = 2000
+
 	styles := DefaultStyles()
 	delegate := newTaskDelegate(styles)
 	taskList := list.New([]list.Item{}, delegate, 0, 0)
@@ -106,28 +123,34 @@ func New(c *app.Container) *Model {
 	taskList.SetFilteringEnabled(true)
 	taskList.DisableQuitKeybindings()
 
+	// Initialize review viewport (size will be updated in WindowSizeMsg)
+	reviewVp := viewport.New(0, 0)
+
 	return &Model{
-		container:        c,
-		mode:             ModeNormal,
-		tasks:            nil,
-		keys:             DefaultKeyMap(),
-		styles:           styles,
-		help:             help.New(),
-		taskList:         taskList,
-		titleInput:       ti,
-		descInput:        di,
-		parentInput:      pi,
-		filterInput:      fi,
-		customInput:      ci,
-		execInput:        ei,
-		builtinAgents:    []string{"claude", "opencode", "codex"},
-		customAgents:     nil,
-		agentCommands:    make(map[string]string),
-		customKeybinds:   make(map[string]domain.TUIKeybinding),
-		keybindWarnings:  nil,
-		commentCounts:    make(map[int]int),
-		agentCursor:      0,
-		startFocusCustom: false,
+		container:          c,
+		mode:               ModeNormal,
+		tasks:              nil,
+		keys:               DefaultKeyMap(),
+		styles:             styles,
+		help:               help.New(),
+		taskList:           taskList,
+		titleInput:         ti,
+		descInput:          di,
+		parentInput:        pi,
+		filterInput:        fi,
+		customInput:        ci,
+		execInput:          ei,
+		reviewMessageInput: ri,
+		editCommentInput:   eci,
+		reviewViewport:     reviewVp,
+		builtinAgents:      []string{"claude", "opencode", "codex"},
+		customAgents:       nil,
+		agentCommands:      make(map[string]string),
+		customKeybinds:     make(map[string]domain.TUIKeybinding),
+		keybindWarnings:    nil,
+		commentCounts:      make(map[int]int),
+		agentCursor:        0,
+		startFocusCustom:   false,
 	}
 }
 
@@ -245,6 +268,22 @@ func (m *Model) updateLayoutSizes() {
 	listW := m.headerFooterContentWidth()
 	m.taskList.SetSize(listW, m.height-8)
 	m.updateDetailPanelViewport()
+	m.updateReviewViewport()
+}
+
+// updateReviewViewport updates the review viewport size based on dialog dimensions.
+func (m *Model) updateReviewViewport() {
+	dialogW := m.dialogWidth() - 8 // Account for padding
+	// Leave space for title, task line, hint, and padding (approximately 8 lines)
+	dialogH := m.height - 16
+	if dialogH < 5 {
+		dialogH = 5
+	}
+	if dialogH > 20 {
+		dialogH = 20
+	}
+	m.reviewViewport.Width = dialogW
+	m.reviewViewport.Height = dialogH
 }
 
 func (m *Model) dialogWidth() int {
@@ -681,5 +720,69 @@ func (m *Model) reviewTask(taskID int) tea.Cmd {
 			return MsgError{Err: err}
 		}
 		return MsgReloadTasks{}
+	}
+}
+
+// notifyWorker returns a command that sends a review comment to the worker.
+func (m *Model) notifyWorker(taskID int, message string, requestChanges bool) tea.Cmd {
+	return func() tea.Msg {
+		uc := m.container.AddCommentUseCase()
+		_, err := uc.Execute(context.Background(), usecase.AddCommentInput{
+			TaskID:         taskID,
+			Message:        message,
+			RequestChanges: requestChanges,
+		})
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionNotifyWorker}
+	}
+}
+
+// editComment returns a command that updates an existing comment.
+func (m *Model) editComment(taskID int, index int, message string) tea.Cmd {
+	return func() tea.Msg {
+		uc := m.container.EditCommentUseCase()
+		err := uc.Execute(context.Background(), usecase.EditCommentInput{
+			TaskID:  taskID,
+			Index:   index,
+			Message: message,
+		})
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionEditComment}
+	}
+}
+
+// prepareEditReviewComment loads the review comment and enters edit mode.
+func (m *Model) prepareEditReviewComment() tea.Cmd {
+	return func() tea.Msg {
+		// Load comments for the task
+		comments, err := m.container.Tasks.GetComments(m.reviewTaskID)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+
+		// Find the last reviewer comment (most recent review result)
+		var reviewComment *domain.Comment
+		var reviewIndex int
+		for i := len(comments) - 1; i >= 0; i-- {
+			if comments[i].Author == "reviewer" {
+				reviewComment = &comments[i]
+				reviewIndex = i
+				break
+			}
+		}
+
+		if reviewComment == nil {
+			return MsgError{Err: fmt.Errorf("no review comment found")}
+		}
+
+		return MsgPrepareEditComment{
+			TaskID:  m.reviewTaskID,
+			Index:   reviewIndex,
+			Message: reviewComment.Text,
+		}
 	}
 }
