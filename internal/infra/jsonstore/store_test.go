@@ -150,7 +150,7 @@ func TestStore_List(t *testing.T) {
 	tasks := []*domain.Task{
 		{ID: 1, Title: "Task 1", Status: domain.StatusTodo, Created: time.Now(), BaseBranch: "main", Labels: []string{"bug"}},
 		{ID: 2, Title: "Task 2", Status: domain.StatusInProgress, Created: time.Now(), BaseBranch: "main", Labels: []string{"feature"}},
-		{ID: 3, Title: "Task 3", Status: domain.StatusDone, Created: time.Now(), BaseBranch: "main", Labels: []string{"bug", "feature"}},
+		{ID: 3, Title: "Task 3", Status: domain.StatusClosed, Created: time.Now(), BaseBranch: "main", Labels: []string{"bug", "feature"}},
 	}
 
 	for _, task := range tasks {

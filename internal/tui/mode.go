@@ -5,19 +5,20 @@ package tui
 type Mode int
 
 const (
-	ModeNormal       Mode = iota // Default navigation mode
-	ModeFilter                   // Text filtering mode
-	ModeConfirm                  // Confirmation dialog mode
-	ModeInputTitle               // Title input mode (for new task) - deprecated, use ModeNewTask
-	ModeInputDesc                // Description input mode (for new task) - deprecated, use ModeNewTask
-	ModeNewTask                  // New task form mode (title, desc, parent)
-	ModeStart                    // Agent picker mode
-	ModeHelp                     // Help overlay mode
-	ModeChangeStatus             // Status change mode
-	ModeExec                     // Execute command mode
-	ModeReviewing                // Review in progress mode
-	ModeReviewResult             // Review result display mode
-	ModeReviewAction             // Review action selection mode (notify, merge, etc.)
+	ModeNormal        Mode = iota // Default navigation mode
+	ModeFilter                    // Text filtering mode
+	ModeConfirm                   // Confirmation dialog mode
+	ModeInputTitle                // Title input mode (for new task) - deprecated, use ModeNewTask
+	ModeInputDesc                 // Description input mode (for new task) - deprecated, use ModeNewTask
+	ModeNewTask                   // New task form mode (title, desc, parent)
+	ModeStart                     // Agent picker mode
+	ModeHelp                      // Help overlay mode
+	ModeChangeStatus              // Status change mode
+	ModeExec                      // Execute command mode
+	ModeReviewing                 // Review in progress mode
+	ModeReviewResult              // Review result display mode
+	ModeReviewAction              // Review action selection mode (notify, merge, etc.)
+	ModeReviewMessage             // Review message input mode (for Request Changes)
 )
 
 // String returns the string representation of the mode.
@@ -49,6 +50,8 @@ func (m Mode) String() string {
 		return "review_result"
 	case ModeReviewAction:
 		return "review_action"
+	case ModeReviewMessage:
+		return "review_message"
 	default:
 		return "unknown"
 	}
@@ -68,7 +71,7 @@ const (
 // IsInputMode returns true if the mode accepts text input.
 func (m Mode) IsInputMode() bool {
 	switch m {
-	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec:
+	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec, ModeReviewMessage:
 		return true
 	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeChangeStatus, ModeReviewing, ModeReviewResult, ModeReviewAction:
 		return false

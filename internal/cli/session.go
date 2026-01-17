@@ -139,6 +139,8 @@ Examples:
 
 // newAttachCommand creates the attach command for attaching to a session.
 func newAttachCommand(c *app.Container) *cobra.Command {
+	var review bool
+
 	cmd := &cobra.Command{
 		Use:   "attach <id>",
 		Short: "Attach to a running session",
@@ -147,13 +149,19 @@ func newAttachCommand(c *app.Container) *cobra.Command {
 This replaces the current process with the tmux session.
 Use Ctrl+G to detach from the session (configured in .git/crew/tmux.conf).
 
+By default, attaches to the work session (crew-<id>).
+Use --review to attach to the review session (crew-<id>-review).
+
 Preconditions:
   - Task must exist
   - Session must be running
 
 Examples:
-  # Attach to session for task #1
-  git crew attach 1`,
+  # Attach to work session for task #1
+  git crew attach 1
+
+  # Attach to review session for task #1
+  git crew attach 1 --review`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -166,6 +174,7 @@ Examples:
 			uc := c.AttachSessionUseCase()
 			_, err = uc.Execute(cmd.Context(), usecase.AttachSessionInput{
 				TaskID: taskID,
+				Review: review,
 			})
 			if err != nil {
 				return err
@@ -175,6 +184,8 @@ Examples:
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&review, "review", false, "Attach to review session instead of work session")
 
 	return cmd
 }
@@ -249,7 +260,7 @@ func newCompleteCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "complete [id]",
 		Short: "Mark task as complete",
-		Long: `Mark a task as complete (in_progress/needs_input → in_review).
+		Long: `Mark a task as complete (in_progress/needs_input → for_review).
 
 If no ID is provided, the task ID is auto-detected from the current branch name.
 
@@ -265,7 +276,7 @@ Examples:
   git crew complete 1
 
   # Complete with a comment
-  git crew complete 1 --comment "Implementation done"
+  git crew complete 1 --comment "Implementation complete"
 
   # Auto-detect task from current branch (when working in a worktree)
   git crew complete`,
@@ -323,6 +334,52 @@ func newSessionEndedCommand(c *app.Container) *cobra.Command {
 			_, err = uc.Execute(cmd.Context(), usecase.SessionEndedInput{
 				TaskID:   taskID,
 				ExitCode: exitCode,
+			})
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+// newReviewSessionEndedCommand creates the _review-session-ended internal command.
+// This is called by the review script's EXIT trap to handle review session termination.
+func newReviewSessionEndedCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:    "_review-session-ended <id> <exit-code> <output-file>",
+		Short:  "Handle review session termination (internal command)",
+		Hidden: true, // Internal command, not shown in help
+		Args:   cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Parse exit code
+			exitCode, err := strconv.Atoi(args[1])
+			if err != nil {
+				return fmt.Errorf("invalid exit code: %w", err)
+			}
+
+			// Read output from file
+			outputFile := args[2]
+			output := ""
+			if data, readErr := os.ReadFile(outputFile); readErr == nil {
+				output = string(data)
+			}
+
+			// Execute use case
+			uc := c.ReviewSessionEndedUseCase(cmd.ErrOrStderr())
+			_, err = uc.Execute(cmd.Context(), usecase.ReviewSessionEndedInput{
+				TaskID:   taskID,
+				ExitCode: exitCode,
+				Output:   output,
 			})
 			if err != nil {
 				return err
@@ -399,7 +456,7 @@ func newStopCommand(c *app.Container) *cobra.Command {
 		Long: `Stop a running session for a task.
 
 This terminates the tmux session, deletes the task script,
-clears agent info, and updates the status to 'in_review'.
+clears agent info, and updates the status to 'stopped'.
 
 The worktree is NOT deleted (use 'close' to also delete the worktree).
 
@@ -500,7 +557,7 @@ func newMergeCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "merge <id>",
 		Short: "Merge task branch into base branch",
-		Long: `Merge a task branch into the base branch and mark the task as done.
+		Long: `Merge a task branch into the base branch and mark the task as closed.
 
 Preconditions:
   - Current branch must be the base branch
@@ -515,7 +572,7 @@ Processing:
   1. If session is running, stop it
   2. Execute git merge --no-ff
   3. Delete the worktree
-  4. Update task status to 'done'
+  4. Update task status to 'closed' (with close_reason: merged)
 
 Examples:
   # Merge task #1 into its base branch (or default branch if not set)

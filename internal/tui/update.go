@@ -91,7 +91,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgAttachSession:
 		// Use tea.Exec to attach to tmux session, returning to TUI after detach
-		return m, m.attachToSession(msg.TaskID)
+		return m, m.attachToSession(msg.TaskID, msg.Review)
 
 	case MsgReloadTasks:
 		// Reload tasks after returning from external commands
@@ -205,6 +205,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleReviewResultMode(msg)
 	case ModeReviewAction:
 		return m.handleReviewActionMode(msg)
+	case ModeReviewMessage:
+		return m.handleReviewMessageMode(msg)
 	}
 
 	return m, nil
@@ -339,7 +341,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Merge):
 		task := m.SelectedTask()
-		if task == nil || task.Status != domain.StatusInReview {
+		if task == nil || (task.Status != domain.StatusForReview && task.Status != domain.StatusReviewed) {
 			return m, nil
 		}
 		m.mode = ModeConfirm
@@ -411,23 +413,37 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 		m.mode = ModeStart
 		return m, nil
 
-	case domain.StatusInProgress, domain.StatusNeedsInput, domain.StatusNeedsChanges:
-		// Attach to session (needs_input/needs_changes - task is running but waiting)
+	case domain.StatusInProgress, domain.StatusNeedsInput:
+		// Attach to session (needs_input - task is running but waiting)
 		return m, func() tea.Msg {
 			return MsgAttachSession{TaskID: task.ID}
 		}
 
-	case domain.StatusInReview:
+	case domain.StatusReviewing:
+		// Attach to review session
+		return m, func() tea.Msg {
+			return MsgAttachSession{TaskID: task.ID, Review: true}
+		}
+
+	case domain.StatusForReview, domain.StatusReviewed:
 		// Show diff for review (attach is available via 'a' key)
 		return m, func() tea.Msg {
 			return MsgShowDiff{TaskID: task.ID}
 		}
 
-	case domain.StatusDone, domain.StatusClosed:
+	case domain.StatusClosed:
 		// Show detail view for terminal states
 		m.detailFocused = true
 		m.updateLayoutSizes()
 		return m, m.loadComments(task.ID)
+
+	default:
+		// Handle legacy "done" status as closed
+		if task.Status.IsLegacyDone() {
+			m.detailFocused = true
+			m.updateLayoutSizes()
+			return m, m.loadComments(task.ID)
+		}
 	}
 
 	return m, nil
@@ -895,8 +911,11 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.Type == tea.KeyEnter:
 		// Execute selected action
 		switch m.reviewActionCursor {
-		case 0: // NotifyWorker with restart
-			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, true)
+		case 0: // Request Changes - enter message input mode
+			m.mode = ModeReviewMessage
+			m.reviewMessageInput.Reset()
+			m.reviewMessageInput.Focus()
+			return m, nil
 		case 1: // NotifyWorker without restart (just send comment)
 			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, false)
 		case 2: // Merge - use confirm dialog
@@ -913,4 +932,32 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// defaultReviewMessage is the default message when the user leaves the input empty.
+const defaultReviewMessage = "Please address the review comments above."
+
+// handleReviewMessageMode handles keys when entering a message for Request Changes.
+func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		// Go back to review action selection
+		m.mode = ModeReviewAction
+		m.reviewMessageInput.Blur()
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		// Submit the message (or use default if empty)
+		message := m.reviewMessageInput.Value()
+		if message == "" {
+			message = defaultReviewMessage
+		}
+		m.reviewMessageInput.Blur()
+		return m, m.notifyWorker(m.reviewTaskID, message, true)
+	}
+
+	// Update text input
+	var cmd tea.Cmd
+	m.reviewMessageInput, cmd = m.reviewMessageInput.Update(msg)
+	return m, cmd
 }

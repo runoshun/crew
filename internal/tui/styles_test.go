@@ -14,9 +14,12 @@ func TestStyles_StatusStyle(t *testing.T) {
 	}{
 		{domain.StatusTodo},
 		{domain.StatusInProgress},
-		{domain.StatusInReview},
+		{domain.StatusNeedsInput},
+		{domain.StatusForReview},
+		{domain.StatusReviewing},
+		{domain.StatusReviewed},
+		{domain.StatusStopped},
 		{domain.StatusError},
-		{domain.StatusDone},
 		{domain.StatusClosed},
 	}
 
@@ -49,9 +52,12 @@ func TestStatusIcon(t *testing.T) {
 	}{
 		{domain.StatusTodo, "●"},
 		{domain.StatusInProgress, "➜"},
-		{domain.StatusInReview, "◎"},
+		{domain.StatusNeedsInput, "?"},
+		{domain.StatusForReview, "◎"},
+		{domain.StatusReviewing, "⟳"},
+		{domain.StatusReviewed, "✔"},
+		{domain.StatusStopped, "⏸"},
 		{domain.StatusError, "✕"},
-		{domain.StatusDone, "✔"},
 		{domain.StatusClosed, "−"},
 	}
 

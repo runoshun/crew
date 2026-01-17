@@ -39,7 +39,7 @@ func TestSessionEnded_Execute_NormalExit(t *testing.T) {
 
 	// Verify task updated
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusInReview, task.Status)
+	assert.Equal(t, domain.StatusForReview, task.Status)
 	// Session info should be kept for review/merge operations
 	assert.Equal(t, "claude", task.Agent)
 	assert.Equal(t, "crew-1", task.Session)
@@ -116,7 +116,7 @@ func TestSessionEnded_Execute_AlreadyCleared(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Test task",
-		Status:  domain.StatusInReview,
+		Status:  domain.StatusForReview,
 		Agent:   "", // Already cleared
 		Session: "", // Already cleared
 	}
@@ -135,7 +135,7 @@ func TestSessionEnded_Execute_AlreadyCleared(t *testing.T) {
 
 	// Status should not change
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusInReview, task.Status)
+	assert.Equal(t, domain.StatusForReview, task.Status)
 }
 
 func TestSessionEnded_Execute_TaskNotFound(t *testing.T) {
@@ -163,7 +163,7 @@ func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Test task",
-		Status:  domain.StatusInReview, // Already in_review
+		Status:  domain.StatusForReview, // Already for_review
 		Agent:   "claude",
 		Session: "crew-1",
 	}
@@ -180,9 +180,9 @@ func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, out.Ignored)
 
-	// Status should remain in_review and session info should be kept
+	// Status should remain for_review and session info should be kept
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusInReview, task.Status)
+	assert.Equal(t, domain.StatusForReview, task.Status)
 	assert.Equal(t, "claude", task.Agent)
 	assert.Equal(t, "crew-1", task.Session)
 }
@@ -194,7 +194,7 @@ func TestSessionEnded_Execute_DoneStatusUnchanged(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Test task",
-		Status:  domain.StatusDone,
+		Status:  domain.StatusClosed,
 		Agent:   "claude", // Shouldn't happen, but test edge case
 		Session: "crew-1",
 	}
@@ -213,7 +213,7 @@ func TestSessionEnded_Execute_DoneStatusUnchanged(t *testing.T) {
 
 	// Status should remain done
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusDone, task.Status)
+	assert.Equal(t, domain.StatusClosed, task.Status)
 }
 
 // Helper function to create script file for testing cleanup

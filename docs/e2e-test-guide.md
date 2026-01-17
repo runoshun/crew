@@ -62,7 +62,7 @@ Verify that each agent transitions status correctly.
 - On start: `todo` → `in_progress`
 - On idle/permission request: `in_progress` → `needs_input`
 - After user input: `needs_input` → `in_progress`
-- After `crew complete`: `in_progress` → `in_review`
+- After `crew complete`: `in_progress` → `for_review`
 
 **Steps:**
 
@@ -97,7 +97,7 @@ crew send <id> Enter
 crew send <id> y
 crew send <id> Enter
 
-# 9. Check status (should be in_review)
+# 9. Check status (should be for_review)
 sleep 10
 crew list | grep <id>
 
@@ -109,7 +109,7 @@ crew close <id>
 - [ ] Transitions to `in_progress` after start
 - [ ] Transitions to `needs_input` when idle
 - [ ] Returns to `in_progress` after input
-- [ ] Transitions to `in_review` after complete
+- [ ] Transitions to `for_review` after complete
 
 ---
 
@@ -276,11 +276,11 @@ crew review <id>
 echo "y" | crew merge <id>
 
 # 6. Verify
-crew show <id>  # status: done
+crew show <id>  # status: closed
 ```
 
 **Verification Points:**
-- [ ] Transitions todo → in_progress → in_review → done
+- [ ] Transitions todo → in_progress → for_review → closed (via merge)
 - [ ] worktree is deleted
 - [ ] Merged to main
 
@@ -292,7 +292,7 @@ crew show <id>  # status: done
 # 1. Create task, start, complete
 crew new --title "E2E: Review revision flow test"
 crew start <id> cc-small
-# ... proceed to in_review
+# ... proceed to for_review
 
 # 2. Review (request changes)
 crew review <id>
@@ -303,7 +303,7 @@ crew comment <id> -R "Please fix: XXX"
 # 4. Check status (should return to in_progress)
 crew list | grep <id>
 
-# 5. Proceed to in_review again
+# 5. Proceed to for_review again
 
 # 6. Re-review and merge
 crew review <id>
@@ -369,7 +369,7 @@ kill %1
 ## Checklist
 
 ### Status Transitions
-- [ ] Claude: in_progress → needs_input → in_progress → in_review
+- [ ] Claude: in_progress → needs_input → in_progress → for_review
 - [ ] OpenCode: Same as above
 - [ ] Codex: Status change via notify
 
@@ -379,7 +379,7 @@ kill %1
 - [ ] send
 
 ### Workflow
-- [ ] Completion flow (todo → done)
+- [ ] Completion flow (todo → closed)
 - [ ] Review revision flow
 
 ### Error Cases

@@ -50,11 +50,11 @@ func TestCompleteTask_Execute_Success(t *testing.T) {
 			// Assert
 			require.NoError(t, err)
 			require.NotNil(t, out)
-			assert.Equal(t, domain.StatusInReview, out.Task.Status)
+			assert.Equal(t, domain.StatusForReview, out.Task.Status)
 
 			// Verify task is updated in repository
 			savedTask := repo.Tasks[1]
-			assert.Equal(t, domain.StatusInReview, savedTask.Status)
+			assert.Equal(t, domain.StatusForReview, savedTask.Status)
 		})
 	}
 }
@@ -101,7 +101,7 @@ func TestCompleteTask_Execute_WithCompleteCommand(t *testing.T) {
 	assert.Equal(t, "sh", executor.ExecutedCmd.Program)
 	assert.Equal(t, []string{"-c", "echo 'Running CI'"}, executor.ExecutedCmd.Args)
 	assert.Equal(t, testDir, executor.ExecutedCmd.Dir)
-	assert.Equal(t, domain.StatusInReview, out.Task.Status)
+	assert.Equal(t, domain.StatusForReview, out.Task.Status)
 }
 
 func TestCompleteTask_Execute_CompleteCommandFails(t *testing.T) {
@@ -191,9 +191,9 @@ func TestCompleteTask_Execute_NotInProgress(t *testing.T) {
 		status domain.Status
 	}{
 		{"from todo", domain.StatusTodo},
-		{"from in_review", domain.StatusInReview},
+		{"from in_review", domain.StatusForReview},
 		{"from error", domain.StatusError},
-		{"from done", domain.StatusDone},
+		{"from done", domain.StatusClosed},
 		{"from closed", domain.StatusClosed},
 	}
 
@@ -427,7 +427,7 @@ func TestCompleteTask_Execute_WithComment(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusInReview, out.Task.Status)
+	assert.Equal(t, domain.StatusForReview, out.Task.Status)
 
 	// Verify comment is added
 	comments, err := repo.GetComments(1)

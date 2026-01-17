@@ -203,11 +203,12 @@ crew start <id> opencode
 | `todo` | Created, awaiting start |
 | `in_progress` | Agent is working |
 | `needs_input` | Agent is waiting for user input |
-| `in_review` | Work complete, awaiting review |
+| `for_review` | Work complete, awaiting review |
+| `reviewing` | Review in progress |
+| `reviewed` | Review complete, results available |
 | `stopped` | Manually stopped |
 | `error` | Session terminated abnormally |
-| `done` | Merge complete |
-| `closed` | Discarded without merge |
+| `closed` | Closed (merged or abandoned) |
 
 ---
 

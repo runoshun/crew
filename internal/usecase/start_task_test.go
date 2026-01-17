@@ -144,7 +144,7 @@ func TestStartTask_Execute_FromInReview(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Test task",
-		Status:     domain.StatusInReview,
+		Status:     domain.StatusForReview,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -230,7 +230,7 @@ func TestStartTask_Execute_AllowAllStatuses(t *testing.T) {
 		name   string
 		status domain.Status
 	}{
-		{"done", domain.StatusDone},
+		{"done", domain.StatusClosed},
 		{"closed", domain.StatusClosed},
 		{"in_progress", domain.StatusInProgress},
 	}

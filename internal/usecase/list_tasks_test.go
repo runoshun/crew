@@ -28,7 +28,7 @@ func TestListTasks_Execute_AllTasks(t *testing.T) {
 	repo.Tasks[3] = &domain.Task{
 		ID:     3,
 		Title:  "Task 3",
-		Status: domain.StatusDone,
+		Status: domain.StatusClosed,
 	}
 
 	uc := NewListTasks(repo, nil)
@@ -54,7 +54,7 @@ func TestListTasks_Execute_ExcludeTerminal(t *testing.T) {
 	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Done Task",
-		Status: domain.StatusDone,
+		Status: domain.StatusClosed,
 	}
 	repo.Tasks[3] = &domain.Task{
 		ID:     3,

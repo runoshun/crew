@@ -99,6 +99,7 @@ func (MsgConfigLoaded) sealed() {}
 // This is handled specially to suspend the TUI.
 type MsgAttachSession struct {
 	TaskID int
+	Review bool // If true, attach to review session instead of work session
 }
 
 func (MsgAttachSession) sealed() {}

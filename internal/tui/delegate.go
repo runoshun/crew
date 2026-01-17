@@ -254,14 +254,14 @@ func formatElapsedTime(d time.Duration) string {
 // Uses a palette of colors for variety from existing Colors.
 func labelColor(label string) lipgloss.Color {
 	palette := []lipgloss.Color{
-		Colors.Error,        // Red - #F38BA8
-		Colors.NeedsChanges, // Peach - #FAB387
-		Colors.Warning,      // Yellow - #F9E2AF
-		Colors.Success,      // Green - #A6E3A1
-		Colors.NeedsInput,   // Teal - #94E2D5
-		Colors.Primary,      // Blue - #89B4FA
-		Colors.Secondary,    // Mauve - #CBA6F7
-		Colors.InReview,     // Also Mauve - #CBA6F7 (keeping for 8 colors)
+		Colors.Error,      // Red - #F38BA8
+		Colors.Stopped,    // Peach - #FAB387
+		Colors.Warning,    // Yellow - #F9E2AF
+		Colors.Success,    // Green - #A6E3A1
+		Colors.NeedsInput, // Teal - #94E2D5
+		Colors.Primary,    // Blue - #89B4FA
+		Colors.Secondary,  // Mauve - #CBA6F7
+		Colors.ForReview,  // Also Mauve - #CBA6F7 (keeping for 8 colors)
 	}
 
 	h := fnv.New32a()

@@ -49,12 +49,13 @@ type Model struct {
 	detailPanelViewport viewport.Model // For right pane detail panel
 
 	// Input state (large structs)
-	titleInput  textinput.Model
-	descInput   textinput.Model
-	parentInput textinput.Model
-	filterInput textinput.Model
-	customInput textinput.Model
-	execInput   textinput.Model
+	titleInput         textinput.Model
+	descInput          textinput.Model
+	parentInput        textinput.Model
+	filterInput        textinput.Model
+	customInput        textinput.Model
+	execInput          textinput.Model
+	reviewMessageInput textinput.Model
 
 	// Review components
 	reviewViewport viewport.Model // For scrollable review result
@@ -103,6 +104,10 @@ func New(c *app.Container) *Model {
 	ei.Placeholder = "Enter command to execute..."
 	ei.CharLimit = 500
 
+	ri := textinput.New()
+	ri.Placeholder = "Message to worker (optional, Enter to skip)"
+	ri.CharLimit = 500
+
 	styles := DefaultStyles()
 	delegate := newTaskDelegate(styles)
 	taskList := list.New([]list.Item{}, delegate, 0, 0)
@@ -117,28 +122,29 @@ func New(c *app.Container) *Model {
 	reviewVp := viewport.New(0, 0)
 
 	return &Model{
-		container:        c,
-		mode:             ModeNormal,
-		tasks:            nil,
-		keys:             DefaultKeyMap(),
-		styles:           styles,
-		help:             help.New(),
-		taskList:         taskList,
-		titleInput:       ti,
-		descInput:        di,
-		parentInput:      pi,
-		filterInput:      fi,
-		customInput:      ci,
-		execInput:        ei,
-		reviewViewport:   reviewVp,
-		builtinAgents:    []string{"claude", "opencode", "codex"},
-		customAgents:     nil,
-		agentCommands:    make(map[string]string),
-		customKeybinds:   make(map[string]domain.TUIKeybinding),
-		keybindWarnings:  nil,
-		commentCounts:    make(map[int]int),
-		agentCursor:      0,
-		startFocusCustom: false,
+		container:          c,
+		mode:               ModeNormal,
+		tasks:              nil,
+		keys:               DefaultKeyMap(),
+		styles:             styles,
+		help:               help.New(),
+		taskList:           taskList,
+		titleInput:         ti,
+		descInput:          di,
+		parentInput:        pi,
+		filterInput:        fi,
+		customInput:        ci,
+		execInput:          ei,
+		reviewMessageInput: ri,
+		reviewViewport:     reviewVp,
+		builtinAgents:      []string{"claude", "opencode", "codex"},
+		customAgents:       nil,
+		agentCommands:      make(map[string]string),
+		customKeybinds:     make(map[string]domain.TUIKeybinding),
+		keybindWarnings:    nil,
+		commentCounts:      make(map[int]int),
+		agentCursor:        0,
+		startFocusCustom:   false,
 	}
 }
 
@@ -286,15 +292,29 @@ func (m *Model) dialogWidth() int {
 }
 
 var statusPriority = map[domain.Status]int{
-	domain.StatusInReview:     0,
-	domain.StatusInProgress:   1,
-	domain.StatusNeedsInput:   1,
-	domain.StatusNeedsChanges: 1,
-	domain.StatusError:        2,
-	domain.StatusStopped:      2,
-	domain.StatusTodo:         3,
-	domain.StatusDone:         4,
-	domain.StatusClosed:       5,
+	domain.StatusReviewing:  0, // Review in progress
+	domain.StatusInProgress: 1, // Work in progress
+	domain.StatusNeedsInput: 1, // Waiting for input
+	domain.StatusForReview:  2, // Awaiting review
+	domain.StatusReviewed:   2, // Review complete
+	domain.StatusError:      3,
+	domain.StatusStopped:    3,
+	domain.StatusTodo:       4,
+	domain.StatusClosed:     5,
+}
+
+// getStatusPriority returns the sort priority for a status.
+// Handles legacy "done" status by treating it as closed.
+func getStatusPriority(status domain.Status) int {
+	if p, ok := statusPriority[status]; ok {
+		return p
+	}
+	// Handle legacy "done" status as closed (priority 5)
+	if status.IsLegacyDone() {
+		return statusPriority[domain.StatusClosed]
+	}
+	// Unknown status goes to the end
+	return 99
 }
 
 func (m *Model) sortedTasks() []*domain.Task {
@@ -304,8 +324,8 @@ func (m *Model) sortedTasks() []*domain.Task {
 	switch m.sortMode {
 	case SortByStatus:
 		sort.Slice(tasks, func(i, j int) bool {
-			pi := statusPriority[tasks[i].Status]
-			pj := statusPriority[tasks[j].Status]
+			pi := getStatusPriority(tasks[i].Status)
+			pj := getStatusPriority(tasks[j].Status)
 			if pi != pj {
 				return pi < pj
 			}
@@ -568,9 +588,15 @@ func (c *domainExecCmd) SetStderr(w io.Writer) { c.stderr = w }
 
 // attachToSession returns a tea.Cmd that attaches to a tmux session.
 // After the attach completes (user detaches), it triggers a task reload.
-func (m *Model) attachToSession(taskID int) tea.Cmd {
+// If review is true, attaches to the review session instead of the work session.
+func (m *Model) attachToSession(taskID int, review bool) tea.Cmd {
 	socketPath := m.container.Config.SocketPath
-	sessionName := domain.SessionName(taskID)
+	var sessionName string
+	if review {
+		sessionName = domain.ReviewSessionName(taskID)
+	} else {
+		sessionName = domain.SessionName(taskID)
+	}
 
 	cmd := domain.NewCommand("tmux", []string{"-S", socketPath, "attach", "-t", sessionName}, "")
 	return tea.Exec(&domainExecCmd{cmd: cmd}, func(err error) tea.Msg {
@@ -681,8 +707,8 @@ func (m *Model) reviewTask(taskID int) tea.Cmd {
 	return func() tea.Msg {
 		uc := m.container.ReviewTaskUseCase(io.Discard, io.Discard)
 		out, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
-			TaskID:  taskID,
-			Verbose: false,
+			TaskID: taskID,
+			Wait:   true, // TUI uses synchronous execution
 		})
 		if err != nil {
 			return MsgReviewError{TaskID: taskID, Err: err}

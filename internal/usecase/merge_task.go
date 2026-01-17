@@ -60,7 +60,7 @@ func NewMergeTask(
 // 2. Execute git merge --no-ff
 // 3. Delete worktree
 // 4. Delete branch
-// 5. Update status to done
+// 5. Update status to closed (with CloseReasonMerged)
 func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOutput, error) {
 	// Get the task
 	task, err := uc.tasks.Get(in.TaskID)
@@ -146,8 +146,9 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 		return nil, fmt.Errorf("delete branch: %w", err)
 	}
 
-	// Update status to done
-	task.Status = domain.StatusDone
+	// Update status to closed with merged reason
+	task.Status = domain.StatusClosed
+	task.CloseReason = domain.CloseReasonMerged
 	task.Agent = ""
 	task.Session = ""
 

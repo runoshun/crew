@@ -42,7 +42,7 @@ func NewStopTask(
 // 1. Terminating the tmux session
 // 2. Deleting the task script
 // 3. Clearing agent info
-// 4. Updating status to in_review
+// 4. Updating status to stopped (if in_progress)
 func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutput, error) {
 	// Get the task
 	task, err := uc.tasks.Get(in.TaskID)

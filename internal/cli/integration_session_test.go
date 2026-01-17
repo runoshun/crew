@@ -226,9 +226,9 @@ func TestIntegration_Complete_Success(t *testing.T) {
 	out = crewMust(t, dir, "complete", "1")
 	assert.Contains(t, out, "Completed task #1")
 
-	// Verify status changed to in_review
+	// Verify status changed to for_review
 	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: in_review")
+	assert.Contains(t, out, "Status: for_review")
 }
 
 func TestIntegration_Complete_NotInProgress(t *testing.T) {
@@ -303,9 +303,9 @@ command = "echo 'CI passed'"
 	out := crewMust(t, dir, "complete", "1")
 	assert.Contains(t, out, "Completed task #1")
 
-	// Verify status changed to in_review
+	// Verify status changed to for_review
 	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: in_review")
+	assert.Contains(t, out, "Status: for_review")
 }
 
 func TestIntegration_Complete_FailingCompleteCommand(t *testing.T) {

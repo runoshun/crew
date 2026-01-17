@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"testing"
+	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/testutil"
@@ -11,19 +12,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testCrewDir = "/crew"
+
+func newTestReviewTask(
+	repo *testutil.MockTaskRepository,
+	sessions *testutil.MockSessionManager,
+	worktrees *testutil.MockWorktreeManager,
+	configLoader *testutil.MockConfigLoader,
+	executor *testutil.MockCommandExecutor,
+	clock *testutil.MockClock,
+	logger *testutil.MockLogger,
+	repoRoot string,
+	stdout, stderr *bytes.Buffer,
+) *ReviewTask {
+	return NewReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, testCrewDir, repoRoot, stdout, stderr)
+}
+
 func TestReviewTask_Execute_TaskNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
 
 	var stdout, stderr bytes.Buffer
-	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 999,
+		Wait:   true,
 	})
 
 	// Assert
@@ -34,22 +55,54 @@ func TestReviewTask_Execute_GetError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.GetErr = assert.AnError
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
 
 	var stdout, stderr bytes.Buffer
-	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
+		Wait:   true,
 	})
 
 	// Assert
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get task")
+}
+
+func TestReviewTask_Execute_InvalidStatus(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress, // Not for_review
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
+
+	var stdout, stderr bytes.Buffer
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID: 1,
+		Wait:   true,
+	})
+
+	// Assert
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrInvalidTransition)
 }
 
 func TestReviewTask_Execute_ConfigLoadError(t *testing.T) {
@@ -58,20 +111,23 @@ func TestReviewTask_Execute_ConfigLoadError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
 	configLoader.LoadErr = assert.AnError
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
 
 	var stdout, stderr bytes.Buffer
-	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
+		Wait:   true,
 	})
 
 	// Assert
@@ -85,20 +141,23 @@ func TestReviewTask_Execute_AgentNotFound(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	configLoader := testutil.NewMockConfigLoader()
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
 
 	var stdout, stderr bytes.Buffer
-	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute with non-existent agent
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
 		Agent:  "non-existent-agent",
+		Wait:   true,
 	})
 
 	// Assert
@@ -112,21 +171,23 @@ func TestReviewTask_Execute_WorktreeResolveError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolveErr = assert.AnError
-
 	configLoader := testutil.NewMockConfigLoader()
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
 
 	var stdout, stderr bytes.Buffer
-	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
+		Wait:   true,
 	})
 
 	// Assert
@@ -140,12 +201,11 @@ func TestReviewTask_Execute_UsesDefaultReviewer(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolvePath = "/tmp/worktree"
-
 	configLoader := testutil.NewMockConfigLoader()
 
 	// Verify default reviewer is set
@@ -153,20 +213,25 @@ func TestReviewTask_Execute_UsesDefaultReviewer(t *testing.T) {
 	require.NotEmpty(t, cfg.AgentsConfig.DefaultReviewer)
 	require.Contains(t, cfg.Agents, cfg.AgentsConfig.DefaultReviewer)
 
-	var stdout, stderr bytes.Buffer
 	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
+
+	var stdout, stderr bytes.Buffer
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute without specifying agent - should use DefaultReviewer
-	_, err := uc.Execute(context.Background(), ReviewTaskInput{
+	out, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
 		Agent:  "", // Empty - should use DefaultReviewer
+		Wait:   true,
 	})
 
 	// Assert that execution used DefaultReviewer (command was built successfully)
 	assert.NoError(t, err)
 	assert.True(t, executor.ExecuteWithContextCalled, "ExecuteWithContext should have been called")
 	assert.NotNil(t, executor.ExecutedCmd, "Command should have been executed")
+	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
 }
 
 func TestReviewTask_Execute_EmptyDefaultReviewer(t *testing.T) {
@@ -175,9 +240,9 @@ func TestReviewTask_Execute_EmptyDefaultReviewer(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolvePath = "/tmp/worktree"
 
@@ -194,62 +259,23 @@ func TestReviewTask_Execute_EmptyDefaultReviewer(t *testing.T) {
 		},
 	}
 	configLoader := &testutil.MockConfigLoader{Config: cfg}
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
 
 	var stdout, stderr bytes.Buffer
-	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute without specifying agent - should fail with empty DefaultReviewer
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
 		Agent:  "", // Empty - should try to use DefaultReviewer (which is also empty)
+		Wait:   true,
 	})
 
 	// Assert that execution failed with agent not found error
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrAgentNotFound)
-}
-
-func TestReviewTask_Execute_UsesSpecifiedAgent(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Test task",
-		Status: domain.StatusInProgress,
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	configLoader := testutil.NewMockConfigLoader()
-
-	// Verify claude-reviewer exists
-	cfg, _ := configLoader.Load()
-	require.Contains(t, cfg.Agents, "claude-reviewer")
-}
-
-func TestReviewTask_Execute_ModelOverride(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Test task",
-		Status: domain.StatusInProgress,
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	configLoader := testutil.NewMockConfigLoader()
-
-	var stdout, stderr bytes.Buffer
-	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
-
-	// This test just verifies the flow doesn't error when model is specified
-	// The actual command execution would fail without a real agent
-	_ = uc
 }
 
 func TestReviewTask_Execute_TaskWithIssue(t *testing.T) {
@@ -258,16 +284,17 @@ func TestReviewTask_Execute_TaskWithIssue(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 		Issue:  123,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolvePath = "/tmp/worktree-gh-123"
 
 	_ = testutil.NewMockConfigLoader()
 	_ = repo
 	_ = worktrees
+	_ = sessions
 
 	// Verify the branch name includes issue
 	expectedBranch := domain.BranchName(1, 123)
@@ -280,9 +307,9 @@ func TestReviewTask_Execute_WithReviewerPrompt(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolvePath = t.TempDir()
 
@@ -296,15 +323,19 @@ func TestReviewTask_Execute_WithReviewerPrompt(t *testing.T) {
 		// Prompt is empty, so ReviewerPrompt should be used
 	}
 
-	var stdout, stderr bytes.Buffer
 	executor := testutil.NewMockCommandExecutor()
 	executor.ExecuteOutput = []byte("Custom reviewer prompt from config")
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
+
+	var stdout, stderr bytes.Buffer
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
 		Agent:  "test-reviewer",
+		Wait:   true,
 	})
 
 	// Assert
@@ -320,9 +351,9 @@ func TestReviewTask_Execute_AgentPromptOverridesReviewerPrompt(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolvePath = t.TempDir()
 
@@ -335,15 +366,19 @@ func TestReviewTask_Execute_AgentPromptOverridesReviewerPrompt(t *testing.T) {
 		Prompt:          "Agent-specific prompt", // This should take precedence
 	}
 
-	var stdout, stderr bytes.Buffer
 	executor := testutil.NewMockCommandExecutor()
 	executor.ExecuteOutput = []byte("Agent-specific prompt")
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
+
+	var stdout, stderr bytes.Buffer
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
 		Agent:  "test-reviewer",
+		Wait:   true,
 	})
 
 	// Assert
@@ -360,9 +395,9 @@ func TestReviewTask_Execute_MessageOverridesReviewerPrompt(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolvePath = t.TempDir()
 
@@ -375,16 +410,20 @@ func TestReviewTask_Execute_MessageOverridesReviewerPrompt(t *testing.T) {
 		CommandTemplate: "echo {{.Prompt}}",
 	}
 
-	var stdout, stderr bytes.Buffer
 	executor := testutil.NewMockCommandExecutor()
 	executor.ExecuteOutput = []byte("User-provided review message")
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
+
+	var stdout, stderr bytes.Buffer
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute with Message - should override ReviewerPrompt
 	out, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID:  1,
 		Agent:   "test-reviewer",
 		Message: "User-provided review message",
+		Wait:    true,
 	})
 
 	// Assert
@@ -401,9 +440,9 @@ func TestReviewTask_Execute_AgentPromptOverridesMessage(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview,
 	}
-
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolvePath = t.TempDir()
 
@@ -415,16 +454,20 @@ func TestReviewTask_Execute_AgentPromptOverridesMessage(t *testing.T) {
 		Prompt:          "Agent-specific prompt", // This should take precedence over Message
 	}
 
-	var stdout, stderr bytes.Buffer
 	executor := testutil.NewMockCommandExecutor()
 	executor.ExecuteOutput = []byte("Agent-specific prompt")
-	uc := NewReviewTask(repo, worktrees, configLoader, executor, "/repo", &stdout, &stderr)
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
+
+	var stdout, stderr bytes.Buffer
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
 
 	// Execute with both Agent.Prompt and Message
 	out, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID:  1,
 		Agent:   "test-reviewer",
 		Message: "User-provided review message",
+		Wait:    true,
 	})
 
 	// Assert
@@ -440,11 +483,12 @@ func TestReviewTask_Execute_WithDisabledAgent(t *testing.T) {
 	task := &domain.Task{
 		ID:         1,
 		Title:      "Test",
-		Status:     domain.StatusInProgress,
+		Status:     domain.StatusForReview,
 		BaseBranch: "main",
 	}
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = task
+	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 
 	// Mock config with disabled agent
@@ -460,15 +504,18 @@ func TestReviewTask_Execute_WithDisabledAgent(t *testing.T) {
 		},
 	}
 	loader := &testutil.MockConfigLoader{Config: cfg}
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
 
 	var stdout, stderr bytes.Buffer
-	executor := testutil.NewMockCommandExecutor()
-	uc := NewReviewTask(repo, worktrees, loader, executor, "/test", &stdout, &stderr)
+	uc := newTestReviewTask(repo, sessions, worktrees, loader, executor, clock, logger, "/test", &stdout, &stderr)
 
 	// Execute with disabled agent
 	_, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
 		Agent:  "claude-reviewer",
+		Wait:   true,
 	})
 
 	// Assert - disabled agents should return ErrAgentDisabled

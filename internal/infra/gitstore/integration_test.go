@@ -232,7 +232,7 @@ func TestIntegration_Snapshot_Persistence(t *testing.T) {
 	require.NoError(t, store1.SaveSnapshot(mainSHA))
 
 	// Modify tasks
-	task1.Status = domain.StatusDone
+	task1.Status = domain.StatusClosed
 	require.NoError(t, store1.Save(task1))
 	require.NoError(t, store1.Delete(2))
 
@@ -304,13 +304,13 @@ func TestIntegration_SyncSnapshot(t *testing.T) {
 	require.NoError(t, store.SaveSnapshot(headSHA))
 
 	// Modify task
-	task.Status = domain.StatusDone
+	task.Status = domain.StatusClosed
 	require.NoError(t, store.Save(task))
 
 	// Verify modification
 	got, err := store.Get(1)
 	require.NoError(t, err)
-	assert.Equal(t, domain.StatusDone, got.Status)
+	assert.Equal(t, domain.StatusClosed, got.Status)
 
 	// Sync should restore from snapshot (since HEAD hasn't changed)
 	require.NoError(t, store.SyncSnapshot())
@@ -338,7 +338,7 @@ func TestIntegration_PruneSnapshots(t *testing.T) {
 	mainSHA := "prune123"
 
 	// Create multiple snapshots
-	statuses := []domain.Status{domain.StatusTodo, domain.StatusInProgress, domain.StatusDone}
+	statuses := []domain.Status{domain.StatusTodo, domain.StatusInProgress, domain.StatusClosed}
 	for i := 0; i < 5; i++ {
 		task.Status = statuses[i%3] // vary status
 		require.NoError(t, store.Save(task))
@@ -402,7 +402,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 	require.NoError(t, store.SaveSnapshot(headSHA))
 
 	// Step 5: Modify tasks
-	task1.Status = domain.StatusDone
+	task1.Status = domain.StatusClosed
 	require.NoError(t, store.Save(task1))
 	require.NoError(t, store.Delete(id2))
 
@@ -414,7 +414,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 	tasks, err := store2.List(domain.TaskFilter{})
 	require.NoError(t, err)
 	require.Len(t, tasks, 1)
-	assert.Equal(t, domain.StatusDone, tasks[0].Status)
+	assert.Equal(t, domain.StatusClosed, tasks[0].Status)
 
 	// Step 7: Restore from snapshot
 	snapshots, err := store2.ListSnapshots(headSHA)

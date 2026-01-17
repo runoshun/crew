@@ -9,7 +9,7 @@ import (
 
 // PruneTasksInput contains the parameters for pruning tasks.
 type PruneTasksInput struct {
-	All    bool // If true, also prune 'done' tasks (in addition to 'closed')
+	All    bool // Unused (kept for backward compatibility)
 	DryRun bool // If true, only list what would be pruned
 }
 
@@ -42,7 +42,7 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 		DeletedWorktrees: []string{},
 	}
 
-	// 1. Identify tasks with closed/done status (for branch/worktree deletion criteria)
+	// 1. Identify tasks with closed status (for branch/worktree deletion criteria)
 	// NOTE: Tasks themselves are NOT deleted, only branches and worktrees
 	tasks, err := uc.tasks.List(domain.TaskFilter{})
 	if err != nil {
@@ -52,9 +52,7 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 	// Build a set of task IDs that should have their resources cleaned up
 	shouldCleanup := make(map[int]bool)
 	for _, task := range tasks {
-		if task.Status == domain.StatusClosed {
-			shouldCleanup[task.ID] = true
-		} else if in.All && task.Status == domain.StatusDone {
+		if task.Status.IsTerminal() {
 			shouldCleanup[task.ID] = true
 		}
 	}
@@ -62,7 +60,7 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 	// 2. Identify branches to delete
 	// Rules:
 	// - Must match crew branch pattern
-	// - Task either doesn't exist OR has closed/done status (in cleanup set)
+	// - Task either doesn't exist OR has closed status (in cleanup set)
 	branches, err := uc.git.ListBranches()
 	if err != nil {
 		return nil, fmt.Errorf("list branches: %w", err)
@@ -102,7 +100,7 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 			continue
 		}
 
-		// Also check for orphan crew worktrees (branch doesn't match deletion list but task is gone/done)
+		// Also check for orphan crew worktrees (branch doesn't match deletion list but task is gone/closed)
 		taskID, isCrewBranch := domain.ParseBranchTaskID(wt.Branch)
 		if !isCrewBranch {
 			continue

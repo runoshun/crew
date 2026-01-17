@@ -10,7 +10,7 @@ import (
 type ListTasksInput struct {
 	ParentID         *int     // Filter by parent task ID (nil = all tasks)
 	Labels           []string // Filter by labels (AND condition)
-	IncludeTerminal  bool     // Include terminal status tasks (closed/done)
+	IncludeTerminal  bool     // Include terminal status tasks (closed)
 	IncludeSessions  bool     // Include session information
 	IncludeProcesses bool     // Include process information (implies IncludeSessions)
 }
@@ -100,11 +100,11 @@ func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOu
 	return &ListTasksOutput{TasksWithInfo: tasksWithInfo}, nil
 }
 
-// filterActiveOnly removes tasks with terminal status (closed/done).
+// filterActiveOnly removes tasks with terminal status (closed).
 func filterActiveOnly(tasks []*domain.Task) []*domain.Task {
 	var result []*domain.Task
 	for _, t := range tasks {
-		if t.Status != domain.StatusClosed && t.Status != domain.StatusDone {
+		if !t.Status.IsTerminal() {
 			result = append(result, t)
 		}
 	}

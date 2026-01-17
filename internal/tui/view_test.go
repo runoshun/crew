@@ -51,7 +51,7 @@ func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 				ID:          1,
 				Title:       "Task with exact content",
 				Description: "Short description",
-				Status:      domain.StatusInReview,
+				Status:      domain.StatusForReview,
 				Agent:       "claude",
 				Created:     time.Now(),
 				Started:     time.Now(),

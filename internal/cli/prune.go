@@ -19,9 +19,7 @@ func newPruneCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prune",
 		Short: "Cleanup branches and worktrees for completed tasks",
-		Long: `Prune removes branches and worktrees for completed tasks.
-By default, it only removes resources for 'closed' tasks.
-Use --all to also remove resources for 'done' (merged) tasks.
+		Long: `Prune removes branches and worktrees for closed tasks.
 It also cleans up orphan crew branches and worktrees.
 
 Note: Tasks themselves are NOT deleted, only their branches and worktrees.`,
@@ -112,7 +110,7 @@ Note: Tasks themselves are NOT deleted, only their branches and worktrees.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&all, "all", false, "Include 'done' tasks in deletion targets")
+	cmd.Flags().BoolVar(&all, "all", false, "(deprecated) No longer needed, all closed tasks are pruned")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Display only, no deletion")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Skip confirmation prompt")
 

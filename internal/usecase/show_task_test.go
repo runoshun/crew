@@ -60,7 +60,7 @@ func TestShowTask_Execute_WithChildren(t *testing.T) {
 		ID:       3,
 		ParentID: &parentID,
 		Title:    "Child task 2",
-		Status:   domain.StatusDone,
+		Status:   domain.StatusClosed,
 	}
 	uc := NewShowTask(repo)
 
