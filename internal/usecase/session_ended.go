@@ -47,7 +47,7 @@ func (uc *SessionEnded) Execute(_ context.Context, in SessionEndedInput) (*Sessi
 	}
 
 	// Check if agent info is already cleared (race condition prevention)
-	// This happens when user runs "git crew stop" before the script's EXIT trap fires
+	// This happens when user runs "crew stop" before the script's EXIT trap fires
 	if task.Agent == "" && task.Session == "" {
 		return &SessionEndedOutput{Ignored: true}, nil
 	}

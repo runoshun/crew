@@ -32,7 +32,7 @@ func newNewCommand(c *app.Container) *cobra.Command {
 		Long: `Create a new task for git-crew to manage.
 
 The task is created with status 'todo'. The worktree and branch
-are not created until the task is started with 'crew start'.
+are not created until the task is started with 'crew start <id> [agent]'.
 
 Examples:
   # Create a root task

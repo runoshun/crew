@@ -52,19 +52,19 @@ Terminal States:
 
 Examples:
   # Simple polling (notify on any change)
-  git crew poll 175 --command 'notify-send "Task {{.TaskID}} changed to {{.NewStatus}}"'
+  crew poll 175 --command 'notify-send "Task {{.TaskID}} changed to {{.NewStatus}}"'
 
   # Poll with expected status and notify on change (5m timeout)
-  git crew poll 175 --expect todo --command 'notify-send "Task {{.TaskID}} started!"'
+  crew poll 175 --expect todo --command 'notify-send "Task {{.TaskID}} started!"'
 
   # Multiple expected statuses (exit if status becomes something else)
-  git crew poll 199 --expect in_progress,needs_input --command 'say "Task {{.TaskID}} changed to {{.NewStatus}}"'
+  crew poll 199 --expect in_progress,needs_input --command 'say "Task {{.TaskID}} changed to {{.NewStatus}}"'
 
   # Poll with custom interval and timeout
-  git crew poll 175 --expect todo --interval 5 --timeout 60
+  crew poll 175 --expect todo --interval 5 --timeout 60
 
   # Use as a trigger for next action
-  git crew poll 175 --expect in_progress --command 'crew complete 175'`,
+  crew poll 175 --expect in_progress --command 'crew complete 175'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
