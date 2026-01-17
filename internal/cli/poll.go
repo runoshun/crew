@@ -33,11 +33,11 @@ after executing the command for the first detected change.
 
 Polling stops automatically when the timeout is reached (default: 300s).
 
-Expected Status Check (Required):
+Expected Status Check (Optional):
   Use --expect to specify expected status(es). 
-  - If the current status already differs from the expected status(es) on startup,
+  - If specified and the current status already differs from the expected status(es) on startup,
     the command is executed immediately and the poll command exits.
-  - If it matches, the command waits for the first status change.
+  - If it matches or if --expect is not specified, the command waits for the first status change.
 
 Command Template:
   The command template can use the following variables:
@@ -51,6 +51,9 @@ Terminal States:
     - error  - Task session terminated with error
 
 Examples:
+  # Simple polling (notify on any change)
+  git crew poll 175 --command 'notify-send "Task {{.TaskID}} changed to {{.NewStatus}}"'
+
   # Poll with expected status and notify on change (5m timeout)
   git crew poll 175 --expect todo --command 'notify-send "Task {{.TaskID}} started!"'
 
@@ -111,9 +114,6 @@ Examples:
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", 10, "Polling interval in seconds")
 	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 300, "Timeout in seconds")
 	cmd.Flags().StringVarP(&opts.Command, "command", "c", "", "Command template to execute on status change")
-
-	// Mark --expect as required (ignore error as flag is guaranteed to exist)
-	_ = cmd.MarkFlagRequired("expect")
 
 	return cmd
 }
