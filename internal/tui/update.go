@@ -436,6 +436,14 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 		m.detailFocused = true
 		m.updateLayoutSizes()
 		return m, m.loadComments(task.ID)
+
+	default:
+		// Handle legacy "done" status as closed
+		if task.Status.IsLegacyDone() {
+			m.detailFocused = true
+			m.updateLayoutSizes()
+			return m, m.loadComments(task.ID)
+		}
 	}
 
 	return m, nil

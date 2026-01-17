@@ -104,7 +104,7 @@ func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOu
 func filterActiveOnly(tasks []*domain.Task) []*domain.Task {
 	var result []*domain.Task
 	for _, t := range tasks {
-		if t.Status != domain.StatusClosed {
+		if !t.Status.IsTerminal() {
 			result = append(result, t)
 		}
 	}

@@ -303,6 +303,20 @@ var statusPriority = map[domain.Status]int{
 	domain.StatusClosed:     5,
 }
 
+// getStatusPriority returns the sort priority for a status.
+// Handles legacy "done" status by treating it as closed.
+func getStatusPriority(status domain.Status) int {
+	if p, ok := statusPriority[status]; ok {
+		return p
+	}
+	// Handle legacy "done" status as closed (priority 5)
+	if status.IsLegacyDone() {
+		return statusPriority[domain.StatusClosed]
+	}
+	// Unknown status goes to the end
+	return 99
+}
+
 func (m *Model) sortedTasks() []*domain.Task {
 	tasks := make([]*domain.Task, len(m.tasks))
 	copy(tasks, m.tasks)
@@ -310,8 +324,8 @@ func (m *Model) sortedTasks() []*domain.Task {
 	switch m.sortMode {
 	case SortByStatus:
 		sort.Slice(tasks, func(i, j int) bool {
-			pi := statusPriority[tasks[i].Status]
-			pj := statusPriority[tasks[j].Status]
+			pi := getStatusPriority(tasks[i].Status)
+			pj := getStatusPriority(tasks[j].Status)
 			if pi != pj {
 				return pi < pj
 			}

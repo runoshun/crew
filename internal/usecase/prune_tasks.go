@@ -52,7 +52,7 @@ func (uc *PruneTasks) Execute(_ context.Context, in PruneTasksInput) (*PruneTask
 	// Build a set of task IDs that should have their resources cleaned up
 	shouldCleanup := make(map[int]bool)
 	for _, task := range tasks {
-		if task.Status == domain.StatusClosed {
+		if task.Status.IsTerminal() {
 			shouldCleanup[task.ID] = true
 		}
 	}
