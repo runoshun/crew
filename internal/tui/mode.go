@@ -15,7 +15,6 @@ const (
 	ModeHelp                          // Help overlay mode
 	ModeChangeStatus                  // Status change mode
 	ModeExec                          // Execute command mode
-	ModeReviewing                     // Review in progress mode
 	ModeReviewResult                  // Review result display mode
 	ModeReviewAction                  // Review action selection mode (notify, merge, etc.)
 	ModeReviewMessage                 // Review message input mode (for Request Changes)
@@ -45,8 +44,6 @@ func (m Mode) String() string {
 		return "change_status"
 	case ModeExec:
 		return "exec"
-	case ModeReviewing:
-		return "reviewing"
 	case ModeReviewResult:
 		return "review_result"
 	case ModeReviewAction:
@@ -76,7 +73,7 @@ func (m Mode) IsInputMode() bool {
 	switch m {
 	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec, ModeReviewMessage, ModeEditReviewComment:
 		return true
-	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeChangeStatus, ModeReviewing, ModeReviewResult, ModeReviewAction:
+	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeChangeStatus, ModeReviewResult, ModeReviewAction:
 		return false
 	}
 	return false

@@ -77,7 +77,6 @@ type Model struct {
 	startFocusCustom   bool
 	showAll            bool
 	detailFocused      bool // Right pane is focused for scrolling
-	reviewCancelled    bool // True if review was cancelled by user
 }
 
 // New creates a new TUI Model with the given container.
@@ -713,14 +712,14 @@ func renderTemplate(tmpl string, data map[string]interface{}) (string, error) {
 func (m *Model) reviewTask(taskID int) tea.Cmd {
 	return func() tea.Msg {
 		uc := m.container.ReviewTaskUseCase(io.Discard, io.Discard)
-		out, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
+		_, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
 			TaskID: taskID,
-			Wait:   true, // TUI uses synchronous execution
+			Wait:   false, // TUI uses background execution (tmux review session)
 		})
 		if err != nil {
-			return MsgReviewError{TaskID: taskID, Err: err}
+			return MsgError{Err: err}
 		}
-		return MsgReviewCompleted{TaskID: taskID, Review: out.Review}
+		return MsgReloadTasks{}
 	}
 }
 
