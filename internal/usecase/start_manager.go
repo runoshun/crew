@@ -67,6 +67,11 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		return nil, fmt.Errorf("agent %q: %w", name, domain.ErrAgentNotFound)
 	}
 
+	// Verify agent role
+	if agent.Role != domain.RoleManager {
+		return nil, fmt.Errorf("agent %q is not a manager (role: %s): %w", name, agent.Role, domain.ErrAgentRoleMismatch)
+	}
+
 	// Resolve model priority: CLI flag > agent config > builtin default
 	model := in.Model
 	if model == "" {
