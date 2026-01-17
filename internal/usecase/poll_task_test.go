@@ -404,7 +404,7 @@ func TestPollTask_Execute_ExpectedStatus_Match(t *testing.T) {
 	// Change to terminal state after short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusDone)
+		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with expected status that matches current status
@@ -430,7 +430,7 @@ func TestPollTask_Execute_ExpectedStatus_Mismatch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInReview, // Current status differs from expected
+		Status: domain.StatusForReview, // Current status differs from expected
 	}
 
 	executor := testutil.NewMockCommandExecutor()
@@ -481,7 +481,7 @@ func TestPollTask_Execute_ExpectedStatus_Multiple(t *testing.T) {
 		},
 		{
 			name:          "does not match any expected status",
-			currentStatus: domain.StatusInReview,
+			currentStatus: domain.StatusForReview,
 			expected:      []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
 			shouldMatch:   false,
 		},
@@ -505,7 +505,7 @@ func TestPollTask_Execute_ExpectedStatus_Multiple(t *testing.T) {
 			if tt.shouldMatch {
 				go func() {
 					time.Sleep(50 * time.Millisecond)
-					repo.UpdateStatus(1, domain.StatusDone)
+					repo.UpdateStatus(1, domain.StatusClosed)
 				}()
 			}
 
@@ -555,7 +555,7 @@ func TestPollTask_Execute_ExpectedStatus_Empty(t *testing.T) {
 	// Change to terminal state after short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusDone)
+		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with empty expected statuses
@@ -587,14 +587,14 @@ func TestPollTask_containsStatus(t *testing.T) {
 	}{
 		{
 			name:     "contains status",
-			statuses: []domain.Status{domain.StatusTodo, domain.StatusInProgress, domain.StatusDone},
+			statuses: []domain.Status{domain.StatusTodo, domain.StatusInProgress, domain.StatusClosed},
 			target:   domain.StatusInProgress,
 			expected: true,
 		},
 		{
 			name:     "does not contain status",
 			statuses: []domain.Status{domain.StatusTodo, domain.StatusInProgress},
-			target:   domain.StatusDone,
+			target:   domain.StatusClosed,
 			expected: false,
 		},
 		{
