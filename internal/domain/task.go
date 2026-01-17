@@ -3,6 +3,7 @@ package domain
 
 import (
 	"errors"
+	"slices"
 	"time"
 )
 
@@ -108,8 +109,9 @@ func (t *Task) FromMarkdown(content string) error {
 			title = line[7:]
 		} else if len(line) >= 7 && line[:7] == "labels:" {
 			labelsFound = true
-			if len(line) > 8 {
-				labelsStr = line[8:] // Skip "labels: "
+			if len(line) > 7 {
+				// Skip "labels:" (7 chars) and trim leading whitespace
+				labelsStr = trimSpace(line[7:])
 			}
 		}
 	}
@@ -118,16 +120,26 @@ func (t *Task) FromMarkdown(content string) error {
 		return ErrEmptyTitle
 	}
 
-	// Parse labels (comma-separated, trim whitespace)
+	// Parse labels (comma-separated, trim whitespace, deduplicate, sort)
 	var labels []string
 	if labelsFound {
 		if labelsStr != "" {
 			parts := splitByComma(labelsStr)
+			// Use a map to deduplicate
+			labelSet := make(map[string]bool)
 			for _, part := range parts {
 				trimmed := trimSpace(part)
 				if trimmed != "" {
-					labels = append(labels, trimmed)
+					labelSet[trimmed] = true
 				}
+			}
+			// Convert map to slice
+			if len(labelSet) > 0 {
+				labels = make([]string, 0, len(labelSet))
+				for label := range labelSet {
+					labels = append(labels, label)
+				}
+				slices.Sort(labels)
 			}
 		}
 		// If labelsFound but labelsStr is empty or all whitespace, labels = nil (cleared)

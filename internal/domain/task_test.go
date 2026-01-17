@@ -153,7 +153,7 @@ labels: bug, urgent, frontend
 Description`,
 			wantTitle:  "Task with labels",
 			wantDesc:   "Description",
-			wantLabels: []string{"bug", "urgent", "frontend"},
+			wantLabels: []string{"bug", "frontend", "urgent"},
 			wantErr:    false,
 		},
 		{
@@ -173,13 +173,39 @@ Description`,
 			name: "with labels with extra whitespace",
 			markdown: `---
 title: Whitespace test
-labels:  bug ,  urgent  , frontend 
+labels:  bug ,  urgent  , frontend
 ---
 
 Description`,
 			wantTitle:  "Whitespace test",
 			wantDesc:   "Description",
-			wantLabels: []string{"bug", "urgent", "frontend"},
+			wantLabels: []string{"bug", "frontend", "urgent"},
+			wantErr:    false,
+		},
+		{
+			name: "with labels without space after colon",
+			markdown: `---
+title: No space after colon
+labels:bug
+---
+
+Description`,
+			wantTitle:  "No space after colon",
+			wantDesc:   "Description",
+			wantLabels: []string{"bug"},
+			wantErr:    false,
+		},
+		{
+			name: "with duplicate labels",
+			markdown: `---
+title: Duplicate labels
+labels: bug, urgent, bug, frontend, urgent
+---
+
+Description`,
+			wantTitle:  "Duplicate labels",
+			wantDesc:   "Description",
+			wantLabels: []string{"bug", "frontend", "urgent"},
 			wantErr:    false,
 		},
 		{
