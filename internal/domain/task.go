@@ -497,8 +497,12 @@ func parseCommentBlock(block string) (ParsedComment, error) {
 		return ParsedComment{}, ErrInvalidCommentMeta
 	}
 
-	// Parse "# Time: <time>"
+	// Parse "# Time: <time>" and validate RFC3339 format
 	if len(lines[3]) < 8 || lines[3][:7] != "# Time:" {
+		return ParsedComment{}, ErrInvalidCommentMeta
+	}
+	timeStr := trimSpace(lines[3][7:])
+	if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
 		return ParsedComment{}, ErrInvalidCommentMeta
 	}
 

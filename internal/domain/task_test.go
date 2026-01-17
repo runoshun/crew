@@ -613,6 +613,60 @@ Description
 			wantErr:     true,
 			errContains: "comment text cannot be empty",
 		},
+		{
+			name: "invalid time format - not RFC3339",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026/01/18 10:00:00
+
+Comment text`,
+			wantErr:     true,
+			errContains: "invalid comment metadata",
+		},
+		{
+			name: "invalid time format - empty",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time:
+
+Comment text`,
+			wantErr:     true,
+			errContains: "invalid comment metadata",
+		},
+		{
+			name: "invalid time format - random string",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: not a valid time
+
+Comment text`,
+			wantErr:     true,
+			errContains: "invalid comment metadata",
+		},
 	}
 
 	for _, tt := range tests {

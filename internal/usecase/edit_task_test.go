@@ -1056,3 +1056,86 @@ Invalid comment`
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid comment index")
 }
+
+func TestEditTask_Execute_EditorMode_MissingComment(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	later := now.Add(time.Hour)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "First comment", Author: "worker", Time: now},
+		{Text: "Second comment", Author: "manager", Time: later},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - only include one comment when two exist
+	markdown := `---
+title: Title
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+First comment`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert - should error because comment was removed
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "comment count mismatch")
+
+	// Verify task was NOT saved (atomic behavior)
+	assert.Equal(t, "Title", repo.Tasks[1].Title)
+}
+
+func TestEditTask_Execute_EditorMode_NoCommentsWhenOriginalHasComments(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "Existing comment", Author: "worker", Time: now},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - no comments section when original has comments
+	markdown := `---
+title: Updated Title
+labels:
+---
+
+Updated description`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert - should error because all comments were removed
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "comment count mismatch")
+
+	// Verify task was NOT saved (atomic behavior)
+	assert.Equal(t, "Title", repo.Tasks[1].Title)
+}

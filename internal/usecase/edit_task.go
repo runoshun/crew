@@ -156,6 +156,47 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		return nil, fmt.Errorf("failed to parse editor content: %w", err)
 	}
 
+	// Get original comments to validate and prepare updates
+	originalComments, err := uc.tasks.GetComments(in.TaskID)
+	if err != nil {
+		return nil, fmt.Errorf("get comments: %w", err)
+	}
+
+	// Validate comment count matches (no add/delete allowed)
+	if len(content.Comments) != len(originalComments) {
+		return nil, fmt.Errorf("comment count mismatch: expected %d, got %d (adding/deleting comments is not allowed)",
+			len(originalComments), len(content.Comments))
+	}
+
+	// Validate all comment indices and prepare updates before saving anything
+	type commentUpdate struct {
+		comment domain.Comment
+		index   int
+	}
+	var commentUpdates []commentUpdate
+
+	for _, parsed := range content.Comments {
+		// Validate index is within bounds
+		if parsed.Index < 0 || parsed.Index >= len(originalComments) {
+			return nil, fmt.Errorf("invalid comment index: %d", parsed.Index)
+		}
+
+		// Only prepare update if text changed
+		original := originalComments[parsed.Index]
+		if original.Text != parsed.Text {
+			commentUpdates = append(commentUpdates, commentUpdate{
+				index: parsed.Index,
+				comment: domain.Comment{
+					Text:   parsed.Text,
+					Time:   original.Time,
+					Author: original.Author,
+				},
+			})
+		}
+	}
+
+	// All validation passed - now apply changes
+
 	// Update task fields
 	task.Title = content.Title
 	task.Description = content.Description
@@ -168,34 +209,10 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		return nil, fmt.Errorf("save task: %w", err)
 	}
 
-	// Update comments if any were parsed
-	if len(content.Comments) > 0 {
-		// Get original comments to preserve author/time
-		originalComments, err := uc.tasks.GetComments(in.TaskID)
-		if err != nil {
-			return nil, fmt.Errorf("get comments: %w", err)
-		}
-
-		// Update each parsed comment
-		for _, parsed := range content.Comments {
-			// Validate index is within bounds
-			if parsed.Index < 0 || parsed.Index >= len(originalComments) {
-				return nil, fmt.Errorf("invalid comment index: %d", parsed.Index)
-			}
-
-			// Only update if text changed
-			original := originalComments[parsed.Index]
-			if original.Text != parsed.Text {
-				// Preserve author and time, only update text
-				updatedComment := domain.Comment{
-					Text:   parsed.Text,
-					Time:   original.Time,
-					Author: original.Author,
-				}
-				if err := uc.tasks.UpdateComment(in.TaskID, parsed.Index, updatedComment); err != nil {
-					return nil, fmt.Errorf("update comment %d: %w", parsed.Index, err)
-				}
-			}
+	// Apply comment updates
+	for _, update := range commentUpdates {
+		if err := uc.tasks.UpdateComment(in.TaskID, update.index, update.comment); err != nil {
+			return nil, fmt.Errorf("update comment %d: %w", update.index, err)
 		}
 	}
 
