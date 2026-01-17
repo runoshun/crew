@@ -97,6 +97,8 @@ func (m *Model) View() string {
 		dialog = m.viewReviewActionDialog()
 	case ModeReviewMessage:
 		dialog = m.viewReviewMessageDialog()
+	case ModeEditReviewComment:
+		dialog = m.viewEditReviewCommentDialog()
 	}
 
 	if dialog != "" {
@@ -456,7 +458,7 @@ func (m *Model) viewFooter() string {
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeReviewing, ModeReviewResult, ModeReviewAction, ModeReviewMessage:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeReviewing, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
 		return ""
 	default:
 		return ""
@@ -1032,7 +1034,7 @@ func (m *Model) viewReviewActionDialog() string {
 
 	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
 
-	// Action options (4 options)
+	// Action options (5 options)
 	type actionOption struct {
 		label string
 		desc  string
@@ -1043,6 +1045,7 @@ func (m *Model) viewReviewActionDialog() string {
 		{"Comment Only", "Send review as comment without restarting"},
 		{"Merge", "Approve and merge the task (LGTM)"},
 		{"Close", "Close the task without merging"},
+		{"Edit Comment", "Edit the saved review comment"},
 	}
 
 	var actionRows []string
@@ -1116,6 +1119,44 @@ func (m *Model) viewReviewMessageDialog() string {
 		description,
 		inputLine,
 		defaultHint, ds.emptyLine(),
+		hint,
+	)
+
+	return m.dialogStyle().Render(content)
+}
+
+func (m *Model) viewEditReviewCommentDialog() string {
+	ds := m.newDialogStyles()
+
+	title := ds.renderLine(ds.label.Render("Edit Review Comment"))
+
+	// Find task
+	var task *domain.Task
+	for _, t := range m.tasks {
+		if t.ID == m.reviewTaskID {
+			task = t
+			break
+		}
+	}
+	if task == nil {
+		return ""
+	}
+
+	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+
+	description := ds.renderLine(ds.text.Render("Edit the review comment:"))
+
+	inputLine := ds.renderLine(m.editCommentInput.View())
+
+	hint := ds.renderLine(
+		ds.key.Render("enter") + ds.text.Render(" save  ") +
+			ds.key.Render("esc") + ds.text.Render(" cancel"))
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title, ds.emptyLine(),
+		taskLine, ds.emptyLine(),
+		description,
+		inputLine, ds.emptyLine(),
 		hint,
 	)
 

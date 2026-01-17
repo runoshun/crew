@@ -73,8 +73,6 @@ func TestPollTask_Execute_StatusChange(t *testing.T) {
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		repo.UpdateStatus(1, domain.StatusInProgress)
-		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with short interval
@@ -88,7 +86,7 @@ func TestPollTask_Execute_StatusChange(t *testing.T) {
 		CommandTemplate: "",
 	})
 
-	// Assert - should exit when status becomes done (terminal state)
+	// Assert - should exit when status changes
 	require.NoError(t, err)
 }
 
@@ -358,10 +356,13 @@ func TestPollTask_Execute_CommandOutput(t *testing.T) {
 	executor := testutil.NewMockCommandExecutor()
 	uc := NewPollTask(repo, clock, executor, &stdout, &stderr)
 
-	// Start a goroutine to change status to terminal state after a delay
-	// Use delay longer than polling interval to ensure we catch the change
+	// Start a goroutine to change status after a delay
 	go func() {
+		// First change to in_progress
 		time.Sleep(1500 * time.Millisecond)
+		repo.UpdateStatus(1, domain.StatusInProgress)
+		// Second change to closed - this should NOT be detected as it exits after first change
+		time.Sleep(1000 * time.Millisecond)
 		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
@@ -379,13 +380,13 @@ func TestPollTask_Execute_CommandOutput(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 
-	// Check that command was executed with correct template expansion
+	// Check that command was executed with correct template expansion for the FIRST change
 	assert.True(t, executor.ExecuteWithContextCalled)
 	assert.NotNil(t, executor.ExecutedCmd)
 	assert.Equal(t, "sh", executor.ExecutedCmd.Program)
 	assert.Len(t, executor.ExecutedCmd.Args, 2)
 	assert.Equal(t, "-c", executor.ExecutedCmd.Args[0])
-	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: todo -> closed")
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: todo -> in_progress")
 }
 
 func TestPollTask_Execute_ExpectedStatus_Match(t *testing.T) {
@@ -404,7 +405,7 @@ func TestPollTask_Execute_ExpectedStatus_Match(t *testing.T) {
 	// Change to terminal state after short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusDone)
+		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with expected status that matches current status
@@ -430,7 +431,7 @@ func TestPollTask_Execute_ExpectedStatus_Mismatch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInReview, // Current status differs from expected
+		Status: domain.StatusForReview, // Current status differs from expected
 	}
 
 	executor := testutil.NewMockCommandExecutor()
@@ -481,7 +482,7 @@ func TestPollTask_Execute_ExpectedStatus_Multiple(t *testing.T) {
 		},
 		{
 			name:          "does not match any expected status",
-			currentStatus: domain.StatusInReview,
+			currentStatus: domain.StatusForReview,
 			expected:      []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
 			shouldMatch:   false,
 		},
@@ -505,7 +506,7 @@ func TestPollTask_Execute_ExpectedStatus_Multiple(t *testing.T) {
 			if tt.shouldMatch {
 				go func() {
 					time.Sleep(50 * time.Millisecond)
-					repo.UpdateStatus(1, domain.StatusDone)
+					repo.UpdateStatus(1, domain.StatusClosed)
 				}()
 			}
 
@@ -555,7 +556,7 @@ func TestPollTask_Execute_ExpectedStatus_Empty(t *testing.T) {
 	// Change to terminal state after short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusDone)
+		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with empty expected statuses
@@ -587,14 +588,14 @@ func TestPollTask_containsStatus(t *testing.T) {
 	}{
 		{
 			name:     "contains status",
-			statuses: []domain.Status{domain.StatusTodo, domain.StatusInProgress, domain.StatusDone},
+			statuses: []domain.Status{domain.StatusTodo, domain.StatusInProgress, domain.StatusClosed},
 			target:   domain.StatusInProgress,
 			expected: true,
 		},
 		{
 			name:     "does not contain status",
 			statuses: []domain.Status{domain.StatusTodo, domain.StatusInProgress},
-			target:   domain.StatusDone,
+			target:   domain.StatusClosed,
 			expected: false,
 		},
 		{

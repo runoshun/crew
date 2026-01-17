@@ -24,19 +24,20 @@ func newPollCommand(c *app.Container) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "poll <TASK_ID>",
-		Short: "Poll task status and execute command on change",
-		Long: `Monitor a task's status and execute a command when the status changes.
+		Short: "Poll task status and exit after one change detection (default timeout: 5m)",
+		Long: `Monitor a task's status and execute a command once when the status changes.
 
 The poll command checks the task status at regular intervals and executes
-a command template when a status change is detected. It automatically exits
-when the task reaches a terminal state (closed, error) or when the
-timeout is reached.
+a command template as soon as a status change is detected. It exits immediately
+after executing the command for the first detected change.
 
-Expected Status Check:
-  Use --expect to specify expected status(es). If the current status differs
-  from the expected status(es), the command will be executed immediately and
-  the poll command will exit. This is useful to avoid waiting when the status
-  has already changed.
+Polling stops automatically when the timeout is reached (default: 300s).
+
+Expected Status Check (Optional):
+  Use --expect to specify expected status(es). 
+  - If specified and the current status already differs from the expected status(es) on startup,
+    the command is executed immediately and the poll command exits.
+  - If it matches or if --expect is not specified, the command waits for the first status change.
 
 Command Template:
   The command template can use the following variables:
@@ -45,28 +46,25 @@ Command Template:
     {{.NewStatus}} - New status
 
 Terminal States:
-  The following states are considered terminal and will stop polling:
+  Reaching a terminal state is also treated as a status change:
     - closed - Task closed (merged or abandoned)
     - error  - Task session terminated with error
 
 Examples:
-  # Basic polling (default interval: 10s, no timeout)
-  git crew poll 175
+  # Simple polling (notify on any change)
+  git crew poll 175 --command 'notify-send "Task {{.TaskID}} changed to {{.NewStatus}}"'
 
-  # Poll with expected status (notify immediately if different)
-  git crew poll 199 --expect in_progress
+  # Poll with expected status and notify on change (5m timeout)
+  git crew poll 175 --expect todo --command 'notify-send "Task {{.TaskID}} started!"'
 
-  # Multiple expected statuses (OR condition)
-  git crew poll 199 --expect in_progress,needs_input
+  # Multiple expected statuses (exit if status becomes something else)
+  git crew poll 199 --expect in_progress,needs_input --command 'say "Task {{.TaskID}} changed to {{.NewStatus}}"'
 
   # Poll with custom interval and timeout
-  git crew poll 175 --interval 5 --timeout 300
+  git crew poll 175 --expect todo --interval 5 --timeout 60
 
-  # Execute notification on status change
-  git crew poll 175 --command 'notify-send "Task {{.TaskID}}: {{.NewStatus}}"'
-
-  # Run in background
-  git crew poll 175 --command 'echo "{{.TaskID}}: {{.OldStatus}} → {{.NewStatus}}"' &`,
+  # Use as a trigger for next action
+  git crew poll 175 --expect in_progress --command 'crew complete 175'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -114,11 +112,8 @@ Examples:
 	// Flags
 	cmd.Flags().StringVarP(&opts.Expect, "expect", "e", "", "Expected status(es) - comma-separated (e.g., 'in_progress' or 'in_progress,needs_input')")
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", 10, "Polling interval in seconds")
-	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 0, "Timeout in seconds (0 = no timeout)")
+	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 300, "Timeout in seconds")
 	cmd.Flags().StringVarP(&opts.Command, "command", "c", "", "Command template to execute on status change")
-
-	// Mark --expect as required (ignore error as flag is guaranteed to exist)
-	_ = cmd.MarkFlagRequired("expect")
 
 	return cmd
 }
