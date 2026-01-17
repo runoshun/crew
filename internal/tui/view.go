@@ -89,8 +89,6 @@ func (m *Model) View() string {
 		dialog = m.viewStatusPicker()
 	case ModeExec:
 		dialog = m.viewExecDialog()
-	case ModeReviewing:
-		dialog = m.viewReviewingDialog()
 	case ModeReviewResult:
 		dialog = m.viewReviewResultDialog()
 	case ModeReviewAction:
@@ -458,7 +456,7 @@ func (m *Model) viewFooter() string {
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeReviewing, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
 		return ""
 	default:
 		return ""
@@ -937,37 +935,6 @@ func (m *Model) viewDetailPanel() string {
 	}
 
 	return panelStyle.Render(content)
-}
-
-func (m *Model) viewReviewingDialog() string {
-	ds := m.newDialogStyles()
-
-	title := ds.renderLine(ds.label.Render("Running Review"))
-
-	// Find task title
-	var taskTitle string
-	for _, t := range m.tasks {
-		if t.ID == m.reviewTaskID {
-			taskTitle = t.Title
-			break
-		}
-	}
-
-	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", m.reviewTaskID, taskTitle)))
-
-	spinner := ds.renderLine(ds.text.Render("Analyzing changes..."))
-	hint := ds.renderLine(ds.muted.Render("Please wait while the AI reviewer analyzes the code"))
-
-	content := lipgloss.JoinVertical(lipgloss.Left,
-		title,
-		ds.emptyLine(),
-		taskLine,
-		ds.emptyLine(),
-		spinner,
-		hint,
-	)
-
-	return m.dialogStyle().Render(content)
 }
 
 func (m *Model) viewReviewResultDialog() string {

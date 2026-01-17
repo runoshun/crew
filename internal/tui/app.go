@@ -77,7 +77,6 @@ type Model struct {
 	startFocusCustom   bool
 	showAll            bool
 	detailFocused      bool // Right pane is focused for scrolling
-	reviewCancelled    bool // True if review was cancelled by user
 }
 
 // New creates a new TUI Model with the given container.
@@ -713,14 +712,14 @@ func renderTemplate(tmpl string, data map[string]interface{}) (string, error) {
 func (m *Model) reviewTask(taskID int) tea.Cmd {
 	return func() tea.Msg {
 		uc := m.container.ReviewTaskUseCase(io.Discard, io.Discard)
-		out, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
+		_, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
 			TaskID: taskID,
-			Wait:   true, // TUI uses synchronous execution
+			Wait:   false, // TUI uses background execution (tmux review session)
 		})
 		if err != nil {
-			return MsgReviewError{TaskID: taskID, Err: err}
+			return MsgError{Err: err}
 		}
-		return MsgReviewCompleted{TaskID: taskID, Review: out.Review}
+		return MsgReloadTasks{}
 	}
 }
 
@@ -784,6 +783,34 @@ func (m *Model) prepareEditReviewComment() tea.Cmd {
 			TaskID:  m.reviewTaskID,
 			Index:   reviewIndex,
 			Message: reviewComment.Text,
+		}
+	}
+}
+
+// loadReviewResult loads the latest reviewer comment for display in ModeReviewResult.
+func (m *Model) loadReviewResult(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		comments, err := m.container.Tasks.GetComments(taskID)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+
+		// Find the last reviewer comment
+		var reviewText string
+		for i := len(comments) - 1; i >= 0; i-- {
+			if comments[i].Author == "reviewer" {
+				reviewText = comments[i].Text
+				break
+			}
+		}
+
+		if reviewText == "" {
+			return MsgError{Err: fmt.Errorf("no review result found for task #%d", taskID)}
+		}
+
+		return MsgReviewResultLoaded{
+			TaskID: taskID,
+			Review: reviewText,
 		}
 	}
 }
