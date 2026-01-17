@@ -28,5 +28,6 @@ var (
 	ErrCommentNotFound       = errors.New("comment not found")
 	ErrAgentNotFound         = errors.New("agent not found")
 	ErrAgentDisabled         = errors.New("agent is disabled")
+	ErrAgentRoleMismatch     = errors.New("agent role mismatch")
 	ErrConfigNil             = errors.New("config is nil")
 )
