@@ -45,7 +45,15 @@ Examples:
   git crew new --title "Fix login bug" --issue 42
 
   # Create a task with labels
-  git crew new --title "Add feature" --label feature --label urgent`,
+  git crew new --title "Add feature" --label feature --label urgent
+  
+  # Create a task with body using HEREDOC (recommended for complex descriptions)
+  git crew new --title "Complex task" --body "$(cat <<'EOF'
+## Summary
+- Step 1
+- Step 2
+EOF
+)"`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Build input
 			// BaseBranch: if --base is provided, use it; otherwise empty (let UseCase decide)
