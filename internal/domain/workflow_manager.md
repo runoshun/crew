@@ -88,10 +88,40 @@ The manager should NOT review code directly.
      - **If reviewer comments exist**: Forward feedback using `crew comment <id> -R "..."`. Provide a brief instruction referring to the reviewer's comments; do NOT transcribe the full findings.
      - **If no reviewer comments**: If the review failed to save or encountered an error, re-run the review or manually paste the reviewer's output.
 
+**Important clarifications**:
+- **Reviewer comments (author=reviewer)** are stored in task comments as a record, NOT as a notification. The worker agent is not automatically notified when reviewer comments are saved.
+- **To notify and restart the worker**, you MUST use `crew comment <id> -R "..."`. This command:
+  - Sets task status to `in_progress`
+  - Notifies the running worker session with your message
+  - Triggers the worker to check and address the reviewer's feedback
+- **Completion from `reviewed` state**: You CANNOT use `crew complete` when a task is in `reviewed` status. To finalize a task:
+  - ✅ LGTM → Use `crew merge <id>` to merge and close
+  - ❌ Needs changes → Use `crew comment <id> -R "..."` to restart work, then review again
+  - 🚫 Abandon → Use `crew close <id>` to close without merging
+
+#### Needs Changes Template
+
+When the review identifies issues, use this template to forward concise, actionable instructions:
+
 ```bash
-# Example: Requesting fixes based on reviewer comments
-crew comment <id> -R "Please address the issues pointed out by the reviewer in the task comments."
+crew comment <id> -R "$(cat <<'MSG'
+Please address the reviewer's feedback (see task comments, author=reviewer).
+
+Priority issues:
+1. [Brief description of first issue]
+2. [Brief description of second issue]
+3. [Brief description of third issue]
+
+After fixing, set status to for_review for re-review.
+MSG
+)"
 ```
+
+**Best practices**:
+- Reference reviewer comments instead of copying them verbatim
+- Highlight top 3-5 priority issues
+- Keep the message concise and actionable
+- Avoid duplicate information already in reviewer comments
 
 ### Review Result Handling
 
