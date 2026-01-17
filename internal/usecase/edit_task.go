@@ -150,14 +150,53 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Parse markdown content
-	if err := task.FromMarkdown(in.EditorText); err != nil {
-		return nil, fmt.Errorf("failed to parse markdown: %w", err)
+	// Parse editor content (includes comments)
+	content, err := domain.ParseEditorContent(in.EditorText)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse editor content: %w", err)
+	}
+
+	// Update task fields
+	task.Title = content.Title
+	task.Description = content.Description
+	if content.LabelsFound {
+		task.Labels = content.Labels
 	}
 
 	// Save updated task
 	if err := uc.tasks.Save(task); err != nil {
 		return nil, fmt.Errorf("save task: %w", err)
+	}
+
+	// Update comments if any were parsed
+	if len(content.Comments) > 0 {
+		// Get original comments to preserve author/time
+		originalComments, err := uc.tasks.GetComments(in.TaskID)
+		if err != nil {
+			return nil, fmt.Errorf("get comments: %w", err)
+		}
+
+		// Update each parsed comment
+		for _, parsed := range content.Comments {
+			// Validate index is within bounds
+			if parsed.Index < 0 || parsed.Index >= len(originalComments) {
+				return nil, fmt.Errorf("invalid comment index: %d", parsed.Index)
+			}
+
+			// Only update if text changed
+			original := originalComments[parsed.Index]
+			if original.Text != parsed.Text {
+				// Preserve author and time, only update text
+				updatedComment := domain.Comment{
+					Text:   parsed.Text,
+					Time:   original.Time,
+					Author: original.Author,
+				}
+				if err := uc.tasks.UpdateComment(in.TaskID, parsed.Index, updatedComment); err != nil {
+					return nil, fmt.Errorf("update comment %d: %w", parsed.Index, err)
+				}
+			}
+		}
 	}
 
 	return &EditTaskOutput{Task: task}, nil

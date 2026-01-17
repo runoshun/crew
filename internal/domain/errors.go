@@ -30,4 +30,6 @@ var (
 	ErrAgentDisabled         = errors.New("agent is disabled")
 	ErrAgentRoleMismatch     = errors.New("agent role mismatch")
 	ErrConfigNil             = errors.New("config is nil")
+	ErrInvalidCommentMeta    = errors.New("invalid comment metadata (index, author, or time)")
+	ErrCommentTextEmpty      = errors.New("comment text cannot be empty")
 )
