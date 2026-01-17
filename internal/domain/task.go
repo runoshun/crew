@@ -45,18 +45,36 @@ func (t *Task) IsRunning() bool {
 }
 
 // ToMarkdown converts the task to a Markdown format with frontmatter.
-// Only title and description are included for editing purposes.
+// Title, labels, and description are included for editing purposes.
 func (t *Task) ToMarkdown() string {
-	return "---\ntitle: " + t.Title + "\n---\n\n" + t.Description
+	result := "---\ntitle: " + t.Title + "\n"
+
+	// Add labels field (comma-separated, empty if no labels)
+	if len(t.Labels) > 0 {
+		result += "labels: "
+		for i, label := range t.Labels {
+			if i > 0 {
+				result += ", "
+			}
+			result += label
+		}
+		result += "\n"
+	} else {
+		result += "labels:\n"
+	}
+
+	result += "---\n\n" + t.Description
+	return result
 }
 
-// FromMarkdown parses Markdown with frontmatter and updates the task's title and description.
+// FromMarkdown parses Markdown with frontmatter and updates the task's title, labels, and description.
 // Returns an error if parsing fails.
 func (t *Task) FromMarkdown(content string) error {
 	// Simple frontmatter parser
 	// Expected format:
 	// ---
 	// title: <title>
+	// labels: <label1>, <label2>, ...
 	// ---
 	//
 	// <description>
@@ -82,15 +100,37 @@ func (t *Task) FromMarkdown(content string) error {
 
 	// Parse frontmatter
 	title := ""
+	labelsStr := ""
+	labelsFound := false
 	for i := 0; i < endIdx; i++ {
 		line := lines[i]
 		if len(line) > 7 && line[:7] == "title: " {
 			title = line[7:]
+		} else if len(line) >= 7 && line[:7] == "labels:" {
+			labelsFound = true
+			if len(line) > 8 {
+				labelsStr = line[8:] // Skip "labels: "
+			}
 		}
 	}
 
 	if title == "" {
 		return ErrEmptyTitle
+	}
+
+	// Parse labels (comma-separated, trim whitespace)
+	var labels []string
+	if labelsFound {
+		if labelsStr != "" {
+			parts := splitByComma(labelsStr)
+			for _, part := range parts {
+				trimmed := trimSpace(part)
+				if trimmed != "" {
+					labels = append(labels, trimmed)
+				}
+			}
+		}
+		// If labelsFound but labelsStr is empty or all whitespace, labels = nil (cleared)
 	}
 
 	// Get description (everything after frontmatter)
@@ -108,6 +148,9 @@ func (t *Task) FromMarkdown(content string) error {
 
 	// Update task fields
 	t.Title = title
+	if labelsFound {
+		t.Labels = labels
+	}
 	t.Description = description
 
 	return nil
@@ -139,6 +182,43 @@ func trimLeadingNewlines(s string) string {
 		start++
 	}
 	return s[start:]
+}
+
+// splitByComma splits a string by commas.
+func splitByComma(s string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := []string{}
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == ',' {
+			parts = append(parts, s[start:i])
+			start = i + 1
+		}
+	}
+	if start < len(s) {
+		parts = append(parts, s[start:])
+	}
+	return parts
+}
+
+// trimSpace removes leading and trailing whitespace.
+func trimSpace(s string) string {
+	start := 0
+	end := len(s)
+
+	// Trim leading whitespace
+	for start < end && (s[start] == ' ' || s[start] == '\t' || s[start] == '\n' || s[start] == '\r') {
+		start++
+	}
+
+	// Trim trailing whitespace
+	for end > start && (s[end-1] == ' ' || s[end-1] == '\t' || s[end-1] == '\n' || s[end-1] == '\r') {
+		end--
+	}
+
+	return s[start:end]
 }
 
 // Comment represents a note attached to a task.

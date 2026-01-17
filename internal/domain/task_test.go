@@ -19,7 +19,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Test Task",
 				Description: "This is a test description",
 			},
-			want: "---\ntitle: Test Task\n---\n\nThis is a test description",
+			want: "---\ntitle: Test Task\nlabels:\n---\n\nThis is a test description",
 		},
 		{
 			name: "with title only",
@@ -27,7 +27,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Title Only",
 				Description: "",
 			},
-			want: "---\ntitle: Title Only\n---\n\n",
+			want: "---\ntitle: Title Only\nlabels:\n---\n\n",
 		},
 		{
 			name: "with multiline description",
@@ -35,7 +35,33 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Multi-line",
 				Description: "Line 1\nLine 2\nLine 3",
 			},
-			want: "---\ntitle: Multi-line\n---\n\nLine 1\nLine 2\nLine 3",
+			want: "---\ntitle: Multi-line\nlabels:\n---\n\nLine 1\nLine 2\nLine 3",
+		},
+		{
+			name: "with single label",
+			task: &Task{
+				Title:       "Task with label",
+				Description: "Description",
+				Labels:      []string{"bug"},
+			},
+			want: "---\ntitle: Task with label\nlabels: bug\n---\n\nDescription",
+		},
+		{
+			name: "with multiple labels",
+			task: &Task{
+				Title:       "Task with labels",
+				Description: "Description",
+				Labels:      []string{"bug", "urgent", "frontend"},
+			},
+			want: "---\ntitle: Task with labels\nlabels: bug, urgent, frontend\n---\n\nDescription",
+		},
+		{
+			name: "with labels and no description",
+			task: &Task{
+				Title:  "Labels only",
+				Labels: []string{"feature"},
+			},
+			want: "---\ntitle: Labels only\nlabels: feature\n---\n\n",
 		},
 	}
 
@@ -53,6 +79,7 @@ func TestTask_FromMarkdown(t *testing.T) {
 		markdown    string
 		wantTitle   string
 		wantDesc    string
+		wantLabels  []string
 		errContains string
 		wantErr     bool
 	}{
@@ -102,6 +129,70 @@ Description after empty lines`,
 			wantTitle: "Test",
 			wantDesc:  "Description after empty lines",
 			wantErr:   false,
+		},
+		{
+			name: "with single label",
+			markdown: `---
+title: Task with label
+labels: bug
+---
+
+Description`,
+			wantTitle:  "Task with label",
+			wantDesc:   "Description",
+			wantLabels: []string{"bug"},
+			wantErr:    false,
+		},
+		{
+			name: "with multiple labels",
+			markdown: `---
+title: Task with labels
+labels: bug, urgent, frontend
+---
+
+Description`,
+			wantTitle:  "Task with labels",
+			wantDesc:   "Description",
+			wantLabels: []string{"bug", "urgent", "frontend"},
+			wantErr:    false,
+		},
+		{
+			name: "with empty labels field",
+			markdown: `---
+title: No labels
+labels:
+---
+
+Description`,
+			wantTitle:  "No labels",
+			wantDesc:   "Description",
+			wantLabels: nil,
+			wantErr:    false,
+		},
+		{
+			name: "with labels with extra whitespace",
+			markdown: `---
+title: Whitespace test
+labels:  bug ,  urgent  , frontend 
+---
+
+Description`,
+			wantTitle:  "Whitespace test",
+			wantDesc:   "Description",
+			wantLabels: []string{"bug", "urgent", "frontend"},
+			wantErr:    false,
+		},
+		{
+			name: "without labels field (backward compatibility)",
+			markdown: `---
+title: Old format
+---
+
+Description`,
+			wantTitle:  "Old format",
+			wantDesc:   "Description",
+			wantLabels: nil, // Labels should not be modified if field is not present
+			wantErr:    false,
 		},
 		{
 			name: "missing opening frontmatter delimiter",
@@ -154,24 +245,56 @@ Description`,
 				require.NoError(t, err)
 				assert.Equal(t, tt.wantTitle, task.Title)
 				assert.Equal(t, tt.wantDesc, task.Description)
+				if tt.wantLabels != nil {
+					assert.Equal(t, tt.wantLabels, task.Labels)
+				}
 			}
 		})
 	}
 }
 
 func TestTask_RoundTrip(t *testing.T) {
-	// Test that ToMarkdown -> FromMarkdown preserves data
-	original := &Task{
-		Title:       "Round Trip Test",
-		Description: "This should survive the round trip",
+	tests := []struct {
+		name     string
+		original *Task
+	}{
+		{
+			name: "without labels",
+			original: &Task{
+				Title:       "Round Trip Test",
+				Description: "This should survive the round trip",
+			},
+		},
+		{
+			name: "with labels",
+			original: &Task{
+				Title:       "Round Trip with Labels",
+				Description: "This should survive with labels",
+				Labels:      []string{"bug", "urgent"},
+			},
+		},
+		{
+			name: "with empty labels",
+			original: &Task{
+				Title:       "Round Trip no labels",
+				Description: "No labels set",
+				Labels:      nil,
+			},
+		},
 	}
 
-	markdown := original.ToMarkdown()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test that ToMarkdown -> FromMarkdown preserves data
+			markdown := tt.original.ToMarkdown()
 
-	parsed := &Task{}
-	err := parsed.FromMarkdown(markdown)
+			parsed := &Task{}
+			err := parsed.FromMarkdown(markdown)
 
-	require.NoError(t, err)
-	assert.Equal(t, original.Title, parsed.Title)
-	assert.Equal(t, original.Description, parsed.Description)
+			require.NoError(t, err)
+			assert.Equal(t, tt.original.Title, parsed.Title)
+			assert.Equal(t, tt.original.Description, parsed.Description)
+			assert.Equal(t, tt.original.Labels, parsed.Labels)
+		})
+	}
 }
