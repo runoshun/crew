@@ -168,34 +168,59 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 			len(originalComments), len(content.Comments))
 	}
 
-	// Validate all comment indices and prepare updates before saving anything
+	// Validate all comment indices are unique and form a complete sequence 0..N-1
 	type commentUpdate struct {
 		comment domain.Comment
 		index   int
 	}
 	var commentUpdates []commentUpdate
 
-	for _, parsed := range content.Comments {
-		// Validate index is within bounds
-		if parsed.Index < 0 || parsed.Index >= len(originalComments) {
-			return nil, fmt.Errorf("invalid comment index: %d", parsed.Index)
+	if len(originalComments) > 0 {
+		// Track which indices are present
+		seenIndices := make(map[int]bool, len(content.Comments))
+
+		for _, parsed := range content.Comments {
+			// Validate index is within bounds
+			if parsed.Index < 0 || parsed.Index >= len(originalComments) {
+				return nil, fmt.Errorf("invalid comment index: %d", parsed.Index)
+			}
+
+			// Check for duplicate indices
+			if seenIndices[parsed.Index] {
+				return nil, fmt.Errorf("duplicate comment index: %d", parsed.Index)
+			}
+			seenIndices[parsed.Index] = true
+
+			// Only prepare update if text changed
+			original := originalComments[parsed.Index]
+			if original.Text != parsed.Text {
+				commentUpdates = append(commentUpdates, commentUpdate{
+					index: parsed.Index,
+					comment: domain.Comment{
+						Text:   parsed.Text,
+						Time:   original.Time,
+						Author: original.Author,
+					},
+				})
+			}
 		}
 
-		// Only prepare update if text changed
-		original := originalComments[parsed.Index]
-		if original.Text != parsed.Text {
-			commentUpdates = append(commentUpdates, commentUpdate{
-				index: parsed.Index,
-				comment: domain.Comment{
-					Text:   parsed.Text,
-					Time:   original.Time,
-					Author: original.Author,
-				},
-			})
+		// Verify all indices are present (0 to N-1)
+		for i := 0; i < len(originalComments); i++ {
+			if !seenIndices[i] {
+				return nil, fmt.Errorf("missing comment index: %d", i)
+			}
 		}
 	}
 
 	// All validation passed - now apply changes
+	// Apply comment updates FIRST to minimize partial save risk
+	// (if UpdateComment fails, task is not saved yet)
+	for _, update := range commentUpdates {
+		if err := uc.tasks.UpdateComment(in.TaskID, update.index, update.comment); err != nil {
+			return nil, fmt.Errorf("update comment %d: %w", update.index, err)
+		}
+	}
 
 	// Update task fields
 	task.Title = content.Title
@@ -204,16 +229,9 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		task.Labels = content.Labels
 	}
 
-	// Save updated task
+	// Save updated task (after comments are successfully updated)
 	if err := uc.tasks.Save(task); err != nil {
 		return nil, fmt.Errorf("save task: %w", err)
-	}
-
-	// Apply comment updates
-	for _, update := range commentUpdates {
-		if err := uc.tasks.UpdateComment(in.TaskID, update.index, update.comment); err != nil {
-			return nil, fmt.Errorf("update comment %d: %w", update.index, err)
-		}
 	}
 
 	return &EditTaskOutput{Task: task}, nil

@@ -1139,3 +1139,57 @@ Updated description`
 	// Verify task was NOT saved (atomic behavior)
 	assert.Equal(t, "Title", repo.Tasks[1].Title)
 }
+
+func TestEditTask_Execute_EditorMode_DuplicateCommentIndex(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	later := now.Add(time.Hour)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "First comment", Author: "worker", Time: now},
+		{Text: "Second comment", Author: "manager", Time: later},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - duplicate index 0
+	markdown := `---
+title: Title
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+First comment
+
+---
+# Comment: 0
+# Author: manager
+# Time: 2026-01-18T11:00:00Z
+
+Second comment with wrong index`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert - should error because of duplicate index
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate comment index")
+
+	// Verify nothing was saved (atomic behavior)
+	assert.Equal(t, "First comment", repo.Comments[1][0].Text)
+	assert.Equal(t, "Second comment", repo.Comments[1][1].Text)
+}
