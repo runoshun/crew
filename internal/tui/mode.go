@@ -5,20 +5,16 @@ package tui
 type Mode int
 
 const (
-	ModeNormal            Mode = iota // Default navigation mode
-	ModeFilter                        // Text filtering mode
-	ModeConfirm                       // Confirmation dialog mode
-	ModeInputTitle                    // Title input mode (for new task) - deprecated, use ModeNewTask
-	ModeInputDesc                     // Description input mode (for new task) - deprecated, use ModeNewTask
-	ModeNewTask                       // New task form mode (title, desc, parent)
-	ModeStart                         // Agent picker mode
-	ModeHelp                          // Help overlay mode
-	ModeChangeStatus                  // Status change mode
-	ModeExec                          // Execute command mode
-	ModeReviewResult                  // Review result display mode
-	ModeReviewAction                  // Review action selection mode (notify, merge, etc.)
-	ModeReviewMessage                 // Review message input mode (for Request Changes)
-	ModeEditReviewComment             // Edit review comment mode
+	ModeNormal       Mode = iota // Default navigation mode
+	ModeFilter                   // Text filtering mode
+	ModeConfirm                  // Confirmation dialog mode
+	ModeInputTitle               // Title input mode (for new task) - deprecated, use ModeNewTask
+	ModeInputDesc                // Description input mode (for new task) - deprecated, use ModeNewTask
+	ModeNewTask                  // New task form mode (title, desc, parent)
+	ModeStart                    // Agent picker mode
+	ModeHelp                     // Help overlay mode
+	ModeChangeStatus             // Status change mode
+	ModeExec                     // Execute command mode
 )
 
 // String returns the string representation of the mode.
@@ -44,14 +40,6 @@ func (m Mode) String() string {
 		return "change_status"
 	case ModeExec:
 		return "exec"
-	case ModeReviewResult:
-		return "review_result"
-	case ModeReviewAction:
-		return "review_action"
-	case ModeReviewMessage:
-		return "review_message"
-	case ModeEditReviewComment:
-		return "edit_review_comment"
 	default:
 		return "unknown"
 	}
@@ -71,24 +59,13 @@ const (
 // IsInputMode returns true if the mode accepts text input.
 func (m Mode) IsInputMode() bool {
 	switch m {
-	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec, ModeReviewMessage, ModeEditReviewComment:
+	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec:
 		return true
-	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeChangeStatus, ModeReviewResult, ModeReviewAction:
+	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeChangeStatus:
 		return false
 	}
 	return false
 }
-
-// ReviewAction represents the action to take after reviewing.
-type ReviewAction int
-
-const (
-	ReviewActionNone         ReviewAction = iota
-	ReviewActionNotifyWorker              // Send review result as comment to worker
-	ReviewActionMerge                     // Merge the task (LGTM)
-	ReviewActionClose                     // Close the task
-	ReviewActionEditComment               // Edit the review comment
-)
 
 // NewTaskField represents the currently focused field in the new task form.
 type NewTaskField int
