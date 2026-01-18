@@ -721,6 +721,18 @@ Description`,
 			wantTitle: "Test Task",
 			wantDesc:  "Description",
 		},
+		{
+			name: "invalid parent - negative number",
+			content: `---
+title: Test Task
+parent: -1
+labels:
+---
+
+Description`,
+			wantErr:     true,
+			errContains: "invalid parent ID",
+		},
 	}
 
 	for _, tt := range tests {
