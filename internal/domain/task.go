@@ -33,6 +33,7 @@ type Task struct {
 	ID          int         `json:"-"`                     // Task ID (stored as map key, not in value)
 	Issue       int         `json:"issue,omitempty"`       // GitHub issue number (0 = not linked)
 	PR          int         `json:"pr,omitempty"`          // GitHub PR number (0 = not created)
+	SkipReview  bool        `json:"skipReview,omitempty"`  // Skip review on completion (go directly to reviewed)
 }
 
 // IsRoot returns true if this is a root task (no parent).

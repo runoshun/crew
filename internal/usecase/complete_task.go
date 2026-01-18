@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -14,52 +15,72 @@ type CompleteTaskInput struct {
 }
 
 // CompleteTaskOutput contains the result of completing a task.
+// Fields are ordered to minimize memory padding.
 type CompleteTaskOutput struct {
-	Task *domain.Task // The completed task
+	Task          *domain.Task // The completed task
+	ReviewSession string       // Review session name (if ReviewStarted is true)
+	ReviewStarted bool         // True if review was automatically started
 }
 
 // CompleteTask is the use case for marking a task as complete.
-// It transitions the task from in_progress to for_review.
+// It transitions the task from in_progress to for_review (or reviewed if skip_review).
+// If not skipping review, it automatically starts the review process.
+// Fields are ordered to minimize memory padding.
 type CompleteTask struct {
 	tasks     domain.TaskRepository
 	worktrees domain.WorktreeManager
+	sessions  domain.SessionManager
 	git       domain.Git
 	config    domain.ConfigLoader
 	clock     domain.Clock
 	logger    domain.Logger
 	executor  domain.CommandExecutor
+	stdout    io.Writer
+	stderr    io.Writer
+	crewDir   string
+	repoRoot  string
 }
 
 // NewCompleteTask creates a new CompleteTask use case.
 func NewCompleteTask(
 	tasks domain.TaskRepository,
 	worktrees domain.WorktreeManager,
+	sessions domain.SessionManager,
 	git domain.Git,
 	config domain.ConfigLoader,
 	clock domain.Clock,
 	logger domain.Logger,
 	executor domain.CommandExecutor,
+	crewDir string,
+	repoRoot string,
+	stdout, stderr io.Writer,
 ) *CompleteTask {
 	return &CompleteTask{
 		tasks:     tasks,
 		worktrees: worktrees,
+		sessions:  sessions,
 		git:       git,
 		config:    config,
 		clock:     clock,
 		logger:    logger,
 		executor:  executor,
+		crewDir:   crewDir,
+		repoRoot:  repoRoot,
+		stdout:    stdout,
+		stderr:    stderr,
 	}
 }
 
 // Execute marks a task as complete.
 // Preconditions:
-//   - Status is in_progress
+//   - Status is in_progress or needs_input
 //   - No uncommitted changes in worktree
 //
 // Processing:
 //   - If [complete].command is configured, execute it (abort on failure)
-//   - Update status to for_review
-func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*CompleteTaskOutput, error) {
+//   - If skip_review: set status to reviewed
+//   - If not skip_review: set status to for_review, then start review automatically
+func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*CompleteTaskOutput, error) {
 	// Get the task
 	task, err := uc.tasks.Get(in.TaskID)
 	if err != nil {
@@ -99,14 +120,18 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 	if cfg != nil && cfg.Complete.Command != "" {
 		// Execute the complete command using CommandExecutor
 		cmd := domain.NewShellCommand(cfg.Complete.Command, worktreePath)
-		output, err := uc.executor.Execute(cmd)
-		if err != nil {
-			return nil, fmt.Errorf("[complete].command failed: %s: %w", string(output), err)
+		output, execErr := uc.executor.Execute(cmd)
+		if execErr != nil {
+			return nil, fmt.Errorf("[complete].command failed: %s: %w", string(output), execErr)
 		}
 	}
 
-	// Update status to for_review
-	task.Status = domain.StatusForReview
+	// Determine if we should skip review
+	// Priority: task.SkipReview > config.Tasks.SkipReview > false
+	skipReview := task.SkipReview
+	if !skipReview && cfg != nil {
+		skipReview = cfg.Tasks.SkipReview
+	}
 
 	// Add comment if provided
 	if in.Comment != "" {
@@ -114,20 +139,82 @@ func (uc *CompleteTask) Execute(_ context.Context, in CompleteTaskInput) (*Compl
 			Text: in.Comment,
 			Time: uc.clock.Now(),
 		}
-		if err := uc.tasks.AddComment(task.ID, comment); err != nil {
-			return nil, fmt.Errorf("add comment: %w", err)
+		if commentErr := uc.tasks.AddComment(task.ID, comment); commentErr != nil {
+			return nil, fmt.Errorf("add comment: %w", commentErr)
 		}
 	}
 
-	// Save task
-	if err := uc.tasks.Save(task); err != nil {
-		return nil, fmt.Errorf("save task: %w", err)
+	if skipReview {
+		// Skip review: go directly to reviewed status
+		task.Status = domain.StatusReviewed
+
+		// Save task
+		if saveErr := uc.tasks.Save(task); saveErr != nil {
+			return nil, fmt.Errorf("save task: %w", saveErr)
+		}
+
+		// Log task completion
+		if uc.logger != nil {
+			uc.logger.Info(task.ID, "task", "completed (status: reviewed, skip_review: true)")
+		}
+
+		return &CompleteTaskOutput{
+			Task:          task,
+			ReviewStarted: false,
+		}, nil
 	}
 
-	// Log task completion
+	// Not skipping review: transition to for_review first, then start review
+	task.Status = domain.StatusForReview
+
+	// Save task with for_review status
+	if saveErr := uc.tasks.Save(task); saveErr != nil {
+		return nil, fmt.Errorf("save task: %w", saveErr)
+	}
+
+	// Start review automatically using ReviewTask
+	reviewUC := NewReviewTask(
+		uc.tasks,
+		uc.sessions,
+		uc.worktrees,
+		uc.config,
+		uc.executor,
+		uc.clock,
+		uc.logger,
+		uc.crewDir,
+		uc.repoRoot,
+		uc.stdout,
+		uc.stderr,
+	)
+
+	reviewOut, reviewErr := reviewUC.Execute(ctx, ReviewTaskInput{
+		TaskID: task.ID,
+		Wait:   false, // Background execution
+	})
+	if reviewErr != nil {
+		// Review failed to start, but completion was successful
+		// Log the error but don't fail the completion
+		if uc.logger != nil {
+			uc.logger.Info(task.ID, "task", fmt.Sprintf("completed (status: for_review), review start failed: %v", reviewErr))
+		}
+
+		// Re-fetch task to get latest state (ReviewTask may have modified it)
+		task, _ = uc.tasks.Get(in.TaskID)
+
+		return &CompleteTaskOutput{
+			Task:          task,
+			ReviewStarted: false,
+		}, nil
+	}
+
+	// Log task completion with review started
 	if uc.logger != nil {
-		uc.logger.Info(task.ID, "task", "completed (status: for_review)")
+		uc.logger.Info(task.ID, "task", fmt.Sprintf("completed and review started (session: %s)", reviewOut.SessionName))
 	}
 
-	return &CompleteTaskOutput{Task: task}, nil
+	return &CompleteTaskOutput{
+		Task:          reviewOut.Task,
+		ReviewStarted: true,
+		ReviewSession: reviewOut.SessionName,
+	}, nil
 }

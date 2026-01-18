@@ -15,6 +15,7 @@ type EditTaskInput struct {
 	Title        *string         // New title (nil = no change)
 	Description  *string         // New description (nil = no change)
 	Status       *domain.Status  // New status (nil = no change)
+	SkipReview   *bool           // New skip_review setting (nil = no change)
 	EditorText   string          // Markdown text from editor (only used when EditorEdit is true)
 	Labels       []string        // Labels to set (replaces all existing labels, nil = no change)
 	AddLabels    []string        // Labels to add
@@ -50,7 +51,7 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	}
 
 	// Validate that at least one field is being updated
-	if in.Title == nil && in.Description == nil && in.Status == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
+	if in.Title == nil && in.Description == nil && in.Status == nil && in.SkipReview == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
@@ -108,6 +109,11 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 			// Manual status change via edit bypasses transition rules
 			task.Status = *in.Status
 		}
+	}
+
+	// Handle skip_review
+	if in.SkipReview != nil {
+		task.SkipReview = *in.SkipReview
 	}
 
 	// Handle labels

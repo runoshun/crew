@@ -24,6 +24,7 @@ func newNewCommand(c *app.Container) *cobra.Command {
 		Labels      []string
 		ParentID    int
 		Issue       int
+		SkipReview  bool
 	}
 
 	cmd := &cobra.Command{
@@ -53,7 +54,10 @@ Examples:
 - Step 1
 - Step 2
 EOF
-)"`,
+)"
+
+  # Create a task that skips review on completion
+  crew new --title "Quick fix" --skip-review`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Build input
 			// BaseBranch: if --base is provided, use it; otherwise empty (let UseCase decide)
@@ -63,6 +67,7 @@ EOF
 				Issue:       opts.Issue,
 				Labels:      opts.Labels,
 				BaseBranch:  opts.Base,
+				SkipReview:  opts.SkipReview,
 			}
 
 			// Set parent ID if specified
@@ -92,6 +97,7 @@ EOF
 	cmd.Flags().IntVar(&opts.Issue, "issue", 0, "Linked GitHub issue number")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Labels (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Base, "base", "", "Base branch for worktree (default: current branch)")
+	cmd.Flags().BoolVar(&opts.SkipReview, "skip-review", false, "Skip review on task completion (go directly to reviewed)")
 
 	return cmd
 }
@@ -499,6 +505,8 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		AddLabels    []string
 		RemoveLabels []string
 		IfStatus     []string
+		SkipReview   bool
+		NoSkipReview bool
 	}
 
 	cmd := &cobra.Command{
@@ -544,7 +552,13 @@ Examples:
   crew edit 1 --rm-label old-label
 
   # Multiple changes at once
-  crew edit 1 --title "New title" --add-label feature --rm-label draft`,
+  crew edit 1 --title "New title" --add-label feature --rm-label draft
+
+  # Enable skip_review for a task
+  crew edit 1 --skip-review
+
+  # Disable skip_review for a task
+  crew edit 1 --no-skip-review`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -560,7 +574,9 @@ Examples:
 				cmd.Flags().Changed("labels") ||
 				len(opts.AddLabels) > 0 ||
 				len(opts.RemoveLabels) > 0 ||
-				len(opts.IfStatus) > 0
+				len(opts.IfStatus) > 0 ||
+				cmd.Flags().Changed("skip-review") ||
+				cmd.Flags().Changed("no-skip-review")
 
 			if !hasFlags {
 				// Editor mode: open task in editor
@@ -599,6 +615,14 @@ Examples:
 				}
 				input.IfStatus = statuses
 			}
+			if cmd.Flags().Changed("skip-review") {
+				v := true
+				input.SkipReview = &v
+			}
+			if cmd.Flags().Changed("no-skip-review") {
+				v := false
+				input.SkipReview = &v
+			}
 
 			// Execute use case
 			uc := c.EditTaskUseCase()
@@ -620,6 +644,9 @@ Examples:
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")
 	cmd.Flags().StringArrayVar(&opts.RemoveLabels, "rm-label", nil, "Labels to remove (can specify multiple)")
+	cmd.Flags().BoolVar(&opts.SkipReview, "skip-review", false, "Enable skip_review for this task (skip review on completion)")
+	cmd.Flags().BoolVar(&opts.NoSkipReview, "no-skip-review", false, "Disable skip_review for this task (require review on completion)")
+	cmd.MarkFlagsMutuallyExclusive("skip-review", "no-skip-review")
 
 	return cmd
 }
