@@ -91,16 +91,16 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("d", "delete"),
 		),
 		Edit: key.NewBinding(
-			key.WithKeys("e"),
-			key.WithHelp("e", "edit task"),
+			key.WithKeys("E"),
+			key.WithHelp("E", "edit task"),
 		),
 		EditComment: key.NewBinding(
-			key.WithKeys("E"),
-			key.WithHelp("E", "edit comment"),
+			key.WithKeys("l"),
+			key.WithHelp("l", "edit comment"),
 		),
 		EditStatus: key.NewBinding(
-			key.WithKeys("="),
-			key.WithHelp("=", "change status"),
+			key.WithKeys("e"),
+			key.WithHelp("e", "change status"),
 		),
 		Merge: key.NewBinding(
 			key.WithKeys("m"),
