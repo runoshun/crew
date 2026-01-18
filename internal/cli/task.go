@@ -658,12 +658,11 @@ Examples:
 
 			// Execute use case
 			uc := c.EditTaskUseCase()
-			out, err := uc.Execute(cmd.Context(), input)
+			_, err = uc.Execute(cmd.Context(), input)
 			if err != nil {
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated task #%d: %s\n", out.Task.ID, out.Task.Title)
 			return nil
 		},
 	}
@@ -742,12 +741,11 @@ func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error 
 	}
 
 	uc := c.EditTaskUseCase()
-	out, err := uc.Execute(cmd.Context(), input)
+	_, err = uc.Execute(cmd.Context(), input)
 	if err != nil {
 		return err
 	}
 
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated task #%d: %s\n", out.Task.ID, out.Task.Title)
 	return nil
 }
 
@@ -843,7 +841,6 @@ Examples:
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Deleted task #%d\n", taskID)
 			return nil
 		},
 	}
@@ -900,10 +897,8 @@ Examples:
 					return err
 				}
 
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated comment %d of task #%d\n", opts.Edit, taskID)
 				return nil
 			}
-
 			// Execute add comment use case
 			uc := c.AddCommentUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.AddCommentInput{
@@ -967,18 +962,16 @@ Examples:
 
 			// Execute use case
 			uc := c.CloseTaskUseCase()
-			out, err := uc.Execute(cmd.Context(), usecase.CloseTaskInput{
+			_, err = uc.Execute(cmd.Context(), usecase.CloseTaskInput{
 				TaskID: taskID,
 			})
 			if err != nil {
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Closed task #%d: %s\n", out.Task.ID, out.Task.Title)
 			return nil
 		},
 	}
-
 	return cmd
 }
 

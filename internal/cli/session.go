@@ -508,14 +508,13 @@ Examples:
 
 			// Execute use case
 			uc := c.StopTaskUseCase()
-			out, err := uc.Execute(cmd.Context(), usecase.StopTaskInput{
+			_, err = uc.Execute(cmd.Context(), usecase.StopTaskInput{
 				TaskID: taskID,
 			})
 			if err != nil {
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Stopped task #%d: %s\n", out.Task.ID, out.Task.Title)
 			return nil
 		},
 	}
@@ -667,7 +666,7 @@ Examples:
 
 			// Execute use case
 			uc := c.MergeTaskUseCase()
-			out, err := uc.Execute(cmd.Context(), usecase.MergeTaskInput{
+			_, err = uc.Execute(cmd.Context(), usecase.MergeTaskInput{
 				TaskID:     taskID,
 				BaseBranch: opts.base,
 			})
@@ -675,7 +674,6 @@ Examples:
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Merged task #%d: %s\n", out.Task.ID, out.Task.Title)
 			return nil
 		},
 	}

@@ -338,11 +338,10 @@ func TestIntegration_Edit(t *testing.T) {
 	crewMust(t, dir, "new", "--title", "Original title")
 
 	// Edit title
-	out := crewMust(t, dir, "edit", "1", "--title", "Updated title")
-	assert.Contains(t, out, "Updated task #1")
+	crewMust(t, dir, "edit", "1", "--title", "Updated title")
 
 	// Verify change
-	out = crewMust(t, dir, "show", "1")
+	out := crewMust(t, dir, "show", "1")
 	assert.Contains(t, out, "Updated title")
 	assert.NotContains(t, out, "Original title")
 }
@@ -373,8 +372,7 @@ func TestIntegration_Rm(t *testing.T) {
 	crewMust(t, dir, "new", "--title", "To delete")
 
 	// Delete
-	out := crewMust(t, dir, "rm", "1")
-	assert.Contains(t, out, "Deleted task #1")
+	crewMust(t, dir, "rm", "1")
 
 	// Verify deleted
 	_, err := crew(t, dir, "show", "1")

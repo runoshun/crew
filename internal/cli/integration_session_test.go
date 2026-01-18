@@ -25,11 +25,10 @@ func TestIntegration_Close(t *testing.T) {
 	crewMust(t, dir, "new", "--title", "Task to close")
 
 	// Close the task
-	out := crewMust(t, dir, "close", "1")
-	assert.Contains(t, out, "Closed task #1")
+	crewMust(t, dir, "close", "1")
 
 	// Verify task is closed
-	out = crewMust(t, dir, "show", "1")
+	out := crewMust(t, dir, "show", "1")
 	assert.Contains(t, out, "Status: closed")
 }
 

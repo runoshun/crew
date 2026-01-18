@@ -30,7 +30,6 @@ func newPushCmd(c *app.Container) *cobra.Command {
 				return fmt.Errorf("push failed: %w", err)
 			}
 
-			fmt.Println("Tasks pushed to remote")
 			return nil
 		},
 	}
@@ -51,11 +50,6 @@ func newFetchCmd(c *app.Container) *cobra.Command {
 				return fmt.Errorf("fetch failed: %w", err)
 			}
 
-			if namespace == "" {
-				fmt.Println("Tasks fetched from remote")
-			} else {
-				fmt.Printf("Tasks fetched from remote (namespace: %s)\n", namespace)
-			}
 			return nil
 		},
 	}
