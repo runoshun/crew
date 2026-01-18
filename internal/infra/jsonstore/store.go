@@ -169,6 +169,16 @@ func (s *Store) UpdateComment(taskID, index int, comment domain.Comment) error {
 	})
 }
 
+// SaveTaskWithComments atomically saves a task and its comments.
+func (s *Store) SaveTaskWithComments(task *domain.Task, comments []domain.Comment) error {
+	return s.withLockWrite(func(data *storeData) error {
+		key := strconv.Itoa(task.ID)
+		data.Tasks[key] = task
+		data.Comments[key] = comments
+		return nil
+	})
+}
+
 // IsInitialized checks if the store file exists.
 func (s *Store) IsInitialized() bool {
 	_, err := os.Stat(s.path)

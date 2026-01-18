@@ -168,13 +168,11 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 			len(originalComments), len(content.Comments))
 	}
 
-	// Validate all comment indices are unique and form a complete sequence 0..N-1
-	type commentUpdate struct {
-		comment domain.Comment
-		index   int
-	}
-	var commentUpdates []commentUpdate
+	// Prepare updated comments list (copy of original, with edits applied)
+	updatedComments := make([]domain.Comment, len(originalComments))
+	copy(updatedComments, originalComments)
 
+	// Validate all comment indices are unique and form a complete sequence 0..N-1
 	if len(originalComments) > 0 {
 		// Track which indices are present
 		seenIndices := make(map[int]bool, len(content.Comments))
@@ -191,17 +189,12 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 			}
 			seenIndices[parsed.Index] = true
 
-			// Only prepare update if text changed
+			// Apply text update (preserve original author and time)
 			original := originalComments[parsed.Index]
-			if original.Text != parsed.Text {
-				commentUpdates = append(commentUpdates, commentUpdate{
-					index: parsed.Index,
-					comment: domain.Comment{
-						Text:   parsed.Text,
-						Time:   original.Time,
-						Author: original.Author,
-					},
-				})
+			updatedComments[parsed.Index] = domain.Comment{
+				Text:   parsed.Text,
+				Time:   original.Time,
+				Author: original.Author,
 			}
 		}
 
@@ -213,15 +206,6 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		}
 	}
 
-	// All validation passed - now apply changes
-	// Apply comment updates FIRST to minimize partial save risk
-	// (if UpdateComment fails, task is not saved yet)
-	for _, update := range commentUpdates {
-		if err := uc.tasks.UpdateComment(in.TaskID, update.index, update.comment); err != nil {
-			return nil, fmt.Errorf("update comment %d: %w", update.index, err)
-		}
-	}
-
 	// Update task fields
 	task.Title = content.Title
 	task.Description = content.Description
@@ -229,9 +213,9 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		task.Labels = content.Labels
 	}
 
-	// Save updated task (after comments are successfully updated)
-	if err := uc.tasks.Save(task); err != nil {
-		return nil, fmt.Errorf("save task: %w", err)
+	// Atomically save task and comments together
+	if err := uc.tasks.SaveTaskWithComments(task, updatedComments); err != nil {
+		return nil, fmt.Errorf("save task with comments: %w", err)
 	}
 
 	return &EditTaskOutput{Task: task}, nil

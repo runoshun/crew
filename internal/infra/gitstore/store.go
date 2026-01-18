@@ -364,6 +364,48 @@ func (s *Store) UpdateComment(taskID, index int, comment domain.Comment) error {
 	return nil
 }
 
+// SaveTaskWithComments atomically saves a task and its comments.
+func (s *Store) SaveTaskWithComments(task *domain.Task, comments []domain.Comment) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Serialize and save task
+	taskData, err := yaml.Marshal(task)
+	if err != nil {
+		return fmt.Errorf("marshal task: %w", err)
+	}
+
+	taskHash, err := s.writeBlob(taskData)
+	if err != nil {
+		return fmt.Errorf("write task blob: %w", err)
+	}
+
+	// Serialize and save comments
+	commentsDataObj := commentsData{Comments: comments}
+	commentsYaml, err := yaml.Marshal(&commentsDataObj)
+	if err != nil {
+		return fmt.Errorf("marshal comments: %w", err)
+	}
+
+	commentsHash, err := s.writeBlob(commentsYaml)
+	if err != nil {
+		return fmt.Errorf("write comments blob: %w", err)
+	}
+
+	// Update both refs together (within the same lock)
+	taskRef := plumbing.NewHashReference(s.taskRef(task.ID), taskHash)
+	if err := s.repo.Storer.SetReference(taskRef); err != nil {
+		return fmt.Errorf("set task ref: %w", err)
+	}
+
+	commentsRef := plumbing.NewHashReference(s.commentsRef(task.ID), commentsHash)
+	if err := s.repo.Storer.SetReference(commentsRef); err != nil {
+		return fmt.Errorf("set comments ref: %w", err)
+	}
+
+	return nil
+}
+
 // getCommentsLocked loads comments without locking (caller must hold lock).
 func (s *Store) getCommentsLocked(taskID int) ([]domain.Comment, error) {
 	ref, err := s.repo.Reference(s.commentsRef(taskID), true)
