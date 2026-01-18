@@ -14,12 +14,12 @@ import (
 // newManagerCommand creates the manager command for launching a manager agent.
 func newManagerCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		model string
-		agent string
+		model  string
+		prompt string
 	}
 
 	cmd := &cobra.Command{
-		Use:   "manager [prompt]",
+		Use:   "manager [name]",
 		Short: "Launch a manager agent",
 		Long: `Launch a manager agent for task orchestration.
 
@@ -29,33 +29,36 @@ but delegate actual code implementation to worker agents.
 The manager agent is launched in the current directory (not a worktree)
 and has access to all crew commands for task management.
 
-If no agent is specified, the default manager is used.
+If no name is specified, the default manager is used.
 
 Examples:
   # Launch the default manager
   crew manager
 
-  # Launch with an additional prompt
-  crew manager "Review task 215"
+  # Launch a specific manager
+  crew manager my-manager
 
-  # Launch a specific manager agent
-  crew manager --agent my-manager
+  # Launch with an additional prompt
+  crew manager --prompt "Review task 215"
+
+  # Launch a specific manager with additional prompt
+  crew manager my-manager --prompt "Review task 215"
 
   # Launch with a specific model
   crew manager --model opus`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			additionalPrompt := ""
+			managerName := ""
 			if len(args) > 0 {
-				additionalPrompt = args[0]
+				managerName = args[0]
 			}
 
 			// Execute use case
 			uc := c.StartManagerUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.StartManagerInput{
-				Name:             opts.agent,
+				Name:             managerName,
 				Model:            opts.model,
-				AdditionalPrompt: additionalPrompt,
+				AdditionalPrompt: opts.prompt,
 			})
 			if err != nil {
 				return err
@@ -68,7 +71,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides manager default)")
-	cmd.Flags().StringVarP(&opts.agent, "agent", "a", "", "Manager agent to use (defaults to configured default)")
+	cmd.Flags().StringVarP(&opts.prompt, "prompt", "p", "", "Additional prompt to pass to the manager")
 
 	return cmd
 }
