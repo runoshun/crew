@@ -4,9 +4,9 @@ Trigger: Say **"auto mode"** to activate this workflow for managing multiple in-
 
 ## Purpose
 
-Advance all in-progress tasks automatically with minimal human intervention. Continue looping until each task reaches one of these states:
-- ✅ **LGTM** - Reviewer approval complete (task is `reviewed` with LGTM comment)
-- ⚠️ **Problematic** - Task flagged for issues (manager decision to stop and report to user)
+Advance all in-progress tasks automatically with minimal human intervention. Continue looping until:
+- All tasks reach ✅ **LGTM** status, OR
+- ⚠️ An undecidable problem occurs (stop and report to user)
 
 ## Important: No Interaction During Auto Mode
 
@@ -15,103 +15,156 @@ Advance all in-progress tasks automatically with minimal human intervention. Con
   - When to run `crew review <id>`
   - When to execute `crew comment -R`
   - Whether to approve `needs_input` requests
-- **Exception**: Only in final summary, list items that cannot be decided (do NOT ask mid-session)
+- **Exception**: Only stop and report when encountering undecidable situations
 
 ## Target Statuses
 
 - **In scope**: `in_progress`, `needs_input`, `for_review`, `reviewing`, `reviewed`
 - **Out of scope**: `todo` (requires explicit start instruction)
 
-## Review Result Handling
+---
 
-- ✅ **LGTM only** = task complete (marks endpoint)
-- ⚠️ **Minor issues** = NOT LGTM (continue work loop)
-- ❌ **Needs changes** = NOT LGTM (continue work loop)
-
-## Auto Mode Loop Specification (Priority Order)
-
-1. **`crew list`** - Enumerate in-scope tasks
-2. **`for_review` status**:
-   - Execute `crew review <id>`
-   - When status becomes `reviewed`, check reviewer comment
-   - ✅ If LGTM: Mark task as complete, move to next
-   - ⚠️/❌ If issues: Send `crew comment <id> -R "..."` **without asking** (notify worker, reset to `in_progress`)
-3. **`reviewed` status**:
-   - Check reviewer comment with `crew show <id>`
-   - Same handling as above
-   - Note: `reviewed` state cannot be completed with `crew complete` (no merge in auto mode)
-4. **`needs_input` status**:
-   - Check requirement with `crew peek <id>`
-   - Manager autonomously approves safe requests
-   - Flag problematic ones (destructive, security, host impact, out-of-scope, etc.)
-   - Continue other tasks first, report problems in final summary
-5. **`reviewing` status**:
-   - Wait (other tasks have priority)
-6. **`in_progress` status**:
-   - Wait, but use `crew peek <id>` to detect stalls/errors
-7. **Loop exit**: All in-scope tasks reach ✅ LGTM or ⚠️ problematic state
-
-## Safety Guidelines
-
-**Approve** (examples):
-- Worktree read/build/test/format: `mise run ci`, `go test`, `git diff`, `git status`
-- Branch operations within task scope
-
-**Deny** (examples):
-- Host system impact: persistent changes, permissions, service control
-- Out-of-scope worktree operations
-- Out-of-task file changes (e.g., doc-fix task modifying test files)
-- Destructive: broad `rm`, `git reset --hard` without justification, force push
-- Security risk: credential handling, etc.
-
-## Comment Template for Addressing Issues
-
-When reviewer finds ⚠️/❌ issues:
+## 1. Initialization
 
 ```bash
-crew comment <id> -R "$(cat <<'MSG'
-Please address the reviewer's feedback (see task comments, author=reviewer).
-
-Priority issues:
-1) [Brief description]
-2) [Brief description]
-3) [Brief description]
-
-After fixing, set status to for_review for re-review.
-MSG
-)"
+crew list --status in_progress,needs_input,for_review,reviewing,reviewed
 ```
 
-**Best practices**:
-- Reference instead of transcribing full findings
-- Highlight top 3 priorities
-- Keep concise and actionable
-- Avoid duplicating reviewer comments
+If no tasks in scope, exit with message: "No target tasks found."
 
-## Example Workflow
+---
+
+## 2. Main Loop
+
+**Re-fetch status with `crew list` at the start of each iteration.**
+
+### Priority Order
+
+| Priority | Status | Action |
+|----------|--------|--------|
+| 1 | `for_review` | Start review |
+| 2 | `reviewed` | Process review result |
+| 3 | `needs_input` | Evaluate input request |
+| 4 | `reviewing` | Skip (wait) |
+| 5 | `in_progress` | Check progress only |
+
+---
+
+## 3. Status Handlers
+
+### 3.1 `for_review`
 
 ```bash
-# Start auto mode (monitor multiple tasks)
-crew list  # See in_progress and for_review tasks
+crew review <id>
+```
 
-# Task #100 is for_review
-crew review 100
-# After review: found issues
-crew comment 100 -R "..."  # Send feedback, reset to in_progress
+Status changes to `reviewing` → then `reviewed` when complete → handled in next loop by 3.2.
 
-# Task #101 is for_review
-crew review 101
-# After review: LGTM
-# ✅ Task #101 complete
+---
 
-# Task #100 now in_progress (was notified of feedback)
-# (Continue monitoring until it returns to for_review)
-crew poll 100 --expect for_review  # Wait for next review submission
+### 3.2 `reviewed`
 
-# Task #102 is needs_input (asking for permission)
-crew peek 102  # Check what permission is needed
-# If safe: approve with crew comment -R "..."
-# If risky: flag for manual decision in summary
+```bash
+crew show <id> --last-review
+```
 
-# Loop continues until all tasks are ✅ LGTM or ⚠️ flagged
+**Evaluation:** Manager reads the review content and judges whether it's LGTM with no issues.
+
+**If LGTM:**
+- Add to completion list (exclude from loop)
+
+**If issues found:**
+```bash
+crew comment <id> -R "Please check the review comments and address them."
+```
+
+---
+
+### 3.3 `needs_input`
+
+```bash
+crew peek <id> -n 50
+```
+
+**Evaluation criteria:**
+
+| Approve (auto-continue) | Deny (flag as problem) |
+|-------------------------|------------------------|
+| Worktree read/build/test | Persistent host system changes |
+| `mise run ci`, `go test`, `git diff`, `git status` | Out-of-scope worktree operations |
+| Branch operations within task scope | Out-of-task file changes |
+| | Destructive ops (`rm -rf`, `git reset --hard`, force push) |
+| | Security risks (credentials, etc.) |
+
+**If approved:**
+```bash
+crew send <id> "y"
+crew send <id> Enter
+```
+
+**If undecidable:**
+- Add to problem list and exit loop
+- Delegate decision to user
+
+---
+
+### 3.4 `reviewing`
+
+- No action (prioritize other tasks)
+- Add to warning list if exceeds 10 minutes
+
+---
+
+### 3.5 `in_progress`
+
+```bash
+crew peek <id> -n 30
+```
+
+**Stall detection:**
+- Same output 3 times in a row → add to warning list
+- Error message detected → add to problem list
+
+---
+
+## 4. Wait Handling
+
+When all tasks are only `in_progress` or `reviewing`:
+
+```bash
+sleep 60
+crew list --status in_progress,needs_input,for_review,reviewing,reviewed
+```
+
+Return to loop start.
+
+---
+
+## 5. Loop Exit Conditions
+
+Exit when any of the following:
+- All target tasks reach ✅ LGTM
+- ⚠️ Undecidable problem occurs
+- Fatal error occurs
+
+---
+
+## 6. Final Report
+
+```
+## Auto Mode Complete
+
+### ✅ LGTM (Ready to merge)
+- #101: feat: add login button
+- #103: fix: validation error
+
+### ⚠️ Needs Attention
+- #102: needs_input with undecidable request → manual review required
+
+### 📊 Statistics
+- Duration: 15 min
+- Reviews executed: 4
+- Feedback sent: 2
+
+Merge? (y: all / specify IDs / n: skip)
 ```
