@@ -886,7 +886,7 @@ func (c *editorExecCmd) SetStderr(w io.Writer) { c.stderr = w }
 // After the editor closes, the task is updated with the edited content.
 func (m *Model) editTaskInEditor(taskID int) tea.Cmd {
 	return func() tea.Msg {
-		// Get current task
+		// Get current task with comments
 		showUC := m.container.ShowTaskUseCase()
 		showOut, err := showUC.Execute(context.Background(), usecase.ShowTaskInput{
 			TaskID: taskID,
@@ -904,8 +904,8 @@ func (m *Model) editTaskInEditor(taskID int) tea.Cmd {
 		}
 		tmpPath := tmpFile.Name()
 
-		// Write task as markdown
-		markdown := task.ToMarkdown()
+		// Write task as markdown with comments
+		markdown := task.ToMarkdownWithComments(showOut.Comments)
 		if _, writeErr := tmpFile.WriteString(markdown); writeErr != nil {
 			_ = tmpFile.Close()
 			_ = os.Remove(tmpPath)
@@ -929,59 +929,6 @@ type execEditTaskMsg struct {
 	tmpPath string
 	origMD  string
 	taskID  int
-}
-
-// editLatestComment returns a tea.Cmd that opens the latest comment in an editor.
-func (m *Model) editLatestComment(taskID int) tea.Cmd {
-	return func() tea.Msg {
-		// Load comments for the task
-		comments, err := m.container.Tasks.GetComments(taskID)
-		if err != nil {
-			return MsgError{Err: err}
-		}
-
-		if len(comments) == 0 {
-			return MsgError{Err: fmt.Errorf("no comments to edit")}
-		}
-
-		// Get the latest comment
-		latestIdx := len(comments) - 1
-		latestComment := comments[latestIdx]
-
-		// Create temporary file with comment content
-		tmpFile, err := os.CreateTemp("", fmt.Sprintf("crew-comment-%d-%d-*.md", taskID, latestIdx))
-		if err != nil {
-			return MsgError{Err: fmt.Errorf("failed to create temp file: %w", err)}
-		}
-		tmpPath := tmpFile.Name()
-
-		// Write comment text
-		commentText := latestComment.Text
-		if _, writeErr := tmpFile.WriteString(commentText); writeErr != nil {
-			_ = tmpFile.Close()
-			_ = os.Remove(tmpPath)
-			return MsgError{Err: fmt.Errorf("failed to write temp file: %w", writeErr)}
-		}
-		if closeErr := tmpFile.Close(); closeErr != nil {
-			_ = os.Remove(tmpPath)
-			return MsgError{Err: fmt.Errorf("failed to close temp file: %w", closeErr)}
-		}
-
-		return execEditCommentMsg{
-			taskID:     taskID,
-			tmpPath:    tmpPath,
-			commentIdx: latestIdx,
-			origMD:     commentText,
-		}
-	}
-}
-
-// execEditCommentMsg triggers editor execution for comment editing.
-type execEditCommentMsg struct {
-	tmpPath    string
-	origMD     string
-	taskID     int
-	commentIdx int
 }
 
 // loadReviewResult loads the latest reviewer comment for display in ModeReviewResult.

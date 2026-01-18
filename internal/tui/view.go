@@ -537,6 +537,7 @@ func (m *Model) viewHelp() string {
 				{"R", "Review"},
 				{"n", "New Task"},
 				{"e", "Change Status"},
+				{"E", "Edit Task"},
 				{"d", "Delete"},
 				{"c", "Close"},
 			},
