@@ -2,6 +2,7 @@ package domain
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -321,6 +322,441 @@ func TestTask_RoundTrip(t *testing.T) {
 			assert.Equal(t, tt.original.Title, parsed.Title)
 			assert.Equal(t, tt.original.Description, parsed.Description)
 			assert.Equal(t, tt.original.Labels, parsed.Labels)
+		})
+	}
+}
+
+func TestTask_ToMarkdownWithComments(t *testing.T) {
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	later := now.Add(time.Hour)
+
+	tests := []struct {
+		name     string
+		task     *Task
+		comments []Comment
+		want     string
+	}{
+		{
+			name: "no comments",
+			task: &Task{
+				Title:       "Test Task",
+				Description: "Description",
+			},
+			comments: nil,
+			want:     "---\ntitle: Test Task\nlabels:\n---\n\nDescription",
+		},
+		{
+			name: "single comment",
+			task: &Task{
+				Title:       "Test Task",
+				Description: "Description",
+			},
+			comments: []Comment{
+				{Text: "First comment", Author: "worker", Time: now},
+			},
+			want: "---\ntitle: Test Task\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment",
+		},
+		{
+			name: "multiple comments",
+			task: &Task{
+				Title:       "Test Task",
+				Description: "Description",
+				Labels:      []string{"bug"},
+			},
+			comments: []Comment{
+				{Text: "First comment", Author: "worker", Time: now},
+				{Text: "Second comment", Author: "manager", Time: later},
+			},
+			want: "---\ntitle: Test Task\nlabels: bug\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment\n\n---\n# Comment: 1\n# Author: manager\n# Time: 2026-01-18T11:00:00Z\n\nSecond comment",
+		},
+		{
+			name: "comment with empty author",
+			task: &Task{
+				Title:       "Test Task",
+				Description: "Description",
+			},
+			comments: []Comment{
+				{Text: "Comment without author", Author: "", Time: now},
+			},
+			want: "---\ntitle: Test Task\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: \n# Time: 2026-01-18T10:00:00Z\n\nComment without author",
+		},
+		{
+			name: "multiline comment",
+			task: &Task{
+				Title:       "Test Task",
+				Description: "Description",
+			},
+			comments: []Comment{
+				{Text: "Line 1\nLine 2\nLine 3", Author: "worker", Time: now},
+			},
+			want: "---\ntitle: Test Task\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nLine 1\nLine 2\nLine 3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.task.ToMarkdownWithComments(tt.comments)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestParseEditorContent(t *testing.T) {
+	tests := []struct {
+		name          string
+		content       string
+		wantTitle     string
+		wantDesc      string
+		wantLabels    []string
+		wantLabelsNil bool
+		wantComments  []ParsedComment
+		wantErr       bool
+		errContains   string
+	}{
+		{
+			name: "task only (no comments)",
+			content: `---
+title: Test Task
+labels: bug
+---
+
+Description text`,
+			wantTitle:    "Test Task",
+			wantDesc:     "Description text",
+			wantLabels:   []string{"bug"},
+			wantComments: nil,
+		},
+		{
+			name: "task with single comment",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+First comment`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+			wantComments: []ParsedComment{
+				{Index: 0, Text: "First comment"},
+			},
+		},
+		{
+			name: "task with multiple comments",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+First comment
+
+---
+# Comment: 1
+# Author: manager
+# Time: 2026-01-18T11:00:00Z
+
+Second comment`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+			wantComments: []ParsedComment{
+				{Index: 0, Text: "First comment"},
+				{Index: 1, Text: "Second comment"},
+			},
+		},
+		{
+			name: "multiline comment text",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+Line 1
+Line 2
+Line 3`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+			wantComments: []ParsedComment{
+				{Index: 0, Text: "Line 1\nLine 2\nLine 3"},
+			},
+		},
+		{
+			name: "empty description with comments",
+			content: `---
+title: Test Task
+labels:
+---
+
+
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+Comment text`,
+			wantTitle: "Test Task",
+			wantDesc:  "",
+			wantComments: []ParsedComment{
+				{Index: 0, Text: "Comment text"},
+			},
+		},
+		{
+			name: "comment with empty author",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author:
+# Time: 2026-01-18T10:00:00Z
+
+Comment text`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+			wantComments: []ParsedComment{
+				{Index: 0, Text: "Comment text"},
+			},
+		},
+		{
+			name: "invalid comment meta - missing index",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment:
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+Comment text`,
+			wantErr:     true,
+			errContains: "invalid comment metadata",
+		},
+		{
+			name: "invalid comment meta - bad index",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: abc
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+Comment text`,
+			wantErr:     true,
+			errContains: "invalid comment metadata",
+		},
+		{
+			name: "empty comment text",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+`,
+			wantErr:     true,
+			errContains: "comment text cannot be empty",
+		},
+		{
+			name: "whitespace only comment text",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+   `,
+			wantErr:     true,
+			errContains: "comment text cannot be empty",
+		},
+		{
+			name: "invalid time format - not RFC3339",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026/01/18 10:00:00
+
+Comment text`,
+			wantErr:     true,
+			errContains: "invalid comment metadata",
+		},
+		{
+			name: "invalid time format - empty",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time:
+
+Comment text`,
+			wantErr:     true,
+			errContains: "invalid comment metadata",
+		},
+		{
+			name: "invalid time format - random string",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: not a valid time
+
+Comment text`,
+			wantErr:     true,
+			errContains: "invalid comment metadata",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseEditorContent(tt.content)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantTitle, got.Title)
+			assert.Equal(t, tt.wantDesc, got.Description)
+			if tt.wantLabelsNil {
+				assert.Nil(t, got.Labels)
+			} else if tt.wantLabels != nil {
+				assert.Equal(t, tt.wantLabels, got.Labels)
+			}
+			assert.Equal(t, tt.wantComments, got.Comments)
+		})
+	}
+}
+
+func TestRoundTripWithComments(t *testing.T) {
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	later := now.Add(time.Hour)
+
+	tests := []struct {
+		name     string
+		task     *Task
+		comments []Comment
+	}{
+		{
+			name: "task with single comment",
+			task: &Task{
+				Title:       "Round Trip Test",
+				Description: "Description",
+			},
+			comments: []Comment{
+				{Text: "First comment", Author: "worker", Time: now},
+			},
+		},
+		{
+			name: "task with multiple comments",
+			task: &Task{
+				Title:       "Multiple Comments",
+				Description: "Description",
+				Labels:      []string{"bug", "urgent"},
+			},
+			comments: []Comment{
+				{Text: "Comment 1", Author: "worker", Time: now},
+				{Text: "Comment 2", Author: "manager", Time: later},
+			},
+		},
+		{
+			name: "multiline description and comments",
+			task: &Task{
+				Title:       "Complex Content",
+				Description: "Line 1\nLine 2\nLine 3",
+			},
+			comments: []Comment{
+				{Text: "Multi\nLine\nComment", Author: "worker", Time: now},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Serialize
+			markdown := tt.task.ToMarkdownWithComments(tt.comments)
+
+			// Parse
+			content, err := ParseEditorContent(markdown)
+			require.NoError(t, err)
+
+			// Verify task fields
+			assert.Equal(t, tt.task.Title, content.Title)
+			assert.Equal(t, tt.task.Description, content.Description)
+			assert.Equal(t, tt.task.Labels, content.Labels)
+
+			// Verify comments
+			require.Len(t, content.Comments, len(tt.comments))
+			for i, expected := range tt.comments {
+				assert.Equal(t, i, content.Comments[i].Index)
+				assert.Equal(t, expected.Text, content.Comments[i].Text)
+			}
 		})
 	}
 }

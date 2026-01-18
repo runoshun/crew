@@ -626,7 +626,7 @@ Examples:
 
 // editTaskWithEditor opens the task in an editor for editing.
 func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error {
-	// Get current task
+	// Get current task with comments
 	showUC := c.ShowTaskUseCase()
 	showOut, err := showUC.Execute(cmd.Context(), usecase.ShowTaskInput{
 		TaskID: taskID,
@@ -645,8 +645,8 @@ func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error 
 	tmpPath := tmpFile.Name()
 	defer func() { _ = os.Remove(tmpPath) }()
 
-	// Write task as markdown
-	markdown := task.ToMarkdown()
+	// Write task as markdown with comments
+	markdown := task.ToMarkdownWithComments(showOut.Comments)
 	if _, writeErr := tmpFile.WriteString(markdown); writeErr != nil {
 		_ = tmpFile.Close()
 		return fmt.Errorf("failed to write temp file: %w", writeErr)

@@ -364,6 +364,62 @@ func (s *Store) UpdateComment(taskID, index int, comment domain.Comment) error {
 	return nil
 }
 
+// SaveTaskWithComments atomically saves a task and its comments.
+// If either update fails after the other succeeds, it rolls back to preserve consistency.
+func (s *Store) SaveTaskWithComments(task *domain.Task, comments []domain.Comment) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Get original task ref for rollback (may not exist for new tasks)
+	taskRefName := s.taskRef(task.ID)
+	commentsRefName := s.commentsRef(task.ID)
+
+	originalTaskRef, _ := s.repo.Reference(taskRefName, true)
+
+	// Serialize and write task blob
+	taskData, err := yaml.Marshal(task)
+	if err != nil {
+		return fmt.Errorf("marshal task: %w", err)
+	}
+
+	taskHash, err := s.writeBlob(taskData)
+	if err != nil {
+		return fmt.Errorf("write task blob: %w", err)
+	}
+
+	// Serialize and write comments blob
+	commentsDataObj := commentsData{Comments: comments}
+	commentsYaml, err := yaml.Marshal(&commentsDataObj)
+	if err != nil {
+		return fmt.Errorf("marshal comments: %w", err)
+	}
+
+	commentsHash, err := s.writeBlob(commentsYaml)
+	if err != nil {
+		return fmt.Errorf("write comments blob: %w", err)
+	}
+
+	// Update task ref
+	newTaskRef := plumbing.NewHashReference(taskRefName, taskHash)
+	if err := s.repo.Storer.SetReference(newTaskRef); err != nil {
+		return fmt.Errorf("set task ref: %w", err)
+	}
+
+	// Update comments ref - rollback task ref on failure
+	newCommentsRef := plumbing.NewHashReference(commentsRefName, commentsHash)
+	if err := s.repo.Storer.SetReference(newCommentsRef); err != nil {
+		// Rollback: restore original task ref
+		if originalTaskRef != nil {
+			_ = s.repo.Storer.SetReference(originalTaskRef)
+		} else {
+			_ = s.repo.Storer.RemoveReference(taskRefName)
+		}
+		return fmt.Errorf("set comments ref: %w", err)
+	}
+
+	return nil
+}
+
 // getCommentsLocked loads comments without locking (caller must hold lock).
 func (s *Store) getCommentsLocked(taskID int) ([]domain.Comment, error) {
 	ref, err := s.repo.Reference(s.commentsRef(taskID), true)

@@ -115,6 +115,16 @@ func (m *MockTaskRepository) UpdateComment(taskID, index int, comment domain.Com
 	return nil
 }
 
+// SaveTaskWithComments atomically saves a task and its comments.
+func (m *MockTaskRepository) SaveTaskWithComments(task *domain.Task, comments []domain.Comment) error {
+	if m.SaveErr != nil {
+		return m.SaveErr
+	}
+	m.Tasks[task.ID] = task
+	m.Comments[task.ID] = comments
+	return nil
+}
+
 // MockStoreInitializer is a test double for domain.StoreInitializer.
 type MockStoreInitializer struct {
 	Initialized bool
@@ -683,6 +693,9 @@ func (m *MockTaskRepository) ListNamespaces() ([]string, error) { return nil, ni
 func (m *MockTaskRepositoryWithAddCommentError) Push() error                       { return nil }
 func (m *MockTaskRepositoryWithAddCommentError) Fetch(_ string) error              { return nil }
 func (m *MockTaskRepositoryWithAddCommentError) ListNamespaces() ([]string, error) { return nil, nil }
+func (m *MockTaskRepositoryWithAddCommentError) SaveTaskWithComments(task *domain.Task, comments []domain.Comment) error {
+	return m.MockTaskRepository.SaveTaskWithComments(task, comments)
+}
 
 func (m *MockTaskRepositoryWithUpdateCommentError) SaveSnapshot(mainSHA string) error { return nil }
 func (m *MockTaskRepositoryWithUpdateCommentError) RestoreSnapshot(snapshotRef string) error {
@@ -697,6 +710,9 @@ func (m *MockTaskRepositoryWithUpdateCommentError) Push() error                 
 func (m *MockTaskRepositoryWithUpdateCommentError) Fetch(_ string) error               { return nil }
 func (m *MockTaskRepositoryWithUpdateCommentError) ListNamespaces() ([]string, error) {
 	return nil, nil
+}
+func (m *MockTaskRepositoryWithUpdateCommentError) SaveTaskWithComments(task *domain.Task, comments []domain.Comment) error {
+	return m.MockTaskRepository.SaveTaskWithComments(task, comments)
 }
 
 // MockLogger is a test double for domain.Logger.

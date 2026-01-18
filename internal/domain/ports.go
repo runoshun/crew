@@ -44,6 +44,10 @@ type TaskRepository interface {
 	// UpdateComment updates an existing comment of a task.
 	UpdateComment(taskID, index int, comment Comment) error
 
+	// SaveTaskWithComments atomically saves a task and its comments.
+	// This is used when both task and comments need to be updated together.
+	SaveTaskWithComments(task *Task, comments []Comment) error
+
 	// === Snapshot operations ===
 
 	// SaveSnapshot saves the current task state as a snapshot.
