@@ -66,6 +66,7 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 
 	// Get initial state for all tasks
 	previousStatuses := make(map[int]domain.Status)
+	var activeTaskIDs []int // Tasks that are not in terminal state
 	for _, taskID := range in.TaskIDs {
 		task, err := uc.tasks.Get(taskID)
 		if err != nil {
@@ -102,12 +103,17 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 			}
 		}
 
-		// Check if task is already in terminal state (immediate exit)
-		if uc.isTerminalStatus(task.Status) {
-			return &PollTaskOutput{}, nil
-		}
-
 		previousStatuses[taskID] = task.Status
+
+		// Track non-terminal tasks for monitoring
+		if !uc.isTerminalStatus(task.Status) {
+			activeTaskIDs = append(activeTaskIDs, taskID)
+		}
+	}
+
+	// If ALL tasks are already in terminal state, exit immediately
+	if len(activeTaskIDs) == 0 {
+		return &PollTaskOutput{}, nil
 	}
 
 	ticker := time.NewTicker(time.Duration(in.Interval) * time.Second)
@@ -133,8 +139,9 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 			// Timeout reached
 			return &PollTaskOutput{}, nil
 		case <-ticker.C:
-			// Poll all tasks
-			for _, taskID := range in.TaskIDs {
+			// Poll only active (non-terminal) tasks
+			var stillActiveTaskIDs []int
+			for _, taskID := range activeTaskIDs {
 				task, err := uc.tasks.Get(taskID)
 				if err != nil {
 					return nil, fmt.Errorf("get task %d: %w", taskID, err)
@@ -160,7 +167,18 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 					// Exit immediately after one change detection
 					return &PollTaskOutput{}, nil
 				}
+
+				// Keep tracking non-terminal tasks
+				if !uc.isTerminalStatus(task.Status) {
+					stillActiveTaskIDs = append(stillActiveTaskIDs, taskID)
+				}
 			}
+
+			// If all tasks have become terminal, exit
+			if len(stillActiveTaskIDs) == 0 {
+				return &PollTaskOutput{}, nil
+			}
+			activeTaskIDs = stillActiveTaskIDs
 		}
 	}
 }

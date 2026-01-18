@@ -737,25 +737,66 @@ func TestPollTask_Execute_MultipleTasks_MiddleChanges(t *testing.T) {
 	assert.Contains(t, executor.ExecutedCmd.Args[1], "2: todo -> for_review")
 }
 
-func TestPollTask_Execute_MultipleTasks_OneTerminal(t *testing.T) {
-	// Setup - one task already in terminal state
+func TestPollTask_Execute_MultipleTasks_OneTerminal_ContinuesMonitoring(t *testing.T) {
+	// Setup - one task already in terminal state, one active
 	repo := NewThreadSafeTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
-		Status: domain.StatusTodo,
+		Status: domain.StatusTodo, // Active task
 	}
 	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Task 2",
-		Status: domain.StatusClosed, // Already terminal
+		Status: domain.StatusClosed, // Already terminal - should be skipped
 	}
 
 	executor := testutil.NewMockCommandExecutor()
 	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
-	// Execute - should exit immediately because task 2 is terminal
+	// Change the active task status after short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		repo.UpdateStatus(1, domain.StatusInProgress)
+	}()
+
+	// Execute - should continue monitoring task 1 even though task 2 is terminal
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := uc.Execute(ctx, PollTaskInput{
+		TaskIDs:         []int{1, 2},
+		Interval:        1,
+		Timeout:         0,
+		CommandTemplate: `echo "{{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"`,
+	})
+
+	// Assert - should detect change on task 1
+	require.NoError(t, err)
+	assert.True(t, executor.ExecuteWithContextCalled)
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: todo -> in_progress")
+}
+
+func TestPollTask_Execute_MultipleTasks_AllTerminal(t *testing.T) {
+	// Setup - ALL tasks already in terminal state
+	repo := NewThreadSafeTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task 1",
+		Status: domain.StatusClosed, // Terminal
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Task 2",
+		Status: domain.StatusError, // Terminal
+	}
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Execute - should exit immediately because ALL tasks are terminal
 	ctx := context.Background()
 	start := time.Now()
 	_, err := uc.Execute(ctx, PollTaskInput{
@@ -768,6 +809,8 @@ func TestPollTask_Execute_MultipleTasks_OneTerminal(t *testing.T) {
 	require.NoError(t, err)
 	elapsed := time.Since(start)
 	assert.Less(t, elapsed, 100*time.Millisecond)
+	// No command should be executed since there's no status change
+	assert.False(t, executor.ExecuteWithContextCalled)
 }
 
 func TestPollTask_Execute_MultipleTasks_OneNotFound(t *testing.T) {
