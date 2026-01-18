@@ -270,7 +270,7 @@ func newCompleteCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "complete [id]",
 		Short: "Mark task as complete",
-		Long: `Mark a task as complete (in_progress/needs_input → for_review).
+		Long: `Mark a task as complete (in_progress/needs_input → reviewing).
 
 If no ID is provided, the task ID is auto-detected from the current branch name.
 
@@ -280,6 +280,10 @@ Preconditions:
 
 If [complete].command is configured, it will be executed before transitioning
 the status. If the command fails, the completion is aborted.
+
+If skip_review is enabled (via task setting or config), the task transitions
+directly to 'reviewed'. Otherwise, it transitions to 'reviewing' and a review
+session is started.
 
 Examples:
   # Complete task by ID
