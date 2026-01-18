@@ -51,6 +51,29 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 
 		// Transition to needs_input: permission asked
 		if (event.type === "permission.asked") {
+			const { id, metadata } = event.properties;
+			
+			// Auto-approve safe git operations in worktree
+			if (metadata && typeof metadata.command === 'string') {
+				const command = metadata.command.trim();
+				
+				// Security: Deny chained commands (&, |, ;) to prevent injection
+				const isSafeCommand = !/[\&\|;]/.test(command);
+				
+				// Security: Ensure command is running within the worktree
+				// Note: {{.Worktree}} is injected by the Go template
+				const cwd = metadata.cwd;
+				const isSafeDir = typeof cwd === 'string' && cwd.startsWith("{{.Worktree}}");
+
+				if (isSafeCommand && isSafeDir) {
+					// Allow: git status, diff, log, add, commit
+					if (/^git\s+(status|diff|log|add|commit)(\s+|$)/.test(command)) {
+						await $.client.permission.reply({ requestID: id, reply: "once" });
+						return;
+					}
+				}
+			}
+
 			await ` + "$`crew edit {{.TaskID}} --status needs_input --if-status in_progress`" + `;
 		}
 
