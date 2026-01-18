@@ -401,3 +401,50 @@ func TestStartManager_Execute_RoleMismatch(t *testing.T) {
 	assert.Contains(t, err.Error(), "test-worker")
 	assert.Contains(t, err.Error(), "worker")
 }
+
+func TestStartManager_Execute_WithAdditionalPrompt(t *testing.T) {
+	repoRoot := t.TempDir()
+	gitDir := repoRoot + "/.git"
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Use builtin claude-manager agent
+
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
+
+	// Execute with additional prompt
+	out, err := uc.Execute(context.Background(), StartManagerInput{
+		Name:             "claude-manager",
+		AdditionalPrompt: "Review task 215",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.NotEmpty(t, out.Command)
+	// Prompt should contain the additional prompt
+	assert.Contains(t, out.Prompt, "Review task 215")
+	// Prompt should also contain the default manager system prompt
+	assert.Contains(t, out.Prompt, "crew --help-manager")
+}
+
+func TestStartManager_Execute_WithoutAdditionalPrompt(t *testing.T) {
+	repoRoot := t.TempDir()
+	gitDir := repoRoot + "/.git"
+
+	configLoader := testutil.NewMockConfigLoader()
+
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
+
+	// Execute without additional prompt (empty)
+	out, err := uc.Execute(context.Background(), StartManagerInput{
+		Name:             "claude-manager",
+		AdditionalPrompt: "", // Empty - should not add anything
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.NotEmpty(t, out.Prompt)
+	// Prompt should contain the default manager system prompt
+	assert.Contains(t, out.Prompt, "crew --help-manager")
+	// Prompt should NOT contain double newlines from empty additional prompt
+	assert.NotContains(t, out.Prompt, "\n\n\n")
+}

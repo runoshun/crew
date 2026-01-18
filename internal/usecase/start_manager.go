@@ -12,8 +12,9 @@ import (
 
 // StartManagerInput contains the parameters for starting a manager.
 type StartManagerInput struct {
-	Name  string // Manager agent name
-	Model string // Model name override (optional)
+	Name             string // Manager agent name
+	Model            string // Model name override (optional)
+	AdditionalPrompt string // Additional prompt to append (optional)
 }
 
 // StartManagerOutput contains the result of starting a manager.
@@ -96,9 +97,15 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		return nil, fmt.Errorf("render command: %w", err)
 	}
 
+	// Append additional prompt if provided
+	finalPrompt := result.Prompt
+	if in.AdditionalPrompt != "" {
+		finalPrompt = result.Prompt + "\n\n" + in.AdditionalPrompt
+	}
+
 	return &StartManagerOutput{
 		Command: result.Command,
-		Prompt:  result.Prompt,
+		Prompt:  finalPrompt,
 	}, nil
 }
 
