@@ -37,12 +37,14 @@ func TestSessionEnded_Execute_NormalExit(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, out.Ignored)
 
-	// Verify task updated
+	// Verify task updated to error status
+	// Reason: Normal exit is only expected via crew complete. If session ends with in_progress status,
+	// it means crew complete was not called, which is abnormal.
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusForReview, task.Status)
-	// Session info should be kept for review/merge operations
-	assert.Equal(t, "claude", task.Agent)
-	assert.Equal(t, "crew-1", task.Session)
+	assert.Equal(t, domain.StatusError, task.Status)
+	// Session info should be cleared
+	assert.Empty(t, task.Agent)
+	assert.Empty(t, task.Session)
 
 	// Verify script file cleaned up
 	assert.NoFileExists(t, domain.ScriptPath(crewDir, 1))
