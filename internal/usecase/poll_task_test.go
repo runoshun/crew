@@ -80,7 +80,7 @@ func TestPollTask_Execute_StatusChange(t *testing.T) {
 	defer cancel()
 
 	_, err := uc.Execute(ctx, PollTaskInput{
-		TaskID:          1,
+		TaskIDs:         []int{1},
 		Interval:        1, // Short interval for faster test
 		Timeout:         0,
 		CommandTemplate: "",
@@ -107,7 +107,7 @@ func TestPollTask_Execute_Timeout(t *testing.T) {
 	ctx := context.Background()
 	start := time.Now()
 	_, err := uc.Execute(ctx, PollTaskInput{
-		TaskID:   1,
+		TaskIDs:  []int{1},
 		Interval: 1,
 		Timeout:  1, // 1 second timeout
 	})
@@ -128,7 +128,7 @@ func TestPollTask_Execute_TaskNotFound(t *testing.T) {
 
 	// Execute
 	_, err := uc.Execute(context.Background(), PollTaskInput{
-		TaskID:   999,
+		TaskIDs:  []int{999},
 		Interval: 1,
 		Timeout:  0,
 	})
@@ -147,7 +147,7 @@ func TestPollTask_Execute_GetTaskError(t *testing.T) {
 
 	// Execute
 	_, err := uc.Execute(context.Background(), PollTaskInput{
-		TaskID:   1,
+		TaskIDs:  []int{1},
 		Interval: 1,
 		Timeout:  0,
 	})
@@ -181,7 +181,7 @@ func TestPollTask_Execute_ContextCanceled(t *testing.T) {
 
 	// Execute
 	_, err := uc.Execute(ctx, PollTaskInput{
-		TaskID:   1,
+		TaskIDs:  []int{1},
 		Interval: 1,
 		Timeout:  0,
 	})
@@ -226,7 +226,7 @@ func TestPollTask_Execute_TerminalStates(t *testing.T) {
 
 			start := time.Now()
 			_, err := uc.Execute(ctx, PollTaskInput{
-				TaskID:   1,
+				TaskIDs:  []int{1},
 				Interval: 1,
 				Timeout:  0,
 			})
@@ -264,7 +264,7 @@ func TestPollTask_Execute_DefaultInterval(t *testing.T) {
 	defer cancel()
 
 	_, err := uc.Execute(ctx, PollTaskInput{
-		TaskID:   1,
+		TaskIDs:  []int{1},
 		Interval: 0, // Should use default (10)
 		Timeout:  0,
 	})
@@ -301,7 +301,7 @@ func TestPollTask_Execute_ImmediateTerminalState(t *testing.T) {
 			ctx := context.Background()
 			start := time.Now()
 			_, err := uc.Execute(ctx, PollTaskInput{
-				TaskID:   1,
+				TaskIDs:  []int{1},
 				Interval: 10,
 				Timeout:  0,
 			})
@@ -371,7 +371,7 @@ func TestPollTask_Execute_CommandOutput(t *testing.T) {
 	defer cancel()
 
 	_, err := uc.Execute(ctx, PollTaskInput{
-		TaskID:          1,
+		TaskIDs:         []int{1},
 		Interval:        1,
 		Timeout:         0,
 		CommandTemplate: `echo "{{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"`,
@@ -413,7 +413,7 @@ func TestPollTask_Execute_ExpectedStatus_Match(t *testing.T) {
 	defer cancel()
 
 	_, err := uc.Execute(ctx, PollTaskInput{
-		TaskID:           1,
+		TaskIDs:          []int{1},
 		ExpectedStatuses: []domain.Status{domain.StatusInProgress},
 		Interval:         1,
 		Timeout:          0,
@@ -442,7 +442,7 @@ func TestPollTask_Execute_ExpectedStatus_Mismatch(t *testing.T) {
 	start := time.Now()
 
 	_, err := uc.Execute(ctx, PollTaskInput{
-		TaskID:           1,
+		TaskIDs:          []int{1},
 		ExpectedStatuses: []domain.Status{domain.StatusInProgress},
 		Interval:         1,
 		Timeout:          0,
@@ -516,7 +516,7 @@ func TestPollTask_Execute_ExpectedStatus_Multiple(t *testing.T) {
 
 			start := time.Now()
 			_, err := uc.Execute(ctx, PollTaskInput{
-				TaskID:           1,
+				TaskIDs:          []int{1},
 				ExpectedStatuses: tt.expected,
 				Interval:         1,
 				Timeout:          0,
@@ -564,7 +564,7 @@ func TestPollTask_Execute_ExpectedStatus_Empty(t *testing.T) {
 	defer cancel()
 
 	_, err := uc.Execute(ctx, PollTaskInput{
-		TaskID:           1,
+		TaskIDs:          []int{1},
 		ExpectedStatuses: []domain.Status{}, // Empty
 		Interval:         1,
 		Timeout:          0,
@@ -624,4 +624,211 @@ func TestPollTask_containsStatus(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestPollTask_Execute_EmptyTaskIDs(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Execute with empty task IDs
+	_, err := uc.Execute(context.Background(), PollTaskInput{
+		TaskIDs:  []int{},
+		Interval: 1,
+		Timeout:  0,
+	})
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one task ID is required")
+}
+
+func TestPollTask_Execute_MultipleTasks_FirstChanges(t *testing.T) {
+	// Setup - multiple tasks, first one changes
+	repo := NewThreadSafeTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task 1",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Task 2",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[3] = &domain.Task{
+		ID:     3,
+		Title:  "Task 3",
+		Status: domain.StatusTodo,
+	}
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Change first task status after short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		repo.UpdateStatus(1, domain.StatusInProgress)
+	}()
+
+	// Execute monitoring multiple tasks
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := uc.Execute(ctx, PollTaskInput{
+		TaskIDs:         []int{1, 2, 3},
+		Interval:        1,
+		Timeout:         0,
+		CommandTemplate: `echo "{{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"`,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.True(t, executor.ExecuteWithContextCalled)
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "1: todo -> in_progress")
+}
+
+func TestPollTask_Execute_MultipleTasks_MiddleChanges(t *testing.T) {
+	// Setup - multiple tasks, middle one changes
+	repo := NewThreadSafeTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task 1",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Task 2",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[3] = &domain.Task{
+		ID:     3,
+		Title:  "Task 3",
+		Status: domain.StatusTodo,
+	}
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Change second task status after short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		repo.UpdateStatus(2, domain.StatusForReview)
+	}()
+
+	// Execute monitoring multiple tasks
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := uc.Execute(ctx, PollTaskInput{
+		TaskIDs:         []int{1, 2, 3},
+		Interval:        1,
+		Timeout:         0,
+		CommandTemplate: `echo "{{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"`,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.True(t, executor.ExecuteWithContextCalled)
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "2: todo -> for_review")
+}
+
+func TestPollTask_Execute_MultipleTasks_OneTerminal(t *testing.T) {
+	// Setup - one task already in terminal state
+	repo := NewThreadSafeTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task 1",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Task 2",
+		Status: domain.StatusClosed, // Already terminal
+	}
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Execute - should exit immediately because task 2 is terminal
+	ctx := context.Background()
+	start := time.Now()
+	_, err := uc.Execute(ctx, PollTaskInput{
+		TaskIDs:  []int{1, 2},
+		Interval: 10,
+		Timeout:  0,
+	})
+
+	// Assert - should exit immediately
+	require.NoError(t, err)
+	elapsed := time.Since(start)
+	assert.Less(t, elapsed, 100*time.Millisecond)
+}
+
+func TestPollTask_Execute_MultipleTasks_OneNotFound(t *testing.T) {
+	// Setup - one task doesn't exist
+	repo := testutil.NewMockTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task 1",
+		Status: domain.StatusTodo,
+	}
+	// Task 2 doesn't exist
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), PollTaskInput{
+		TaskIDs:  []int{1, 999},
+		Interval: 1,
+		Timeout:  0,
+	})
+
+	// Assert - should return error for task not found
+	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
+	assert.Contains(t, err.Error(), "999")
+}
+
+func TestPollTask_Execute_MultipleTasks_ExpectedStatus_Mismatch(t *testing.T) {
+	// Setup - one task doesn't match expected status
+	repo := NewThreadSafeTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task 1",
+		Status: domain.StatusInProgress, // Matches expected
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Task 2",
+		Status: domain.StatusForReview, // Does NOT match expected
+	}
+
+	executor := testutil.NewMockCommandExecutor()
+	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
+
+	// Execute - should exit immediately because task 2 doesn't match
+	ctx := context.Background()
+	start := time.Now()
+	_, err := uc.Execute(ctx, PollTaskInput{
+		TaskIDs:          []int{1, 2},
+		ExpectedStatuses: []domain.Status{domain.StatusInProgress},
+		Interval:         10,
+		Timeout:          0,
+		CommandTemplate:  `echo "{{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"`,
+	})
+
+	// Assert - should exit immediately
+	require.NoError(t, err)
+	elapsed := time.Since(start)
+	assert.Less(t, elapsed, 100*time.Millisecond)
+	assert.True(t, executor.ExecuteWithContextCalled)
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "2: in_progress -> for_review")
 }

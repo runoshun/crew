@@ -23,25 +23,31 @@ func newPollCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "poll <TASK_ID>",
+		Use:   "poll <TASK_ID> [TASK_ID...]",
 		Short: "Poll task status and exit after one change detection (default timeout: 5m)",
-		Long: `Monitor a task's status and execute a command once when the status changes.
+		Long: `Monitor one or more tasks' status and execute a command once when any status changes.
 
 The poll command checks the task status at regular intervals and executes
-a command template as soon as a status change is detected. It exits immediately
-after executing the command for the first detected change.
+a command template as soon as a status change is detected on any of the
+monitored tasks. It exits immediately after executing the command for the
+first detected change.
 
 Polling stops automatically when the timeout is reached (default: 300s).
 
+Multiple Task Monitoring:
+  You can specify multiple task IDs to monitor them simultaneously.
+  The command exits when ANY of the specified tasks changes status.
+
 Expected Status Check (Optional):
-  Use --expect to specify expected status(es). 
-  - If specified and the current status already differs from the expected status(es) on startup,
-    the command is executed immediately and the poll command exits.
-  - If it matches or if --expect is not specified, the command waits for the first status change.
+  Use --expect to specify expected status(es).
+  - If specified and ANY task's current status already differs from the expected status(es)
+    on startup, the command is executed immediately and the poll command exits.
+  - If all tasks match or if --expect is not specified, the command waits for the first
+    status change on any task.
 
 Command Template:
   The command template can use the following variables:
-    {{.TaskID}}    - Task ID
+    {{.TaskID}}    - Task ID (the task that changed)
     {{.OldStatus}} - Previous status (or expected status if --expect is used)
     {{.NewStatus}} - New status
 
@@ -54,6 +60,9 @@ Examples:
   # Simple polling (notify on any change)
   crew poll 175 --command 'notify-send "Task {{.TaskID}} changed to {{.NewStatus}}"'
 
+  # Poll multiple tasks (exit when any changes)
+  crew poll 220 221 222 --command 'echo "Task {{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"'
+
   # Poll with expected status and notify on change (5m timeout)
   crew poll 175 --expect todo --command 'notify-send "Task {{.TaskID}} started!"'
 
@@ -65,12 +74,16 @@ Examples:
 
   # Use as a trigger for next action
   crew poll 175 --expect in_progress --command 'crew complete 175'`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse task ID
-			var taskID int
-			if _, err := fmt.Sscanf(args[0], "%d", &taskID); err != nil {
-				return fmt.Errorf("invalid task ID: %s", args[0])
+			// Parse task IDs
+			var taskIDs []int
+			for _, arg := range args {
+				var taskID int
+				if _, err := fmt.Sscanf(arg, "%d", &taskID); err != nil {
+					return fmt.Errorf("invalid task ID: %s", arg)
+				}
+				taskIDs = append(taskIDs, taskID)
 			}
 
 			// Parse expected statuses
@@ -98,7 +111,7 @@ Examples:
 			// Execute use case
 			uc := c.PollTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 			_, err := uc.Execute(ctx, usecase.PollTaskInput{
-				TaskID:           taskID,
+				TaskIDs:          taskIDs,
 				ExpectedStatuses: expectedStatuses,
 				Interval:         opts.Interval,
 				Timeout:          opts.Timeout,
