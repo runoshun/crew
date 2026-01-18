@@ -12,25 +12,42 @@ Advance all in-progress tasks automatically with minimal human intervention. Con
 
 - **NO confirmations/questions until exit conditions are met** (y/n, selections, etc.)
 - Manager makes autonomous decisions about:
-  - When to run `crew review <id>`
   - When to execute `crew comment -R`
   - Whether to approve `needs_input` requests
 - **Exception**: Only stop and report when encountering undecidable situations
 
+## Task Flow (Expected)
+
+```
+in_progress → worker calls `crew complete`
+           → reviewing (auto-review starts)
+           → reviewed (review complete)
+           → LGTM or feedback sent
+```
+
+Workers are expected to call `crew complete` when done. This triggers auto-review.
+
 ## Target Statuses
 
-- **In scope**: `in_progress`, `needs_input`, `for_review`, `reviewing`, `reviewed`
-- **Out of scope**: `todo` (requires explicit start instruction)
+| Status | In Scope | Notes |
+|--------|----------|-------|
+| `in_progress` | ✅ | Worker is working |
+| `needs_input` | ✅ | Worker waiting for approval |
+| `reviewing` | ✅ | Auto-review in progress |
+| `reviewed` | ✅ | Review complete, needs evaluation |
+| `error` | ✅ | Problem occurred, report to user |
+| `for_review` | ✅ | Legacy/fallback, start review if seen |
+| `todo` | ❌ | Requires explicit start instruction |
 
 ---
 
 ## 1. Initialization
 
 ```bash
-crew list --status in_progress,needs_input,for_review,reviewing,reviewed
+crew list
 ```
 
-If no tasks in scope, exit with message: "No target tasks found."
+Filter for in-scope statuses. If no tasks in scope, exit with message: "No target tasks found."
 
 ---
 
@@ -42,23 +59,21 @@ If no tasks in scope, exit with message: "No target tasks found."
 
 | Priority | Status | Action |
 |----------|--------|--------|
-| 1 | `for_review` | Start review |
+| 1 | `error` | Add to problem list |
 | 2 | `reviewed` | Process review result |
 | 3 | `needs_input` | Evaluate input request |
-| 4 | `reviewing` | Skip (wait) |
-| 5 | `in_progress` | Check progress only |
+| 4 | `for_review` | Start review (legacy fallback) |
+| 5 | `reviewing` | Skip (wait) |
+| 6 | `in_progress` | Check progress only |
 
 ---
 
 ## 3. Status Handlers
 
-### 3.1 `for_review`
+### 3.1 `error`
 
-```bash
-crew review <id>
-```
-
-Status changes to `reviewing` → then `reviewed` when complete → handled in next loop by 3.2.
+- Add to problem list immediately
+- Include in final report for user attention
 
 ---
 
@@ -108,14 +123,26 @@ crew send <id> Enter
 
 ---
 
-### 3.4 `reviewing`
+### 3.4 `for_review` (Legacy Fallback)
 
-- No action (prioritize other tasks)
+This status should rarely occur with the new flow. If seen:
+
+```bash
+crew review <id>
+```
+
+Status changes to `reviewing` → then `reviewed` when complete.
+
+---
+
+### 3.5 `reviewing`
+
+- No action (wait for review to complete)
 - Add to warning list if exceeds 10 minutes
 
 ---
 
-### 3.5 `in_progress`
+### 3.6 `in_progress`
 
 ```bash
 crew peek <id> -n 30
@@ -133,7 +160,7 @@ When all tasks are only `in_progress` or `reviewing`:
 
 ```bash
 sleep 60
-crew list --status in_progress,needs_input,for_review,reviewing,reviewed
+crew list
 ```
 
 Return to loop start.
@@ -160,10 +187,11 @@ Exit when any of the following:
 
 ### ⚠️ Needs Attention
 - #102: needs_input with undecidable request → manual review required
+- #105: error status → session terminated unexpectedly
 
 ### 📊 Statistics
 - Duration: 15 min
-- Reviews executed: 4
+- Reviews evaluated: 4
 - Feedback sent: 2
 
 Merge? (y: all / specify IDs / n: skip)
