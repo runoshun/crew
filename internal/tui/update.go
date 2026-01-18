@@ -133,25 +133,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return MsgReloadTasks{}
 		})
 
-	case execEditCommentMsg:
-		// Execute the editor for comment editing
-		// Clean up temp file after editor closes
-		return m, tea.Exec(&editorExecCmd{
-			container:  m.container,
-			taskID:     msg.taskID,
-			tmpPath:    msg.tmpPath,
-			origMD:     msg.origMD,
-			isComment:  true,
-			commentIdx: msg.commentIdx,
-			commentMD:  msg.origMD,
-		}, func(err error) tea.Msg {
-			_ = os.Remove(msg.tmpPath)
-			if err != nil {
-				return MsgError{Err: err}
-			}
-			return MsgReloadTasks{}
-		})
-
 	case MsgTick:
 		// Auto-refresh: reload tasks and schedule next tick
 		return m, tea.Batch(m.loadTasks(), m.tick())
@@ -357,13 +338,6 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, m.editTaskInEditor(task.ID)
-
-	case key.Matches(msg, m.keys.EditComment):
-		task := m.SelectedTask()
-		if task == nil {
-			return m, nil
-		}
-		return m, m.editLatestComment(task.ID)
 
 	case key.Matches(msg, m.keys.EditStatus):
 		task := m.SelectedTask()
