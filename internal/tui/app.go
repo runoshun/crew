@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -785,6 +786,202 @@ func (m *Model) prepareEditReviewComment() tea.Cmd {
 			Message: reviewComment.Text,
 		}
 	}
+}
+
+// getEditor returns the user's preferred editor from environment variables.
+// Returns an error if neither EDITOR nor VISUAL is set.
+func getEditor() (string, error) {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		return "", domain.ErrEditorNotSet
+	}
+	return editor, nil
+}
+
+// editorExecCmd wraps editor execution with pre/post file operations.
+// It implements tea.ExecCommand interface.
+type editorExecCmd struct {
+	container  *app.Container
+	stdin      io.Reader
+	stdout     io.Writer
+	stderr     io.Writer
+	tmpPath    string
+	origMD     string
+	commentMD  string // original comment markdown (only used when isComment is true)
+	taskID     int
+	commentIdx int  // comment index (only used when isComment is true)
+	isComment  bool // true for comment edit, false for task edit
+}
+
+func (c *editorExecCmd) Run() error {
+	editor, err := getEditor()
+	if err != nil {
+		return err
+	}
+
+	// Build editor command
+	// #nosec G204 - editor comes from trusted environment variable
+	cmd := exec.Command(editor, c.tmpPath)
+	cmd.Stdin = c.stdin
+	cmd.Stdout = c.stdout
+	cmd.Stderr = c.stderr
+
+	if runErr := cmd.Run(); runErr != nil {
+		return fmt.Errorf("editor failed: %w", runErr)
+	}
+
+	// Read edited content
+	editedContent, err := os.ReadFile(c.tmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to read edited file: %w", err)
+	}
+
+	if c.isComment {
+		// Comment edit mode
+		if string(editedContent) == c.commentMD {
+			// No changes
+			return nil
+		}
+
+		// Update comment
+		uc := c.container.EditCommentUseCase()
+		editErr := uc.Execute(context.Background(), usecase.EditCommentInput{
+			TaskID:  c.taskID,
+			Index:   c.commentIdx,
+			Message: strings.TrimSpace(string(editedContent)),
+		})
+		if editErr != nil {
+			return fmt.Errorf("failed to update comment: %w", editErr)
+		}
+	} else {
+		// Task edit mode
+		if string(editedContent) == c.origMD {
+			// No changes
+			return nil
+		}
+
+		// Update task with edited content
+		uc := c.container.EditTaskUseCase()
+		_, editErr := uc.Execute(context.Background(), usecase.EditTaskInput{
+			TaskID:     c.taskID,
+			EditorEdit: true,
+			EditorText: string(editedContent),
+		})
+		if editErr != nil {
+			return fmt.Errorf("failed to update task: %w", editErr)
+		}
+	}
+
+	return nil
+}
+
+func (c *editorExecCmd) SetStdin(r io.Reader)  { c.stdin = r }
+func (c *editorExecCmd) SetStdout(w io.Writer) { c.stdout = w }
+func (c *editorExecCmd) SetStderr(w io.Writer) { c.stderr = w }
+
+// editTaskInEditor returns a tea.Cmd that opens the task in an editor.
+// After the editor closes, the task is updated with the edited content.
+func (m *Model) editTaskInEditor(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		// Get current task
+		showUC := m.container.ShowTaskUseCase()
+		showOut, err := showUC.Execute(context.Background(), usecase.ShowTaskInput{
+			TaskID: taskID,
+		})
+		if err != nil {
+			return MsgError{Err: err}
+		}
+
+		task := showOut.Task
+
+		// Create temporary file with task content
+		tmpFile, err := os.CreateTemp("", fmt.Sprintf("crew-task-%d-*.md", taskID))
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("failed to create temp file: %w", err)}
+		}
+		tmpPath := tmpFile.Name()
+
+		// Write task as markdown
+		markdown := task.ToMarkdown()
+		if _, writeErr := tmpFile.WriteString(markdown); writeErr != nil {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpPath)
+			return MsgError{Err: fmt.Errorf("failed to write temp file: %w", writeErr)}
+		}
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			_ = os.Remove(tmpPath)
+			return MsgError{Err: fmt.Errorf("failed to close temp file: %w", closeErr)}
+		}
+
+		return execEditTaskMsg{
+			taskID:  taskID,
+			tmpPath: tmpPath,
+			origMD:  markdown,
+		}
+	}
+}
+
+// execEditTaskMsg triggers editor execution for task editing.
+type execEditTaskMsg struct {
+	tmpPath string
+	origMD  string
+	taskID  int
+}
+
+// editLatestComment returns a tea.Cmd that opens the latest comment in an editor.
+func (m *Model) editLatestComment(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		// Load comments for the task
+		comments, err := m.container.Tasks.GetComments(taskID)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+
+		if len(comments) == 0 {
+			return MsgError{Err: fmt.Errorf("no comments to edit")}
+		}
+
+		// Get the latest comment
+		latestIdx := len(comments) - 1
+		latestComment := comments[latestIdx]
+
+		// Create temporary file with comment content
+		tmpFile, err := os.CreateTemp("", fmt.Sprintf("crew-comment-%d-%d-*.md", taskID, latestIdx))
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("failed to create temp file: %w", err)}
+		}
+		tmpPath := tmpFile.Name()
+
+		// Write comment text
+		commentText := latestComment.Text
+		if _, writeErr := tmpFile.WriteString(commentText); writeErr != nil {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpPath)
+			return MsgError{Err: fmt.Errorf("failed to write temp file: %w", writeErr)}
+		}
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			_ = os.Remove(tmpPath)
+			return MsgError{Err: fmt.Errorf("failed to close temp file: %w", closeErr)}
+		}
+
+		return execEditCommentMsg{
+			taskID:     taskID,
+			tmpPath:    tmpPath,
+			commentIdx: latestIdx,
+			origMD:     commentText,
+		}
+	}
+}
+
+// execEditCommentMsg triggers editor execution for comment editing.
+type execEditCommentMsg struct {
+	tmpPath    string
+	origMD     string
+	taskID     int
+	commentIdx int
 }
 
 // loadReviewResult loads the latest reviewer comment for display in ModeReviewResult.
