@@ -173,9 +173,6 @@ crew poll <id> --interval 5 --timeout 300
 
 # Execute notification on status change
 crew poll <id> --command 'notify-send "Task {{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.NewStatus{{"}}"}}"'
-
-# Run in background
-crew poll <id> --command 'echo "{{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.OldStatus{{"}}"}} → {{"{{"}}.NewStatus{{"}}"}}"' &
 ```
 
 **Command template variables**:
