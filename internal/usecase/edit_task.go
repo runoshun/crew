@@ -113,7 +113,7 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 
 	// Handle skip_review
 	if in.SkipReview != nil {
-		task.SkipReview = *in.SkipReview
+		task.SkipReview = in.SkipReview
 	}
 
 	// Handle labels

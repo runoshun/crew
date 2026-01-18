@@ -67,12 +67,16 @@ EOF
 				Issue:       opts.Issue,
 				Labels:      opts.Labels,
 				BaseBranch:  opts.Base,
-				SkipReview:  opts.SkipReview,
 			}
 
 			// Set parent ID if specified
 			if opts.ParentID > 0 {
 				input.ParentID = &opts.ParentID
+			}
+
+			// Set skip_review only if flag was explicitly provided
+			if cmd.Flags().Changed("skip-review") {
+				input.SkipReview = &opts.SkipReview
 			}
 
 			// Execute use case

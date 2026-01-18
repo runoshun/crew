@@ -12,12 +12,12 @@ import (
 // Fields are ordered to minimize memory padding.
 type NewTaskInput struct {
 	ParentID    *int     // Parent task ID (optional, nil = root task)
+	SkipReview  *bool    // Skip review on completion (nil=use config, true=skip, false=require review)
 	Title       string   // Task title (required)
 	Description string   // Task description (optional)
 	BaseBranch  string   // Base branch (optional, empty = use default)
 	Labels      []string // Labels (optional)
 	Issue       int      // Linked GitHub issue number (0 = not linked)
-	SkipReview  bool     // Skip review on completion (go directly to reviewed)
 }
 
 // NewTaskOutput contains the result of creating a new task.
@@ -83,7 +83,7 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 		Issue:       in.Issue,
 		Labels:      in.Labels,
 		BaseBranch:  baseBranch,
-		SkipReview:  in.SkipReview,
+		SkipReview:  in.SkipReview, // nil means use config, explicit true/false overrides
 	}
 
 	// Save task

@@ -119,13 +119,17 @@ Examples:
 
 			// Execute use case
 			uc := c.StartTaskUseCase()
-			out, err := uc.Execute(cmd.Context(), usecase.StartTaskInput{
-				TaskID:     taskID,
-				Agent:      agent,
-				Model:      opts.model,
-				Continue:   opts.continueFlag,
-				SkipReview: opts.skipReview,
-			})
+			input := usecase.StartTaskInput{
+				TaskID:   taskID,
+				Agent:    agent,
+				Model:    opts.model,
+				Continue: opts.continueFlag,
+			}
+			// Set skip_review only if flag was explicitly provided
+			if cmd.Flags().Changed("skip-review") {
+				input.SkipReview = &opts.skipReview
+			}
+			out, err := uc.Execute(cmd.Context(), input)
 			if err != nil {
 				return err
 			}

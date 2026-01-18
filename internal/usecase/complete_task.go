@@ -127,11 +127,16 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	}
 
 	// Determine if we should skip review
-	// Priority: task.SkipReview > config.Tasks.SkipReview > false
-	skipReview := task.SkipReview
-	if !skipReview && cfg != nil {
+	// Priority: task.SkipReview (if explicitly set) > config.Tasks.SkipReview > false
+	var skipReview bool
+	if task.SkipReview != nil {
+		// Task has explicit setting, use it (respects --no-skip-review)
+		skipReview = *task.SkipReview
+	} else if cfg != nil {
+		// Fall back to config setting
 		skipReview = cfg.Tasks.SkipReview
 	}
+	// else: default false
 
 	// Add comment if provided
 	if in.Comment != "" {

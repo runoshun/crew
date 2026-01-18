@@ -22,6 +22,7 @@ type Task struct {
 	Created     time.Time   `json:"created"`               // Creation time
 	Started     time.Time   `json:"started,omitempty"`     // When status became in_progress
 	ParentID    *int        `json:"parentID"`              // Parent task ID (nil = root task)
+	SkipReview  *bool       `json:"skipReview,omitempty"`  // Skip review on completion (nil=use config, true=skip, false=require review)
 	Description string      `json:"description,omitempty"` // Description (optional)
 	Agent       string      `json:"agent,omitempty"`       // Running agent name (empty if not running)
 	Session     string      `json:"session,omitempty"`     // tmux session name (empty if not running)
@@ -33,7 +34,6 @@ type Task struct {
 	ID          int         `json:"-"`                     // Task ID (stored as map key, not in value)
 	Issue       int         `json:"issue,omitempty"`       // GitHub issue number (0 = not linked)
 	PR          int         `json:"pr,omitempty"`          // GitHub PR number (0 = not created)
-	SkipReview  bool        `json:"skipReview,omitempty"`  // Skip review on completion (go directly to reviewed)
 }
 
 // IsRoot returns true if this is a root task (no parent).

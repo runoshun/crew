@@ -15,11 +15,11 @@ import (
 // StartTaskInput contains the parameters for starting a task.
 // Fields are ordered to minimize memory padding.
 type StartTaskInput struct {
+	SkipReview *bool  // Set task's SkipReview flag on start (nil=no change, true=skip, false=require review)
 	Agent      string // Agent name (required in MVP)
 	Model      string // Model name override (optional, uses agent's default if empty)
 	TaskID     int    // Task ID to start
 	Continue   bool   // Continue from previous session (adds agent-specific continue args)
-	SkipReview bool   // Set task's SkipReview flag on start
 }
 
 // StartTaskOutput contains the result of starting a task.
@@ -169,8 +169,8 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 	task.Agent = agentName
 	task.Session = sessionName
 	task.Started = uc.clock.Now()
-	if in.SkipReview {
-		task.SkipReview = true
+	if in.SkipReview != nil {
+		task.SkipReview = in.SkipReview
 	}
 	if err := uc.tasks.Save(task); err != nil {
 		// Rollback: stop session, cleanup script and worktree
