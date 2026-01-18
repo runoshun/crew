@@ -16,6 +16,7 @@ type EditTaskInput struct {
 	Description  *string         // New description (nil = no change)
 	Status       *domain.Status  // New status (nil = no change)
 	SkipReview   *bool           // New skip_review setting (nil = no change)
+	ParentID     *int            // New parent ID (nil = no change, 0 = remove parent)
 	EditorText   string          // Markdown text from editor (only used when EditorEdit is true)
 	Labels       []string        // Labels to set (replaces all existing labels, nil = no change)
 	AddLabels    []string        // Labels to add
@@ -24,6 +25,7 @@ type EditTaskInput struct {
 	TaskID       int             // Task ID to edit (required)
 	LabelsSet    bool            // True if Labels was explicitly set (to distinguish nil from empty)
 	EditorEdit   bool            // True if editing via editor (title/description from markdown)
+	RemoveParent bool            // True to remove parent (set ParentID to nil)
 }
 
 // EditTaskOutput contains the result of editing a task.
@@ -51,7 +53,7 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	}
 
 	// Validate that at least one field is being updated
-	if in.Title == nil && in.Description == nil && in.Status == nil && in.SkipReview == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
+	if in.Title == nil && in.Description == nil && in.Status == nil && in.SkipReview == nil && in.ParentID == nil && !in.RemoveParent && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
@@ -114,6 +116,37 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	// Handle skip_review
 	if in.SkipReview != nil {
 		task.SkipReview = in.SkipReview
+	}
+
+	// Handle parent change
+	if in.RemoveParent {
+		// Remove parent (make this a root task)
+		task.ParentID = nil
+	} else if in.ParentID != nil {
+		newParentID := *in.ParentID
+		if newParentID == 0 {
+			// --parent 0 means remove parent
+			task.ParentID = nil
+		} else if newParentID < 0 {
+			// Negative IDs are invalid
+			return nil, domain.ErrInvalidParentID
+		} else {
+			// Validate parent exists
+			parent, err := uc.tasks.Get(newParentID)
+			if err != nil {
+				return nil, fmt.Errorf("get parent task: %w", err)
+			}
+			if parent == nil {
+				return nil, domain.ErrParentNotFound
+			}
+
+			// Check for circular reference: ensure we're not setting a descendant as parent
+			if err := uc.checkCircularReference(in.TaskID, newParentID); err != nil {
+				return nil, err
+			}
+
+			task.ParentID = &newParentID
+		}
 	}
 
 	// Handle labels
@@ -219,6 +252,43 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		task.Labels = content.Labels
 	}
 
+	// Handle parent change from editor
+	if content.ParentFound {
+		// Check if parent actually changed
+		parentChanged := false
+		if content.ParentID == nil && task.ParentID != nil {
+			parentChanged = true
+		} else if content.ParentID != nil && task.ParentID == nil {
+			parentChanged = true
+		} else if content.ParentID != nil && task.ParentID != nil && *content.ParentID != *task.ParentID {
+			parentChanged = true
+		}
+
+		if parentChanged {
+			if content.ParentID == nil {
+				// Remove parent
+				task.ParentID = nil
+			} else {
+				newParentID := *content.ParentID
+				// Validate parent exists
+				parent, err := uc.tasks.Get(newParentID)
+				if err != nil {
+					return nil, fmt.Errorf("get parent task: %w", err)
+				}
+				if parent == nil {
+					return nil, domain.ErrParentNotFound
+				}
+
+				// Check for circular reference
+				if err := uc.checkCircularReference(in.TaskID, newParentID); err != nil {
+					return nil, err
+				}
+
+				task.ParentID = &newParentID
+			}
+		}
+	}
+
 	// Atomically save task and comments together
 	if err := uc.tasks.SaveTaskWithComments(task, updatedComments); err != nil {
 		return nil, fmt.Errorf("save task with comments: %w", err)
@@ -263,4 +333,50 @@ func updateLabels(current, add, remove []string) []string {
 
 	slices.Sort(result)
 	return result
+}
+
+// checkCircularReference checks if setting newParentID as parent of taskID would create a cycle.
+// Returns ErrCircularReference if a cycle would be created.
+func (uc *EditTask) checkCircularReference(taskID, newParentID int) error {
+	// Self-reference is a cycle
+	if taskID == newParentID {
+		return domain.ErrCircularReference
+	}
+
+	// Check if newParentID is a descendant of taskID by traversing descendants
+	return uc.checkIsDescendant(taskID, newParentID)
+}
+
+// checkIsDescendant checks if targetID is a descendant of taskID.
+// Uses BFS to traverse the task tree.
+func (uc *EditTask) checkIsDescendant(taskID, targetID int) error {
+	// BFS queue of task IDs to check
+	queue := []int{taskID}
+	visited := make(map[int]bool)
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if visited[current] {
+			continue
+		}
+		visited[current] = true
+
+		// Get children of current task
+		children, err := uc.tasks.GetChildren(current)
+		if err != nil {
+			return fmt.Errorf("get children: %w", err)
+		}
+
+		for _, child := range children {
+			if child.ID == targetID {
+				// Found: targetID is a descendant of taskID
+				return domain.ErrCircularReference
+			}
+			queue = append(queue, child.ID)
+		}
+	}
+
+	return nil
 }

@@ -20,7 +20,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Test Task",
 				Description: "This is a test description",
 			},
-			want: "---\ntitle: Test Task\nlabels:\n---\n\nThis is a test description",
+			want: "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nThis is a test description",
 		},
 		{
 			name: "with title only",
@@ -28,7 +28,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Title Only",
 				Description: "",
 			},
-			want: "---\ntitle: Title Only\nlabels:\n---\n\n",
+			want: "---\ntitle: Title Only\nparent:\nlabels:\n---\n\n",
 		},
 		{
 			name: "with multiline description",
@@ -36,7 +36,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Multi-line",
 				Description: "Line 1\nLine 2\nLine 3",
 			},
-			want: "---\ntitle: Multi-line\nlabels:\n---\n\nLine 1\nLine 2\nLine 3",
+			want: "---\ntitle: Multi-line\nparent:\nlabels:\n---\n\nLine 1\nLine 2\nLine 3",
 		},
 		{
 			name: "with single label",
@@ -45,7 +45,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Description: "Description",
 				Labels:      []string{"bug"},
 			},
-			want: "---\ntitle: Task with label\nlabels: bug\n---\n\nDescription",
+			want: "---\ntitle: Task with label\nparent:\nlabels: bug\n---\n\nDescription",
 		},
 		{
 			name: "with multiple labels",
@@ -54,7 +54,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Description: "Description",
 				Labels:      []string{"bug", "urgent", "frontend"},
 			},
-			want: "---\ntitle: Task with labels\nlabels: bug, urgent, frontend\n---\n\nDescription",
+			want: "---\ntitle: Task with labels\nparent:\nlabels: bug, urgent, frontend\n---\n\nDescription",
 		},
 		{
 			name: "with labels and no description",
@@ -62,7 +62,15 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:  "Labels only",
 				Labels: []string{"feature"},
 			},
-			want: "---\ntitle: Labels only\nlabels: feature\n---\n\n",
+			want: "---\ntitle: Labels only\nparent:\nlabels: feature\n---\n\n",
+		},
+		{
+			name: "with parent",
+			task: &Task{
+				Title:    "Sub task",
+				ParentID: intPtr(5),
+			},
+			want: "---\ntitle: Sub task\nparent: 5\nlabels:\n---\n\n",
 		},
 	}
 
@@ -343,7 +351,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 				Description: "Description",
 			},
 			comments: nil,
-			want:     "---\ntitle: Test Task\nlabels:\n---\n\nDescription",
+			want:     "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nDescription",
 		},
 		{
 			name: "single comment",
@@ -354,7 +362,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 			comments: []Comment{
 				{Text: "First comment", Author: "worker", Time: now},
 			},
-			want: "---\ntitle: Test Task\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment",
+			want: "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment",
 		},
 		{
 			name: "multiple comments",
@@ -367,7 +375,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 				{Text: "First comment", Author: "worker", Time: now},
 				{Text: "Second comment", Author: "manager", Time: later},
 			},
-			want: "---\ntitle: Test Task\nlabels: bug\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment\n\n---\n# Comment: 1\n# Author: manager\n# Time: 2026-01-18T11:00:00Z\n\nSecond comment",
+			want: "---\ntitle: Test Task\nparent:\nlabels: bug\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment\n\n---\n# Comment: 1\n# Author: manager\n# Time: 2026-01-18T11:00:00Z\n\nSecond comment",
 		},
 		{
 			name: "comment with empty author",
@@ -378,7 +386,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 			comments: []Comment{
 				{Text: "Comment without author", Author: "", Time: now},
 			},
-			want: "---\ntitle: Test Task\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: \n# Time: 2026-01-18T10:00:00Z\n\nComment without author",
+			want: "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: \n# Time: 2026-01-18T10:00:00Z\n\nComment without author",
 		},
 		{
 			name: "multiline comment",
@@ -389,7 +397,17 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 			comments: []Comment{
 				{Text: "Line 1\nLine 2\nLine 3", Author: "worker", Time: now},
 			},
-			want: "---\ntitle: Test Task\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nLine 1\nLine 2\nLine 3",
+			want: "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nLine 1\nLine 2\nLine 3",
+		},
+		{
+			name: "task with parent",
+			task: &Task{
+				Title:       "Sub Task",
+				Description: "Description",
+				ParentID:    intPtr(10),
+			},
+			comments: nil,
+			want:     "---\ntitle: Sub Task\nparent: 10\nlabels:\n---\n\nDescription",
 		},
 	}
 
@@ -667,6 +685,54 @@ Comment text`,
 			wantErr:     true,
 			errContains: "invalid comment metadata",
 		},
+		{
+			name: "invalid parent - non-numeric",
+			content: `---
+title: Test Task
+parent: abc
+labels:
+---
+
+Description`,
+			wantErr:     true,
+			errContains: "invalid parent ID",
+		},
+		{
+			name: "valid parent - numeric",
+			content: `---
+title: Test Task
+parent: 5
+labels:
+---
+
+Description`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+		},
+		{
+			name: "valid parent - zero removes parent",
+			content: `---
+title: Test Task
+parent: 0
+labels:
+---
+
+Description`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+		},
+		{
+			name: "invalid parent - negative number",
+			content: `---
+title: Test Task
+parent: -1
+labels:
+---
+
+Description`,
+			wantErr:     true,
+			errContains: "invalid parent ID",
+		},
 	}
 
 	for _, tt := range tests {
@@ -759,4 +825,9 @@ func TestRoundTripWithComments(t *testing.T) {
 			}
 		})
 	}
+}
+
+// intPtr returns a pointer to the given int.
+func intPtr(n int) *int {
+	return &n
 }

@@ -521,8 +521,10 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		AddLabels    []string
 		RemoveLabels []string
 		IfStatus     []string
+		ParentID     int
 		SkipReview   bool
 		NoSkipReview bool
+		NoParent     bool
 	}
 
 	cmd := &cobra.Command{
@@ -574,7 +576,14 @@ Examples:
   crew edit 1 --skip-review
 
   # Disable skip_review for a task
-  crew edit 1 --no-skip-review`,
+  crew edit 1 --no-skip-review
+
+  # Set parent task
+  crew edit 1 --parent 5
+
+  # Remove parent (make it a root task)
+  crew edit 1 --no-parent
+  crew edit 1 --parent 0`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -592,7 +601,9 @@ Examples:
 				len(opts.RemoveLabels) > 0 ||
 				len(opts.IfStatus) > 0 ||
 				cmd.Flags().Changed("skip-review") ||
-				cmd.Flags().Changed("no-skip-review")
+				cmd.Flags().Changed("no-skip-review") ||
+				cmd.Flags().Changed("parent") ||
+				cmd.Flags().Changed("no-parent")
 
 			if !hasFlags {
 				// Editor mode: open task in editor
@@ -639,6 +650,11 @@ Examples:
 				v := false
 				input.SkipReview = &v
 			}
+			if cmd.Flags().Changed("no-parent") {
+				input.RemoveParent = true
+			} else if cmd.Flags().Changed("parent") {
+				input.ParentID = &opts.ParentID
+			}
 
 			// Execute use case
 			uc := c.EditTaskUseCase()
@@ -663,6 +679,9 @@ Examples:
 	cmd.Flags().BoolVar(&opts.SkipReview, "skip-review", false, "Enable skip_review for this task (skip review on completion)")
 	cmd.Flags().BoolVar(&opts.NoSkipReview, "no-skip-review", false, "Disable skip_review for this task (require review on completion)")
 	cmd.MarkFlagsMutuallyExclusive("skip-review", "no-skip-review")
+	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Set parent task ID (0 to remove parent)")
+	cmd.Flags().BoolVar(&opts.NoParent, "no-parent", false, "Remove parent task (make this a root task)")
+	cmd.MarkFlagsMutuallyExclusive("parent", "no-parent")
 
 	return cmd
 }
