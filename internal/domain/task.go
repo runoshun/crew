@@ -57,6 +57,13 @@ func (t *Task) ToMarkdown() string {
 func (t *Task) ToMarkdownWithComments(comments []Comment) string {
 	result := "---\ntitle: " + t.Title + "\n"
 
+	// Add parent field
+	if t.ParentID != nil {
+		result += "parent: " + intToStr(*t.ParentID) + "\n"
+	} else {
+		result += "parent:\n"
+	}
+
 	// Add labels field (comma-separated, empty if no labels)
 	if len(t.Labels) > 0 {
 		result += "labels: "
@@ -287,12 +294,15 @@ type ParsedComment struct {
 }
 
 // EditorContent represents the parsed content from editor markdown format.
+// Fields are ordered to minimize memory padding.
 type EditorContent struct {
+	ParentID    *int // New parent ID (nil if not found or empty)
 	Title       string
 	Description string
 	Labels      []string
 	Comments    []ParsedComment
 	LabelsFound bool // True if labels field was present in frontmatter
+	ParentFound bool // True if parent field was present in frontmatter
 }
 
 // ParseEditorContent parses the editor markdown format and extracts task info and comments.
@@ -321,6 +331,8 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 	title := ""
 	labelsStr := ""
 	labelsFound := false
+	parentStr := ""
+	parentFound := false
 	for i := 0; i < endIdx; i++ {
 		line := lines[i]
 		if len(line) > 7 && line[:7] == "title: " {
@@ -329,6 +341,11 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 			labelsFound = true
 			if len(line) > 7 {
 				labelsStr = trimSpace(line[7:])
+			}
+		} else if len(line) >= 7 && line[:7] == "parent:" {
+			parentFound = true
+			if len(line) > 7 {
+				parentStr = trimSpace(line[7:])
 			}
 		}
 	}
@@ -355,6 +372,16 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 			}
 			slices.Sort(labels)
 		}
+	}
+
+	// Parse parent ID
+	var parentID *int
+	if parentFound && parentStr != "" {
+		id, err := strToInt(parentStr)
+		if err == nil && id > 0 {
+			parentID = &id
+		}
+		// Note: if parsing fails or id <= 0, parentID stays nil (removing parent)
 	}
 
 	// Get body after frontmatter (description + comments)
@@ -405,7 +432,9 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 		Description: description,
 		Labels:      labels,
 		Comments:    comments,
+		ParentID:    parentID,
 		LabelsFound: labelsFound,
+		ParentFound: parentFound,
 	}, nil
 }
 

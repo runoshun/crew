@@ -1193,3 +1193,305 @@ Second comment with wrong index`
 	assert.Equal(t, "First comment", repo.Comments[1][0].Text)
 	assert.Equal(t, "Second comment", repo.Comments[1][1].Text)
 }
+
+func TestEditTask_Execute_SetParent(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Child task",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Parent task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - set parent
+	parentID := 2
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		ParentID: &parentID,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out.Task.ParentID)
+	assert.Equal(t, 2, *out.Task.ParentID)
+}
+
+func TestEditTask_Execute_RemoveParent(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	parentID := 2
+	repo.Tasks[1] = &domain.Task{
+		ID:       1,
+		Title:    "Child task",
+		ParentID: &parentID,
+		Status:   domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Parent task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - remove parent using RemoveParent flag
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:       1,
+		RemoveParent: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Nil(t, out.Task.ParentID)
+}
+
+func TestEditTask_Execute_RemoveParentWithZero(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	parentID := 2
+	repo.Tasks[1] = &domain.Task{
+		ID:       1,
+		Title:    "Child task",
+		ParentID: &parentID,
+		Status:   domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Parent task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - remove parent using ParentID=0
+	zeroParentID := 0
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		ParentID: &zeroParentID,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Nil(t, out.Task.ParentID)
+}
+
+func TestEditTask_Execute_ParentNotFound(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Child task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - set non-existent parent
+	parentID := 999
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		ParentID: &parentID,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrParentNotFound)
+}
+
+func TestEditTask_Execute_CircularReference_SelfReference(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - try to set self as parent
+	parentID := 1
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		ParentID: &parentID,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrCircularReference)
+}
+
+func TestEditTask_Execute_CircularReference_ChildAsParent(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	parentID := 1
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Parent task",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:       2,
+		Title:    "Child task",
+		ParentID: &parentID,
+		Status:   domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - try to set child as parent (creates cycle)
+	newParentID := 2
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		ParentID: &newParentID,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrCircularReference)
+}
+
+func TestEditTask_Execute_CircularReference_GrandchildAsParent(t *testing.T) {
+	// Setup: 1 -> 2 -> 3 (grandchild)
+	repo := testutil.NewMockTaskRepository()
+	parentID1 := 1
+	parentID2 := 2
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Root task",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:       2,
+		Title:    "Child task",
+		ParentID: &parentID1,
+		Status:   domain.StatusTodo,
+	}
+	repo.Tasks[3] = &domain.Task{
+		ID:       3,
+		Title:    "Grandchild task",
+		ParentID: &parentID2,
+		Status:   domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - try to set grandchild (3) as parent of root (1)
+	newParentID := 3
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		ParentID: &newParentID,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrCircularReference)
+}
+
+func TestEditTask_Execute_EditorMode_SetParent(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Child task",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Parent task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - set parent
+	markdown := `---
+title: Child task
+parent: 2
+labels:
+---
+
+Description`
+
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out.Task.ParentID)
+	assert.Equal(t, 2, *out.Task.ParentID)
+}
+
+func TestEditTask_Execute_EditorMode_RemoveParent(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	parentID := 2
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Child task",
+		Description: "Description",
+		ParentID:    &parentID,
+		Status:      domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:     2,
+		Title:  "Parent task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - remove parent (empty parent field)
+	markdown := `---
+title: Child task
+parent:
+labels:
+---
+
+Description`
+
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Nil(t, out.Task.ParentID)
+}
+
+func TestEditTask_Execute_EditorMode_CircularReference(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	parentID := 1
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Parent task",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Tasks[2] = &domain.Task{
+		ID:       2,
+		Title:    "Child task",
+		ParentID: &parentID,
+		Status:   domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - try to set child as parent
+	markdown := `---
+title: Parent task
+parent: 2
+labels:
+---
+
+Description`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrCircularReference)
+}
