@@ -60,207 +60,35 @@ Issues found in #114:
 
 ### "Implement this feature"
 
-```bash
-# 1. Create task (Use HEREDOC for --body to avoid shell escaping issues)
-crew new --title "Implement feature X" --body "$(cat <<'EOF'
-Detailed description...
-EOF
-)"
+1. Investigate source code first to understand existing patterns
+2. Create task:
+   ```bash
+   crew new --title "..." --body "$(cat <<'EOF'
+   ## Files to change
+   - ...
 
-# 2. Start agent
-crew start <id> <worker>
+   ## Steps
+   1. ...
 
-# 3. Monitor progress
-crew peek <id>
-```
+   ## Completion criteria
+   - [ ] ...
+   EOF
+   )"
+   ```
+3. Start agent: `crew start <id> <worker>`
+4. Monitor progress: `crew peek <id>`
+
+**Note**: Use HEREDOC syntax for --body to avoid shell escaping issues.
 
 ### "Review this"
 
-Delegate reviews to a dedicated reviewer agent via `crew review`.
-The manager should NOT review code directly.
+1. Start review: `crew review <id>`
+2. Check result: `crew show <id>` (look for author=reviewer comment)
+3. Take action:
+   - ✅ LGTM → Done
+   - ❌ Issues → `crew comment <id> -R "..."` to notify worker
 
-#### Standard Review Workflow
-
-1. **Start review**: `crew review <id> &` (run in background)
-2. **Check progress**: Use `crew attach <id> --review` to monitor the reviewer's output (Note: `crew peek` does not support `--review`)
-3. **Wait for completion**: Monitor task status until it becomes `reviewed`
-4. **Check result**: `crew show <id>` and verify the presence of reviewer comments
-5. **Take action**:
-   - ✅ **LGTM**: `echo "y" | crew merge <id>`
-   - ❌ **Needs changes**:
-     - **If reviewer comments exist**: Forward feedback using `crew comment <id> -R "..."`. Provide a brief instruction referring to the reviewer's comments; do NOT transcribe the full findings.
-     - **If no reviewer comments**: If the review failed to save or encountered an error, re-run the review or manually paste the reviewer's output.
-
-**Important clarifications**:
-- **Reviewer comments (author=reviewer)** are stored in task comments as a record, NOT as a notification. The worker agent is not automatically notified when reviewer comments are saved.
-- **To notify and restart the worker**, you MUST use `crew comment <id> -R "..."`. This command:
-  - Sets task status to `in_progress`
-  - Notifies the running worker session with your message
-  - Triggers the worker to check and address the reviewer's feedback
-- **Completion from `reviewed` state**: You CANNOT use `crew complete` when a task is in `reviewed` status. To finalize a task:
-  - ✅ LGTM → Use `crew merge <id>` to merge and close
-  - ❌ Needs changes → Use `crew comment <id> -R "..."` to restart work, then review again
-  - 🚫 Abandon → Use `crew close <id>` to close without merging
-
-#### Needs Changes Template
-
-When the review identifies issues, use this template to forward concise, actionable instructions:
-
-```bash
-crew comment <id> -R "$(cat <<'MSG'
-Please address the reviewer's feedback (see task comments, author=reviewer).
-
-Priority issues:
-1. [Brief description of first issue]
-2. [Brief description of second issue]
-3. [Brief description of third issue]
-
-After fixing, set status to for_review for re-review.
-MSG
-)"
-```
-
----
-
-## Command Input Guidelines: Using HEREDOC for Safe Input
-
-When passing multi-line text or commands with special characters (backticks, `$()`, `<id>`, etc.) to crew commands, **always use HEREDOC syntax**. This prevents shell interpretation errors and ensures reliable command execution.
-
-### Why HEREDOC?
-
-- `crew comment` and `crew new --body` interpret shell metacharacters, causing:
-  - Lost text when `<id>` patterns are present
-  - Command substitution errors with `$(...)` or backticks
-  - Unpredictable behavior with quotes and escape sequences
-- HEREDOC syntax safely passes literal text while preserving formatting
-
-### Template: crew comment
-
-Use this template for sending plain comments to tasks:
-
-```bash
-crew comment TASK_ID "$(cat <<'MSG'
-Your comment text here.
-Multiple lines are supported.
-MSG
-)"
-```
-
-**Example**:
-```bash
-crew comment 42 "$(cat <<'MSG'
-Fixed the build error in src/main.go.
-Run tests to verify: make test
-MSG
-)"
-```
-
-### Template: crew comment -R (Reviewer feedback)
-
-Use this template for sending reviewer feedback or requested changes:
-
-```bash
-crew comment TASK_ID -R "$(cat <<'MSG'
-## Review Summary
-
-Please address the following issues:
-
-1. Issue 1: Description
-2. Issue 2: Description
-
-Run tests after fixing.
-MSG
-)"
-```
-
-**Example**:
-```bash
-crew comment 42 -R "$(cat <<'MSG'
-## Review Summary
-
-Please fix these issues:
-
-1. Add error handling in fetchData()
-2. Update tests for new validation logic
-
-After fixing, set status to for_review.
-MSG
-)"
-```
-
-### Template: crew new --body
-
-Use this template for creating tasks with detailed descriptions:
-
-```bash
-crew new --title "Feature: Description" --body "$(cat <<'BODY'
-## Summary
-- Brief description of the feature
-
-## Files to Change
-- src/component.ts
-- src/component.test.ts
-
-## Implementation Steps
-1. Step 1
-2. Step 2
-3. Step 3
-
-## Acceptance Criteria
-- [ ] Criterion 1
-- [ ] Criterion 2
-BODY
-)"
-```
-
-**Example**:
-```bash
-crew new --title "Add user authentication" --body "$(cat <<'BODY'
-## Summary
-- Implement JWT-based authentication for the API
-
-## Files to Change
-- src/auth.ts
-- src/auth.test.ts
-- src/middleware.ts
-
-## Implementation Steps
-1. Create JWT token generation function
-2. Add authentication middleware
-3. Update API endpoints to use middleware
-
-## Acceptance Criteria
-- [ ] Tokens are properly validated
-- [ ] All tests pass
-BODY
-)"
-```
-
----
-
-**Best practices**:
-- Reference reviewer comments instead of copying them verbatim
-- Highlight top 3-5 priority issues
-- Keep the message concise and actionable
-- Avoid duplicate information already in reviewer comments
-
-### Review Result Handling
-
-**Important**: Do NOT automatically forward all review findings to the worker.
-
-When the reviewer agent completes the review:
-
-1. **Review findings**: The reviewer provides feedback on code quality, architecture, errors, etc.
-2. **Filter and validate**: Manager (task creator) reviews the findings and assesses validity
-3. **Selective forwarding**: Only forward valid issues via `crew comment`
-4. **Clarify misunderstandings**: If reviewer misunderstood the context or requirements:
-   - Update task description or add supplementary comment
-   - Explain the valid reasoning behind the current implementation
-   - Do NOT just send the raw review findings to the worker
-
-**Manager responsibility**: The task creator is responsible for filtering review feedback and ensuring the worker receives only actionable, valid feedback.
-
----
+**Note**: Reviewer comments are for record only. Use `comment -R` to notify workers.
 
 ### "What's the progress?"
 
@@ -307,57 +135,12 @@ crew start <id> opencode
 
 ---
 
-## Task Creation Best Practices
-
-**Before writing detailed implementation plans**: Investigate the source code first to understand existing patterns and architecture. Do not guess file names or implementation details.
-
-**What to include in --body**:
-1. **Files to change**: File names and line numbers if possible
-2. **Implementation plan**: Break down into steps
-3. **Completion criteria**: Clear checklist format
-4. **References**: Pointers to related existing implementations
-
-**Note: Use HEREDOC for --body**
-When using `--body`, it is strongly recommended to use HEREDOC to prevent the shell from interpreting characters like backticks, quotes, or dollar signs.
-
-```bash
-crew new --title "..." --body "$(cat <<'EOF'
-## Summary
-- ...
-EOF
-)"
-```
-
-**Good example**:
-```markdown
-## Files to Change
-
-| File | Changes |
-|------|---------|
-| src/feature.ts | Update component logic |
-| src/feature.test.ts | Update tests |
-
-## Implementation Plan
-
-1. Change the component implementation
-2. Update tests
-3. Run CI
-
-## Completion Criteria
-
-- [ ] Feature works as expected
-- [ ] All tests pass
-```
-
----
-
 ## Important Notes
 
 1. **Send Enter after send**: `crew send <id> "..."` alone doesn't confirm input
 2. **Use crew exec for worktree operations**: `crew exec <id> -- <command>` runs command in worktree
 3. **Use main (NOT origin/main)**: In worktree, use `git merge main`
 4. **Use echo "y" for merge**: Skip interactive confirmation
-5. **Run review in background**: `crew review <id> &` - Reviews take time, run in background to continue other work
 
 ---
 
@@ -406,121 +189,9 @@ crew poll <id> --command 'echo "{{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.OldStatus{{"}}
 
 ## Auto Mode
 
-Trigger: Say **"auto mode"** to activate this workflow for managing multiple in-progress tasks.
+Trigger: Say **"auto mode"** to activate the autonomous task management workflow.
 
-### Purpose
-
-Advance all in-progress tasks automatically with minimal human intervention. Continue looping until each task reaches one of these states:
-- ✅ **LGTM** - Reviewer approval complete (task is `reviewed` with LGTM comment)
-- ⚠️ **Problematic** - Task flagged for issues (manager decision to stop and report to user)
-
-### Important: No Interaction During Auto Mode
-
-- **NO confirmations/questions until exit conditions are met** (y/n, selections, etc.)
-- Manager makes autonomous decisions about:
-  - When to run `crew review <id>`
-  - When to execute `crew comment -R`
-  - Whether to approve `needs_input` requests
-- **Exception**: Only in final summary, list items that cannot be decided (do NOT ask mid-session)
-
-### Target Statuses
-
-- **In scope**: `in_progress`, `needs_input`, `for_review`, `reviewing`, `reviewed`
-- **Out of scope**: `todo` (requires explicit start instruction)
-
-### Review Result Handling
-
-- ✅ **LGTM only** = task complete (marks endpoint)
-- ⚠️ **Minor issues** = NOT LGTM (continue work loop)
-- ❌ **Needs changes** = NOT LGTM (continue work loop)
-
-### Auto Mode Loop Specification (Priority Order)
-
-1. **`crew list`** - Enumerate in-scope tasks
-2. **`for_review` status**:
-   - Execute `crew review <id>`
-   - When status becomes `reviewed`, check reviewer comment
-   - ✅ If LGTM: Mark task as complete, move to next
-   - ⚠️/❌ If issues: Send `crew comment <id> -R "..."` **without asking** (notify worker, reset to `in_progress`)
-3. **`reviewed` status**:
-   - Check reviewer comment with `crew show <id>`
-   - Same handling as above
-   - Note: `reviewed` state cannot be completed with `crew complete` (no merge in auto mode)
-4. **`needs_input` status**:
-   - Check requirement with `crew peek <id>`
-   - Manager autonomously approves safe requests
-   - Flag problematic ones (destructive, security, host impact, out-of-scope, etc.)
-   - Continue other tasks first, report problems in final summary
-5. **`reviewing` status**:
-   - Wait (other tasks have priority)
-6. **`in_progress` status**:
-   - Wait, but use `crew peek <id>` to detect stalls/errors
-7. **Loop exit**: All in-scope tasks reach ✅ LGTM or ⚠️ problematic state
-
-### Safety Guidelines
-
-**Approve** (examples):
-- Worktree read/build/test/format: `mise run ci`, `go test`, `git diff`, `git status`
-- Branch operations within task scope
-
-**Deny** (examples):
-- Host system impact: persistent changes, permissions, service control
-- Out-of-scope worktree operations
-- Out-of-task file changes (e.g., doc-fix task modifying test files)
-- Destructive: broad `rm`, `git reset --hard` without justification, force push
-- Security risk: credential handling, etc.
-
-### Comment Template for Addressing Issues
-
-When reviewer finds ⚠️/❌ issues:
-
-```bash
-crew comment <id> -R "$(cat <<'MSG'
-Please address the reviewer's feedback (see task comments, author=reviewer).
-
-Priority issues:
-1) [Brief description]
-2) [Brief description]
-3) [Brief description]
-
-After fixing, set status to for_review for re-review.
-MSG
-)"
-```
-
-**Best practices**:
-- Reference instead of transcribing full findings
-- Highlight top 3 priorities
-- Keep concise and actionable
-- Avoid duplicating reviewer comments
-
-### Example Workflow
-
-```bash
-# Start auto mode (monitor multiple tasks)
-crew list  # See in_progress and for_review tasks
-
-# Task #100 is for_review
-crew review 100
-# After review: found issues
-crew comment 100 -R "..."  # Send feedback, reset to in_progress
-
-# Task #101 is for_review
-crew review 101
-# After review: LGTM
-# ✅ Task #101 complete
-
-# Task #100 now in_progress (was notified of feedback)
-# (Continue monitoring until it returns to for_review)
-crew poll 100 --expect for_review  # Wait for next review submission
-
-# Task #102 is needs_input (asking for permission)
-crew peek 102  # Check what permission is needed
-# If safe: approve with crew comment -R "..."
-# If risky: flag for manual decision in summary
-
-# Loop continues until all tasks are ✅ LGTM or ⚠️ flagged
-```
+Run `crew --help-manager-auto` for detailed Auto Mode specifications.
 
 ---
 

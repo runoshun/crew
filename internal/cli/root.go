@@ -27,6 +27,7 @@ func NewRootCommand(c *app.Container, version string) *cobra.Command {
 	var fullWorker bool
 	var fullManager bool
 	var managerOnboarding bool
+	var managerAuto bool
 
 	root := &cobra.Command{
 		Use:   "crew",
@@ -37,7 +38,8 @@ It combines git worktree + tmux to achieve a model where
 and isolated task execution.
 
 Use --help-worker or --help-manager for role-specific detailed help.
-Use --help-manager-onboarding to see the onboarding guide for new projects.`,
+Use --help-manager-onboarding to see the onboarding guide for new projects.
+Use --help-manager-auto to see the auto mode guide.`,
 		Version: version,
 		// SilenceUsage prevents usage from being printed on errors
 		SilenceUsage: true,
@@ -77,6 +79,9 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 			if managerOnboarding {
 				flagCount++
 			}
+			if managerAuto {
+				flagCount++
+			}
 			if flagCount > 1 {
 				return errors.New("cannot use multiple help flags together")
 			}
@@ -91,6 +96,9 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 			if managerOnboarding {
 				return showManagerOnboardingHelp(cmd.OutOrStdout())
 			}
+			if managerAuto {
+				return showManagerAutoHelp(cmd.OutOrStdout())
+			}
 			// Default: launch TUI
 			return launchTUIFunc(c)
 		},
@@ -100,6 +108,7 @@ Use --help-manager-onboarding to see the onboarding guide for new projects.`,
 	root.Flags().BoolVar(&fullWorker, "help-worker", false, "Show detailed help for worker agents")
 	root.Flags().BoolVar(&fullManager, "help-manager", false, "Show detailed help for manager agents")
 	root.Flags().BoolVar(&managerOnboarding, "help-manager-onboarding", false, "Show onboarding guide for setting up crew")
+	root.Flags().BoolVar(&managerAuto, "help-manager-auto", false, "Show auto mode guide for manager agents")
 
 	// Define command groups
 	root.AddGroup(
