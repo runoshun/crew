@@ -96,7 +96,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgReloadTasks:
 		// Reload tasks after returning from external commands
-		return m, m.loadTasks()
+		// Also reload comments if detail panel is showing
+		cmds := []tea.Cmd{m.loadTasks()}
+		if m.showDetailPanel() {
+			if task := m.SelectedTask(); task != nil {
+				cmds = append(cmds, m.loadComments(task.ID))
+			}
+		}
+		return m, tea.Batch(cmds...)
 
 	case MsgShowDiff:
 		// Trigger diff display for a task

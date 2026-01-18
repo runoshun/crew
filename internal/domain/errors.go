@@ -29,4 +29,5 @@ var (
 	ErrAgentNotFound         = errors.New("agent not found")
 	ErrAgentDisabled         = errors.New("agent is disabled")
 	ErrConfigNil             = errors.New("config is nil")
+	ErrEditorNotSet          = errors.New("no editor configured: set $EDITOR or $VISUAL environment variable")
 )

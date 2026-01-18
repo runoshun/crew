@@ -790,15 +790,16 @@ func (m *Model) prepareEditReviewComment() tea.Cmd {
 }
 
 // getEditor returns the user's preferred editor from environment variables.
-func getEditor() string {
+// Returns an error if neither EDITOR nor VISUAL is set.
+func getEditor() (string, error) {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
 		editor = os.Getenv("VISUAL")
 	}
 	if editor == "" {
-		editor = "vim"
+		return "", domain.ErrEditorNotSet
 	}
-	return editor
+	return editor, nil
 }
 
 // editorExecCmd wraps editor execution with pre/post file operations.
@@ -817,7 +818,10 @@ type editorExecCmd struct {
 }
 
 func (c *editorExecCmd) Run() error {
-	editor := getEditor()
+	editor, err := getEditor()
+	if err != nil {
+		return err
+	}
 
 	// Build editor command
 	// #nosec G204 - editor comes from trusted environment variable
@@ -826,8 +830,8 @@ func (c *editorExecCmd) Run() error {
 	cmd.Stdout = c.stdout
 	cmd.Stderr = c.stderr
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("editor failed: %w", err)
+	if runErr := cmd.Run(); runErr != nil {
+		return fmt.Errorf("editor failed: %w", runErr)
 	}
 
 	// Read edited content
