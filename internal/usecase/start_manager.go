@@ -100,7 +100,11 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 	// Append additional prompt if provided
 	finalPrompt := result.Prompt
 	if in.AdditionalPrompt != "" {
-		finalPrompt = result.Prompt + "\n\n" + in.AdditionalPrompt
+		if result.Prompt != "" {
+			finalPrompt = result.Prompt + "\n\n" + in.AdditionalPrompt
+		} else {
+			finalPrompt = in.AdditionalPrompt
+		}
 	}
 
 	return &StartManagerOutput{
