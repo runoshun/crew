@@ -51,6 +51,20 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 
 		// Transition to needs_input: permission asked
 		if (event.type === "permission.asked") {
+			const { id, metadata } = event.properties;
+			
+			// Auto-approve safe git operations in worktree
+			// metadata.command contains the shell command being executed
+			if (metadata && typeof metadata.command === 'string') {
+				const command = metadata.command.trim();
+				// Allow: git status, diff, log, add, commit
+				// Deny: push, reset --hard, clean -fd (by exclusion/not matching)
+				if (/^git\s+(status|diff|log|add|commit)(\s+|$)/.test(command)) {
+					await $.client.permission.reply({ requestID: id, reply: "once" });
+					return;
+				}
+			}
+
 			await ` + "$`crew edit {{.TaskID}} --status needs_input --if-status in_progress`" + `;
 		}
 
