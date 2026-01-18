@@ -52,17 +52,13 @@ func (uc *SessionEnded) Execute(_ context.Context, in SessionEndedInput) (*Sessi
 		return &SessionEndedOutput{Ignored: true}, nil
 	}
 
-	// Update status based on exit code and determine whether to clear session info
-	// - Normal exit (0) from in_progress: transition to for_review and keep session
-	// - Normal exit (0) from other states: maintain current status and keep session
-	// - Abnormal exit (non-zero): transition to error and clear session
+	// Update status based on task status and determine whether to clear session info
+	// - in_progress: transition to error and clear session (session end = abnormal if in_progress)
+	// - Other states: maintain current status and keep session
 	shouldClearSession := false
-	if in.ExitCode != 0 && task.Status == domain.StatusInProgress {
+	if task.Status == domain.StatusInProgress {
 		task.Status = domain.StatusError
 		shouldClearSession = true
-	} else if task.Status == domain.StatusInProgress {
-		// Normal exit from in_progress -> for_review (keep session for review/merge)
-		task.Status = domain.StatusForReview
 	}
 	// If already for_review, reviewed, or closed, don't change status or session
 
