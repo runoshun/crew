@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -105,6 +106,42 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Execute the diff command using domainExecCmd wrapper
 		// diff can return non-zero when there are differences, so ignore errors
 		return m, tea.Exec(&domainExecCmd{cmd: msg.cmd, ignoreErrors: true}, func(err error) tea.Msg {
+			return MsgReloadTasks{}
+		})
+
+	case execEditTaskMsg:
+		// Execute the editor for task editing
+		// Clean up temp file after editor closes
+		return m, tea.Exec(&editorExecCmd{
+			container: m.container,
+			taskID:    msg.taskID,
+			tmpPath:   msg.tmpPath,
+			origMD:    msg.origMD,
+			isComment: false,
+		}, func(err error) tea.Msg {
+			_ = os.Remove(msg.tmpPath)
+			if err != nil {
+				return MsgError{Err: err}
+			}
+			return MsgReloadTasks{}
+		})
+
+	case execEditCommentMsg:
+		// Execute the editor for comment editing
+		// Clean up temp file after editor closes
+		return m, tea.Exec(&editorExecCmd{
+			container:  m.container,
+			taskID:     msg.taskID,
+			tmpPath:    msg.tmpPath,
+			origMD:     msg.origMD,
+			isComment:  true,
+			commentIdx: msg.commentIdx,
+			commentMD:  msg.origMD,
+		}, func(err error) tea.Msg {
+			_ = os.Remove(msg.tmpPath)
+			if err != nil {
+				return MsgError{Err: err}
+			}
 			return MsgReloadTasks{}
 		})
 
@@ -338,6 +375,20 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.confirmAction = ConfirmDelete
 		m.confirmTaskID = task.ID
 		return m, nil
+
+	case key.Matches(msg, m.keys.Edit):
+		task := m.SelectedTask()
+		if task == nil {
+			return m, nil
+		}
+		return m, m.editTaskInEditor(task.ID)
+
+	case key.Matches(msg, m.keys.EditComment):
+		task := m.SelectedTask()
+		if task == nil {
+			return m, nil
+		}
+		return m, m.editLatestComment(task.ID)
 
 	case key.Matches(msg, m.keys.EditStatus):
 		task := m.SelectedTask()

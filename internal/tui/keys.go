@@ -17,10 +17,12 @@ type KeyMap struct {
 	Review key.Binding // Run review on task
 
 	// Task management
-	New        key.Binding // Create new task
-	Copy       key.Binding // Copy task
-	Delete     key.Binding // Delete task
-	EditStatus key.Binding // Change task status
+	New         key.Binding // Create new task
+	Copy        key.Binding // Copy task
+	Delete      key.Binding // Delete task
+	Edit        key.Binding // Edit task in editor
+	EditComment key.Binding // Edit latest comment in editor
+	EditStatus  key.Binding // Change task status
 
 	// Workflow
 	Merge key.Binding // Merge task
@@ -88,9 +90,17 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("d"),
 			key.WithHelp("d", "delete"),
 		),
-		EditStatus: key.NewBinding(
+		Edit: key.NewBinding(
 			key.WithKeys("e"),
-			key.WithHelp("e", "change status"),
+			key.WithHelp("e", "edit task"),
+		),
+		EditComment: key.NewBinding(
+			key.WithKeys("E"),
+			key.WithHelp("E", "edit comment"),
+		),
+		EditStatus: key.NewBinding(
+			key.WithKeys("="),
+			key.WithHelp("=", "change status"),
 		),
 		Merge: key.NewBinding(
 			key.WithKeys("m"),
@@ -151,11 +161,11 @@ func (k KeyMap) ShortHelp() []key.Binding {
 // FullHelp returns keybindings for the expanded help view.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Enter},                         // Navigation
-		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},   // Session
-		{k.New, k.Copy, k.Delete, k.EditStatus},         // Task management
-		{k.Merge, k.Close},                              // Workflow
-		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
+		{k.Up, k.Down, k.Enter},                                        // Navigation
+		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},                  // Session
+		{k.New, k.Copy, k.Delete, k.Edit, k.EditComment, k.EditStatus}, // Task management
+		{k.Merge, k.Close},                                             // Workflow
+		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit},                // View & general
 	}
 }
 
@@ -182,6 +192,8 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.New)
 	addKeys(k.Copy)
 	addKeys(k.Delete)
+	addKeys(k.Edit)
+	addKeys(k.EditComment)
 	addKeys(k.EditStatus)
 	addKeys(k.Merge)
 	addKeys(k.Close)
