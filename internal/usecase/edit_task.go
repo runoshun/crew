@@ -127,6 +127,9 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 		if newParentID == 0 {
 			// --parent 0 means remove parent
 			task.ParentID = nil
+		} else if newParentID < 0 {
+			// Negative IDs are invalid
+			return nil, domain.ErrInvalidParentID
 		} else {
 			// Validate parent exists
 			parent, err := uc.tasks.Get(newParentID)

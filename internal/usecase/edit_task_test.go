@@ -1300,6 +1300,27 @@ func TestEditTask_Execute_ParentNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrParentNotFound)
 }
 
+func TestEditTask_Execute_NegativeParentID(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - try to set negative parent ID
+	parentID := -1
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:   1,
+		ParentID: &parentID,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrInvalidParentID)
+}
+
 func TestEditTask_Execute_CircularReference_SelfReference(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
