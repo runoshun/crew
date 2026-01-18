@@ -58,12 +58,13 @@ func (uc *ShowTask) Execute(_ context.Context, in ShowTaskInput) (*ShowTaskOutpu
 
 	// Filter comments
 	if in.LastReview {
-		// Find latest comment by "reviewer"
+		// Find latest comment by "reviewer" based on Time
 		var latestReview *domain.Comment
-		for i := len(comments) - 1; i >= 0; i-- {
+		for i := range comments {
 			if comments[i].Author == "reviewer" {
-				latestReview = &comments[i]
-				break
+				if latestReview == nil || comments[i].Time.After(latestReview.Time) {
+					latestReview = &comments[i]
+				}
 			}
 		}
 

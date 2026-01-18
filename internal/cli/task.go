@@ -365,7 +365,13 @@ Examples:
   crew show
 
   # Output in JSON format
-  crew show 1 --json`,
+  crew show 1 --json
+
+  # Show only the latest reviewer comment
+  crew show 1 --last-review
+
+  # Show comments by a specific author
+  crew show 1 --comments-by reviewer`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve task ID
