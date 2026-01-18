@@ -137,22 +137,6 @@ type MsgCommentCountsLoaded struct {
 
 func (MsgCommentCountsLoaded) sealed() {}
 
-// MsgReviewCompleted is sent when a review is completed.
-type MsgReviewCompleted struct {
-	Review string // Review result from the agent
-	TaskID int
-}
-
-func (MsgReviewCompleted) sealed() {}
-
-// MsgReviewError is sent when a review fails.
-type MsgReviewError struct {
-	Err    error
-	TaskID int
-}
-
-func (MsgReviewError) sealed() {}
-
 // MsgReviewActionCompleted is sent when a review action is completed.
 type MsgReviewActionCompleted struct {
 	TaskID int
@@ -169,3 +153,11 @@ type MsgPrepareEditComment struct {
 }
 
 func (MsgPrepareEditComment) sealed() {}
+
+// MsgReviewResultLoaded is sent when review result (reviewer comment) is loaded for display.
+type MsgReviewResultLoaded struct {
+	Review string
+	TaskID int
+}
+
+func (MsgReviewResultLoaded) sealed() {}

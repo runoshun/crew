@@ -169,41 +169,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateTaskList()
 		return m, nil
 
-	case MsgReviewCompleted:
-		// Ignore if cancelled or TaskID mismatch (stale result from previous review)
-		if m.reviewCancelled || m.reviewTaskID == 0 || m.reviewTaskID != msg.TaskID {
-			// Clear review state if this was a cancelled review
-			if m.reviewCancelled && m.reviewTaskID == msg.TaskID {
-				m.reviewCancelled = false
-				m.reviewTaskID = 0
-				m.reviewResult = ""
-			}
-			return m, nil
-		}
-		m.mode = ModeReviewResult
-		m.reviewResult = msg.Review
-		// Initialize viewport with review content
-		m.reviewViewport.SetContent(msg.Review)
-		m.reviewViewport.GotoTop()
-		return m, m.loadTasks()
-
-	case MsgReviewError:
-		// Ignore if cancelled or TaskID mismatch (stale error from previous review)
-		if m.reviewCancelled || m.reviewTaskID == 0 || m.reviewTaskID != msg.TaskID {
-			// Clear review state if this was a cancelled review
-			if m.reviewCancelled && m.reviewTaskID == msg.TaskID {
-				m.reviewCancelled = false
-				m.reviewTaskID = 0
-				m.reviewResult = ""
-			}
-			return m, nil
-		}
-		m.err = msg.Err
-		m.mode = ModeNormal
-		m.reviewTaskID = 0
-		m.reviewResult = ""
-		return m, nil
-
 	case MsgReviewActionCompleted:
 		m.mode = ModeNormal
 		m.reviewTaskID = 0
@@ -216,6 +181,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.editCommentIndex = msg.Index
 		m.editCommentInput.SetValue(msg.Message)
 		m.editCommentInput.Focus()
+		return m, nil
+
+	case MsgReviewResultLoaded:
+		m.reviewTaskID = msg.TaskID
+		m.reviewResult = msg.Review
+		m.mode = ModeReviewResult
+		m.reviewViewport.SetContent(msg.Review)
+		m.updateReviewViewport()
 		return m, nil
 	}
 
@@ -250,8 +223,6 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEditStatusMode(msg)
 	case ModeExec:
 		return m.handleExecMode(msg)
-	case ModeReviewing:
-		return m.handleReviewingMode(msg)
 	case ModeReviewResult:
 		return m.handleReviewResultMode(msg)
 	case ModeReviewAction:
@@ -352,10 +323,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.err = fmt.Errorf("task worktree not found - cannot review")
 			return m, nil
 		}
-		m.mode = ModeReviewing
-		m.reviewTaskID = task.ID
-		m.reviewResult = ""
-		m.reviewCancelled = false
+		// Start review in background (tmux review session)
 		return m, m.reviewTask(task.ID)
 
 	case key.Matches(msg, m.keys.New):
@@ -492,11 +460,15 @@ func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
 			return MsgAttachSession{TaskID: task.ID, Review: true}
 		}
 
-	case domain.StatusForReview, domain.StatusReviewed:
+	case domain.StatusForReview:
 		// Show diff for review (attach is available via 'a' key)
 		return m, func() tea.Msg {
 			return MsgShowDiff{TaskID: task.ID}
 		}
+
+	case domain.StatusReviewed:
+		// Load and show review result, then allow actions (merge, request changes, etc.)
+		return m, m.loadReviewResult(task.ID)
 
 	case domain.StatusClosed:
 		// Show detail view for terminal states
@@ -909,20 +881,6 @@ func (m *Model) handleExecMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.execInput, cmd = m.execInput.Update(msg)
 	return m, cmd
-}
-
-// handleReviewingMode handles keys while review is in progress.
-func (m *Model) handleReviewingMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Allow escaping during review
-	if key.Matches(msg, m.keys.Escape) {
-		// Mark as cancelled so completion message will be ignored
-		m.reviewCancelled = true
-		m.mode = ModeNormal
-		m.reviewTaskID = 0
-		return m, nil
-	}
-	// Ignore other keys while reviewing
-	return m, nil
 }
 
 // handleReviewResultMode handles keys when viewing review results.

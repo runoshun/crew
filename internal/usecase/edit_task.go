@@ -15,6 +15,7 @@ type EditTaskInput struct {
 	Title        *string         // New title (nil = no change)
 	Description  *string         // New description (nil = no change)
 	Status       *domain.Status  // New status (nil = no change)
+	SkipReview   *bool           // New skip_review setting (nil = no change)
 	EditorText   string          // Markdown text from editor (only used when EditorEdit is true)
 	Labels       []string        // Labels to set (replaces all existing labels, nil = no change)
 	AddLabels    []string        // Labels to add
@@ -50,7 +51,7 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	}
 
 	// Validate that at least one field is being updated
-	if in.Title == nil && in.Description == nil && in.Status == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
+	if in.Title == nil && in.Description == nil && in.Status == nil && in.SkipReview == nil && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
@@ -110,6 +111,11 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 		}
 	}
 
+	// Handle skip_review
+	if in.SkipReview != nil {
+		task.SkipReview = in.SkipReview
+	}
+
 	// Handle labels
 	if in.LabelsSet {
 		// Replace all labels with the new set (deduplicated)
@@ -150,14 +156,72 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Parse markdown content
-	if err := task.FromMarkdown(in.EditorText); err != nil {
-		return nil, fmt.Errorf("failed to parse markdown: %w", err)
+	// Parse editor content (includes comments)
+	content, err := domain.ParseEditorContent(in.EditorText)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse editor content: %w", err)
 	}
 
-	// Save updated task
-	if err := uc.tasks.Save(task); err != nil {
-		return nil, fmt.Errorf("save task: %w", err)
+	// Get original comments to validate and prepare updates
+	originalComments, err := uc.tasks.GetComments(in.TaskID)
+	if err != nil {
+		return nil, fmt.Errorf("get comments: %w", err)
+	}
+
+	// Validate comment count matches (no add/delete allowed)
+	if len(content.Comments) != len(originalComments) {
+		return nil, fmt.Errorf("comment count mismatch: expected %d, got %d (adding/deleting comments is not allowed)",
+			len(originalComments), len(content.Comments))
+	}
+
+	// Prepare updated comments list (copy of original, with edits applied)
+	updatedComments := make([]domain.Comment, len(originalComments))
+	copy(updatedComments, originalComments)
+
+	// Validate all comment indices are unique and form a complete sequence 0..N-1
+	if len(originalComments) > 0 {
+		// Track which indices are present
+		seenIndices := make(map[int]bool, len(content.Comments))
+
+		for _, parsed := range content.Comments {
+			// Validate index is within bounds
+			if parsed.Index < 0 || parsed.Index >= len(originalComments) {
+				return nil, fmt.Errorf("invalid comment index: %d", parsed.Index)
+			}
+
+			// Check for duplicate indices
+			if seenIndices[parsed.Index] {
+				return nil, fmt.Errorf("duplicate comment index: %d", parsed.Index)
+			}
+			seenIndices[parsed.Index] = true
+
+			// Apply text update (preserve original author and time)
+			original := originalComments[parsed.Index]
+			updatedComments[parsed.Index] = domain.Comment{
+				Text:   parsed.Text,
+				Time:   original.Time,
+				Author: original.Author,
+			}
+		}
+
+		// Verify all indices are present (0 to N-1)
+		for i := 0; i < len(originalComments); i++ {
+			if !seenIndices[i] {
+				return nil, fmt.Errorf("missing comment index: %d", i)
+			}
+		}
+	}
+
+	// Update task fields
+	task.Title = content.Title
+	task.Description = content.Description
+	if content.LabelsFound {
+		task.Labels = content.Labels
+	}
+
+	// Atomically save task and comments together
+	if err := uc.tasks.SaveTaskWithComments(task, updatedComments); err != nil {
+		return nil, fmt.Errorf("save task with comments: %w", err)
 	}
 
 	return &EditTaskOutput{Task: task}, nil

@@ -15,7 +15,7 @@ import (
 type PollTaskInput struct {
 	CommandTemplate  string          // Command template to execute on status change
 	ExpectedStatuses []domain.Status // Expected statuses (if current status differs, notify immediately)
-	TaskID           int             // Task ID to poll
+	TaskIDs          []int           // Task IDs to poll (monitors multiple tasks)
 	Interval         int             // Polling interval in seconds (default: 10)
 	Timeout          int             // Timeout in seconds (0 = no timeout)
 }
@@ -54,53 +54,68 @@ type CommandData struct {
 
 // Execute polls the task status and executes the command on status change.
 func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOutput, error) {
+	// Validate input
+	if len(in.TaskIDs) == 0 {
+		return nil, fmt.Errorf("at least one task ID is required")
+	}
+
 	// Validate interval
 	if in.Interval <= 0 {
 		in.Interval = 10
 	}
 
-	// Get initial task state
-	task, err := uc.tasks.Get(in.TaskID)
-	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
-	}
+	// Get initial state for all tasks
+	previousStatuses := make(map[int]domain.Status)
+	var activeTaskIDs []int // Tasks that are not in terminal state
+	for _, taskID := range in.TaskIDs {
+		task, err := uc.tasks.Get(taskID)
+		if err != nil {
+			return nil, fmt.Errorf("get task %d: %w", taskID, err)
+		}
+		if task == nil {
+			return nil, fmt.Errorf("task %d: %w", taskID, domain.ErrTaskNotFound)
+		}
 
-	// Check if current status matches expected statuses (immediate notification if different)
-	// This must come before terminal check to ensure notification even for terminal states
-	if len(in.ExpectedStatuses) > 0 {
-		if !uc.containsStatus(in.ExpectedStatuses, task.Status) {
-			// Current status differs from expected - notify immediately
-			if in.CommandTemplate != "" {
-				// Join expected statuses for display
-				expectedStr := ""
-				for i, s := range in.ExpectedStatuses {
-					if i > 0 {
-						expectedStr += ","
+		// Check if current status matches expected statuses (immediate notification if different)
+		// This must come before terminal check to ensure notification even for terminal states
+		if len(in.ExpectedStatuses) > 0 {
+			if !uc.containsStatus(in.ExpectedStatuses, task.Status) {
+				// Current status differs from expected - notify immediately
+				if in.CommandTemplate != "" {
+					// Join expected statuses for display
+					expectedStr := ""
+					for i, s := range in.ExpectedStatuses {
+						if i > 0 {
+							expectedStr += ","
+						}
+						expectedStr += string(s)
 					}
-					expectedStr += string(s)
+					data := CommandData{
+						TaskID:    taskID,
+						OldStatus: expectedStr, // Show all expected statuses
+						NewStatus: string(task.Status),
+					}
+					if err := uc.executeCommand(ctx, in.CommandTemplate, data); err != nil {
+						return nil, fmt.Errorf("execute command: %w", err)
+					}
 				}
-				data := CommandData{
-					TaskID:    in.TaskID,
-					OldStatus: expectedStr, // Show all expected statuses
-					NewStatus: string(task.Status),
-				}
-				if err := uc.executeCommand(ctx, in.CommandTemplate, data); err != nil {
-					return nil, fmt.Errorf("execute command: %w", err)
-				}
+				return &PollTaskOutput{}, nil
 			}
-			return &PollTaskOutput{}, nil
+		}
+
+		previousStatuses[taskID] = task.Status
+
+		// Track non-terminal tasks for monitoring
+		if !uc.isTerminalStatus(task.Status) {
+			activeTaskIDs = append(activeTaskIDs, taskID)
 		}
 	}
 
-	// Check if task is already in terminal state (immediate exit)
-	if uc.isTerminalStatus(task.Status) {
+	// If ALL tasks are already in terminal state, exit immediately
+	if len(activeTaskIDs) == 0 {
 		return &PollTaskOutput{}, nil
 	}
 
-	previousStatus := task.Status
 	ticker := time.NewTicker(time.Duration(in.Interval) * time.Second)
 	defer ticker.Stop()
 
@@ -124,31 +139,46 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 			// Timeout reached
 			return &PollTaskOutput{}, nil
 		case <-ticker.C:
-			// Poll the task
-			task, err := uc.tasks.Get(in.TaskID)
-			if err != nil {
-				return nil, fmt.Errorf("get task: %w", err)
-			}
-			if task == nil {
-				return nil, domain.ErrTaskNotFound
+			// Poll only active (non-terminal) tasks
+			var stillActiveTaskIDs []int
+			for _, taskID := range activeTaskIDs {
+				task, err := uc.tasks.Get(taskID)
+				if err != nil {
+					return nil, fmt.Errorf("get task %d: %w", taskID, err)
+				}
+				if task == nil {
+					return nil, fmt.Errorf("task %d: %w", taskID, domain.ErrTaskNotFound)
+				}
+
+				previousStatus := previousStatuses[taskID]
+				// Check for status change
+				if task.Status != previousStatus {
+					// Execute command
+					if in.CommandTemplate != "" {
+						data := CommandData{
+							TaskID:    taskID,
+							OldStatus: string(previousStatus),
+							NewStatus: string(task.Status),
+						}
+						if err := uc.executeCommand(ctx, in.CommandTemplate, data); err != nil {
+							return nil, fmt.Errorf("execute command: %w", err)
+						}
+					}
+					// Exit immediately after one change detection
+					return &PollTaskOutput{}, nil
+				}
+
+				// Keep tracking non-terminal tasks
+				if !uc.isTerminalStatus(task.Status) {
+					stillActiveTaskIDs = append(stillActiveTaskIDs, taskID)
+				}
 			}
 
-			// Check for status change
-			if task.Status != previousStatus {
-				// Execute command
-				if in.CommandTemplate != "" {
-					data := CommandData{
-						TaskID:    in.TaskID,
-						OldStatus: string(previousStatus),
-						NewStatus: string(task.Status),
-					}
-					if err := uc.executeCommand(ctx, in.CommandTemplate, data); err != nil {
-						return nil, fmt.Errorf("execute command: %w", err)
-					}
-				}
-				// Exit immediately after one change detection
+			// If all tasks have become terminal, exit
+			if len(stillActiveTaskIDs) == 0 {
 				return &PollTaskOutput{}, nil
 			}
+			activeTaskIDs = stillActiveTaskIDs
 		}
 	}
 }

@@ -24,6 +24,7 @@ func newNewCommand(c *app.Container) *cobra.Command {
 		Labels      []string
 		ParentID    int
 		Issue       int
+		SkipReview  bool
 	}
 
 	cmd := &cobra.Command{
@@ -32,20 +33,31 @@ func newNewCommand(c *app.Container) *cobra.Command {
 		Long: `Create a new task for git-crew to manage.
 
 The task is created with status 'todo'. The worktree and branch
-are not created until the task is started with 'git crew start'.
+are not created until the task is started with 'crew start <id> [agent]'.
 
 Examples:
   # Create a root task
-  git crew new --title "Auth refactoring"
+  crew new --title "Auth refactoring"
 
   # Create a sub-task under task #1
-  git crew new --parent 1 --title "OAuth2.0 implementation"
+  crew new --parent 1 --title "OAuth2.0 implementation"
 
   # Create a task linked to a GitHub issue
-  git crew new --title "Fix login bug" --issue 42
+  crew new --title "Fix login bug" --issue 42
 
   # Create a task with labels
-  git crew new --title "Add feature" --label feature --label urgent`,
+  crew new --title "Add feature" --label feature --label urgent
+
+  # Create a task with body using HEREDOC (recommended for complex descriptions)
+  crew new --title "Complex task" --body "$(cat <<'EOF'
+## Summary
+- Step 1
+- Step 2
+EOF
+)"
+
+  # Create a task that skips review on completion
+  crew new --title "Quick fix" --skip-review`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Build input
 			// BaseBranch: if --base is provided, use it; otherwise empty (let UseCase decide)
@@ -60,6 +72,11 @@ Examples:
 			// Set parent ID if specified
 			if opts.ParentID > 0 {
 				input.ParentID = &opts.ParentID
+			}
+
+			// Set skip_review only if flag was explicitly provided
+			if cmd.Flags().Changed("skip-review") {
+				input.SkipReview = &opts.SkipReview
 			}
 
 			// Execute use case
@@ -84,6 +101,7 @@ Examples:
 	cmd.Flags().IntVar(&opts.Issue, "issue", 0, "Linked GitHub issue number")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Labels (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Base, "base", "", "Base branch for worktree (default: current branch)")
+	cmd.Flags().BoolVar(&opts.SkipReview, "skip-review", false, "Skip review on task completion (go directly to reviewed)")
 
 	return cmd
 }
@@ -116,25 +134,25 @@ With --processes (-p), process details are shown instead of the task list.
 
 Examples:
   # List active tasks (default: exclude closed)
-  git crew list
+  crew list
 
   # List all tasks including closed
-  git crew list --all
-  git crew list -a
+  crew list --all
+  crew list -a
 
   # List with session information
-  git crew list -s
-  git crew list --sessions
+  crew list -s
+  crew list --sessions
 
   # List with process information
-  git crew list -p
-  git crew list --processes
+  crew list -p
+  crew list --processes
 
   # List only sub-tasks of task #1
-  git crew list --parent 1
+  crew list --parent 1
 
   # List tasks with specific labels
-  git crew list --label bug --label urgent`,
+  crew list --label bug --label urgent`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Build input
 			input := usecase.ListTasksInput{
@@ -327,7 +345,9 @@ func formatDuration(d time.Duration) string {
 // newShowCommand creates the show command for displaying task details.
 func newShowCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		JSON bool
+		CommentsBy string
+		JSON       bool
+		LastReview bool
 	}
 
 	cmd := &cobra.Command{
@@ -349,13 +369,19 @@ Output includes:
 
 Examples:
   # Show task by ID
-  git crew show 1
+  crew show 1
 
   # Auto-detect task from current branch
-  git crew show
+  crew show
 
   # Output in JSON format
-  git crew show 1 --json`,
+  crew show 1 --json
+
+  # Show only the latest reviewer comment
+  crew show 1 --last-review
+
+  # Show comments by a specific author
+  crew show 1 --comments-by reviewer`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve task ID
@@ -367,7 +393,9 @@ Examples:
 			// Execute use case
 			uc := c.ShowTaskUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.ShowTaskInput{
-				TaskID: taskID,
+				TaskID:     taskID,
+				CommentsBy: opts.CommentsBy,
+				LastReview: opts.LastReview,
 			})
 			if err != nil {
 				return err
@@ -433,6 +461,8 @@ Examples:
 	}
 
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output in JSON format")
+	cmd.Flags().StringVar(&opts.CommentsBy, "comments-by", "", "Filter comments by author")
+	cmd.Flags().BoolVar(&opts.LastReview, "last-review", false, "Show only the latest review comment")
 
 	return cmd
 }
@@ -491,6 +521,8 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		AddLabels    []string
 		RemoveLabels []string
 		IfStatus     []string
+		SkipReview   bool
+		NoSkipReview bool
 	}
 
 	cmd := &cobra.Command{
@@ -506,37 +538,43 @@ the task is updated directly without opening an editor.
 
 Examples:
   # Open task in editor
-  git crew edit 1
+  crew edit 1
 
   # Change task title
-  git crew edit 1 --title "New task title"
+  crew edit 1 --title "New task title"
 
   # Update description
-  git crew edit 1 --body "Updated description text"
+  crew edit 1 --body "Updated description text"
 
   # Change task status
-  git crew edit 1 --status for_review
+  crew edit 1 --status for_review
 
   # Conditional status change (only if current status matches)
-  git crew edit 1 --status needs_input --if-status in_progress
+  crew edit 1 --status needs_input --if-status in_progress
 
   # Multiple conditions (status change only if current status is one of these)
-  git crew edit 1 --status needs_input --if-status in_progress --if-status needs_input
+  crew edit 1 --status needs_input --if-status in_progress --if-status needs_input
 
   # Replace all labels (comma-separated)
-  git crew edit 1 --labels bug,urgent
+  crew edit 1 --labels bug,urgent
 
   # Clear all labels
-  git crew edit 1 --labels ""
+  crew edit 1 --labels ""
 
   # Add labels
-  git crew edit 1 --add-label bug --add-label urgent
+  crew edit 1 --add-label bug --add-label urgent
 
   # Remove labels
-  git crew edit 1 --rm-label old-label
+  crew edit 1 --rm-label old-label
 
   # Multiple changes at once
-  git crew edit 1 --title "New title" --add-label feature --rm-label draft`,
+  crew edit 1 --title "New title" --add-label feature --rm-label draft
+
+  # Enable skip_review for a task
+  crew edit 1 --skip-review
+
+  # Disable skip_review for a task
+  crew edit 1 --no-skip-review`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -552,7 +590,9 @@ Examples:
 				cmd.Flags().Changed("labels") ||
 				len(opts.AddLabels) > 0 ||
 				len(opts.RemoveLabels) > 0 ||
-				len(opts.IfStatus) > 0
+				len(opts.IfStatus) > 0 ||
+				cmd.Flags().Changed("skip-review") ||
+				cmd.Flags().Changed("no-skip-review")
 
 			if !hasFlags {
 				// Editor mode: open task in editor
@@ -591,6 +631,14 @@ Examples:
 				}
 				input.IfStatus = statuses
 			}
+			if cmd.Flags().Changed("skip-review") {
+				v := true
+				input.SkipReview = &v
+			}
+			if cmd.Flags().Changed("no-skip-review") {
+				v := false
+				input.SkipReview = &v
+			}
 
 			// Execute use case
 			uc := c.EditTaskUseCase()
@@ -612,13 +660,16 @@ Examples:
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")
 	cmd.Flags().StringArrayVar(&opts.RemoveLabels, "rm-label", nil, "Labels to remove (can specify multiple)")
+	cmd.Flags().BoolVar(&opts.SkipReview, "skip-review", false, "Enable skip_review for this task (skip review on completion)")
+	cmd.Flags().BoolVar(&opts.NoSkipReview, "no-skip-review", false, "Disable skip_review for this task (require review on completion)")
+	cmd.MarkFlagsMutuallyExclusive("skip-review", "no-skip-review")
 
 	return cmd
 }
 
 // editTaskWithEditor opens the task in an editor for editing.
 func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error {
-	// Get current task
+	// Get current task with comments
 	showUC := c.ShowTaskUseCase()
 	showOut, err := showUC.Execute(cmd.Context(), usecase.ShowTaskInput{
 		TaskID: taskID,
@@ -637,8 +688,8 @@ func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error 
 	tmpPath := tmpFile.Name()
 	defer func() { _ = os.Remove(tmpPath) }()
 
-	// Write task as markdown
-	markdown := task.ToMarkdown()
+	// Write task as markdown with comments
+	markdown := task.ToMarkdownWithComments(showOut.Comments)
 	if _, writeErr := tmpFile.WriteString(markdown); writeErr != nil {
 		_ = tmpFile.Close()
 		return fmt.Errorf("failed to write temp file: %w", writeErr)
@@ -700,10 +751,10 @@ The base branch is set to the source task's branch name.
 
 Examples:
   # Copy task with default title
-  git crew cp 1
+  crew cp 1
 
   # Copy task with custom title
-  git crew cp 1 --title "New feature based on #1"`,
+  crew cp 1 --title "New feature based on #1"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -752,10 +803,10 @@ clean up worktrees or sessions - that will be added in later phases.
 
 Examples:
   # Delete task by ID
-  git crew rm 1
+  crew rm 1
 
   # Delete task using # prefix
-  git crew rm "#1"`,
+  crew rm "#1"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -799,17 +850,17 @@ They can be used to track progress, notes, or any relevant information.
 
 Examples:
   # Add a comment to task #1
-  git crew comment 1 "Started working on authentication"
+  crew comment 1 "Started working on authentication"
 
   # Request changes (comment + status change + notification)
-  git crew comment 1 "修正してください" --request-changes
-  git crew comment 1 "修正してください" -R
+  crew comment 1 "修正してください" --request-changes
+  crew comment 1 "修正してください" -R
 
   # Edit an existing comment (index starts from 0)
-  git crew comment 1 --edit 0 "Updated message"
+  crew comment 1 --edit 0 "Updated message"
 
   # Use with task ID prefix
-  git crew comment "#1" "Completed initial implementation"`,
+  crew comment "#1" "Completed initial implementation"`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -883,10 +934,10 @@ The task will remain in the task list but will not be merged.
 
 Examples:
   # Close task by ID
-  git crew close 1
+  crew close 1
 
   # Close task using # prefix
-  git crew close "#1"`,
+  crew close "#1"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID

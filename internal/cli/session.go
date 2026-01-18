@@ -28,13 +28,13 @@ through the {{.Args}} template variable.
 
 Examples:
   # Show diff for task #1
-  git crew diff 1
+  crew diff 1
 
   # Show diff with --stat
-  git crew diff 1 --stat
+  crew diff 1 --stat
 
   # Show diff for specific file
-  git crew diff 1 -- path/to/file.go`,
+  crew diff 1 -- path/to/file.go`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -71,6 +71,7 @@ func newStartCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		model        string
 		continueFlag bool
+		skipReview   bool
 	}
 
 	cmd := &cobra.Command{
@@ -87,18 +88,21 @@ In the MVP version, this is the full command (e.g., "claude", "bash").
 
 Examples:
   # Start task #1 with claude
-  git crew start 1 claude
+  crew start 1 claude
 
   # Start task with a different agent
-  git crew start 1 bash
+  crew start 1 bash
 
   # Start task with a specific model
-  git crew start 1 claude --model sonnet
-  git crew start 1 opencode -m gpt-4o
+  crew start 1 claude --model sonnet
+  crew start 1 opencode -m gpt-4o
 
   # Continue a stopped task
-  git crew start 1 --continue
-  git crew start 1 -c`,
+  crew start 1 --continue
+  crew start 1 -c
+
+  # Start task with skip_review enabled (skip review on completion)
+  crew start 1 claude --skip-review`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -115,12 +119,17 @@ Examples:
 
 			// Execute use case
 			uc := c.StartTaskUseCase()
-			out, err := uc.Execute(cmd.Context(), usecase.StartTaskInput{
+			input := usecase.StartTaskInput{
 				TaskID:   taskID,
 				Agent:    agent,
 				Model:    opts.model,
 				Continue: opts.continueFlag,
-			})
+			}
+			// Set skip_review only if flag was explicitly provided
+			if cmd.Flags().Changed("skip-review") {
+				input.SkipReview = &opts.skipReview
+			}
+			out, err := uc.Execute(cmd.Context(), input)
 			if err != nil {
 				return err
 			}
@@ -133,6 +142,7 @@ Examples:
 
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
 	cmd.Flags().BoolVarP(&opts.continueFlag, "continue", "c", false, "Continue from previous session")
+	cmd.Flags().BoolVar(&opts.skipReview, "skip-review", false, "Set skip_review for this task (skip review on completion)")
 
 	return cmd
 }
@@ -158,10 +168,10 @@ Preconditions:
 
 Examples:
   # Attach to work session for task #1
-  git crew attach 1
+  crew attach 1
 
   # Attach to review session for task #1
-  git crew attach 1 --review`,
+  crew attach 1 --review`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -211,15 +221,15 @@ Preconditions:
 
 Examples:
   # View last 30 lines (default) of task #1 session
-  git crew peek 1
+  crew peek 1
 
   # View last 50 lines
-  git crew peek 1 --lines 50
-  git crew peek 1 -n 50
+  crew peek 1 --lines 50
+  crew peek 1 -n 50
 
   # View with ANSI escape sequences (colors)
-  git crew peek 1 --escape
-  git crew peek 1 -e`,
+  crew peek 1 --escape
+  crew peek 1 -e`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -273,13 +283,13 @@ the status. If the command fails, the completion is aborted.
 
 Examples:
   # Complete task by ID
-  git crew complete 1
+  crew complete 1
 
   # Complete with a comment
-  git crew complete 1 --comment "Implementation complete"
+  crew complete 1 --comment "Implementation complete"
 
   # Auto-detect task from current branch (when working in a worktree)
-  git crew complete`,
+  crew complete`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve task ID
@@ -289,7 +299,7 @@ Examples:
 			}
 
 			// Execute use case
-			uc := c.CompleteTaskUseCase()
+			uc := c.CompleteTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 			out, err := uc.Execute(cmd.Context(), usecase.CompleteTaskInput{
 				TaskID:  taskID,
 				Comment: opts.comment,
@@ -298,7 +308,11 @@ Examples:
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
+			if out.ReviewStarted {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d and started review (session: %s): %s\n", out.Task.ID, out.ReviewSession, out.Task.Title)
+			} else {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
+			}
 			return nil
 		},
 	}
@@ -409,16 +423,16 @@ Preconditions:
 
 Examples:
   # Send Enter key to task #1
-  git crew send 1 Enter
+  crew send 1 Enter
 
   # Send Tab key for completion
-  git crew send 1 Tab
+  crew send 1 Tab
 
   # Send Escape key
-  git crew send 1 Escape
+  crew send 1 Escape
 
   # Send text
-  git crew send 1 "hello world"`,
+  crew send 1 "hello world"`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -462,7 +476,7 @@ The worktree is NOT deleted (use 'close' to also delete the worktree).
 
 Examples:
   # Stop session for task #1
-  git crew stop 1`,
+  crew stop 1`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -506,13 +520,13 @@ Preconditions:
 
 Examples:
   # Run tests in task #1's worktree
-  git crew exec 1 -- npm test
+  crew exec 1 -- npm test
 
   # Check git status in task's worktree
-  git crew exec 1 -- git status
+  crew exec 1 -- git status
 
   # Run a build command
-  git crew exec 1 -- make build`,
+  crew exec 1 -- make build`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -576,13 +590,13 @@ Processing:
 
 Examples:
   # Merge task #1 into its base branch (or default branch if not set)
-  git crew merge 1
+  crew merge 1
 
   # Merge task #1 into feature/workspace branch (override task's base branch)
-  git crew merge 1 --base feature/workspace
+  crew merge 1 --base feature/workspace
 
   # Skip confirmation prompt
-  git crew merge 1 --yes`,
+  crew merge 1 --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID

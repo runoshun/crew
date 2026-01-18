@@ -377,3 +377,27 @@ func TestStartManager_Execute_WithDisabledAgent(t *testing.T) {
 	assert.Contains(t, err.Error(), "opencode-manager")
 	assert.Contains(t, err.Error(), "disabled")
 }
+
+func TestStartManager_Execute_RoleMismatch(t *testing.T) {
+	repoRoot := t.TempDir()
+	gitDir := repoRoot + "/.git"
+
+	configLoader := testutil.NewMockConfigLoader()
+	// Configure a worker agent (RoleWorker)
+	configLoader.Config.Agents["test-worker"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "worker-cmd",
+	}
+
+	uc := NewStartManager(configLoader, repoRoot, gitDir)
+
+	// Execute with worker agent (should fail)
+	_, err := uc.Execute(context.Background(), StartManagerInput{
+		Name: "test-worker",
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrAgentRoleMismatch)
+	assert.Contains(t, err.Error(), "test-worker")
+	assert.Contains(t, err.Error(), "worker")
+}

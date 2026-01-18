@@ -862,3 +862,334 @@ func TestEditTask_Execute_InvalidIfStatus(t *testing.T) {
 	// Assert
 	assert.ErrorIs(t, err, domain.ErrInvalidStatus)
 }
+
+func TestEditTask_Execute_EditorMode_WithComments(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Original Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "Original comment", Author: "worker", Time: now},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - edit comment text
+	markdown := `---
+title: Updated Title
+labels:
+---
+
+Updated description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+Edited comment text`
+
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "Updated Title", out.Task.Title)
+	assert.Equal(t, "Updated description", out.Task.Description)
+
+	// Verify comment was updated
+	comments := repo.Comments[1]
+	require.Len(t, comments, 1)
+	assert.Equal(t, "Edited comment text", comments[0].Text)
+	// Author and time should be preserved
+	assert.Equal(t, "worker", comments[0].Author)
+	assert.Equal(t, now, comments[0].Time)
+}
+
+func TestEditTask_Execute_EditorMode_MultipleComments(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	later := now.Add(time.Hour)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "First comment", Author: "worker", Time: now},
+		{Text: "Second comment", Author: "manager", Time: later},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - edit only second comment
+	markdown := `---
+title: Title
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+First comment
+
+---
+# Comment: 1
+# Author: manager
+# Time: 2026-01-18T11:00:00Z
+
+Edited second comment`
+
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "Title", out.Task.Title)
+
+	// Verify comments
+	comments := repo.Comments[1]
+	require.Len(t, comments, 2)
+	assert.Equal(t, "First comment", comments[0].Text) // unchanged
+	assert.Equal(t, "Edited second comment", comments[1].Text)
+	// Metadata preserved
+	assert.Equal(t, "manager", comments[1].Author)
+	assert.Equal(t, later, comments[1].Time)
+}
+
+func TestEditTask_Execute_EditorMode_CommentUnchanged(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "Same comment", Author: "worker", Time: now},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - comment text unchanged
+	markdown := `---
+title: Title
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+Same comment`
+
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "Title", out.Task.Title)
+	// Comment should still be unchanged
+	comments := repo.Comments[1]
+	require.Len(t, comments, 1)
+	assert.Equal(t, "Same comment", comments[0].Text)
+}
+
+func TestEditTask_Execute_EditorMode_InvalidCommentIndex(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "Only comment", Author: "worker", Time: time.Now()},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - reference non-existent comment index
+	markdown := `---
+title: Title
+labels:
+---
+
+Description
+
+---
+# Comment: 5
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+Invalid comment`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid comment index")
+}
+
+func TestEditTask_Execute_EditorMode_MissingComment(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	later := now.Add(time.Hour)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "First comment", Author: "worker", Time: now},
+		{Text: "Second comment", Author: "manager", Time: later},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - only include one comment when two exist
+	markdown := `---
+title: Title
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+First comment`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert - should error because comment was removed
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "comment count mismatch")
+
+	// Verify task was NOT saved (atomic behavior)
+	assert.Equal(t, "Title", repo.Tasks[1].Title)
+}
+
+func TestEditTask_Execute_EditorMode_NoCommentsWhenOriginalHasComments(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "Existing comment", Author: "worker", Time: now},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - no comments section when original has comments
+	markdown := `---
+title: Updated Title
+labels:
+---
+
+Updated description`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert - should error because all comments were removed
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "comment count mismatch")
+
+	// Verify task was NOT saved (atomic behavior)
+	assert.Equal(t, "Title", repo.Tasks[1].Title)
+}
+
+func TestEditTask_Execute_EditorMode_DuplicateCommentIndex(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	later := now.Add(time.Hour)
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Title",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "First comment", Author: "worker", Time: now},
+		{Text: "Second comment", Author: "manager", Time: later},
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - duplicate index 0
+	markdown := `---
+title: Title
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Time: 2026-01-18T10:00:00Z
+
+First comment
+
+---
+# Comment: 0
+# Author: manager
+# Time: 2026-01-18T11:00:00Z
+
+Second comment with wrong index`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert - should error because of duplicate index
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate comment index")
+
+	// Verify nothing was saved (atomic behavior)
+	assert.Equal(t, "First comment", repo.Comments[1][0].Text)
+	assert.Equal(t, "Second comment", repo.Comments[1][1].Text)
+}

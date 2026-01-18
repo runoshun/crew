@@ -71,78 +71,6 @@ func TestUpdate_MsgConfigLoaded_Warnings(t *testing.T) {
 	assert.Equal(t, []string{"unknown key: xxx"}, result.warnings)
 }
 
-func TestUpdate_MsgReviewCompleted(t *testing.T) {
-	m := &Model{
-		mode:         ModeReviewing,
-		reviewTaskID: 42,
-	}
-
-	msg := MsgReviewCompleted{TaskID: 42, Review: "LGTM - code looks good!"}
-
-	updatedModel, _ := m.Update(msg)
-	result, ok := updatedModel.(*Model)
-	assert.True(t, ok)
-	assert.Equal(t, ModeReviewResult, result.mode)
-	assert.Equal(t, "LGTM - code looks good!", result.reviewResult)
-	assert.Equal(t, 42, result.reviewTaskID)
-}
-
-func TestUpdate_MsgReviewCompleted_Cancelled(t *testing.T) {
-	m := &Model{
-		mode:            ModeNormal, // Already returned to normal
-		reviewCancelled: true,       // User cancelled
-		reviewTaskID:    42,
-	}
-
-	msg := MsgReviewCompleted{TaskID: 42, Review: "LGTM - code looks good!"}
-
-	updatedModel, _ := m.Update(msg)
-	result, ok := updatedModel.(*Model)
-	assert.True(t, ok)
-	// Should stay in normal mode and clear state
-	assert.Equal(t, ModeNormal, result.mode)
-	assert.False(t, result.reviewCancelled)
-	assert.Equal(t, 0, result.reviewTaskID)
-	assert.Equal(t, "", result.reviewResult)
-}
-
-func TestUpdate_MsgReviewError(t *testing.T) {
-	m := &Model{
-		mode:         ModeReviewing,
-		reviewTaskID: 42,
-		reviewResult: "some partial result",
-	}
-
-	msg := MsgReviewError{TaskID: 42, Err: assert.AnError}
-
-	updatedModel, _ := m.Update(msg)
-	result, ok := updatedModel.(*Model)
-	assert.True(t, ok)
-	assert.Equal(t, ModeNormal, result.mode)
-	assert.Equal(t, assert.AnError, result.err)
-	assert.Equal(t, 0, result.reviewTaskID)
-	assert.Equal(t, "", result.reviewResult)
-}
-
-func TestUpdate_MsgReviewError_Cancelled(t *testing.T) {
-	m := &Model{
-		mode:            ModeNormal, // Already returned to normal
-		reviewCancelled: true,       // User cancelled
-		reviewTaskID:    42,
-	}
-
-	msg := MsgReviewError{TaskID: 42, Err: assert.AnError}
-
-	updatedModel, _ := m.Update(msg)
-	result, ok := updatedModel.(*Model)
-	assert.True(t, ok)
-	// Should stay in normal mode, no error shown
-	assert.Equal(t, ModeNormal, result.mode)
-	assert.Nil(t, result.err)
-	assert.False(t, result.reviewCancelled)
-	assert.Equal(t, 0, result.reviewTaskID)
-}
-
 func TestUpdate_MsgReviewActionCompleted(t *testing.T) {
 	m := &Model{
 		mode:               ModeReviewAction,
@@ -160,64 +88,6 @@ func TestUpdate_MsgReviewActionCompleted(t *testing.T) {
 	assert.Equal(t, 0, result.reviewTaskID)
 	assert.Equal(t, "", result.reviewResult)
 	assert.Equal(t, 0, result.reviewActionCursor)
-}
-
-func TestUpdate_MsgReviewCompleted_StaleResult(t *testing.T) {
-	// Scenario: User cancelled task 42's review and started task 99's review
-	// Then stale result from task 42 arrives - should be ignored
-	m := &Model{
-		mode:         ModeReviewing, // Currently reviewing task 99
-		reviewTaskID: 99,            // New task being reviewed
-	}
-
-	// Stale result from task 42 arrives
-	msg := MsgReviewCompleted{TaskID: 42, Review: "Old review for task 42"}
-
-	updatedModel, _ := m.Update(msg)
-	result, ok := updatedModel.(*Model)
-	assert.True(t, ok)
-	// Should stay in reviewing mode, waiting for task 99's result
-	assert.Equal(t, ModeReviewing, result.mode)
-	assert.Equal(t, 99, result.reviewTaskID)
-	assert.Equal(t, "", result.reviewResult) // Old result not stored
-}
-
-func TestUpdate_MsgReviewError_StaleError(t *testing.T) {
-	// Scenario: User cancelled task 42's review and started task 99's review
-	// Then stale error from task 42 arrives - should be ignored
-	m := &Model{
-		mode:         ModeReviewing, // Currently reviewing task 99
-		reviewTaskID: 99,            // New task being reviewed
-	}
-
-	// Stale error from task 42 arrives
-	msg := MsgReviewError{TaskID: 42, Err: assert.AnError}
-
-	updatedModel, _ := m.Update(msg)
-	result, ok := updatedModel.(*Model)
-	assert.True(t, ok)
-	// Should stay in reviewing mode, waiting for task 99's result
-	assert.Equal(t, ModeReviewing, result.mode)
-	assert.Equal(t, 99, result.reviewTaskID)
-	assert.Nil(t, result.err) // Old error not shown
-}
-
-func TestUpdate_MsgReviewCompleted_NoActiveReview(t *testing.T) {
-	// Scenario: Review completed but no active review (reviewTaskID is 0)
-	m := &Model{
-		mode:         ModeNormal,
-		reviewTaskID: 0, // No active review
-	}
-
-	msg := MsgReviewCompleted{TaskID: 42, Review: "Orphan review"}
-
-	updatedModel, _ := m.Update(msg)
-	result, ok := updatedModel.(*Model)
-	assert.True(t, ok)
-	// Should stay in normal mode
-	assert.Equal(t, ModeNormal, result.mode)
-	assert.Equal(t, 0, result.reviewTaskID)
-	assert.Equal(t, "", result.reviewResult)
 }
 
 func TestUpdate_MsgPrepareEditComment(t *testing.T) {
@@ -241,4 +111,24 @@ func TestUpdate_MsgPrepareEditComment(t *testing.T) {
 	assert.Equal(t, ModeEditReviewComment, result.mode)
 	assert.Equal(t, 0, result.editCommentIndex)
 	assert.Equal(t, "Original review comment", result.editCommentInput.Value())
+}
+
+func TestUpdate_MsgReviewResultLoaded(t *testing.T) {
+	m := &Model{
+		mode:         ModeNormal,
+		reviewTaskID: 0,
+		reviewResult: "",
+	}
+
+	msg := MsgReviewResultLoaded{
+		TaskID: 42,
+		Review: "Review content here",
+	}
+
+	updatedModel, _ := m.Update(msg)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeReviewResult, result.mode)
+	assert.Equal(t, 42, result.reviewTaskID)
+	assert.Equal(t, "Review content here", result.reviewResult)
 }

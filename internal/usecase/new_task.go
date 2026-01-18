@@ -12,6 +12,7 @@ import (
 // Fields are ordered to minimize memory padding.
 type NewTaskInput struct {
 	ParentID    *int     // Parent task ID (optional, nil = root task)
+	SkipReview  *bool    // Skip review on completion (nil=use config, true=skip, false=require review)
 	Title       string   // Task title (required)
 	Description string   // Task description (optional)
 	BaseBranch  string   // Base branch (optional, empty = use default)
@@ -82,6 +83,7 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 		Issue:       in.Issue,
 		Labels:      in.Labels,
 		BaseBranch:  baseBranch,
+		SkipReview:  in.SkipReview, // nil means use config, explicit true/false overrides
 	}
 
 	// Save task

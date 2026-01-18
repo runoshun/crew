@@ -56,3 +56,12 @@ func showManagerOnboardingHelp(w io.Writer) error {
 	_, err = fmt.Fprint(w, help)
 	return err
 }
+
+func showManagerAutoHelp(w io.Writer) error {
+	help, err := domain.RenderManagerAutoHelp()
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprint(w, help)
+	return err
+}

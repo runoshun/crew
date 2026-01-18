@@ -9,7 +9,9 @@ import (
 
 // ShowTaskInput contains the parameters for showing a task.
 type ShowTaskInput struct {
-	TaskID int // Task ID (required)
+	CommentsBy string // Filter comments by author (optional)
+	TaskID     int    // Task ID (required)
+	LastReview bool   // Show only the latest review comment (author="reviewer")
 }
 
 // ShowTaskOutput contains the result of showing a task.
@@ -52,6 +54,34 @@ func (uc *ShowTask) Execute(_ context.Context, in ShowTaskInput) (*ShowTaskOutpu
 	comments, err := uc.tasks.GetComments(in.TaskID)
 	if err != nil {
 		return nil, fmt.Errorf("get comments: %w", err)
+	}
+
+	// Filter comments
+	if in.LastReview {
+		// Find latest comment by "reviewer" based on Time
+		var latestReview *domain.Comment
+		for i := range comments {
+			if comments[i].Author == "reviewer" {
+				if latestReview == nil || comments[i].Time.After(latestReview.Time) {
+					latestReview = &comments[i]
+				}
+			}
+		}
+
+		if latestReview != nil {
+			comments = []domain.Comment{*latestReview}
+		} else {
+			comments = []domain.Comment{}
+		}
+	} else if in.CommentsBy != "" {
+		// Filter by author
+		filtered := make([]domain.Comment, 0, len(comments))
+		for _, c := range comments {
+			if c.Author == in.CommentsBy {
+				filtered = append(filtered, c)
+			}
+		}
+		comments = filtered
 	}
 
 	return &ShowTaskOutput{

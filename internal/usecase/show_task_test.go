@@ -216,3 +216,80 @@ func TestShowTask_Execute_GetCommentsError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get comments")
 }
+
+func TestShowTask_Execute_WithCommentsBy(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:    1,
+		Title: "Test task",
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "Manager comment", Author: "manager"},
+		{Text: "Worker comment", Author: "worker"},
+		{Text: "Another manager comment", Author: "manager"},
+	}
+	uc := NewShowTask(repo)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), ShowTaskInput{
+		TaskID:     1,
+		CommentsBy: "manager",
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Len(t, out.Comments, 2)
+	assert.Equal(t, "Manager comment", out.Comments[0].Text)
+	assert.Equal(t, "Another manager comment", out.Comments[1].Text)
+}
+
+func TestShowTask_Execute_WithLastReview(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:    1,
+		Title: "Test task",
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "Review 1", Author: "reviewer", Time: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{Text: "Worker reply", Author: "worker", Time: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
+		{Text: "Review 2", Author: "reviewer", Time: time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)},
+		{Text: "Worker fix", Author: "worker", Time: time.Date(2024, 1, 4, 0, 0, 0, 0, time.UTC)},
+	}
+	uc := NewShowTask(repo)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), ShowTaskInput{
+		TaskID:     1,
+		LastReview: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Len(t, out.Comments, 1)
+	assert.Equal(t, "Review 2", out.Comments[0].Text)
+}
+
+func TestShowTask_Execute_WithLastReview_NoReview(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:    1,
+		Title: "Test task",
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "Worker comment", Author: "worker"},
+	}
+	uc := NewShowTask(repo)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), ShowTaskInput{
+		TaskID:     1,
+		LastReview: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Empty(t, out.Comments)
+}
