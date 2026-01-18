@@ -71,6 +71,7 @@ func newStartCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		model        string
 		continueFlag bool
+		skipReview   bool
 	}
 
 	cmd := &cobra.Command{
@@ -98,7 +99,10 @@ Examples:
 
   # Continue a stopped task
   crew start 1 --continue
-  crew start 1 -c`,
+  crew start 1 -c
+
+  # Start task with skip_review enabled (skip review on completion)
+  crew start 1 claude --skip-review`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -115,12 +119,17 @@ Examples:
 
 			// Execute use case
 			uc := c.StartTaskUseCase()
-			out, err := uc.Execute(cmd.Context(), usecase.StartTaskInput{
+			input := usecase.StartTaskInput{
 				TaskID:   taskID,
 				Agent:    agent,
 				Model:    opts.model,
 				Continue: opts.continueFlag,
-			})
+			}
+			// Set skip_review only if flag was explicitly provided
+			if cmd.Flags().Changed("skip-review") {
+				input.SkipReview = &opts.skipReview
+			}
+			out, err := uc.Execute(cmd.Context(), input)
 			if err != nil {
 				return err
 			}
@@ -133,6 +142,7 @@ Examples:
 
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
 	cmd.Flags().BoolVarP(&opts.continueFlag, "continue", "c", false, "Continue from previous session")
+	cmd.Flags().BoolVar(&opts.skipReview, "skip-review", false, "Set skip_review for this task (skip review on completion)")
 
 	return cmd
 }
@@ -289,7 +299,7 @@ Examples:
 			}
 
 			// Execute use case
-			uc := c.CompleteTaskUseCase()
+			uc := c.CompleteTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 			out, err := uc.Execute(cmd.Context(), usecase.CompleteTaskInput{
 				TaskID:  taskID,
 				Comment: opts.comment,
@@ -298,7 +308,11 @@ Examples:
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
+			if out.ReviewStarted {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d and started review (session: %s): %s\n", out.Task.ID, out.ReviewSession, out.Task.Title)
+			} else {
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
+			}
 			return nil
 		},
 	}
