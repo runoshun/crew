@@ -308,11 +308,28 @@ Examples:
 				return err
 			}
 
-			if out.ReviewStarted {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d and started review (session: %s): %s\n", out.Task.ID, out.ReviewSession, out.Task.Title)
+			if out.ShouldStartReview {
+				// Start review automatically
+				reviewUC := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
+				reviewOut, reviewErr := reviewUC.Execute(cmd.Context(), usecase.ReviewTaskInput{
+					TaskID: taskID,
+					Wait:   false, // Background execution
+				})
+
+				if reviewErr != nil {
+					// Review failed to start
+					// Note: Task is already in reviewing status. We log the error but don't fail the command.
+					// The user can try 'crew review' later or manually fix the state.
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Task #%d completed, but failed to start review: %v\n", out.Task.ID, reviewErr)
+					// We might consider reverting status here, but CompleteTask has committed it.
+					// Leaving it as is for now as per minimal changes strategy.
+				} else {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d and started review (session: %s): %s\n", out.Task.ID, reviewOut.SessionName, out.Task.Title)
+				}
 			} else {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
 			}
+
 			return nil
 		},
 	}

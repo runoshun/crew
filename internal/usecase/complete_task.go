@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -17,26 +16,22 @@ type CompleteTaskInput struct {
 // CompleteTaskOutput contains the result of completing a task.
 // Fields are ordered to minimize memory padding.
 type CompleteTaskOutput struct {
-	Task          *domain.Task // The completed task
-	ReviewSession string       // Review session name (if ReviewStarted is true)
-	ReviewStarted bool         // True if review was automatically started
+	Task              *domain.Task // The completed task
+	ShouldStartReview bool         // True if review should be started by CLI
 }
 
 // CompleteTask is the use case for marking a task as complete.
-// It transitions the task from in_progress to for_review (or reviewed if skip_review).
-// If not skipping review, it automatically starts the review process.
+// It transitions the task from in_progress to reviewing (or reviewed if skip_review).
+// If not skipping review, it signals to the CLI that review should be started.
 // Fields are ordered to minimize memory padding.
 type CompleteTask struct {
 	tasks     domain.TaskRepository
 	worktrees domain.WorktreeManager
-	sessions  domain.SessionManager
 	git       domain.Git
 	config    domain.ConfigLoader
 	clock     domain.Clock
 	logger    domain.Logger
 	executor  domain.CommandExecutor
-	stdout    io.Writer
-	stderr    io.Writer
 	crewDir   string
 	repoRoot  string
 }
@@ -45,7 +40,6 @@ type CompleteTask struct {
 func NewCompleteTask(
 	tasks domain.TaskRepository,
 	worktrees domain.WorktreeManager,
-	sessions domain.SessionManager,
 	git domain.Git,
 	config domain.ConfigLoader,
 	clock domain.Clock,
@@ -53,12 +47,10 @@ func NewCompleteTask(
 	executor domain.CommandExecutor,
 	crewDir string,
 	repoRoot string,
-	stdout, stderr io.Writer,
 ) *CompleteTask {
 	return &CompleteTask{
 		tasks:     tasks,
 		worktrees: worktrees,
-		sessions:  sessions,
 		git:       git,
 		config:    config,
 		clock:     clock,
@@ -66,8 +58,6 @@ func NewCompleteTask(
 		executor:  executor,
 		crewDir:   crewDir,
 		repoRoot:  repoRoot,
-		stdout:    stdout,
-		stderr:    stderr,
 	}
 }
 
@@ -79,7 +69,7 @@ func NewCompleteTask(
 // Processing:
 //   - If [complete].command is configured, execute it (abort on failure)
 //   - If skip_review: set status to reviewed
-//   - If not skip_review: set status to for_review, then start review automatically
+//   - If not skip_review: set status to reviewing (indicating review start)
 func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*CompleteTaskOutput, error) {
 	// Get the task
 	task, err := uc.tasks.Get(in.TaskID)
@@ -164,62 +154,26 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}
 
 		return &CompleteTaskOutput{
-			Task:          task,
-			ReviewStarted: false,
+			Task:              task,
+			ShouldStartReview: false,
 		}, nil
 	}
 
-	// Not skipping review: transition to for_review first, then start review
-	task.Status = domain.StatusForReview
+	// Not skipping review: transition to reviewing directly
+	task.Status = domain.StatusReviewing
 
-	// Save task with for_review status
+	// Save task
 	if saveErr := uc.tasks.Save(task); saveErr != nil {
 		return nil, fmt.Errorf("save task: %w", saveErr)
 	}
 
-	// Start review automatically using ReviewTask
-	reviewUC := NewReviewTask(
-		uc.tasks,
-		uc.sessions,
-		uc.worktrees,
-		uc.config,
-		uc.executor,
-		uc.clock,
-		uc.logger,
-		uc.crewDir,
-		uc.repoRoot,
-		uc.stdout,
-		uc.stderr,
-	)
-
-	reviewOut, reviewErr := reviewUC.Execute(ctx, ReviewTaskInput{
-		TaskID: task.ID,
-		Wait:   false, // Background execution
-	})
-	if reviewErr != nil {
-		// Review failed to start, but completion was successful
-		// Log the error but don't fail the completion
-		if uc.logger != nil {
-			uc.logger.Info(task.ID, "task", fmt.Sprintf("completed (status: for_review), review start failed: %v", reviewErr))
-		}
-
-		// Re-fetch task to get latest state (ReviewTask may have modified it)
-		task, _ = uc.tasks.Get(in.TaskID)
-
-		return &CompleteTaskOutput{
-			Task:          task,
-			ReviewStarted: false,
-		}, nil
-	}
-
-	// Log task completion with review started
+	// Log task completion
 	if uc.logger != nil {
-		uc.logger.Info(task.ID, "task", fmt.Sprintf("completed and review started (session: %s)", reviewOut.SessionName))
+		uc.logger.Info(task.ID, "task", "completed (status: reviewing, review should start)")
 	}
 
 	return &CompleteTaskOutput{
-		Task:          reviewOut.Task,
-		ReviewStarted: true,
-		ReviewSession: reviewOut.SessionName,
+		Task:              task,
+		ShouldStartReview: true,
 	}, nil
 }

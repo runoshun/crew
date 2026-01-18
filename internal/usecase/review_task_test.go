@@ -523,3 +523,34 @@ func TestReviewTask_Execute_WithDisabledAgent(t *testing.T) {
 	assert.Contains(t, err.Error(), "claude-reviewer")
 	assert.Contains(t, err.Error(), "disabled")
 }
+
+func TestReviewTask_Execute_StatusReviewing(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusReviewing, // Already reviewing
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+	configLoader := testutil.NewMockConfigLoader()
+	executor := testutil.NewMockCommandExecutor()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	logger := testutil.NewMockLogger()
+
+	var stdout, stderr bytes.Buffer
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, logger, "/repo", &stdout, &stderr)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID: 1,
+		Wait:   true,
+	})
+
+	// Assert - should succeed
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+}
