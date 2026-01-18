@@ -685,6 +685,42 @@ Comment text`,
 			wantErr:     true,
 			errContains: "invalid comment metadata",
 		},
+		{
+			name: "invalid parent - non-numeric",
+			content: `---
+title: Test Task
+parent: abc
+labels:
+---
+
+Description`,
+			wantErr:     true,
+			errContains: "invalid parent ID",
+		},
+		{
+			name: "valid parent - numeric",
+			content: `---
+title: Test Task
+parent: 5
+labels:
+---
+
+Description`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+		},
+		{
+			name: "valid parent - zero removes parent",
+			content: `---
+title: Test Task
+parent: 0
+labels:
+---
+
+Description`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+		},
 	}
 
 	for _, tt := range tests {

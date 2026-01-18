@@ -378,10 +378,14 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 	var parentID *int
 	if parentFound && parentStr != "" {
 		id, err := strToInt(parentStr)
-		if err == nil && id > 0 {
+		if err != nil {
+			// Non-numeric value like "abc" is an error
+			return nil, ErrInvalidParentID
+		}
+		if id > 0 {
 			parentID = &id
 		}
-		// Note: if parsing fails or id <= 0, parentID stays nil (removing parent)
+		// id <= 0 means remove parent (parentID stays nil)
 	}
 
 	// Get body after frontmatter (description + comments)

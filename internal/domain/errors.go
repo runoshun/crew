@@ -7,6 +7,7 @@ var (
 	ErrTaskNotFound          = errors.New("task not found")
 	ErrParentNotFound        = errors.New("parent task not found")
 	ErrCircularReference     = errors.New("circular reference detected: parent would create a cycle")
+	ErrInvalidParentID       = errors.New("invalid parent ID: must be a positive number or empty")
 	ErrInvalidTransition     = errors.New("invalid status transition")
 	ErrSessionRunning        = errors.New("session already running")
 	ErrNoSession             = errors.New("no running session")

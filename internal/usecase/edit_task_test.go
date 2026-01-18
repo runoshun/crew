@@ -1495,3 +1495,33 @@ Description`
 	// Assert
 	assert.ErrorIs(t, err, domain.ErrCircularReference)
 }
+
+func TestEditTask_Execute_EditorMode_InvalidParentID(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Task",
+		Description: "Description",
+		Status:      domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute with editor mode - invalid parent ID (non-numeric)
+	markdown := `---
+title: Task
+parent: abc
+labels:
+---
+
+Description`
+
+	_, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:     1,
+		EditorEdit: true,
+		EditorText: markdown,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrInvalidParentID)
+}
