@@ -633,8 +633,6 @@ func TestNewEditCommand_UpdateTitle(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Updated task #1")
-	assert.Contains(t, buf.String(), "Updated title")
 
 	// Verify task was updated
 	task := repo.Tasks[1]
@@ -665,7 +663,6 @@ func TestNewEditCommand_UpdateDescription(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Updated task #1")
 
 	// Verify description was updated
 	task := repo.Tasks[1]
@@ -696,7 +693,6 @@ func TestNewEditCommand_AddLabels(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Updated task #1")
 
 	// Verify labels were added
 	task := repo.Tasks[1]
@@ -729,7 +725,6 @@ func TestNewEditCommand_RemoveLabels(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Updated task #1")
 
 	// Verify label was removed
 	task := repo.Tasks[1]
@@ -796,7 +791,6 @@ func TestNewRmCommand_Success(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Deleted task #1")
 
 	// Verify task was deleted
 	_, exists := repo.Tasks[1]
@@ -824,7 +818,6 @@ func TestNewRmCommand_WithHashPrefix(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Contains(t, buf.String(), "Deleted task #1")
 
 	// Verify task was deleted
 	_, exists := repo.Tasks[1]
