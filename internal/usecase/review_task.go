@@ -87,9 +87,10 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Validate status - must be for_review
-	if task.Status != domain.StatusForReview {
-		return nil, fmt.Errorf("cannot review task in %s status (must be for_review): %w", task.Status, domain.ErrInvalidTransition)
+	// Validate status - must be for_review or reviewing
+	// reviewing is allowed because CompleteTask transitions to it before starting review
+	if task.Status != domain.StatusForReview && task.Status != domain.StatusReviewing {
+		return nil, fmt.Errorf("cannot review task in %s status (must be for_review or reviewing): %w", task.Status, domain.ErrInvalidTransition)
 	}
 
 	// Check if review session is already running

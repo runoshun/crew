@@ -270,7 +270,7 @@ func newCompleteCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "complete [id]",
 		Short: "Mark task as complete",
-		Long: `Mark a task as complete (in_progress/needs_input → for_review).
+		Long: `Mark a task as complete (in_progress/needs_input → reviewing).
 
 If no ID is provided, the task ID is auto-detected from the current branch name.
 
@@ -280,6 +280,10 @@ Preconditions:
 
 If [complete].command is configured, it will be executed before transitioning
 the status. If the command fails, the completion is aborted.
+
+If skip_review is enabled (via task setting or config), the task transitions
+directly to 'reviewed'. Otherwise, it transitions to 'reviewing' and a review
+session is started.
 
 Examples:
   # Complete task by ID
@@ -308,11 +312,28 @@ Examples:
 				return err
 			}
 
-			if out.ReviewStarted {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d and started review (session: %s): %s\n", out.Task.ID, out.ReviewSession, out.Task.Title)
+			if out.ShouldStartReview {
+				// Start review automatically
+				reviewUC := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
+				reviewOut, reviewErr := reviewUC.Execute(cmd.Context(), usecase.ReviewTaskInput{
+					TaskID: taskID,
+					Wait:   false, // Background execution
+				})
+
+				if reviewErr != nil {
+					// Review failed to start
+					// Note: Task is already in reviewing status. We log the error but don't fail the command.
+					// The user can try 'crew review' later or manually fix the state.
+					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Task #%d completed, but failed to start review: %v\n", out.Task.ID, reviewErr)
+					// We might consider reverting status here, but CompleteTask has committed it.
+					// Leaving it as is for now as per minimal changes strategy.
+				} else {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d and started review (session: %s): %s\n", out.Task.ID, reviewOut.SessionName, out.Task.Title)
+				}
 			} else {
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
 			}
+
 			return nil
 		},
 	}

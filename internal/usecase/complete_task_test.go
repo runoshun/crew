@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"bytes"
 	"context"
 	"testing"
 
@@ -28,9 +27,7 @@ func newTestCompleteTask(
 	clock *testutil.MockClock,
 	executor *testutil.MockCommandExecutor,
 ) *CompleteTask {
-	sessions := testutil.NewMockSessionManager()
-	var stdout, stderr bytes.Buffer
-	return NewCompleteTask(repo, worktrees, sessions, git, configLoader, clock, nil, executor, "/tmp/crew", "/tmp/repo", &stdout, &stderr)
+	return NewCompleteTask(repo, worktrees, git, configLoader, clock, nil, executor, "/tmp/crew", "/tmp/repo")
 }
 
 func TestCompleteTask_Execute_Success(t *testing.T) {
@@ -75,7 +72,7 @@ func TestCompleteTask_Execute_Success(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, out)
 			assert.Equal(t, domain.StatusReviewed, out.Task.Status) // skip_review=true goes to reviewed
-			assert.False(t, out.ReviewStarted)
+			assert.False(t, out.ShouldStartReview)
 
 			// Verify task is updated in repository
 			savedTask := repo.Tasks[1]
@@ -496,7 +493,7 @@ func TestCompleteTask_Execute_SkipReview_TaskLevel(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
-	assert.False(t, out.ReviewStarted)
+	assert.False(t, out.ShouldStartReview)
 }
 
 func TestCompleteTask_Execute_SkipReview_ConfigLevel(t *testing.T) {
@@ -536,7 +533,7 @@ func TestCompleteTask_Execute_SkipReview_ConfigLevel(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
-	assert.False(t, out.ReviewStarted)
+	assert.False(t, out.ShouldStartReview)
 }
 
 func TestCompleteTask_Execute_SkipReview_TaskTrueOverridesConfigFalse(t *testing.T) {
@@ -576,7 +573,7 @@ func TestCompleteTask_Execute_SkipReview_TaskTrueOverridesConfigFalse(t *testing
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
-	assert.False(t, out.ReviewStarted)
+	assert.False(t, out.ShouldStartReview)
 }
 
 func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing.T) {
@@ -614,10 +611,10 @@ func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing
 	})
 
 	// Assert - task.SkipReview=false should take precedence over config
-	// Task goes to for_review (review will fail to start in mock, but status should be for_review)
+	// Task goes to reviewing
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// Since review fails in mock, status stays for_review
-	assert.Equal(t, domain.StatusForReview, out.Task.Status)
-	assert.False(t, out.ReviewStarted)
+	// Status should be reviewing
+	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	assert.True(t, out.ShouldStartReview)
 }
