@@ -335,7 +335,9 @@ func formatDuration(d time.Duration) string {
 // newShowCommand creates the show command for displaying task details.
 func newShowCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		JSON bool
+		CommentsBy string
+		JSON       bool
+		LastReview bool
 	}
 
 	cmd := &cobra.Command{
@@ -375,7 +377,9 @@ Examples:
 			// Execute use case
 			uc := c.ShowTaskUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.ShowTaskInput{
-				TaskID: taskID,
+				TaskID:     taskID,
+				CommentsBy: opts.CommentsBy,
+				LastReview: opts.LastReview,
 			})
 			if err != nil {
 				return err
@@ -441,6 +445,8 @@ Examples:
 	}
 
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output in JSON format")
+	cmd.Flags().StringVar(&opts.CommentsBy, "comments-by", "", "Filter comments by author")
+	cmd.Flags().BoolVar(&opts.LastReview, "last-review", false, "Show only the latest review comment")
 
 	return cmd
 }
