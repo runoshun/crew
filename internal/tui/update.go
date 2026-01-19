@@ -182,8 +182,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reviewTaskID = msg.TaskID
 		m.reviewResult = msg.Review
 		m.mode = ModeReviewResult
-		m.reviewViewport.SetContent(msg.Review)
-		m.updateReviewViewport()
+		m.updateReviewViewport() // This renders content with word wrap
 		return m, nil
 	}
 
