@@ -485,19 +485,27 @@ Examples:
 
 // newStopCommand creates the stop command for stopping a task session.
 func newStopCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		review bool
+	}
+
 	cmd := &cobra.Command{
 		Use:   "stop <id>",
 		Short: "Stop a session",
 		Long: `Stop a running session for a task.
 
-This terminates the tmux session, deletes the task script,
-clears agent info, and updates the status to 'stopped'.
+This terminates the tmux session and cleans up generated scripts.
+When stopping a work session, it clears agent info and updates the
+status to 'stopped'.
 
 The worktree is NOT deleted (use 'close' to also delete the worktree).
 
 Examples:
   # Stop session for task #1
-  crew stop 1`,
+  crew stop 1
+
+  # Stop review session for task #1
+  crew stop 1 --review`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -508,16 +516,33 @@ Examples:
 
 			// Execute use case
 			uc := c.StopTaskUseCase()
-			_, err = uc.Execute(cmd.Context(), usecase.StopTaskInput{
+			out, err := uc.Execute(cmd.Context(), usecase.StopTaskInput{
 				TaskID: taskID,
+				Review: opts.review,
 			})
 			if err != nil {
 				return err
 			}
 
+			if out.SessionName == "" {
+				if opts.review {
+					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No review session running for task #%d\n", taskID)
+					return nil
+				}
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No running session for task #%d\n", taskID)
+				return nil
+			}
+
+			label := "session"
+			if opts.review || out.SessionName == domain.ReviewSessionName(taskID) {
+				label = "review session"
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Stopped %s %s\n", label, out.SessionName)
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVarP(&opts.review, "review", "r", false, "Stop the reviewer session instead of the work session")
 
 	return cmd
 }

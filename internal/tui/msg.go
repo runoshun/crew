@@ -27,6 +27,7 @@ func (MsgTaskStarted) sealed() {}
 
 // MsgTaskStopped is sent when a task session is stopped.
 type MsgTaskStopped struct {
+	Review bool
 	TaskID int
 }
 

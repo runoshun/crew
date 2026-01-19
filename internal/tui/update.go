@@ -49,6 +49,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgTaskStopped:
 		m.mode = ModeNormal
 		m.confirmAction = ConfirmNone
+		m.confirmReviewSession = false
+		if msg.Review {
+			m.err = fmt.Errorf("review session stopped for task #%d", msg.TaskID)
+		} else {
+			m.err = fmt.Errorf("session stopped for task #%d", msg.TaskID)
+		}
 		return m, m.loadTasks()
 
 	case MsgTaskCreated:
@@ -256,12 +262,16 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Stop):
 		task := m.SelectedTask()
-		if task == nil || task.Status != domain.StatusInProgress {
+		if task == nil {
+			return m, nil
+		}
+		if task.Status != domain.StatusInProgress && task.Status != domain.StatusReviewing {
 			return m, nil
 		}
 		m.mode = ModeConfirm
 		m.confirmAction = ConfirmStop
 		m.confirmTaskID = task.ID
+		m.confirmReviewSession = task.Status == domain.StatusReviewing
 		return m, nil
 
 	case key.Matches(msg, m.keys.Attach):
@@ -523,7 +533,7 @@ func (m *Model) handleConfirmMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case ConfirmClose:
 			return m, m.closeTask(m.confirmTaskID)
 		case ConfirmStop:
-			return m, m.stopTask(m.confirmTaskID)
+			return m, m.stopTask(m.confirmTaskID, m.confirmReviewSession)
 		case ConfirmMerge:
 			return m, m.mergeTask(m.confirmTaskID)
 		}
