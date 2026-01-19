@@ -9,8 +9,8 @@ type KeyMap struct {
 	Down key.Binding
 
 	// Actions
-	Enter   key.Binding // Show actions menu
-	Default key.Binding // Execute default action
+	Enter   key.Binding // Execute default action
+	Default key.Binding // Show actions menu
 	Start   key.Binding // Start task with agent
 	Stop    key.Binding // Stop running session
 	Attach  key.Binding // Attach to session
@@ -56,11 +56,11 @@ func DefaultKeyMap() KeyMap {
 		),
 		Enter: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("enter", "actions"),
+			key.WithHelp("enter", "default"),
 		),
 		Default: key.NewBinding(
 			key.WithKeys(" "),
-			key.WithHelp("space", "default"),
+			key.WithHelp("space", "actions"),
 		),
 		Start: key.NewBinding(
 			key.WithKeys("s"),

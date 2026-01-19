@@ -572,8 +572,8 @@ func (m *Model) viewFooter() string {
 	switch m.mode {
 	case ModeNormal:
 		content = m.styles.FooterKey.Render("j/k") + " nav  " +
-			m.styles.FooterKey.Render("enter") + " actions  " +
-			m.styles.FooterKey.Render("space") + " default  " +
+			m.styles.FooterKey.Render("enter") + " default  " +
+			m.styles.FooterKey.Render("space") + " actions  " +
 			m.styles.FooterKey.Render("n") + " new  " +
 			m.styles.FooterKey.Render("?") + " help  " +
 			m.styles.FooterKey.Render("q") + " quit"
@@ -647,8 +647,8 @@ func (m *Model) viewHelp() string {
 			}{
 				{"↑/k", "Move up"},
 				{"↓/j", "Move down"},
-				{"enter", "Actions"},
-				{"space", "Default"},
+				{"enter", "Default"},
+				{"space", "Actions"},
 				{"/", "Filter"},
 				{"o", "Sort"},
 				{"v", "Details"},
@@ -661,7 +661,7 @@ func (m *Model) viewHelp() string {
 				key  string
 				desc string
 			}{
-				{"space", "Default"},
+				{"space", "Actions"},
 				{"s", "Start"},
 				{"S", "Stop (work/review)"},
 				{"a", "Attach"},
@@ -1125,8 +1125,7 @@ func (m *Model) viewActionMenuDialog() string {
 
 	hint := ds.renderLine(
 		ds.key.Render("↑↓") + ds.text.Render(" select  ") +
-			ds.key.Render("enter") + ds.text.Render(" confirm  ") +
-			ds.key.Render("space") + ds.text.Render(" default  ") +
+			ds.key.Render("enter") + ds.text.Render(" execute  ") +
 			ds.key.Render("esc") + ds.text.Render(" close"))
 
 	lines := []string{title}
@@ -1170,7 +1169,6 @@ func (m *Model) viewReviewResultDialog() string {
 	hint := ds.renderLine(
 		ds.key.Render("j/k") + ds.text.Render(" scroll  ") +
 			ds.key.Render("enter") + ds.text.Render(" actions  ") +
-			ds.key.Render("space") + ds.text.Render(" default  ") +
 			ds.key.Render("esc") + ds.text.Render(" close") +
 			ds.muted.Render(scrollInfo))
 
