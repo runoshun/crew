@@ -788,7 +788,10 @@ func (m *Model) handleDetailPanelFocused(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	return m, nil
+	// Forward other keys to viewport for page up/down, mouse scroll, etc.
+	var cmd tea.Cmd
+	m.detailPanelViewport, cmd = m.detailPanelViewport.Update(msg)
+	return m, cmd
 }
 
 // handleEditStatusMode handles keys in status change mode.
