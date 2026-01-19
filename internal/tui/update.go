@@ -50,7 +50,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = ModeNormal
 		m.confirmAction = ConfirmNone
 		m.confirmReviewSession = false
-		if msg.Review {
+		if msg.SessionName == "" {
+			if msg.Review {
+				m.err = fmt.Errorf("no review session running for task #%d", msg.TaskID)
+			} else {
+				m.err = fmt.Errorf("no running session for task #%d", msg.TaskID)
+			}
+			return m, m.loadTasks()
+		}
+		if msg.Review || msg.SessionName == domain.ReviewSessionName(msg.TaskID) {
 			m.err = fmt.Errorf("review session stopped for task #%d", msg.TaskID)
 		} else {
 			m.err = fmt.Errorf("session stopped for task #%d", msg.TaskID)

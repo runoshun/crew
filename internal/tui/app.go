@@ -365,14 +365,14 @@ func (m *Model) startTask(taskID int, agent string) tea.Cmd {
 // stopTask returns a command that stops a task session.
 func (m *Model) stopTask(taskID int, review bool) tea.Cmd {
 	return func() tea.Msg {
-		_, err := m.container.StopTaskUseCase().Execute(
+		out, err := m.container.StopTaskUseCase().Execute(
 			context.Background(),
 			usecase.StopTaskInput{TaskID: taskID, Review: review},
 		)
 		if err != nil {
 			return MsgError{Err: err}
 		}
-		return MsgTaskStopped{TaskID: taskID, Review: review}
+		return MsgTaskStopped{TaskID: taskID, Review: review, SessionName: out.SessionName}
 	}
 }
 
