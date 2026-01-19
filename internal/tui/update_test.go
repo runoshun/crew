@@ -215,23 +215,35 @@ func TestUpdate_MsgReviewResultLoaded(t *testing.T) {
 	assert.Equal(t, "Review content here", result.reviewResult)
 }
 
-func TestUpdate_ActionMenuSpace(t *testing.T) {
-	m := &Model{
+func TestUpdate_ActionMenuEnter(t *testing.T) {
+	actionCalled := false
+
+	var m *Model
+	m = &Model{
+		keys: DefaultKeyMap(),
 		mode: ModeActionMenu,
 		actionMenuItems: []actionMenuItem{
-			{ActionID: "detail", IsDefault: true},
+			{
+				ActionID:  "detail",
+				IsDefault: true,
+				Action: func() (tea.Model, tea.Cmd) {
+					actionCalled = true
+					return m, nil
+				},
+			},
 		},
 	}
 
-	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	result, ok := updatedModel.(*Model)
 	assert.True(t, ok)
 	assert.Equal(t, ModeNormal, result.mode)
 	assert.Nil(t, result.actionMenuItems)
+	assert.True(t, actionCalled)
 }
 
-func TestUpdate_NormalModeSpace_TodoTask(t *testing.T) {
-	// Test that Space key in normal mode triggers default action (start) for todo task
+func TestUpdate_NormalModeEnter_TodoTask(t *testing.T) {
+	// Test that Enter key in normal mode triggers default action (start) for todo task
 	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
 	items := []list.Item{taskItem{task: task}}
 
@@ -242,24 +254,37 @@ func TestUpdate_NormalModeSpace_TodoTask(t *testing.T) {
 		taskList: list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
 	}
 
-	// Using tea.KeySpace simulates pressing the space key
-	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	// Using tea.KeyEnter simulates pressing the Enter key
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	result, ok := updatedModel.(*Model)
 	assert.True(t, ok)
-	assert.Equal(t, ModeStart, result.mode, "Space should trigger default action (start) for todo task")
+	assert.Equal(t, ModeStart, result.mode, "Enter should trigger default action (start) for todo task")
 }
 
-func TestUpdate_NormalModeSpace_NoSelection(t *testing.T) {
-	// Test that Space key with no selection does nothing
+func TestUpdate_NormalModeEnter_NoSelection(t *testing.T) {
+	// Test that Enter key with no selection does nothing
 	m := &Model{
 		keys:     DefaultKeyMap(),
 		mode:     ModeNormal,
 		taskList: list.New([]list.Item{}, newTaskDelegate(DefaultStyles()), 0, 0),
 	}
 
-	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	assert.Nil(t, cmd)
 	result, ok := updatedModel.(*Model)
 	assert.True(t, ok)
 	assert.Equal(t, ModeNormal, result.mode)
+}
+
+func TestUpdate_NormalModeSpace_OpensActionMenu(t *testing.T) {
+	m := &Model{
+		keys: DefaultKeyMap(),
+		mode: ModeNormal,
+	}
+
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Empty(t, result.actionMenuItems)
 }

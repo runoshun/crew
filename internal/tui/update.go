@@ -259,10 +259,10 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case key.Matches(msg, m.keys.Enter):
-		return m.openActionMenu()
+		return m.handleDefaultAction()
 
 	case key.Matches(msg, m.keys.Default):
-		return m.handleDefaultAction()
+		return m.openActionMenu()
 
 	case key.Matches(msg, m.keys.Start):
 		task := m.SelectedTask()
@@ -486,10 +486,7 @@ func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.Type == tea.KeySpace:
-		selectedTask := m.SelectedTask()
-		m.mode = ModeNormal
-		m.actionMenuItems = nil
-		return m.performDefaultAction(selectedTask)
+		return m, nil
 	}
 
 	return m, nil
@@ -754,7 +751,7 @@ func (m *Model) handleStartModeList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.Type == tea.KeySpace:
-		return m.handleDefaultAction()
+		return m, nil
 
 	case key.Matches(msg, m.keys.Up):
 		if m.agentCursor > 0 {
@@ -798,7 +795,7 @@ func (m *Model) handleStartModeCustomInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 
 	case msg.Type == tea.KeySpace:
-		return m.handleDefaultAction()
+		return m, nil
 
 	case msg.Type == tea.KeyEnter:
 		task := m.SelectedTask()
