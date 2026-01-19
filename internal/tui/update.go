@@ -61,7 +61,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Review || msg.SessionName == domain.ReviewSessionName(msg.TaskID) {
 			m.err = fmt.Errorf("review session stopped for task #%d", msg.TaskID)
 		} else {
-			m.err = fmt.Errorf("session stopped for task #%d", msg.TaskID)
+			m.err = fmt.Errorf("work session stopped for task #%d", msg.TaskID)
 		}
 		return m, m.loadTasks()
 
@@ -273,7 +273,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if task == nil {
 			return m, nil
 		}
-		if task.Status != domain.StatusInProgress && task.Status != domain.StatusReviewing {
+		if !m.canStopSelectedTask(task) {
 			return m, nil
 		}
 		m.mode = ModeConfirm
