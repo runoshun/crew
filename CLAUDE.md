@@ -34,12 +34,6 @@ Always run before committing:
 mise run ci
 ```
 
-### Branch Strategy
-
-- **Never commit directly to main**
-- Use feature branches: `feature/<description>`
-- Create from main: `git checkout main && git checkout -b feature/<description>`
-
 ### Commit Message Format
 
 ```
@@ -123,10 +117,9 @@ Key principles:
 1. **Always run `mise run ci` before committing**
 2. **Write tests for all new code**
 3. **Follow the 1 file = 1 UseCase pattern**
-4. **Never commit directly to main**
-5. **Handle all errors explicitly**
-6. **Use domain errors, not raw errors**
-7. **Don't set default config values at read site** - Defaults are set in `domain.NewDefaultConfig()`. Never check `if cfg.Field == "" { field = "default" }`
+4. **Handle all errors explicitly**
+5. **Use domain errors, not raw errors**
+6. **Don't set default config values at read site** - Defaults are set in `domain.NewDefaultConfig()`. Never check `if cfg.Field == "" { field = "default" }`
 
 ### Best Practices (SHOULD follow)
 
