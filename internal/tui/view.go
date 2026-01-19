@@ -61,13 +61,33 @@ func (ds dialogStyles) renderLine(s string) string {
 func (ds dialogStyles) fillViewportLines(viewportContent string, height int) string {
 	lines := strings.Split(viewportContent, "\n")
 	result := make([]string, 0, height)
+	padStyle := lipgloss.NewStyle().Background(ds.bg)
 
 	// Pad each content line to the full width
 	for _, line := range lines {
 		if len(result) >= height {
 			break
 		}
-		result = append(result, ds.line.Render(line))
+		if line == "" {
+			result = append(result, ds.emptyLine())
+			continue
+		}
+
+		renderedLine := line
+		if lipgloss.Width(renderedLine) > ds.width {
+			renderedLine = lipgloss.NewStyle().MaxWidth(ds.width).Render(renderedLine)
+		}
+		lineWidth := lipgloss.Width(renderedLine)
+		padWidth := ds.width - lineWidth
+		if padWidth < 0 {
+			padWidth = 0
+		}
+		content := padStyle.Render(renderedLine)
+		paddedLine := content
+		if padWidth > 0 {
+			paddedLine = content + padStyle.Width(padWidth).Render("")
+		}
+		result = append(result, paddedLine)
 	}
 
 	// Fill remaining height with empty lines
