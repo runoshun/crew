@@ -281,12 +281,13 @@ func TestFillViewportLines(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		content       string
-		height        int
-		expectedLines int
-		hasEmptyLines bool
-		description   string
+		name            string
+		content         string
+		height          int
+		expectedLines   int
+		hasEmptyLines   bool
+		requirePadStyle bool
+		description     string
 	}{
 		{
 			name:          "content fits within height",
@@ -331,6 +332,16 @@ func TestFillViewportLines(t *testing.T) {
 			hasEmptyLines: true,
 			description:   "ANSI colored lines should be padded correctly using lipgloss.Width",
 		},
+		{
+			name: "ANSI reset within line",
+			content: lipgloss.NewStyle().Foreground(lipgloss.Color("#A6E3A1")).Render("+added") +
+				" " + "\x1b[0m" + "tail",
+			height:          1,
+			expectedLines:   1,
+			hasEmptyLines:   false,
+			requirePadStyle: true,
+			description:     "ANSI reset should not strip background on pad",
+		},
 	}
 
 	for _, tt := range tests {
@@ -345,6 +356,15 @@ func TestFillViewportLines(t *testing.T) {
 			for _, line := range resultLines {
 				lineWidth := lipgloss.Width(line)
 				assert.Equal(t, width, lineWidth, "Each line should have full width")
+			}
+
+			if tt.requirePadStyle {
+				padSample := lipgloss.NewStyle().Background(bg).Render(" ")
+				assert.Contains(t, resultLines[0], padSample, "Line should include background-filled pad even with ANSI reset")
+			}
+			if tt.hasEmptyLines {
+				emptyLine := ds.emptyLine()
+				assert.Contains(t, result, emptyLine, "Result should contain empty lines")
 			}
 		})
 	}
