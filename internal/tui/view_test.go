@@ -271,6 +271,74 @@ func TestViewFooter_Truncation(t *testing.T) {
 	}
 }
 
+func TestFillViewportLines(t *testing.T) {
+	bg := Colors.Background
+	width := 20
+	ds := dialogStyles{
+		width: width,
+		bg:    bg,
+		line:  lipgloss.NewStyle().Background(bg).Width(width),
+	}
+
+	tests := []struct {
+		name          string
+		content       string
+		height        int
+		expectedLines int
+		hasEmptyLines bool
+		description   string
+	}{
+		{
+			name:          "content fits within height",
+			content:       "line1\nline2\nline3",
+			height:        5,
+			expectedLines: 5,
+			hasEmptyLines: true,
+			description:   "Should pad remaining height with empty lines",
+		},
+		{
+			name:          "content equals height",
+			content:       "line1\nline2\nline3",
+			height:        3,
+			expectedLines: 3,
+			hasEmptyLines: false,
+			description:   "Should fit exactly without extra empty lines",
+		},
+		{
+			name:          "content exceeds height",
+			content:       "line1\nline2\nline3\nline4\nline5",
+			height:        3,
+			expectedLines: 3,
+			hasEmptyLines: false,
+			description:   "Should truncate to height",
+		},
+		{
+			name:          "empty content",
+			content:       "",
+			height:        3,
+			expectedLines: 3,
+			hasEmptyLines: true,
+			description:   "Empty content should fill with empty lines",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ds.fillViewportLines(tt.content, tt.height)
+
+			// Count resulting lines
+			resultLines := strings.Split(result, "\n")
+			assert.Equal(t, tt.expectedLines, len(resultLines), tt.description)
+
+			// Verify each line has the expected width (background applied)
+			for _, line := range resultLines {
+				lineWidth := lipgloss.Width(line)
+				assert.Equal(t, width, lineWidth, "Each line should have full width")
+			}
+		})
+	}
+}
+
 func TestViewFooter_MinimalWidth(t *testing.T) {
 	// Test the edge case where maxContentWidth <= 3
 	// This should show only "..." for the content
