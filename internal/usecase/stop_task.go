@@ -42,7 +42,7 @@ func NewStopTask(
 // 1. Terminating the tmux session
 // 2. Deleting the task script
 // 3. Clearing agent info
-// 4. Updating status to stopped (if in_progress)
+// 4. Updating status to stopped (if session exists)
 func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutput, error) {
 	// Get the task
 	task, err := uc.tasks.Get(in.TaskID)
@@ -57,6 +57,7 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 	sessionName := domain.SessionName(task.ID)
 
 	// Stop session if running
+	hadSession := task.Session != ""
 	running, err := uc.sessions.IsRunning(sessionName)
 	if err != nil {
 		return nil, fmt.Errorf("check session running: %w", err)
@@ -67,17 +68,17 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		}
 	}
 
+	// Update status to stopped if a session was associated or is running
+	if hadSession || running {
+		task.Status = domain.StatusStopped
+	}
+
 	// Delete task script (ignore errors)
 	uc.cleanupScriptFiles(task.ID)
 
 	// Clear agent info
 	task.Agent = ""
 	task.Session = ""
-
-	// Update status to stopped if currently in_progress
-	if task.Status == domain.StatusInProgress {
-		task.Status = domain.StatusStopped
-	}
 
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {

@@ -234,6 +234,10 @@ func (m *Model) SelectedTask() *domain.Task {
 	return nil
 }
 
+func (m *Model) canStopSelectedTask(task *domain.Task) bool {
+	return task != nil && task.Session != ""
+}
+
 // updateTaskList updates the task list items from tasks.
 func (m *Model) updateTaskList() {
 	sorted := m.sortedTasks()

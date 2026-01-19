@@ -496,6 +496,9 @@ func (m *Model) viewFooter() string {
 			m.styles.FooterKey.Render("n") + " new  " +
 			m.styles.FooterKey.Render("?") + " help  " +
 			m.styles.FooterKey.Render("q") + " quit"
+		if m.canStopSelectedTask(m.SelectedTask()) {
+			content = content + "  " + m.styles.FooterKey.Render("S") + " stop"
+		}
 	case ModeFilter:
 		content = "enter apply · esc cancel"
 	case ModeChangeStatus:
