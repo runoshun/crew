@@ -56,8 +56,8 @@ func NewMergeTask(
 // - If both are empty, uses GetDefaultBranch()
 //
 // Processing:
-// 1. If session is running, stop it
-// 2. Execute git merge --no-ff
+// 1. Execute git merge --no-ff
+// 2. If session is running, stop it
 // 3. Delete worktree
 // 4. Delete branch
 // 5. Update status to closed (with CloseReasonMerged)
@@ -108,6 +108,12 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	// Get branch name
 	branch := domain.BranchName(task.ID, task.Issue)
 
+	// Execute git merge --no-ff first (before deleting worktree)
+	// This way, if merge fails due to conflict, worktree is preserved for resolution
+	if mergeErr := uc.git.Merge(branch, true); mergeErr != nil {
+		return nil, fmt.Errorf("merge branch: %w", mergeErr)
+	}
+
 	// Check if session is running
 	sessionName := domain.SessionName(task.ID)
 	running, err := uc.sessions.IsRunning(sessionName)
@@ -116,18 +122,12 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 	}
 
 	if running {
-		// Always stop session before merge
+		// Stop session after merge succeeds
 		if stopErr := uc.sessions.Stop(sessionName); stopErr != nil {
 			return nil, fmt.Errorf("stop session: %w", stopErr)
 		}
 		// Clean up script files (mirroring StopTask behavior)
 		uc.cleanupScriptFiles(task.ID)
-	}
-
-	// Execute git merge --no-ff first (before deleting worktree)
-	// This way, if merge fails due to conflict, worktree is preserved for resolution
-	if mergeErr := uc.git.Merge(branch, true); mergeErr != nil {
-		return nil, fmt.Errorf("merge branch: %w", mergeErr)
 	}
 
 	// Delete worktree if it exists (after successful merge)

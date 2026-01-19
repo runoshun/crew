@@ -104,7 +104,7 @@ func TestMergeTask_Execute_StopsRunningSession(t *testing.T) {
 
 	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
 
-	// Execute - session should be stopped automatically
+	// Execute - session should be stopped after merge
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
 		TaskID: 1,
 	})
@@ -248,7 +248,7 @@ func TestMergeTask_Execute_MergeError(t *testing.T) {
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
-	sessions.IsRunningVal = false
+	sessions.IsRunningVal = true
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ExistsVal = true
 	git := &testutil.MockGit{
@@ -266,6 +266,7 @@ func TestMergeTask_Execute_MergeError(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "merge branch")
+	assert.False(t, sessions.StopCalled)
 }
 
 func TestMergeTask_Execute_DeleteBranchError(t *testing.T) {
