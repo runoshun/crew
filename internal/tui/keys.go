@@ -59,7 +59,7 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("enter", "actions"),
 		),
 		Default: key.NewBinding(
-			key.WithKeys("space"),
+			key.WithKeys(" "),
 			key.WithHelp("space", "default"),
 		),
 		Start: key.NewBinding(

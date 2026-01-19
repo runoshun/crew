@@ -229,3 +229,37 @@ func TestUpdate_ActionMenuSpace(t *testing.T) {
 	assert.Equal(t, ModeNormal, result.mode)
 	assert.Nil(t, result.actionMenuItems)
 }
+
+func TestUpdate_NormalModeSpace_TodoTask(t *testing.T) {
+	// Test that Space key in normal mode triggers default action (start) for todo task
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
+	items := []list.Item{taskItem{task: task}}
+
+	m := &Model{
+		keys:     DefaultKeyMap(),
+		mode:     ModeNormal,
+		tasks:    []*domain.Task{task},
+		taskList: list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	// Using tea.KeySpace simulates pressing the space key
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeStart, result.mode, "Space should trigger default action (start) for todo task")
+}
+
+func TestUpdate_NormalModeSpace_NoSelection(t *testing.T) {
+	// Test that Space key with no selection does nothing
+	m := &Model{
+		keys:     DefaultKeyMap(),
+		mode:     ModeNormal,
+		taskList: list.New([]list.Item{}, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode)
+}
