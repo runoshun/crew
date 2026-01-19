@@ -219,7 +219,7 @@ func TestViewFooter_Truncation(t *testing.T) {
 		{
 			name:        "Wide screen - full footer displayed",
 			width:       120,
-			expectedHas: "quit",
+			expectedHas: "default",
 			description: "Footer should display full content on wide screen",
 		},
 		{

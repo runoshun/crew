@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
@@ -131,4 +132,19 @@ func TestUpdate_MsgReviewResultLoaded(t *testing.T) {
 	assert.Equal(t, ModeReviewResult, result.mode)
 	assert.Equal(t, 42, result.reviewTaskID)
 	assert.Equal(t, "Review content here", result.reviewResult)
+}
+
+func TestUpdate_ActionMenuSpace(t *testing.T) {
+	m := &Model{
+		mode: ModeActionMenu,
+		actionMenuItems: []actionMenuItem{
+			{ActionID: "detail", IsDefault: true},
+		},
+	}
+
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Nil(t, result.actionMenuItems)
 }
