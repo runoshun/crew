@@ -70,6 +70,59 @@ func TestStopTask_Execute_NoRunningSession(t *testing.T) {
 	assert.False(t, sessions.StopCalled, "stop should not be called when no session running")
 }
 
+func TestStopTask_Execute_StopReviewSession(t *testing.T) {
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task in review",
+		Status: domain.StatusReviewing,
+	}
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = true
+	uc := NewStopTask(repo, sessions, t.TempDir())
+
+	out, err := uc.Execute(context.Background(), StopTaskInput{
+		TaskID: 1,
+		Review: true,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	assert.Equal(t, domain.ReviewSessionName(1), out.SessionName)
+	assert.True(t, sessions.StopCalled)
+}
+
+func TestStopTask_Execute_StopReviewSessionFallback(t *testing.T) {
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:      1,
+		Title:   "Task in review",
+		Status:  domain.StatusReviewing,
+		Agent:   "claude",
+		Session: "crew-1",
+	}
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = false
+	sessionsByName := map[string]bool{
+		domain.ReviewSessionName(1): true,
+		"crew-1":                    false,
+	}
+	sessions.IsRunningFunc = func(name string) (bool, error) {
+		return sessionsByName[name], nil
+	}
+	uc := NewStopTask(repo, sessions, t.TempDir())
+
+	out, err := uc.Execute(context.Background(), StopTaskInput{
+		TaskID: 1,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.ReviewSessionName(1), out.SessionName)
+	assert.True(t, sessions.StopCalled)
+}
+
 func TestStopTask_Execute_NotInProgress(t *testing.T) {
 	// Setup - task in todo status (no transition to in_review)
 	repo := testutil.NewMockTaskRepository()

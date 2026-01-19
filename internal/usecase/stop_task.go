@@ -10,12 +10,14 @@ import (
 
 // StopTaskInput contains the parameters for stopping a task session.
 type StopTaskInput struct {
-	TaskID int // Task ID to stop
+	Review bool // Stop review session instead of work session
+	TaskID int  // Task ID to stop
 }
 
 // StopTaskOutput contains the result of stopping a task session.
 type StopTaskOutput struct {
-	Task *domain.Task // The stopped task
+	Task        *domain.Task // The stopped task
+	SessionName string       // Name of the session that was stopped (if any)
 }
 
 // StopTask is the use case for stopping a task session.
@@ -41,7 +43,7 @@ func NewStopTask(
 // Execute stops a task session by:
 // 1. Terminating the tmux session
 // 2. Deleting the task script
-// 3. Clearing agent info
+// 3. Clearing agent info (work sessions only)
 // 4. Updating status to stopped (if session exists)
 func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutput, error) {
 	// Get the task
@@ -53,29 +55,67 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		return nil, domain.ErrTaskNotFound
 	}
 
-	// Get session name
-	sessionName := domain.SessionName(task.ID)
+	workSessionName := domain.SessionName(task.ID)
+	reviewSessionName := domain.ReviewSessionName(task.ID)
 
-	// Stop session if running
-	hadSession := task.Session != ""
-	running, err := uc.sessions.IsRunning(sessionName)
-	if err != nil {
-		return nil, fmt.Errorf("check session running: %w", err)
+	if in.Review {
+		sessionStopped, stopErr := uc.stopSession(reviewSessionName)
+		if stopErr != nil {
+			return nil, stopErr
+		}
+		uc.cleanupReviewScriptFiles(task.ID)
+		return &StopTaskOutput{Task: task, SessionName: sessionStopped}, nil
 	}
-	if running {
-		if stopErr := uc.sessions.Stop(sessionName); stopErr != nil {
-			return nil, fmt.Errorf("stop session: %w", stopErr)
+
+	sessionStopped, err := uc.stopSession(workSessionName)
+	if err != nil {
+		return nil, err
+	}
+	if sessionStopped != "" {
+		if task.Status != domain.StatusReviewing {
+			task.Status = domain.StatusStopped
+		}
+		uc.cleanupScriptFiles(task.ID)
+		return uc.saveStoppedTask(task, sessionStopped)
+	}
+
+	if task.Session != "" {
+		if task.Status != domain.StatusReviewing {
+			task.Status = domain.StatusStopped
+			uc.cleanupScriptFiles(task.ID)
+			return uc.saveStoppedTask(task, "")
 		}
 	}
 
-	// Update status to stopped if a session was associated or is running
-	if hadSession || running {
-		task.Status = domain.StatusStopped
+	reviewStopped, err := uc.stopSession(reviewSessionName)
+	if err != nil {
+		return nil, err
+	}
+	if reviewStopped != "" {
+		uc.cleanupReviewScriptFiles(task.ID)
+		return &StopTaskOutput{Task: task, SessionName: reviewStopped}, nil
 	}
 
-	// Delete task script (ignore errors)
 	uc.cleanupScriptFiles(task.ID)
+	return uc.saveStoppedTask(task, "")
+}
 
+func (uc *StopTask) stopSession(sessionName string) (string, error) {
+	running, err := uc.sessions.IsRunning(sessionName)
+	if err != nil {
+		return "", fmt.Errorf("check session running: %w", err)
+	}
+	if !running {
+		return "", nil
+	}
+
+	if stopErr := uc.sessions.Stop(sessionName); stopErr != nil {
+		return "", fmt.Errorf("stop session: %w", stopErr)
+	}
+	return sessionName, nil
+}
+
+func (uc *StopTask) saveStoppedTask(task *domain.Task, sessionStopped string) (*StopTaskOutput, error) {
 	// Clear agent info
 	task.Agent = ""
 	task.Session = ""
@@ -85,11 +125,19 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		return nil, fmt.Errorf("save task: %w", err)
 	}
 
-	return &StopTaskOutput{Task: task}, nil
+	return &StopTaskOutput{Task: task, SessionName: sessionStopped}, nil
 }
 
 // cleanupScriptFiles removes the generated script file.
 func (uc *StopTask) cleanupScriptFiles(taskID int) {
 	scriptPath := domain.ScriptPath(uc.crewDir, taskID)
 	_ = os.Remove(scriptPath)
+}
+
+// cleanupReviewScriptFiles removes the generated review script files.
+func (uc *StopTask) cleanupReviewScriptFiles(taskID int) {
+	scriptPath := domain.ReviewScriptPath(uc.crewDir, taskID)
+	_ = os.Remove(scriptPath)
+	promptPath := domain.ReviewPromptPath(uc.crewDir, taskID)
+	_ = os.Remove(promptPath)
 }
