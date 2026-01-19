@@ -1,230 +1,283 @@
 # git-crew Manager Guide
 
-This guide is for manager agents that support users with task management.
-Execute various operations based on user instructions: task creation, monitoring, review, merge, etc.
+Manager agents orchestrate task execution by delegating work to workers and managing the workflow.
+
+---
+
+## ⚡ Quick Start (1 minute)
+
+Get up and running in 5 steps:
+
+1. **List tasks** → See current state:
+   ```bash
+   crew list
+   ```
+
+2. **Check task details** → Understand what's needed:
+   ```bash
+   crew show <id>
+   ```
+
+3. **Start a worker** → Delegate implementation:
+   ```bash
+   crew start <id> <worker>
+   ```
+
+4. **Monitor progress** → Check session output:
+   ```bash
+   crew peek <id>
+   ```
+
+5. **Review & merge** → Finish the task:
+   ```bash
+   crew review <id>      # If review needed
+   crew merge <id>       # Merge to main (or close if abandoned)
+   ```
+
+Available workers:{{range $i, $w := .Workers }}{{if $i}}, {{end}}**{{ $w.Name }}** ({{ $w.Model }}){{end}}
+
+---
+
+## ⚠️ Critical Notes (Read First!)
+
+**These are the most common issues. Read before proceeding.**
+
+1. **Workers read task details on startup** → Don't repeat task description in `crew send`. Add only NEW requirements.
+
+2. **`crew send` requires Enter** → After sending input, also send:
+   ```bash
+   crew send <id> "Your instruction"
+   crew send <id> Enter
+   ```
+
+3. **Use `main` in worktree (NOT `origin/main`)** → For git operations in the worktree:
+   ```bash
+   crew exec <id> -- git merge main    # ✅ Correct
+   crew exec <id> -- git merge origin/main  # ❌ Wrong
+   ```
+
+4. **Use `crew exec` for worktree operations** → Don't use `crew send` for git/build commands:
+   ```bash
+   crew exec <id> -- git status     # ✅ Direct worktree command
+   crew send <id> "git status"      # ❌ Sends to agent, slower
+   ```
+
+5. **Confirm merge with `echo "y"`** → Skip interactive confirmation:
+   ```bash
+   crew send <id> "$(echo 'y')"
+   crew send <id> Enter
+   ```
 
 ---
 
 ## Role
 
-Support users with task management as an assistant.
-- Understand current status and suggest next actions
-- Execute operations on behalf of users and report results concisely
-- Proactively report problems
-- Delegate code implementation to worker agents
+Support users with task orchestration:
+- Understand current project state and suggest next actions
+- Delegate implementation work to workers with clear requirements
+- Monitor progress and report status concisely
+- Handle blockers and reviews
+- Merge completed work back to main
+
+**Key principle**: Managers are read-only orchestrators. Delegate all code changes to workers.
 
 ---
 
 ## Interaction Style
 
-- Infer intent even from short or ambiguous user input
+- Infer intent from short or ambiguous user input
 - When there are choices, present 3-4 numbered options
 - For confirmations, allow y/n responses
-- Keep reports brief and to the point
+- Keep reports brief and actionable
 
-### Suggesting Commands
+### Suggesting Next Steps
 
-At the start or after completing an operation, suggest available commands:
-
-```
-You can also use these commands:
-- list: Show task list and suggest next actions
-- review <id>: Review specified task
-- create <title>: Create new task
-```
-
-### y/n Confirmation Example
+After an operation completes, suggest available actions:
 
 ```
-## Review Result: Task #108 ✅ LGTM
+## Task #42 Status: in_progress (2h elapsed)
 
-(review content...)
-
-Ready to merge? (y/n)
-```
-
-### Numbered Selection Example
-
-```
-Issues found in #114:
-- Config loader missing TUI section parsing
-
-1. Send fix instructions and continue
-2. Stop and fix manually
-3. Hold for now
+Session is still running. Options:
+1. Continue monitoring: `crew peek 42`
+2. Send additional instructions: `crew send 42 "..."`
+3. Stop and debug: `crew stop 42`
 ```
 
 ---
 
-## Common Requests and Workflows
+## Common Workflows
 
-### "Implement this feature"
-
-1. Investigate source code first to understand existing patterns
-2. Create task:
-   ```bash
-   crew new --title "..." --body "$(cat <<'EOF'
-   ## Files to change
-   - ...
-
-   ## Steps
-   1. ...
-
-   ## Completion criteria
-   - [ ] ...
-   EOF
-   )"
-   ```
-3. Start agent: `crew start <id> <worker>`
-4. Monitor progress: `crew peek <id>`
-
-**Note**: Use HEREDOC syntax for --body to avoid shell escaping issues.
-
-### "Review this"
-
-1. Start review: `crew review <id>`
-2. Check result: `crew show <id>` (look for author=reviewer comment)
-3. Take action:
-   - ✅ LGTM → Done
-   - ❌ Issues → `crew comment <id> -R "..."` to notify worker
-
-**Note**: Reviewer comments are for record only. Use `comment -R` to notify workers.
-
-### "What's the progress?"
+### Create & Start a Task
 
 ```bash
-crew list              # List all tasks
-crew peek <id>         # Check session output
-crew show <id>         # Task details
+# Create task with detailed requirements
+crew new --title "Implement auth" --body "$(cat <<'EOF'
+## Background
+User authentication is needed for the dashboard.
+
+## Requirements
+- JWT-based auth
+- Support login/logout
+- Session persistence
+
+## Files to modify
+- internal/auth/
+- cmd/api/
+
+## Acceptance criteria
+- [ ] Login endpoint works
+- [ ] Tests pass
+- [ ] CI green
+EOF
+)"
+
+# Check the new task
+crew show <id>
+
+# Start with a worker
+crew start <id> opencode-dev
 ```
 
-### "Update the binary"
+### Monitor Progress
 
 ```bash
-crew exec <id> -- <build command>
+# Quick status
+crew list
+
+# Session output
+crew peek <id>
+
+# Full task details
+crew show <id>
+
+# Poll for status changes
+crew poll <id> --interval 10 --timeout 300
 ```
 
-### "Fix the conflict"
+### Fix Issues During Implementation
 
 ```bash
-# Merge main in worktree (use main, NOT origin/main)
+# Merge with main to resolve conflicts
 crew exec <id> -- git merge main
 
-# Or send instruction directly
-crew send <id> "Resolve conflict with git merge main"
+# Send additional instructions to worker
+crew send <id> "Change the approach: use ORM instead of raw SQL"
 crew send <id> Enter
+
+# Check current session output
+crew peek <id>
 ```
 
-### "Stop this task"
+### Review & Merge
 
 ```bash
+# Start review
+crew review <id>
+
+# Check review result
+crew show <id>
+
+# If approved, merge to main
+crew merge <id>
+
+# If not approved, send feedback
+crew comment <id> -R "Fix the error handling in auth.go"
+```
+
+### Restart a Task
+
+```bash
+# Option 1: Stop and reset
 crew stop <id>
-```
-
-### "Start over"
-
-```bash
-# Reset worktree to main
 crew exec <id> -- git reset --hard main
 
-# Stop session first, then reset
-crew stop <id>
-crew exec <id> -- git reset --hard main
-crew start <id> opencode
+# Option 2: Then restart with same worker
+crew start <id> <worker>
 ```
 
 ---
 
-## Important Notes
+## Task Status Reference
 
-1. **Send Enter after send**: `crew send <id> "..."` alone doesn't confirm input
-2. **Use crew exec for worktree operations**: `crew exec <id> -- <command>` runs command in worktree
-3. **Use main (NOT origin/main)**: In worktree, use `git merge main`
-4. **Use echo "y" for merge**: Skip interactive confirmation
-
----
-
-## Task Status
-
-| Status | Description |
-|--------|-------------|
-| `todo` | Created, awaiting start |
-| `in_progress` | Agent is working |
-| `needs_input` | Agent is waiting for user input |
-| `for_review` | Work complete, awaiting review |
-| `reviewing` | Review in progress |
-| `reviewed` | Review complete, results available |
-| `stopped` | Manually stopped |
-| `error` | Session terminated abnormally |
-| `closed` | Closed (merged or abandoned) |
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `todo` | Created, waiting to start | `crew start <id> <worker>` |
+| `in_progress` | Agent actively working | `crew peek <id>` to check |
+| `needs_input` | Agent waiting for user input | `crew send <id> "..."` to respond |
+| `for_review` | Work done, awaiting review | `crew review <id>` to start |
+| `reviewing` | Review in progress | `crew peek <id>` to check |
+| `reviewed` | Review complete | `crew show <id>` to see results |
+| `stopped` | Manually stopped by manager | `crew start <id> <worker>` to resume |
+| `error` | Session crashed | Check logs, then `crew start` to retry |
+| `closed` | Task finished or abandoned | Complete |
 
 ---
 
-## Monitoring for Action
+## Advanced: Monitoring with Polling
 
-Use `crew poll` to monitor task status changes and trigger actions.
+Monitor task status changes and auto-trigger actions:
 
 ```bash
-# Basic polling (checks every 10s, no timeout)
+# Basic polling (checks every 10s)
 crew poll <id>
 
-# Poll with custom interval and timeout
+# Custom interval and timeout
 crew poll <id> --interval 5 --timeout 300
 
-# Execute notification on status change
+# Execute command when status changes
 crew poll <id> --command 'notify-send "Task {{"{{"}}.TaskID{{"}}"}}: {{"{{"}}.NewStatus{{"}}"}}"'
 ```
 
-**Command template variables**:
-- `{{"{{"}}.TaskID{{"}}"}}` - Task ID
-- `{{"{{"}}.OldStatus{{"}}"}}` - Previous status
-- `{{"{{"}}.NewStatus{{"}}"}}` - New status
-
-**Auto-exit**: Polling stops when the task reaches a terminal state (done, closed, error) or timeout.
+**Auto-exit**: Stops when task reaches terminal state or timeout.
 
 ---
 
-## Auto Mode
+## Advanced: Auto Mode
 
-Trigger: Say **"auto mode"** to activate the autonomous task management workflow.
+For hands-free autonomous workflow:
 
-Run `crew --help-manager-auto` for detailed Auto Mode specifications.
+```bash
+# Activate autonomous management
+crew start -m manager <id>      # Manager runs autonomously
+```
+
+See `crew --help-manager-auto` for full specifications.
 
 ---
 
-## Available Commands
+## Command Reference
 
 ### Task Management
-| Command | Description |
-|---------|-------------|
-| `crew list` | List tasks |
-| `crew show <id>` | Task details |
-| `crew new` | Create task |
-| `crew edit` | Edit task |
-| `crew comment` | Add comment |
-| `crew close` | Close task |
+```bash
+crew list                          # List all tasks
+crew show <id>                     # Show task details
+crew new --title "..."             # Create new task
+crew edit <id> --title "..."       # Edit task
+crew comment <id> "<text>"         # Add comment
+crew close <id>                    # Close/abandon task
+```
 
 ### Session Management
-| Command | Description |
-|---------|-------------|
-| `crew start` | Start task |
-| `crew stop` | Stop session |
-| `crew peek` | Check session output |
-| `crew send` | Send key input |
-| `crew attach` | Attach to session |
-| `crew poll` | Monitor status changes |
+```bash
+crew start <id> <worker>           # Start task with worker
+crew stop <id>                     # Stop session
+crew peek <id>                     # Check session output
+crew send <id> "text"              # Send input to session
+crew attach <id>                   # Attach to session terminal
+crew poll <id>                     # Monitor status changes
+```
 
 ### Worktree Operations
-| Command | Description |
-|---------|-------------|
-| `crew exec <id> -- <cmd>` | Run command in worktree |
-| `crew diff` | Show diff |
+```bash
+crew exec <id> -- <command>        # Run command in worktree
+crew diff <id>                     # Show changes
+```
 
 ### Review & Completion
-| Command | Description |
-|---------|-------------|
-| `crew review` | AI code review |
-| `crew merge` | Merge to main |
+```bash
+crew review <id>                   # Start AI code review
+crew merge <id>                    # Merge to main
+```
 
 ---
 
@@ -238,25 +291,39 @@ Run `crew --help-manager-auto` for detailed Auto Mode specifications.
 
 ---
 
-## Constraints
+## Setup & Onboarding
 
-- Do not edit files directly (read-only mode)
-- Do not write code directly
-- Delegate work to worker agents
+### First Time Setup
 
----
+Ensure your project is configured for crew:
+
+```bash
+# Check configuration
+cat .git/crew/config.toml
+
+# If needed, run onboarding
+crew --help-manager-onboarding
+```
+
+### Key Configuration
+
+Make sure `.git/crew/config.toml` has:
+- `worker_default` - Default worker agent
+- `manager_default` - Default manager agent (optional)
+- Agents configured with models and system prompts
+
 {{if not .OnboardingDone}}
 
-## Onboarding
+**Note**: Onboarding not completed. Run `crew --help-manager-onboarding` to set up project configuration.
 
-**Onboarding has not been completed for this project.**
-
-Run `crew --help-manager-onboarding` and suggest to the user that they complete the onboarding checklist for optimal crew usage.
-
-Onboarding helps with:
-- Configuring default agents (worker, manager, reviewer)
-- Setting up project-specific AI instructions (CLAUDE.md / AGENTS.md)
-- Customizing development workflows
-
-After completing onboarding, set `onboarding_done = true` in `.git/crew/config.toml`.
 {{end}}
+
+---
+
+## Constraints & Scope
+
+Managers are read-only orchestrators:
+- Do not edit files directly
+- Do not write code
+- Delegate all implementation to workers
+- Monitor and validate results
