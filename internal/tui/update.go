@@ -279,7 +279,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Exec):
 		task := m.SelectedTask()
-		if task == nil {
+		if !m.hasWorktree(task) {
 			return m, nil
 		}
 		m.mode = ModeExec
@@ -288,7 +288,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Review):
 		task := m.SelectedTask()
-		if task == nil {
+		if !m.hasWorktree(task) {
 			return m, nil
 		}
 		// Start review in background (tmux review session)

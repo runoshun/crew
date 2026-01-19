@@ -277,6 +277,23 @@ func (m *Model) canStopSelectedTask(task *domain.Task) bool {
 	return task != nil && task.Session != ""
 }
 
+func (m *Model) hasWorktree(task *domain.Task) bool {
+	if task == nil {
+		return false
+	}
+	branch := domain.BranchName(task.ID, task.Issue)
+	exists, err := m.container.Worktrees.Exists(branch)
+	if err != nil {
+		m.err = fmt.Errorf("check worktree: %w", err)
+		return false
+	}
+	if !exists {
+		m.err = domain.ErrWorktreeNotFound
+		return false
+	}
+	return true
+}
+
 // updateTaskList updates the task list items from tasks.
 func (m *Model) updateTaskList() {
 	sorted := m.sortedTasks()
@@ -644,9 +661,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				branch := domain.BranchName(task.ID, task.Issue)
-				exists, _ := m.container.Worktrees.Exists(branch)
-				return exists
+				return m.hasWorktree(task)
 			},
 		},
 		{
@@ -658,9 +673,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, m.reviewTask(task.ID)
 			},
 			IsAvailable: func() bool {
-				branch := domain.BranchName(task.ID, task.Issue)
-				exists, _ := m.container.Worktrees.Exists(branch)
-				return exists
+				return m.hasWorktree(task)
 			},
 		},
 		{
