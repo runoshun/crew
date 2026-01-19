@@ -69,6 +69,9 @@ func TestAttachSession_Execute_NoSession(t *testing.T) {
 
 	// Assert
 	assert.ErrorIs(t, err, domain.ErrNoSession)
+	assert.Contains(t, err.Error(), "crew start 1 --continue")
+	assert.Contains(t, err.Error(), "crew peek 1")
+	assert.Contains(t, err.Error(), "crew exec 1 -- <cmd>")
 }
 
 func TestAttachSession_Execute_IsRunningError(t *testing.T) {

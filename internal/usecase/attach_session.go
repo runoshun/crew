@@ -60,7 +60,7 @@ func (uc *AttachSession) Execute(_ context.Context, in AttachSessionInput) (*Att
 		return nil, fmt.Errorf("check session: %w", err)
 	}
 	if !running {
-		return nil, domain.ErrNoSession
+		return nil, fmt.Errorf("%w: session stopped or missing. Recover: crew start %d --continue, crew peek %d, or crew exec %d -- <cmd>", domain.ErrNoSession, task.ID, task.ID, task.ID)
 	}
 
 	// Attach to session (this replaces the current process)
