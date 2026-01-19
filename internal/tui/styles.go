@@ -531,6 +531,21 @@ func (s Styles) RenderMarkdown(text string, width int) string {
 	return strings.TrimSpace(out)
 }
 
+// RenderMarkdownWithBg renders markdown text with background color applied to each line.
+// This ensures the background color is consistent even when ANSI codes reset styles.
+func (s Styles) RenderMarkdownWithBg(text string, width int, bg lipgloss.Color) string {
+	rendered := s.RenderMarkdown(text, width)
+
+	// Apply background color to each line to ensure consistent background
+	lines := strings.Split(rendered, "\n")
+	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
+	for i, line := range lines {
+		lines[i] = lineStyle.Render(line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func (s Styles) markdownStyle() ansi.StyleConfig {
 	return ansi.StyleConfig{
 		Document: ansi.StyleBlock{
