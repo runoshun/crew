@@ -42,6 +42,13 @@
 
 <<end>>
 
+[tasks]
+## Task settings
+## - new_task_base: Base branch for new tasks
+##   - "current" (default): Use the current branch as base
+##   - "default": Use the default branch (main) as base
+# new_task_base = "current"
+
 [worktree]
 ## Worktree initialization settings (applied to all workers)
 ## - setup_command: Command to run after worktree creation
