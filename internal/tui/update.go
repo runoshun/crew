@@ -260,7 +260,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Stop):
 		task := m.SelectedTask()
-		if task == nil || !task.IsRunning() {
+		if !m.canStopSelectedTask(task) {
 			return m, nil
 		}
 		m.mode = ModeConfirm

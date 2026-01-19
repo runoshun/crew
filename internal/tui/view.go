@@ -119,6 +119,10 @@ func (m *Model) overlayDialog(base, dialog string) string {
 }
 
 func (m *Model) viewMain() string {
+	if len(m.tasks) == 0 {
+		return m.viewEmptyState()
+	}
+
 	// On narrow screen with detail focused, show only the detail panel
 	if !m.showListPane() {
 		return m.viewDetailPanel()
@@ -206,27 +210,63 @@ func (m *Model) viewHeader() string {
 
 func (m *Model) viewTaskList() string {
 	if len(m.taskList.Items()) == 0 {
-		return m.viewEmptyState()
+		return m.viewFilteredEmptyState()
 	}
 	return m.taskList.View()
 }
 
-// viewEmptyState renders a friendly empty state message.
+// viewEmptyState renders a friendly empty state message centered on screen.
 func (m *Model) viewEmptyState() string {
-	var b strings.Builder
-	b.WriteString("\n")
-	b.WriteString(m.styles.Footer.Render("  No tasks yet\n\n"))
-	b.WriteString(m.styles.Footer.Render("  Press "))
-	b.WriteString(m.styles.FooterKey.Render("n"))
-	b.WriteString(m.styles.Footer.Render(" to create your first task"))
-	b.WriteString("\n")
-	b.WriteString(m.styles.Footer.Render("  Press "))
-	b.WriteString(m.styles.FooterKey.Render("enter"))
-	b.WriteString(m.styles.Footer.Render(" for actions · "))
-	b.WriteString(m.styles.FooterKey.Render("space"))
-	b.WriteString(m.styles.Footer.Render(" for default"))
-	b.WriteString("\n")
-	return b.String()
+	contentWidth := m.contentWidth()
+	contentHeight := m.height - 2
+	if contentWidth < 0 {
+		contentWidth = 0
+	}
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+
+	titleStyle := m.styles.HeaderText
+	bodyStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
+	hintStyle := lipgloss.NewStyle().Foreground(Colors.KeyText).Bold(true)
+
+	title := titleStyle.Render("No tasks yet")
+	primary := bodyStyle.Render("Create your first task to get started")
+	hint := lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		bodyStyle.Render("Hint: "),
+		hintStyle.Render("crew create \"Your task title\""),
+	)
+
+	content := lipgloss.JoinVertical(lipgloss.Center, title, "", primary, hint)
+	return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, content)
+}
+
+// viewFilteredEmptyState renders empty state when filter hides tasks.
+func (m *Model) viewFilteredEmptyState() string {
+	contentWidth := m.contentWidth()
+	contentHeight := m.height - 2
+	if contentWidth < 0 {
+		contentWidth = 0
+	}
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+
+	titleStyle := m.styles.HeaderText
+	bodyStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
+	hintStyle := lipgloss.NewStyle().Foreground(Colors.KeyText).Bold(true)
+
+	title := titleStyle.Render("No matching tasks")
+	primary := bodyStyle.Render("Clear the filter to see all tasks")
+	hint := lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		bodyStyle.Render("Hint: "),
+		hintStyle.Render("press / then backspace"),
+	)
+
+	content := lipgloss.JoinVertical(lipgloss.Center, title, "", primary, hint)
+	return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, content)
 }
 
 func (m *Model) viewConfirmDialog() string {
@@ -459,6 +499,9 @@ func (m *Model) viewFooter() string {
 			m.styles.FooterKey.Render("n") + " new  " +
 			m.styles.FooterKey.Render("?") + " help  " +
 			m.styles.FooterKey.Render("q") + " quit"
+		if m.canStopSelectedTask(m.SelectedTask()) {
+			content = content + "  " + m.styles.FooterKey.Render("S") + " stop"
+		}
 	case ModeFilter:
 		content = "enter apply · esc cancel"
 	case ModeChangeStatus:

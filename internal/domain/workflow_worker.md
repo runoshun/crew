@@ -72,7 +72,7 @@ crew show
 
 # 3. Run CI (see "CI Tests" section for your project's specific command)
 
-# 4. Commit changes
+# 4. Commit changes: DO NOT USE git -C <dir> <cmd> form, USE git <cmd> simply.
 git add <files>
 git commit -m "feat: ..."
 

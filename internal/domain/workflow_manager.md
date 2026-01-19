@@ -204,7 +204,6 @@ crew start <id> <worker>
 | `todo` | Created, waiting to start | `crew start <id> <worker>` |
 | `in_progress` | Agent actively working | `crew peek <id>` to check |
 | `needs_input` | Agent waiting for user input | `crew send <id> "..."` to respond |
-| `for_review` | Work done, awaiting review | `crew review <id>` to start |
 | `reviewing` | Review in progress | `crew peek <id>` to check |
 | `reviewed` | Review complete | `crew show <id>` to see results |
 | `stopped` | Manually stopped by manager | `crew start <id> <worker>` to resume |
@@ -291,6 +290,8 @@ crew merge <id>                    # Merge to main
 
 ---
 
+{{if not .OnboardingDone}}
+
 ## Setup & Onboarding
 
 ### First Time Setup
@@ -311,8 +312,6 @@ Make sure `.git/crew/config.toml` has:
 - `worker_default` - Default worker agent
 - `manager_default` - Default manager agent (optional)
 - Agents configured with models and system prompts
-
-{{if not .OnboardingDone}}
 
 **Note**: Onboarding not completed. Run `crew --help-manager-onboarding` to set up project configuration.
 

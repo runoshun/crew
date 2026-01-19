@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -35,6 +36,65 @@ func TestUpdate_MsgCommentsLoaded(t *testing.T) {
 	result, ok := updatedModel.(*Model)
 	assert.True(t, ok, "Update should return *Model")
 	assert.Equal(t, testComments, result.comments, "Comments should be set")
+}
+
+func TestUpdate_StopKey_NoSelection(t *testing.T) {
+	m := &Model{
+		keys:     DefaultKeyMap(),
+		mode:     ModeNormal,
+		taskList: list.New([]list.Item{}, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Equal(t, ConfirmNone, result.confirmAction)
+	assert.Equal(t, 0, result.confirmTaskID)
+}
+
+func TestUpdate_StopKey_NoSession(t *testing.T) {
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
+	items := []list.Item{taskItem{task: task}}
+
+	m := &Model{
+		keys:     DefaultKeyMap(),
+		mode:     ModeNormal,
+		tasks:    []*domain.Task{task},
+		taskList: list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Equal(t, ConfirmNone, result.confirmAction)
+	assert.Equal(t, 0, result.confirmTaskID)
+}
+
+func TestUpdate_StopKey_WithSession(t *testing.T) {
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusForReview, Session: "crew-1"}
+	items := []list.Item{taskItem{task: task}}
+
+	m := &Model{
+		keys:     DefaultKeyMap(),
+		mode:     ModeNormal,
+		tasks:    []*domain.Task{task},
+		taskList: list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+
+	assert.Equal(t, ModeConfirm, result.mode)
+	assert.Equal(t, ConfirmStop, result.confirmAction)
+	assert.Equal(t, 1, result.confirmTaskID)
 }
 
 func TestUpdate_MsgCommentsLoaded_EmptyComments(t *testing.T) {
