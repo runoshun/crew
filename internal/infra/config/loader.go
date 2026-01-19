@@ -286,6 +286,14 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						if s, ok := v.(string); ok {
 							res.Tasks.Namespace = s
 						}
+					case "new_task_base":
+						if s, ok := v.(string); ok {
+							res.Tasks.NewTaskBase = s
+							// Validate: only "", "current", or "default" are valid
+							if s != "" && s != "current" && s != "default" {
+								warnings = append(warnings, fmt.Sprintf("invalid value for tasks.new_task_base: %q (expected \"current\" or \"default\")", s))
+							}
+						}
 					case "encrypt":
 						if b, ok := v.(bool); ok {
 							res.Tasks.Encrypt = b
@@ -560,6 +568,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.Tasks.Namespace != "" {
 		result.Tasks.Namespace = override.Tasks.Namespace
+	}
+	if override.Tasks.NewTaskBase != "" {
+		result.Tasks.NewTaskBase = override.Tasks.NewTaskBase
 	}
 	if override.Tasks.Encrypt {
 		result.Tasks.Encrypt = override.Tasks.Encrypt
