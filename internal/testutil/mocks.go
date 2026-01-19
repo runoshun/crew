@@ -338,23 +338,24 @@ func (m *MockGit) GetNewTaskBaseBranch() (string, error) {
 // MockSessionManager is a test double for domain.SessionManager.
 // Fields are ordered to minimize memory padding.
 type MockSessionManager struct {
-	IsRunningErr error
-	StartErr     error
-	StopErr      error
-	AttachErr    error
-	SendErr      error
-	PeekErr      error
-	PeekOutput   string
-	SentKeys     string
-	StartOpts    domain.StartSessionOptions
-	PeekLines    int
-	PeekEscape   bool
-	IsRunningVal bool
-	StartCalled  bool
-	StopCalled   bool
-	AttachCalled bool
-	SendCalled   bool
-	PeekCalled   bool
+	IsRunningErr  error
+	StartErr      error
+	StopErr       error
+	AttachErr     error
+	SendErr       error
+	PeekErr       error
+	PeekOutput    string
+	SentKeys      string
+	IsRunningFunc func(string) (bool, error)
+	StartOpts     domain.StartSessionOptions
+	PeekLines     int
+	PeekEscape    bool
+	IsRunningVal  bool
+	StartCalled   bool
+	StopCalled    bool
+	AttachCalled  bool
+	SendCalled    bool
+	PeekCalled    bool
 }
 
 // NewMockSessionManager creates a new MockSessionManager.
@@ -403,7 +404,10 @@ func (m *MockSessionManager) Send(_ string, keys string) error {
 }
 
 // IsRunning returns the configured value or error.
-func (m *MockSessionManager) IsRunning(_ string) (bool, error) {
+func (m *MockSessionManager) IsRunning(name string) (bool, error) {
+	if m.IsRunningFunc != nil {
+		return m.IsRunningFunc(name)
+	}
 	if m.IsRunningErr != nil {
 		return false, m.IsRunningErr
 	}

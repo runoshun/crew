@@ -97,6 +97,27 @@ func TestUpdate_StopKey_WithSession(t *testing.T) {
 	assert.Equal(t, 1, result.confirmTaskID)
 }
 
+func TestUpdate_StopKey_InProgress(t *testing.T) {
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusInProgress}
+	items := []list.Item{taskItem{task: task}}
+
+	m := &Model{
+		keys:     DefaultKeyMap(),
+		mode:     ModeNormal,
+		tasks:    []*domain.Task{task},
+		taskList: list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'S'}})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+
+	assert.Equal(t, ModeConfirm, result.mode)
+	assert.Equal(t, ConfirmStop, result.confirmAction)
+	assert.Equal(t, 1, result.confirmTaskID)
+}
+
 func TestUpdate_MsgCommentsLoaded_EmptyComments(t *testing.T) {
 	m := &Model{
 		comments: []domain.Comment{

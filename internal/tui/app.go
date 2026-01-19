@@ -63,21 +63,22 @@ type Model struct {
 	editCommentInput textinput.Model
 
 	// Numeric state (smaller types last)
-	mode               Mode
-	confirmAction      ConfirmAction
-	sortMode           SortMode
-	newTaskField       NewTaskField
-	width              int
-	height             int
-	confirmTaskID      int
-	agentCursor        int
-	statusCursor       int
-	reviewTaskID       int // Task being reviewed
-	reviewActionCursor int // Cursor for action selection
-	editCommentIndex   int // Index of comment being edited
-	startFocusCustom   bool
-	showAll            bool
-	detailFocused      bool // Right pane is focused for scrolling
+	mode                 Mode
+	confirmAction        ConfirmAction
+	sortMode             SortMode
+	newTaskField         NewTaskField
+	width                int
+	height               int
+	confirmTaskID        int
+	agentCursor          int
+	statusCursor         int
+	reviewTaskID         int // Task being reviewed
+	reviewActionCursor   int // Cursor for action selection
+	editCommentIndex     int // Index of comment being edited
+	startFocusCustom     bool
+	showAll              bool
+	detailFocused        bool // Right pane is focused for scrolling
+	confirmReviewSession bool
 }
 
 // New creates a new TUI Model with the given container.
@@ -235,7 +236,13 @@ func (m *Model) SelectedTask() *domain.Task {
 }
 
 func (m *Model) canStopSelectedTask(task *domain.Task) bool {
-	return task != nil && task.Session != ""
+	if task == nil {
+		return false
+	}
+	if task.Status == domain.StatusInProgress || task.Status == domain.StatusNeedsInput || task.Status == domain.StatusReviewing {
+		return true
+	}
+	return task.Session != ""
 }
 
 // updateTaskList updates the task list items from tasks.
@@ -366,16 +373,16 @@ func (m *Model) startTask(taskID int, agent string) tea.Cmd {
 }
 
 // stopTask returns a command that stops a task session.
-func (m *Model) stopTask(taskID int) tea.Cmd {
+func (m *Model) stopTask(taskID int, review bool) tea.Cmd {
 	return func() tea.Msg {
-		_, err := m.container.StopTaskUseCase().Execute(
+		out, err := m.container.StopTaskUseCase().Execute(
 			context.Background(),
-			usecase.StopTaskInput{TaskID: taskID},
+			usecase.StopTaskInput{TaskID: taskID, Review: review},
 		)
 		if err != nil {
 			return MsgError{Err: err}
 		}
-		return MsgTaskStopped{TaskID: taskID}
+		return MsgTaskStopped{TaskID: taskID, Review: review, SessionName: out.SessionName}
 	}
 }
 
