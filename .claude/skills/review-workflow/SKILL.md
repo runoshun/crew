@@ -59,8 +59,6 @@ Register ALL TODOs at once when starting Phase 1:
      - docs/README.md - Project overview
      - docs/core-concepts.md - Design principles
      - docs/architecture.md - Code structure
-     - docs/spec-cli.md - CLI command specs
-     - docs/spec-tui.md - TUI screen specs
 
 2. **Identify review target**
    - Check if user specified a target (PR number, branch, files)
