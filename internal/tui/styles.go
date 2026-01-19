@@ -6,6 +6,8 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/padding"
+	"github.com/muesli/reflow/wrap"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
@@ -514,6 +516,7 @@ func StatusIcon(status domain.Status) string {
 }
 
 // RenderMarkdown renders markdown text with the given width.
+// It applies hard wrap to ensure long words/URLs don't overflow.
 func (s Styles) RenderMarkdown(text string, width int) string {
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStyles(s.markdownStyle()),
@@ -528,7 +531,29 @@ func (s Styles) RenderMarkdown(text string, width int) string {
 		return text
 	}
 
-	return strings.TrimSpace(out)
+	// Apply hard wrap to handle long words/URLs that glamour's word wrap can't break.
+	// wrap.String is ANSI-aware, so it won't break escape sequences.
+	out = wrap.String(strings.TrimSpace(out), width)
+
+	return out
+}
+
+// RenderMarkdownWithPadding renders markdown text with hard wrap and pads each line
+// to the specified width. This is useful for dialogs where background color needs
+// to extend to the full width of the dialog.
+func (s Styles) RenderMarkdownWithPadding(text string, width int) string {
+	if width <= 0 {
+		return text
+	}
+
+	// First render with standard markdown
+	out := s.RenderMarkdown(text, width)
+
+	// Then pad each line to fill the width (for background color)
+	// padding.String is ANSI-aware
+	out = padding.String(out, uint(width)) //#nosec G115 -- width is checked above
+
+	return out
 }
 
 func (s Styles) markdownStyle() ansi.StyleConfig {
