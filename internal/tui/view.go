@@ -931,7 +931,7 @@ func (m *Model) viewDetailPanel() string {
 			Foreground(Colors.Muted).
 			Width(panelWidth - 4)
 		scrollInfo := fmt.Sprintf(" %d%%", int(m.detailPanelViewport.ScrollPercent()*100))
-		footer := footerStyle.Render("j/k scroll · v/esc back" + scrollInfo)
+		footer := footerStyle.Render("↑↓ scroll · j/k half · g/G jump · v/esc back" + scrollInfo)
 		content = content + "\n" + footer
 	}
 
