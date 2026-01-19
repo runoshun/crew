@@ -42,14 +42,15 @@ func TestShowManagerHelp(t *testing.T) {
 
 	// Check that content contains key sections
 	assert.Contains(t, content, "# git-crew Manager Guide")
+	assert.Contains(t, content, "## ⚡ Quick Start")
+	assert.Contains(t, content, "## ⚠️ Critical Notes")
 	assert.Contains(t, content, "crew new")
 	assert.Contains(t, content, "crew start")
 	assert.Contains(t, content, "crew peek")
 	assert.Contains(t, content, "crew merge")
-	assert.Contains(t, content, "Send Enter after send")
+	assert.Contains(t, content, "crew send` requires Enter")
 	assert.Contains(t, content, "--body")
 	assert.Contains(t, content, "## Interaction Style")
-	assert.Contains(t, content, "Numbered Selection Example")
 
 	// Check available workers section
 	assert.Contains(t, content, "## Available Workers")
@@ -58,7 +59,7 @@ func TestShowManagerHelp(t *testing.T) {
 }
 
 func TestShowManagerHelp_OnboardingSection(t *testing.T) {
-	t.Run("shows onboarding section when not done", func(t *testing.T) {
+	t.Run("shows onboarding note when not done", func(t *testing.T) {
 		var buf bytes.Buffer
 		cfg := &domain.Config{
 			OnboardingDone: false,
@@ -68,12 +69,12 @@ func TestShowManagerHelp_OnboardingSection(t *testing.T) {
 
 		require.NoError(t, err)
 		content := buf.String()
-		assert.Contains(t, content, "## Onboarding")
-		assert.Contains(t, content, "Onboarding has not been completed")
+		assert.Contains(t, content, "## Setup & Onboarding")
+		assert.Contains(t, content, "Onboarding not completed")
 		assert.Contains(t, content, "crew --help-manager-onboarding")
 	})
 
-	t.Run("hides onboarding section when done", func(t *testing.T) {
+	t.Run("hides onboarding note when done", func(t *testing.T) {
 		var buf bytes.Buffer
 		cfg := &domain.Config{
 			OnboardingDone: true,
@@ -83,8 +84,7 @@ func TestShowManagerHelp_OnboardingSection(t *testing.T) {
 
 		require.NoError(t, err)
 		content := buf.String()
-		assert.NotContains(t, content, "## Onboarding")
-		assert.NotContains(t, content, "Onboarding has not been completed")
+		assert.NotContains(t, content, "Onboarding not completed")
 	})
 }
 
