@@ -226,17 +226,62 @@ func (m *Model) viewEmptyState() string {
 
 	titleStyle := m.styles.HeaderText
 	bodyStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
-	hintStyle := lipgloss.NewStyle().Foreground(Colors.KeyText).Bold(true)
+	keyStyle := lipgloss.NewStyle().Foreground(Colors.KeyText).Bold(true)
+	cmdStyle := lipgloss.NewStyle().Foreground(Colors.Primary)
+
+	// ASCII logo - compact to fit narrow terminals
+	logo := lipgloss.NewStyle().Foreground(Colors.Primary).Render(`  _____ ____  _______      __
+ / ____|  _ \| ____\ \    / /
+| |    | |_) | |__  \ \  / /
+| |    |  _ <|  __|  \ \/ /
+| |____| |_) | |____  \  /
+ \_____|____/|______|  \/    `)
 
 	title := titleStyle.Render("No tasks yet")
-	primary := bodyStyle.Render("Create your first task to get started")
-	hint := lipgloss.JoinHorizontal(
-		lipgloss.Center,
-		bodyStyle.Render("Hint: "),
-		hintStyle.Render("crew create \"Your task title\""),
+	subtitle := bodyStyle.Render("Create your first task to get started")
+
+	// Hints section
+	hint1 := lipgloss.JoinHorizontal(lipgloss.Left,
+		bodyStyle.Render("Press "),
+		keyStyle.Render("n"),
+		bodyStyle.Render(" to create a new task"),
+	)
+	hint2 := lipgloss.JoinHorizontal(lipgloss.Left,
+		bodyStyle.Render("Or run: "),
+		cmdStyle.Render("crew new --title \"Your task\""),
+	)
+	hint3 := lipgloss.JoinHorizontal(lipgloss.Left,
+		bodyStyle.Render("Need help? "),
+		cmdStyle.Render("crew manager"),
+		bodyStyle.Render(" for AI assistance"),
 	)
 
-	content := lipgloss.JoinVertical(lipgloss.Center, title, "", primary, hint)
+	// Build content based on available height
+	var content string
+	if contentHeight >= 14 && contentWidth >= 40 {
+		// Full layout with logo
+		content = lipgloss.JoinVertical(lipgloss.Center,
+			logo,
+			"",
+			title,
+			subtitle,
+			"",
+			hint1,
+			hint2,
+			hint3,
+		)
+	} else {
+		// Compact layout without logo
+		content = lipgloss.JoinVertical(lipgloss.Center,
+			title,
+			subtitle,
+			"",
+			hint1,
+			hint2,
+			hint3,
+		)
+	}
+
 	return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, content)
 }
 
