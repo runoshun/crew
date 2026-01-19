@@ -162,7 +162,7 @@ func (c *Container) InitRepoUseCase() *usecase.InitRepo {
 
 // NewTaskUseCase returns a new NewTask use case.
 func (c *Container) NewTaskUseCase() *usecase.NewTask {
-	return usecase.NewNewTask(c.Tasks, c.Git, c.Clock, c.Logger)
+	return usecase.NewNewTask(c.Tasks, c.Git, c.ConfigLoader, c.Clock, c.Logger)
 }
 
 // ListTasksUseCase returns a new ListTasks use case.

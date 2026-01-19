@@ -31,18 +31,31 @@ func resolveBaseBranch(task *domain.Task, git domain.Git) (string, error) {
 //
 // Resolution priority:
 //  1. baseBranch parameter (if not empty)
-//  2. git.GetNewTaskBaseBranch()
+//  2. config.Tasks.NewTaskBase:
+//     - "default": use git.GetDefaultBranch()
+//     - "" or "current" (default): use git.CurrentBranch()
 //
 // This helper centralizes the BaseBranch resolution logic for new task creation.
-func resolveNewTaskBaseBranch(baseBranch string, git domain.Git) (string, error) {
+func resolveNewTaskBaseBranch(baseBranch string, git domain.Git, config *domain.Config) (string, error) {
 	if baseBranch != "" {
 		return baseBranch, nil
 	}
 
-	newTaskBaseBranch, err := git.GetNewTaskBaseBranch()
-	if err != nil {
-		return "", fmt.Errorf("get new task base branch: %w", err)
+	// Check config for new task base branch setting
+	// Default is "current" (use current branch)
+	if config != nil && config.Tasks.NewTaskBase == "default" {
+		defaultBranch, err := git.GetDefaultBranch()
+		if err != nil {
+			return "", fmt.Errorf("get default branch: %w", err)
+		}
+		return defaultBranch, nil
 	}
 
-	return newTaskBaseBranch, nil
+	// Use current branch (default behavior)
+	currentBranch, err := git.CurrentBranch()
+	if err != nil {
+		return "", fmt.Errorf("get current branch: %w", err)
+	}
+
+	return currentBranch, nil
 }

@@ -27,19 +27,21 @@ type NewTaskOutput struct {
 
 // NewTask is the use case for creating a new task.
 type NewTask struct {
-	tasks  domain.TaskRepository
-	git    domain.Git
-	clock  domain.Clock
-	logger domain.Logger
+	tasks        domain.TaskRepository
+	git          domain.Git
+	configLoader domain.ConfigLoader
+	clock        domain.Clock
+	logger       domain.Logger
 }
 
 // NewNewTask creates a new NewTask use case.
-func NewNewTask(tasks domain.TaskRepository, git domain.Git, clock domain.Clock, logger domain.Logger) *NewTask {
+func NewNewTask(tasks domain.TaskRepository, git domain.Git, configLoader domain.ConfigLoader, clock domain.Clock, logger domain.Logger) *NewTask {
 	return &NewTask{
-		tasks:  tasks,
-		git:    git,
-		clock:  clock,
-		logger: logger,
+		tasks:        tasks,
+		git:          git,
+		configLoader: configLoader,
+		clock:        clock,
+		logger:       logger,
 	}
 }
 
@@ -67,9 +69,18 @@ func (uc *NewTask) Execute(_ context.Context, in NewTaskInput) (*NewTaskOutput, 
 		return nil, fmt.Errorf("generate task ID: %w", err)
 	}
 
+	// Load config for base branch resolution
+	var config *domain.Config
+	if uc.configLoader != nil {
+		config, err = uc.configLoader.Load()
+		if err != nil {
+			return nil, fmt.Errorf("load config: %w", err)
+		}
+	}
+
 	// Create task
 	now := uc.clock.Now()
-	baseBranch, err := resolveNewTaskBaseBranch(in.BaseBranch, uc.git)
+	baseBranch, err := resolveNewTaskBaseBranch(in.BaseBranch, uc.git, config)
 	if err != nil {
 		return nil, err
 	}

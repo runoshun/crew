@@ -194,10 +194,6 @@ type Git interface {
 	// GetDefaultBranch returns the default branch name.
 	// Priority: git config crew.defaultBranch > refs/remotes/origin/HEAD > "main"
 	GetDefaultBranch() (string, error)
-
-	// GetNewTaskBaseBranch returns the base branch for new tasks.
-	// Priority: git config crew.newTaskBase > current branch (if "current") > GetDefaultBranch()
-	GetNewTaskBaseBranch() (string, error)
 }
 
 // GitHub provides GitHub integration via gh CLI.

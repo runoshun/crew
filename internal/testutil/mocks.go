@@ -242,22 +242,20 @@ func (m *MockTaskRepositoryWithUpdateCommentError) UpdateComment(_ int, _ int, _
 // MockGit is a test double for domain.Git.
 // Fields are ordered to minimize memory padding.
 type MockGit struct {
-	CurrentBranchErr        error
-	HasUncommittedErr       error
-	MergeErr                error
-	DeleteBranchErr         error
-	GetDefaultBranchErr     error
-	GetNewTaskBaseBranchErr error
-	CurrentBranchName       string
-	DefaultBranchName       string
-	NewTaskBaseBranchName   string
-	MergeBranch             string
-	DeletedBranch           string
-	HasUncommittedChangesV  bool
-	MergeNoFF               bool
-	MergeCalled             bool
-	DeleteBranchCalled      bool
-	GetDefaultBranchCalled  bool
+	CurrentBranchErr       error
+	HasUncommittedErr      error
+	MergeErr               error
+	DeleteBranchErr        error
+	GetDefaultBranchErr    error
+	CurrentBranchName      string
+	DefaultBranchName      string
+	MergeBranch            string
+	DeletedBranch          string
+	HasUncommittedChangesV bool
+	MergeNoFF              bool
+	MergeCalled            bool
+	DeleteBranchCalled     bool
+	GetDefaultBranchCalled bool
 }
 
 // Ensure MockGit implements domain.Git interface.
@@ -322,17 +320,6 @@ func (m *MockGit) GetDefaultBranch() (string, error) {
 		return m.DefaultBranchName, nil
 	}
 	return "main", nil
-}
-
-// GetNewTaskBaseBranch returns the configured new task base branch name or error.
-func (m *MockGit) GetNewTaskBaseBranch() (string, error) {
-	if m.GetNewTaskBaseBranchErr != nil {
-		return "", m.GetNewTaskBaseBranchErr
-	}
-	if m.NewTaskBaseBranchName != "" {
-		return m.NewTaskBaseBranchName, nil
-	}
-	return m.GetDefaultBranch()
 }
 
 // MockSessionManager is a test double for domain.SessionManager.

@@ -154,6 +154,10 @@ tui_command = "git diff --color {{.BaseBranch}}...HEAD | less -R"
 [log]
 level = "info"
 
+# Task settings
+[tasks]
+new_task_base = "current"  # Base branch for new tasks: "current" (default) or "default"
+
 # Git Configuration (via git config)
 # These settings are configured using `git config` rather than TOML
 
@@ -161,12 +165,6 @@ level = "info"
 #   Override the default branch name used for merging and diffs
 #   Priority: 1) git config crew.defaultBranch, 2) origin/HEAD, 3) "main"
 #   Example: git config crew.defaultBranch develop
-
-# crew.newTaskBase
-#   Control which branch to use as the base when creating new tasks
-#   Values: "default" (use crew.defaultBranch logic), "current" (use current HEAD)
-#   Default: "default"
-#   Example: git config crew.newTaskBase current
 
 # TUI Customization
 [tui.keybindings]

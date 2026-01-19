@@ -178,28 +178,6 @@ func (c *Client) GetDefaultBranch() (string, error) {
 	return "main", nil
 }
 
-// GetNewTaskBaseBranch returns the base branch for new tasks.
-// Priority: git config crew.newTaskBase == "current" ? current branch : GetDefaultBranch()
-func (c *Client) GetNewTaskBaseBranch() (string, error) {
-	// Check git config crew.newTaskBase
-	cmd := exec.Command("git", "config", "crew.newTaskBase")
-	cmd.Dir = c.repoRoot
-	if out, err := cmd.Output(); err == nil {
-		setting := strings.TrimSpace(string(out))
-		if setting == "current" {
-			// Use current branch
-			currentBranch, err := c.CurrentBranch()
-			if err != nil {
-				return "", fmt.Errorf("get current branch: %w", err)
-			}
-			return currentBranch, nil
-		}
-	}
-
-	// Otherwise, use default branch
-	return c.GetDefaultBranch()
-}
-
 // Ensure Client implements domain.Git interface.
 var _ domain.Git = (*Client)(nil)
 
