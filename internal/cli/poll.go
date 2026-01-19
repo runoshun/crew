@@ -30,12 +30,12 @@ func newPollCommand(c *app.Container) *cobra.Command {
 The poll command checks the task status at regular intervals and executes
 a command template as soon as a status change is detected on any of the
 monitored tasks. It exits immediately after executing the command for the
-first detected change.
+first detected change (single-shot).
 
 Polling stops automatically when the timeout is reached (default: 300s).
 
-Multiple Task Monitoring:
-  You can specify multiple task IDs to monitor them simultaneously.
+Multiple Task Monitoring (Recommended):
+  Always list all related task IDs so a change in any one triggers the action.
   The command exits when ANY of the specified tasks changes status.
 
 Expected Status Check (Optional):
@@ -57,23 +57,20 @@ Terminal States:
     - error  - Task session terminated with error
 
 Examples:
-  # Simple polling (notify on any change)
-  crew poll 175 --command 'notify-send "Task {{.TaskID}} changed to {{.NewStatus}}"'
-
   # Poll multiple tasks (exit when any changes)
   crew poll 220 221 222 --command 'echo "Task {{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"'
 
-  # Poll with expected status and notify on change (5m timeout)
-  crew poll 175 --expect todo --command 'notify-send "Task {{.TaskID}} started!"'
+  # Poll multiple tasks with expected status and notify on change (5m timeout)
+  crew poll 175 176 177 --expect todo --command 'notify-send "Task {{.TaskID}} started!"'
 
   # Multiple expected statuses (exit if status becomes something else)
-  crew poll 199 --expect in_progress,needs_input --command 'say "Task {{.TaskID}} changed to {{.NewStatus}}"'
+  crew poll 199 200 --expect in_progress,needs_input --command 'say "Task {{.TaskID}} changed to {{.NewStatus}}"'
 
   # Poll with custom interval and timeout
-  crew poll 175 --expect todo --interval 5 --timeout 60
+  crew poll 175 176 --expect todo --interval 5 --timeout 60
 
   # Use as a trigger for next action
-  crew poll 175 --expect in_progress --command 'crew complete 175'`,
+  crew poll 175 176 --expect in_progress --command 'crew complete {{.TaskID}}'`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task IDs
