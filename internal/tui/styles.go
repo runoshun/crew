@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/wrap"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
@@ -514,6 +515,7 @@ func StatusIcon(status domain.Status) string {
 }
 
 // RenderMarkdown renders markdown text with the given width.
+// It applies hard wrap to ensure long words/URLs don't overflow.
 func (s Styles) RenderMarkdown(text string, width int) string {
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStyles(s.markdownStyle()),
@@ -528,7 +530,11 @@ func (s Styles) RenderMarkdown(text string, width int) string {
 		return text
 	}
 
-	return strings.TrimSpace(out)
+	// Apply hard wrap to handle long words/URLs that glamour's word wrap can't break.
+	// wrap.String is ANSI-aware, so it won't break escape sequences.
+	out = wrap.String(strings.TrimSpace(out), width)
+
+	return out
 }
 
 // RenderMarkdownWithBg renders markdown text with background color applied to each line.
