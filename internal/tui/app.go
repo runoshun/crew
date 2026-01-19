@@ -339,7 +339,7 @@ func (m *Model) updateLayoutSizes() {
 	m.updateReviewViewport()
 }
 
-// updateReviewViewport updates the review viewport size based on dialog dimensions.
+// updateReviewViewport updates the review viewport size and content based on dialog dimensions.
 func (m *Model) updateReviewViewport() {
 	dialogW := m.dialogWidth() - 8 // Account for padding
 	// Leave space for title, task line, hint, and padding (approximately 8 lines)
@@ -352,6 +352,12 @@ func (m *Model) updateReviewViewport() {
 	}
 	m.reviewViewport.Width = dialogW
 	m.reviewViewport.Height = dialogH
+
+	// Re-render content with word wrap when size changes
+	if m.reviewResult != "" {
+		renderedContent := m.styles.RenderMarkdown(m.reviewResult, dialogW)
+		m.reviewViewport.SetContent(renderedContent)
+	}
 }
 
 func (m *Model) dialogWidth() int {
