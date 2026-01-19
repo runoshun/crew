@@ -353,9 +353,9 @@ func (m *Model) updateReviewViewport() {
 	m.reviewViewport.Width = dialogW
 	m.reviewViewport.Height = dialogH
 
-	// Re-render content with word wrap when size changes
+	// Re-render content with word wrap and dialog background color when size changes
 	if m.reviewResult != "" {
-		renderedContent := m.styles.RenderMarkdown(m.reviewResult, dialogW)
+		renderedContent := m.styles.RenderMarkdownWithBg(m.reviewResult, dialogW, Colors.Background)
 		m.reviewViewport.SetContent(renderedContent)
 	}
 }
