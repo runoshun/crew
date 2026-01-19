@@ -24,6 +24,43 @@ import (
 const autoRefreshInterval = 5 * time.Second
 
 // Model is the main bubbletea model for the TUI.
+//
+//nolint:govet // Field alignment not critical for UI menu items.
+type actionMenuItem struct {
+	ActionID    string
+	Label       string
+	Desc        string
+	Key         string
+	Action      func() (tea.Model, tea.Cmd)
+	IsAvailable func() bool
+	IsDefault   bool
+}
+
+func (m *Model) defaultActionID(task *domain.Task) string {
+	if task == nil {
+		return ""
+	}
+	switch task.Status {
+	case domain.StatusTodo, domain.StatusError, domain.StatusStopped:
+		return "start"
+	case domain.StatusInProgress, domain.StatusNeedsInput:
+		return "attach"
+	case domain.StatusReviewing:
+		return "attach_review"
+	case domain.StatusForReview:
+		return "show_diff"
+	case domain.StatusReviewed:
+		return "review_result"
+	case domain.StatusClosed:
+		return "detail"
+	default:
+		if task.Status.IsLegacyDone() {
+			return "detail"
+		}
+	}
+	return ""
+}
+
 type Model struct {
 	// Dependencies (pointers first for alignment)
 	container *app.Container
@@ -41,6 +78,7 @@ type Model struct {
 	customKeybinds  map[string]domain.TUIKeybinding
 	keybindWarnings []string
 	reviewResult    string // Review result text
+	actionMenuItems []actionMenuItem
 
 	// Components (structs with pointers)
 	keys                KeyMap
@@ -72,6 +110,7 @@ type Model struct {
 	confirmTaskID        int
 	agentCursor          int
 	statusCursor         int
+	actionMenuCursor     int
 	reviewTaskID         int // Task being reviewed
 	reviewActionCursor   int // Cursor for action selection
 	editCommentIndex     int // Index of comment being edited
@@ -243,6 +282,23 @@ func (m *Model) canStopSelectedTask(task *domain.Task) bool {
 		return true
 	}
 	return task.Session != ""
+}
+
+func (m *Model) hasWorktree(task *domain.Task) bool {
+	if task == nil {
+		return false
+	}
+	branch := domain.BranchName(task.ID, task.Issue)
+	exists, err := m.container.Worktrees.Exists(branch)
+	if err != nil {
+		m.err = fmt.Errorf("check worktree: %w", err)
+		return false
+	}
+	if !exists {
+		m.err = domain.ErrWorktreeNotFound
+		return false
+	}
+	return true
 }
 
 // updateTaskList updates the task list items from tasks.
@@ -499,6 +555,241 @@ func (m *Model) updateStatus(taskID int, status domain.Status) tea.Cmd {
 
 // updateAgents updates the agent lists from config.
 // Agents with role=worker and hidden=false are shown in the TUI.
+func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
+	if task == nil {
+		return nil
+	}
+
+	actions := []actionMenuItem{
+		{
+			ActionID: "start",
+			Label:    "Start",
+			Desc:     "Start with agent",
+			Key:      "s",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.mode = ModeStart
+				return m, nil
+			},
+			IsAvailable: func() bool {
+				return task.Status.CanStart()
+			},
+		},
+		{
+			ActionID: "stop",
+			Label:    "Stop",
+			Desc:     "Stop running session",
+			Key:      "S",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.mode = ModeConfirm
+				m.confirmAction = ConfirmStop
+				m.confirmTaskID = task.ID
+				return m, nil
+			},
+			IsAvailable: func() bool {
+				return task.IsRunning() && task.Status == domain.StatusInProgress
+			},
+		},
+		{
+			ActionID: "attach",
+			Label:    "Attach",
+			Desc:     "Attach to session",
+			Key:      "a",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, func() tea.Msg {
+					return MsgAttachSession{TaskID: task.ID}
+				}
+			},
+			IsAvailable: func() bool {
+				return task.IsRunning()
+			},
+		},
+		{
+			ActionID: "attach_review",
+			Label:    "Attach Review",
+			Desc:     "Open review session",
+			Key:      "A",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, func() tea.Msg {
+					return MsgAttachSession{TaskID: task.ID, Review: true}
+				}
+			},
+			IsAvailable: func() bool {
+				return task.Status == domain.StatusReviewing
+			},
+		},
+		{
+			ActionID: "show_diff",
+			Label:    "Show Diff",
+			Desc:     "Open diff for review",
+			Key:      "D",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, func() tea.Msg {
+					return MsgShowDiff{TaskID: task.ID}
+				}
+			},
+			IsAvailable: func() bool {
+				return task.Status == domain.StatusForReview
+			},
+		},
+		{
+			ActionID: "review_result",
+			Label:    "Review Result",
+			Desc:     "Open review summary",
+			Key:      "r",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, m.loadReviewResult(task.ID)
+			},
+			IsAvailable: func() bool {
+				return task.Status == domain.StatusReviewed
+			},
+		},
+		{
+			ActionID: "change_status",
+			Label:    "Change Status",
+			Desc:     "Pick new status",
+			Key:      "e",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.mode = ModeChangeStatus
+				m.statusCursor = 0
+				return m, nil
+			},
+			IsAvailable: func() bool {
+				return !task.Status.IsTerminal()
+			},
+		},
+		{
+			ActionID: "exec",
+			Label:    "Execute",
+			Desc:     "Run command in worktree",
+			Key:      "x",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.mode = ModeExec
+				m.execInput.Focus()
+				return m, nil
+			},
+			IsAvailable: func() bool {
+				return m.hasWorktree(task)
+			},
+		},
+		{
+			ActionID: "review",
+			Label:    "Review",
+			Desc:     "Run reviewer session",
+			Key:      "R",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, m.reviewTask(task.ID)
+			},
+			IsAvailable: func() bool {
+				return m.hasWorktree(task)
+			},
+		},
+		{
+			ActionID: "copy",
+			Label:    "Copy",
+			Desc:     "Duplicate task",
+			Key:      "y",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, m.copyTask(task.ID)
+			},
+			IsAvailable: func() bool {
+				return true
+			},
+		},
+		{
+			ActionID: "edit",
+			Label:    "Edit",
+			Desc:     "Edit task in editor",
+			Key:      "E",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, m.editTaskInEditor(task.ID)
+			},
+			IsAvailable: func() bool {
+				return true
+			},
+		},
+		{
+			ActionID: "delete",
+			Label:    "Delete",
+			Desc:     "Delete task",
+			Key:      "d",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.mode = ModeConfirm
+				m.confirmAction = ConfirmDelete
+				m.confirmTaskID = task.ID
+				return m, nil
+			},
+			IsAvailable: func() bool {
+				return true
+			},
+		},
+		{
+			ActionID: "close",
+			Label:    "Close",
+			Desc:     "Close task",
+			Key:      "c",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.mode = ModeConfirm
+				m.confirmAction = ConfirmClose
+				m.confirmTaskID = task.ID
+				return m, nil
+			},
+			IsAvailable: func() bool {
+				return !task.Status.IsTerminal()
+			},
+		},
+		{
+			ActionID: "merge",
+			Label:    "Merge",
+			Desc:     "Merge task",
+			Key:      "m",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.mode = ModeConfirm
+				m.confirmAction = ConfirmMerge
+				m.confirmTaskID = task.ID
+				return m, nil
+			},
+			IsAvailable: func() bool {
+				return task.Status == domain.StatusForReview || task.Status == domain.StatusReviewed
+			},
+		},
+		{
+			ActionID: "detail",
+			Label:    "Details",
+			Desc:     "Open details panel",
+			Key:      "v",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.detailFocused = true
+				m.updateLayoutSizes()
+				return m, m.loadComments(task.ID)
+			},
+			IsAvailable: func() bool {
+				return true
+			},
+		},
+	}
+
+	var filtered []actionMenuItem
+	for _, action := range actions {
+		if action.IsAvailable == nil || action.IsAvailable() {
+			filtered = append(filtered, action)
+		}
+	}
+
+	defaultID := m.defaultActionID(task)
+
+	if defaultID == "" {
+		defaultID = "detail"
+	}
+	for i := range filtered {
+		if filtered[i].ActionID == defaultID {
+			filtered[i].IsDefault = true
+			break
+		}
+	}
+
+	return filtered
+}
+
 func (m *Model) updateAgents() {
 	if m.config == nil {
 		return

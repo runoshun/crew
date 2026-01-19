@@ -220,6 +220,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleExecMode(msg)
 	case ModeReviewResult:
 		return m.handleReviewResultMode(msg)
+	case ModeActionMenu:
+		return m.handleActionMenuMode(msg)
 	case ModeReviewAction:
 		return m.handleReviewActionMode(msg)
 	case ModeReviewMessage:
@@ -258,7 +260,10 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case key.Matches(msg, m.keys.Enter):
-		return m.handleSmartAction()
+		return m.openActionMenu()
+
+	case key.Matches(msg, m.keys.Default):
+		return m.handleDefaultAction()
 
 	case key.Matches(msg, m.keys.Start):
 		task := m.SelectedTask()
@@ -293,13 +298,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Exec):
 		task := m.SelectedTask()
-		if task == nil {
-			return m, nil
-		}
-		// Check if worktree exists
-		branch := domain.BranchName(task.ID, task.Issue)
-		if exists, _ := m.container.Worktrees.Exists(branch); !exists {
-			m.err = fmt.Errorf("task worktree not found")
+		if !m.hasWorktree(task) {
 			return m, nil
 		}
 		m.mode = ModeExec
@@ -308,18 +307,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Review):
 		task := m.SelectedTask()
-		if task == nil {
-			return m, nil
-		}
-		// Check if worktree exists
-		branch := domain.BranchName(task.ID, task.Issue)
-		exists, err := m.container.Worktrees.Exists(branch)
-		if err != nil {
-			m.err = fmt.Errorf("check worktree: %w", err)
-			return m, nil
-		}
-		if !exists {
-			m.err = fmt.Errorf("task worktree not found - cannot review")
+		if !m.hasWorktree(task) {
 			return m, nil
 		}
 		// Start review in background (tmux review session)
@@ -427,9 +415,88 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleSmartAction performs context-aware action on Enter.
-func (m *Model) handleSmartAction() (tea.Model, tea.Cmd) {
-	task := m.SelectedTask()
+// handleDefaultAction performs context-aware default action.
+func (m *Model) handleDefaultAction() (tea.Model, tea.Cmd) {
+	return m.performDefaultAction(m.SelectedTask())
+}
+
+func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
+	items := m.actionMenuItemsForTask(m.SelectedTask())
+	if len(items) == 0 {
+		return m, nil
+	}
+	m.actionMenuItems = items
+	m.actionMenuCursor = 0
+	for i, item := range items {
+		if item.IsDefault {
+			m.actionMenuCursor = i
+			break
+		}
+	}
+	m.mode = ModeActionMenu
+	return m, nil
+}
+
+func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		m.actionMenuItems = nil
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		if m.actionMenuCursor > 0 {
+			m.actionMenuCursor--
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		if m.actionMenuCursor < len(m.actionMenuItems)-1 {
+			m.actionMenuCursor++
+		}
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		if len(m.actionMenuItems) == 0 {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		selected := m.actionMenuItems[m.actionMenuCursor]
+		m.mode = ModeNormal
+		m.actionMenuItems = nil
+		if selected.Action == nil {
+			return m, nil
+		}
+		return selected.Action()
+
+	case msg.Type == tea.KeyRunes:
+		if len(m.actionMenuItems) == 0 || len(msg.Runes) == 0 {
+			return m, nil
+		}
+		runeKey := string(msg.Runes)
+		for _, action := range m.actionMenuItems {
+			if action.Key == runeKey {
+				m.mode = ModeNormal
+				m.actionMenuItems = nil
+				if action.Action == nil {
+					return m, nil
+				}
+				return action.Action()
+			}
+		}
+		return m, nil
+
+	case msg.Type == tea.KeySpace:
+		selectedTask := m.SelectedTask()
+		m.mode = ModeNormal
+		m.actionMenuItems = nil
+		return m.performDefaultAction(selectedTask)
+	}
+
+	return m, nil
+}
+
+func (m *Model) performDefaultAction(task *domain.Task) (tea.Model, tea.Cmd) {
 	if task == nil {
 		return m, nil
 	}
@@ -687,6 +754,9 @@ func (m *Model) handleStartModeList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.startFocusCustom = false
 		return m, nil
 
+	case msg.Type == tea.KeySpace:
+		return m.handleDefaultAction()
+
 	case key.Matches(msg, m.keys.Up):
 		if m.agentCursor > 0 {
 			m.agentCursor--
@@ -727,6 +797,9 @@ func (m *Model) handleStartModeCustomInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.customInput.Reset()
 		m.startFocusCustom = false
 		return m, nil
+
+	case msg.Type == tea.KeySpace:
+		return m.handleDefaultAction()
 
 	case msg.Type == tea.KeyEnter:
 		task := m.SelectedTask()

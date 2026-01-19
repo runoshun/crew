@@ -89,6 +89,8 @@ func (m *Model) View() string {
 		dialog = m.viewStatusPicker()
 	case ModeExec:
 		dialog = m.viewExecDialog()
+	case ModeActionMenu:
+		dialog = m.viewActionMenuDialog()
 	case ModeReviewResult:
 		dialog = m.viewReviewResultDialog()
 	case ModeReviewAction:
@@ -496,7 +498,8 @@ func (m *Model) viewFooter() string {
 	switch m.mode {
 	case ModeNormal:
 		content = m.styles.FooterKey.Render("j/k") + " nav  " +
-			m.styles.FooterKey.Render("enter") + " open  " +
+			m.styles.FooterKey.Render("enter") + " actions  " +
+			m.styles.FooterKey.Render("space") + " default  " +
 			m.styles.FooterKey.Render("n") + " new  " +
 			m.styles.FooterKey.Render("?") + " help  " +
 			m.styles.FooterKey.Render("q") + " quit"
@@ -509,7 +512,7 @@ func (m *Model) viewFooter() string {
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
 		return ""
 	default:
 		return ""
@@ -570,7 +573,8 @@ func (m *Model) viewHelp() string {
 			}{
 				{"↑/k", "Move up"},
 				{"↓/j", "Move down"},
-				{"enter", "Open/Action"},
+				{"enter", "Actions"},
+				{"space", "Default"},
 				{"/", "Filter"},
 				{"o", "Sort"},
 				{"v", "Details"},
@@ -583,6 +587,7 @@ func (m *Model) viewHelp() string {
 				key  string
 				desc string
 			}{
+				{"space", "Default"},
 				{"s", "Start"},
 				{"S", "Stop (work/review)"},
 				{"a", "Attach"},
@@ -991,6 +996,77 @@ func (m *Model) viewDetailPanel() string {
 	return panelStyle.Render(content)
 }
 
+func (m *Model) viewActionMenuDialog() string {
+	if len(m.actionMenuItems) == 0 {
+		return ""
+	}
+	// Find task title
+	var taskTitle string
+	taskID := 0
+	if task := m.SelectedTask(); task != nil {
+		taskTitle = task.Title
+		taskID = task.ID
+	}
+
+	ds := m.newDialogStyles()
+	baseStyle := lipgloss.NewStyle().Background(ds.bg)
+	labelStyle := baseStyle.Foreground(Colors.TitleNormal)
+	mutedStyle := baseStyle.Foreground(Colors.Muted)
+	cursorStyle := baseStyle.Foreground(Colors.Primary)
+
+	title := ds.renderLine(ds.label.Render("Task Actions"))
+	taskLine := ""
+	if taskID > 0 {
+		taskLine = ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", taskID, taskTitle)))
+	}
+
+	var rows []string
+	for i, action := range m.actionMenuItems {
+		cursor := " "
+		rowStyle := labelStyle
+		if i == m.actionMenuCursor {
+			cursor = "▸"
+			rowStyle = ds.label
+		}
+		defaultTag := ""
+		if action.IsDefault {
+			defaultTag = ds.muted.Render(" (default)")
+		}
+		keyLabel := ""
+		if action.Key != "" {
+			keyLabel = ds.key.Render(action.Key) + baseStyle.Render(" ")
+		}
+		row := ds.renderLine(
+			baseStyle.Render("  ") +
+				cursorStyle.Render(cursor) +
+				baseStyle.Render(" ") +
+				keyLabel +
+				rowStyle.Render(fmt.Sprintf("%-14s", action.Label)) +
+				baseStyle.Render(" ") +
+				mutedStyle.Render(action.Desc) +
+				defaultTag,
+		)
+		rows = append(rows, row)
+	}
+
+	hint := ds.renderLine(
+		ds.key.Render("↑↓") + ds.text.Render(" select  ") +
+			ds.key.Render("enter") + ds.text.Render(" confirm  ") +
+			ds.key.Render("space") + ds.text.Render(" default  ") +
+			ds.key.Render("esc") + ds.text.Render(" close"))
+
+	lines := []string{title}
+	if taskLine != "" {
+		lines = append(lines, ds.emptyLine(), taskLine)
+	}
+	lines = append(lines, ds.emptyLine())
+	lines = append(lines, rows...)
+	lines = append(lines, ds.emptyLine(), hint)
+
+	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return m.dialogStyle().Render(content)
+}
+
 func (m *Model) viewReviewResultDialog() string {
 	ds := m.newDialogStyles()
 
@@ -1019,6 +1095,7 @@ func (m *Model) viewReviewResultDialog() string {
 	hint := ds.renderLine(
 		ds.key.Render("j/k") + ds.text.Render(" scroll  ") +
 			ds.key.Render("enter") + ds.text.Render(" actions  ") +
+			ds.key.Render("space") + ds.text.Render(" default  ") +
 			ds.key.Render("esc") + ds.text.Render(" close") +
 			ds.muted.Render(scrollInfo))
 

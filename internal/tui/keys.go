@@ -9,12 +9,13 @@ type KeyMap struct {
 	Down key.Binding
 
 	// Actions
-	Enter  key.Binding // Smart action (start if todo, attach if running)
-	Start  key.Binding // Start task with agent
-	Stop   key.Binding // Stop running session
-	Attach key.Binding // Attach to session
-	Exec   key.Binding // Execute command
-	Review key.Binding // Run review on task
+	Enter   key.Binding // Show actions menu
+	Default key.Binding // Execute default action
+	Start   key.Binding // Start task with agent
+	Stop    key.Binding // Stop running session
+	Attach  key.Binding // Attach to session
+	Exec    key.Binding // Execute command
+	Review  key.Binding // Run review on task
 
 	// Task management
 	New        key.Binding // Create new task
@@ -55,7 +56,11 @@ func DefaultKeyMap() KeyMap {
 		),
 		Enter: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("enter", "smart action"),
+			key.WithHelp("enter", "actions"),
+		),
+		Default: key.NewBinding(
+			key.WithKeys("space"),
+			key.WithHelp("space", "default"),
 		),
 		Start: key.NewBinding(
 			key.WithKeys("s"),
@@ -150,16 +155,18 @@ func DefaultKeyMap() KeyMap {
 
 // ShortHelp returns keybindings to show in the short help view.
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Enter, k.Start, k.Help, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.Enter, k.Default, k.Start, k.Help, k.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Enter},                         // Navigation
+		{k.Up, k.Down, k.Enter}, // Navigation
+		{k.Default},             // Default action
+
 		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},   // Session
 		{k.New, k.Copy, k.Delete, k.Edit, k.EditStatus}, // Task management
-		{k.Merge, k.Close},                              // Workflow
+		{k.Merge, k.Close}, // Workflow
 		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
 	}
 }
@@ -179,6 +186,7 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.Up)
 	addKeys(k.Down)
 	addKeys(k.Enter)
+	addKeys(k.Default)
 	addKeys(k.Start)
 	addKeys(k.Stop)
 	addKeys(k.Attach)
