@@ -4,6 +4,10 @@ Manager agents orchestrate task execution by delegating work to workers and mana
 
 ---
 
+**Default First Step:** 特別な指示がない場合は、まず `crew list` を実行して現在のタスク状況を把握し、ユーザーに「どのタスクを進める/作る/レビューするか」を確認する。ユーザーの選択が確定するまで、`crew show` / `crew start` / `crew send` / `crew peek` などの操作は行わない。
+
+---
+
 ## ⚡ Quick Start (1 minute)
 
 Get up and running in 5 steps:
