@@ -232,12 +232,18 @@ func (m *Model) viewEmptyState() string {
 	cmdStyle := lipgloss.NewStyle().Foreground(Colors.Primary)
 
 	// ASCII logo - compact to fit narrow terminals
-	logo := lipgloss.NewStyle().Foreground(Colors.Primary).Render(`  _____ ____  _______      __
- / ____|  _ \| ____\ \    / /
-| |    | |_) | |__  \ \  / /
-| |    |  _ <|  __|  \ \/ /
-| |____| |_) | |____  \  /
- \_____|____/|______|  \/    `)
+	logo := lipgloss.NewStyle().Foreground(Colors.Primary).Render(`
+      ___           ___           ___           ___     
+     /  /\         /  /\         /  /\         /__/\    
+    /  /:/        /  /::\       /  /:/_       _\_ \:\   
+   /  /:/        /  /:/\:\     /  /:/ /\     /__/\ \:\  
+  /  /:/  ___   /  /:/~/:/    /  /:/ /:/_   _\_ \:\ \:\ 
+ /__/:/  /  /\ /__/:/ /:/___ /__/:/ /:/ /\ /__/\ \:\ \:\
+ \  \:\ /  /:/ \  \:\/:::::/ \  \:\/:/ /:/ \  \:\ \:\/:/
+  \  \:\  /:/   \  \::/~~~~   \  \::/ /:/   \  \:\ \::/ 
+   \  \:\/:/     \  \:\        \  \:\/:/     \  \:\/:/  
+    \  \::/       \  \:\        \  \::/       \  \::/   
+     \__\/         \__\/         \__\/         \__\/`)
 
 	title := titleStyle.Render("No tasks yet")
 	subtitle := bodyStyle.Render("Create your first task to get started")
