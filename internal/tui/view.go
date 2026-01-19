@@ -55,6 +55,29 @@ func (ds dialogStyles) renderLine(s string) string {
 	return ds.line.Render(s)
 }
 
+// fillViewportLines pads each line of the viewport content to the dialog width
+// and fills remaining height with empty lines, all with the dialog background color.
+// This ensures the entire viewport area has consistent background color.
+func (ds dialogStyles) fillViewportLines(viewportContent string, height int) string {
+	lines := strings.Split(viewportContent, "\n")
+	result := make([]string, 0, height)
+
+	// Pad each content line to the full width
+	for _, line := range lines {
+		if len(result) >= height {
+			break
+		}
+		result = append(result, ds.line.Render(line))
+	}
+
+	// Fill remaining height with empty lines
+	for len(result) < height {
+		result = append(result, ds.emptyLine())
+	}
+
+	return strings.Join(result, "\n")
+}
+
 func (m *Model) dialogStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Background(Colors.Background).
@@ -1135,7 +1158,8 @@ func (m *Model) viewReviewResultDialog() string {
 	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", m.reviewTaskID, taskTitle)))
 
 	// Use viewport for scrollable review content
-	viewportContent := m.reviewViewport.View()
+	// Fill viewport lines with background color to ensure consistent appearance
+	viewportContent := ds.fillViewportLines(m.reviewViewport.View(), m.reviewViewport.Height)
 
 	// Add scroll indicator
 	scrollInfo := ""
