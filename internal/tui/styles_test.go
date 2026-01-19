@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/muesli/reflow/ansi"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
@@ -112,10 +114,14 @@ func TestStyles_RenderMarkdown(t *testing.T) {
 				t.Error("RenderMarkdown returned empty string")
 			}
 
-			// Result should not contain lines longer than width (considering ANSI sequences)
-			// This is a basic sanity check; ANSI-aware width calculation would be ideal
-			if len(result) == 0 {
-				t.Error("RenderMarkdown returned empty result")
+			// Verify hard wrap: no line should exceed the specified width
+			// Use ANSI-aware width calculation
+			lines := strings.Split(result, "\n")
+			for i, line := range lines {
+				lineWidth := ansi.PrintableRuneWidth(line)
+				if lineWidth > tt.width {
+					t.Errorf("line %d exceeds width %d: got %d chars (%q)", i, tt.width, lineWidth, line)
+				}
 			}
 		})
 	}
@@ -148,6 +154,20 @@ func TestStyles_RenderMarkdownWithPadding(t *testing.T) {
 			// Result should not be empty
 			if result == "" {
 				t.Error("RenderMarkdownWithPadding returned empty string")
+			}
+
+			// Verify padding: each line should be exactly the specified width
+			// (except possibly the last line if it ends without newline)
+			lines := strings.Split(result, "\n")
+			for i, line := range lines {
+				// Skip empty lines (may appear at end)
+				if line == "" {
+					continue
+				}
+				lineWidth := ansi.PrintableRuneWidth(line)
+				if lineWidth != tt.width {
+					t.Errorf("line %d width mismatch: got %d, want %d (%q)", i, lineWidth, tt.width, line)
+				}
 			}
 		})
 	}

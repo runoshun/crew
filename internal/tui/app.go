@@ -355,7 +355,10 @@ func (m *Model) updateReviewViewport() {
 
 	// Re-render content with word wrap and padding when size changes.
 	// Padding ensures background color extends to full width of the dialog.
-	if m.reviewResult != "" {
+	// Clear content when reviewResult is empty to avoid showing stale data.
+	if m.reviewResult == "" {
+		m.reviewViewport.SetContent("")
+	} else {
 		renderedContent := m.styles.RenderMarkdownWithPadding(m.reviewResult, dialogW)
 		m.reviewViewport.SetContent(renderedContent)
 	}
