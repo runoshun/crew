@@ -320,6 +320,17 @@ func TestFillViewportLines(t *testing.T) {
 			hasEmptyLines: true,
 			description:   "Empty content should fill with empty lines",
 		},
+		{
+			name: "ANSI colored content",
+			// Simulate diff-like colored output: green for additions, red for deletions
+			content: lipgloss.NewStyle().Foreground(lipgloss.Color("#A6E3A1")).Render("+added") + "\n" +
+				lipgloss.NewStyle().Foreground(lipgloss.Color("#F38BA8")).Render("-removed") + "\n" +
+				"plain",
+			height:        5,
+			expectedLines: 5,
+			hasEmptyLines: true,
+			description:   "ANSI colored lines should be padded correctly using lipgloss.Width",
+		},
 	}
 
 	for _, tt := range tests {
