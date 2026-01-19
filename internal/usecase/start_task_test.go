@@ -1171,3 +1171,124 @@ func TestStartTask_Execute_WorktreeSetupError(t *testing.T) {
 	// Verify worktree was cleaned up after error
 	assert.True(t, worktrees.RemoveCalled, "Worktree should be removed after setup error")
 }
+
+func TestStartTask_Execute_WithAdditionalPrompt(t *testing.T) {
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute with additional prompt
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID:            1,
+		Agent:             "claude",
+		AdditionalPrompts: []string{"Focus on performance optimization"},
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify script contains additional prompt
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	assert.Contains(t, script, "Focus on performance optimization")
+	// Verify default prompt is also present
+	assert.Contains(t, script, "Task #1")
+}
+
+func TestStartTask_Execute_WithMultipleAdditionalPrompts(t *testing.T) {
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute with multiple additional prompts
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+		AdditionalPrompts: []string{
+			"Use TDD approach",
+			"Write comprehensive tests",
+		},
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify script contains all additional prompts
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	assert.Contains(t, script, "Use TDD approach")
+	assert.Contains(t, script, "Write comprehensive tests")
+	// Verify default prompt is also present
+	assert.Contains(t, script, "Task #1")
+}
+
+func TestStartTask_Execute_WithEmptyAdditionalPrompts(t *testing.T) {
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute with empty strings in additional prompts (should be ignored)
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID:            1,
+		Agent:             "claude",
+		AdditionalPrompts: []string{"", "Valid prompt", ""},
+	})
+
+	// Assert
+	require.NoError(t, err)
+
+	// Verify script contains only non-empty prompt
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+	assert.Contains(t, script, "Valid prompt")
+	// Verify default prompt is also present
+	assert.Contains(t, script, "Task #1")
+}

@@ -214,6 +214,8 @@ crew start <id> <worker>
 
 ## Advanced: Monitoring with Polling
 
+**Monitoring (Opt-in)**: `peek`/`poll` are useful but frequent monitoring can create noise. Only use them when the user explicitly requests progress checks (e.g., "check progress", "notify when done", "proceed to next"). When uncertain, ask "Monitor progress? (y/n)" first.
+
 Monitor task status changes and auto-trigger actions:
 
 ```bash

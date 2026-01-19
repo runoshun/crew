@@ -70,6 +70,7 @@ Examples:
 func newStartCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		model        string
+		prompts      []string
 		continueFlag bool
 		skipReview   bool
 	}
@@ -102,7 +103,13 @@ Examples:
   crew start 1 -c
 
   # Start task with skip_review enabled (skip review on completion)
-  crew start 1 claude --skip-review`,
+  crew start 1 claude --skip-review
+
+  # Start task with additional prompt
+  crew start 1 claude --prompt "Focus on performance optimization"
+
+  # Start task with multiple additional prompts
+  crew start 1 claude -p "Use TDD approach" -p "Write comprehensive tests"`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -120,10 +127,11 @@ Examples:
 			// Execute use case
 			uc := c.StartTaskUseCase()
 			input := usecase.StartTaskInput{
-				TaskID:   taskID,
-				Agent:    agent,
-				Model:    opts.model,
-				Continue: opts.continueFlag,
+				TaskID:            taskID,
+				Agent:             agent,
+				Model:             opts.model,
+				Continue:          opts.continueFlag,
+				AdditionalPrompts: opts.prompts,
 			}
 			// Set skip_review only if flag was explicitly provided
 			if cmd.Flags().Changed("skip-review") {
@@ -143,6 +151,7 @@ Examples:
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
 	cmd.Flags().BoolVarP(&opts.continueFlag, "continue", "c", false, "Continue from previous session")
 	cmd.Flags().BoolVar(&opts.skipReview, "skip-review", false, "Set skip_review for this task (skip review on completion)")
+	cmd.Flags().StringArrayVarP(&opts.prompts, "prompt", "p", nil, "Additional prompt to append (can be specified multiple times)")
 
 	return cmd
 }

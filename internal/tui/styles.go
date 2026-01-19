@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/glamour/ansi"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/padding"
 	"github.com/muesli/reflow/wrap"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -538,22 +537,19 @@ func (s Styles) RenderMarkdown(text string, width int) string {
 	return out
 }
 
-// RenderMarkdownWithPadding renders markdown text with hard wrap and pads each line
-// to the specified width. This is useful for dialogs where background color needs
-// to extend to the full width of the dialog.
-func (s Styles) RenderMarkdownWithPadding(text string, width int) string {
-	if width <= 0 {
-		return text
+// RenderMarkdownWithBg renders markdown text with background color applied to each line.
+// This ensures the background color is consistent even when ANSI codes reset styles.
+func (s Styles) RenderMarkdownWithBg(text string, width int, bg lipgloss.Color) string {
+	rendered := s.RenderMarkdown(text, width)
+
+	// Apply background color to each line to ensure consistent background
+	lines := strings.Split(rendered, "\n")
+	lineStyle := lipgloss.NewStyle().Background(bg).Width(width)
+	for i, line := range lines {
+		lines[i] = lineStyle.Render(line)
 	}
 
-	// First render with standard markdown
-	out := s.RenderMarkdown(text, width)
-
-	// Then pad each line to fill the width (for background color)
-	// padding.String is ANSI-aware
-	out = padding.String(out, uint(width)) //#nosec G115 -- width is checked above
-
-	return out
+	return strings.Join(lines, "\n")
 }
 
 func (s Styles) markdownStyle() ansi.StyleConfig {

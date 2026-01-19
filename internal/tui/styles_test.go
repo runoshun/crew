@@ -127,7 +127,7 @@ func TestStyles_RenderMarkdown(t *testing.T) {
 	}
 }
 
-func TestStyles_RenderMarkdownWithPadding(t *testing.T) {
+func TestStyles_RenderMarkdownWithBg(t *testing.T) {
 	styles := DefaultStyles()
 
 	tests := []struct {
@@ -136,28 +136,32 @@ func TestStyles_RenderMarkdownWithPadding(t *testing.T) {
 		width int
 	}{
 		{
-			name:  "basic text with padding",
+			name:  "basic text with background",
 			text:  "Hello",
 			width: 20,
 		},
 		{
-			name:  "multiline with padding",
+			name:  "multiline with background",
 			text:  "Line 1\nLine 2",
 			width: 20,
+		},
+		{
+			name:  "long word should hard wrap with background",
+			text:  "ThisIsAVeryLongWordThatNeedsWrapping",
+			width: 15,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := styles.RenderMarkdownWithPadding(tt.text, tt.width)
+			result := styles.RenderMarkdownWithBg(tt.text, tt.width, Colors.Background)
 
 			// Result should not be empty
 			if result == "" {
-				t.Error("RenderMarkdownWithPadding returned empty string")
+				t.Error("RenderMarkdownWithBg returned empty string")
 			}
 
-			// Verify padding: each line should be exactly the specified width
-			// (except possibly the last line if it ends without newline)
+			// Verify each line has consistent width (lipgloss.Width applies padding)
 			lines := strings.Split(result, "\n")
 			for i, line := range lines {
 				// Skip empty lines (may appear at end)
@@ -168,38 +172,6 @@ func TestStyles_RenderMarkdownWithPadding(t *testing.T) {
 				if lineWidth != tt.width {
 					t.Errorf("line %d width mismatch: got %d, want %d (%q)", i, lineWidth, tt.width, line)
 				}
-			}
-		})
-	}
-}
-
-func TestStyles_RenderMarkdownWithPadding_ZeroWidth(t *testing.T) {
-	styles := DefaultStyles()
-
-	tests := []struct {
-		name  string
-		text  string
-		width int
-	}{
-		{
-			name:  "zero width returns original text",
-			text:  "Hello",
-			width: 0,
-		},
-		{
-			name:  "negative width returns original text",
-			text:  "Hello",
-			width: -1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := styles.RenderMarkdownWithPadding(tt.text, tt.width)
-
-			// Should return original text for invalid width
-			if result != tt.text {
-				t.Errorf("RenderMarkdownWithPadding with width=%d = %q, want %q", tt.width, result, tt.text)
 			}
 		})
 	}
