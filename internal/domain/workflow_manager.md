@@ -34,7 +34,7 @@ Get up and running in 5 steps:
    crew merge <id>       # Merge to main (or close if abandoned)
    ```
 
-Available workers: {{- range .Workers }} **{{ .Name }}** ({{ .Model }}){{- end }}
+Available workers:{{range $i, $w := .Workers }}{{if $i}}, {{end}}**{{ $w.Name }}** ({{ $w.Model }}){{end}}
 
 ---
 
