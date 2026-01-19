@@ -760,14 +760,35 @@ func (m *Model) handleDetailPanelFocused(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.updateLayoutSizes() // Restore taskList width
 		return m, nil
 
-	// Scroll: j/k, up/down
-	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down):
-		var cmd tea.Cmd
-		m.detailPanelViewport, cmd = m.detailPanelViewport.Update(msg)
-		return m, cmd
+	// Arrow keys: 1 line scroll
+	case msg.String() == "up":
+		m.detailPanelViewport.ScrollUp(1)
+		return m, nil
+
+	case msg.String() == "down":
+		m.detailPanelViewport.ScrollDown(1)
+		return m, nil
+
+	// j/k: half page scroll
+	case msg.String() == "j":
+		m.detailPanelViewport.HalfPageDown()
+		return m, nil
+
+	case msg.String() == "k":
+		m.detailPanelViewport.HalfPageUp()
+		return m, nil
+
+	// g/G: jump to top/bottom
+	case msg.String() == "g":
+		m.detailPanelViewport.GotoTop()
+		return m, nil
+
+	case msg.String() == "G":
+		m.detailPanelViewport.GotoBottom()
+		return m, nil
 	}
 
-	// Forward other keys to viewport for page up/down etc.
+	// Forward other keys to viewport for page up/down, mouse scroll, etc.
 	var cmd tea.Cmd
 	m.detailPanelViewport, cmd = m.detailPanelViewport.Update(msg)
 	return m, cmd
