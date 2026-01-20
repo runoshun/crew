@@ -760,3 +760,88 @@ level = "debug"
 	// Verify onboarding_done defaults to false
 	assert.False(t, cfg.OnboardingDone)
 }
+
+func TestLoader_Load_NewTaskBase_Valid(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected string
+	}{
+		{"current", "current", "current"},
+		{"default", "default", "default"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crewDir := t.TempDir()
+			globalDir := t.TempDir()
+
+			config := `[tasks]
+`
+			if tt.value != "" {
+				config += `new_task_base = "` + tt.value + `"
+`
+			}
+			err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+			require.NoError(t, err)
+
+			loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+			cfg, err := loader.Load()
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.expected, cfg.Tasks.NewTaskBase)
+			assert.Empty(t, cfg.Warnings, "valid value should not produce warnings")
+		})
+	}
+}
+
+func TestLoader_Load_NewTaskBase_Invalid(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	config := `[tasks]
+new_task_base = "invalid_value"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Value is still set (for debugging purposes)
+	assert.Equal(t, "invalid_value", cfg.Tasks.NewTaskBase)
+
+	// Warning should be generated
+	require.Len(t, cfg.Warnings, 1)
+	assert.Contains(t, cfg.Warnings[0], "invalid value for tasks.new_task_base")
+	assert.Contains(t, cfg.Warnings[0], "invalid_value")
+}
+
+func TestLoader_Load_NewTaskBase_Merge(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Global config sets "current"
+	globalConfig := `[tasks]
+new_task_base = "current"
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// Repo config overrides to "default"
+	repoConfig := `[tasks]
+new_task_base = "default"
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Repo should override global
+	assert.Equal(t, "default", cfg.Tasks.NewTaskBase)
+	assert.Empty(t, cfg.Warnings)
+}
