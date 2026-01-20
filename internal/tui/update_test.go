@@ -38,6 +38,32 @@ func TestUpdate_MsgCommentsLoaded(t *testing.T) {
 	assert.Equal(t, testComments, result.comments, "Comments should be set")
 }
 
+func TestUpdateTaskList_PreservesFilter(t *testing.T) {
+	filterInput := textinput.New()
+	filterInput.SetValue("alpha")
+
+	tasks := []*domain.Task{
+		{ID: 1, Title: "alpha task", Status: domain.StatusTodo},
+		{ID: 2, Title: "beta task", Status: domain.StatusTodo},
+	}
+
+	m := &Model{
+		tasks:         tasks,
+		commentCounts: map[int]int{1: 2, 2: 0},
+		filterInput:   filterInput,
+		taskList:      list.New([]list.Item{}, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	m.updateTaskList()
+
+	items := m.taskList.Items()
+	assert.Len(t, items, 1)
+	item, ok := items[0].(taskItem)
+	assert.True(t, ok)
+	assert.Equal(t, 1, item.task.ID)
+	assert.Equal(t, 2, item.commentCount)
+}
+
 func TestUpdate_StopKey_NoSelection(t *testing.T) {
 	m := &Model{
 		keys:     DefaultKeyMap(),

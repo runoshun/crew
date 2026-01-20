@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -566,25 +565,21 @@ func (m *Model) handleFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) applyFilter() {
 	query := strings.ToLower(m.filterInput.Value())
+	tasks := m.sortedTasks()
 	if query == "" {
-		m.updateTaskList()
+		m.setTaskItems(tasks)
 		return
 	}
 
-	var filtered []*domain.Task
-	for _, t := range m.tasks {
+	filtered := make([]*domain.Task, 0, len(tasks))
+	for _, t := range tasks {
 		if strings.Contains(strings.ToLower(t.Title), query) ||
 			strings.Contains(strings.ToLower(string(t.Status)), query) ||
 			strings.Contains(strings.ToLower(t.Agent), query) {
 			filtered = append(filtered, t)
 		}
 	}
-
-	items := make([]list.Item, 0, len(filtered))
-	for _, task := range filtered {
-		items = append(items, taskItem{task: task})
-	}
-	m.taskList.SetItems(items)
+	m.setTaskItems(filtered)
 }
 
 // handleConfirmMode handles keys in confirm mode.

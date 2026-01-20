@@ -303,9 +303,16 @@ func (m *Model) hasWorktree(task *domain.Task) bool {
 
 // updateTaskList updates the task list items from tasks.
 func (m *Model) updateTaskList() {
-	sorted := m.sortedTasks()
-	items := make([]list.Item, 0, len(sorted))
-	for _, task := range sorted {
+	if m.filterInput.Value() != "" {
+		m.applyFilter()
+		return
+	}
+	m.setTaskItems(m.sortedTasks())
+}
+
+func (m *Model) setTaskItems(tasks []*domain.Task) {
+	items := make([]list.Item, 0, len(tasks))
+	for _, task := range tasks {
 		count := m.commentCounts[task.ID]
 		items = append(items, taskItem{task: task, commentCount: count})
 	}
