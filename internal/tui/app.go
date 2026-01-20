@@ -405,7 +405,7 @@ func (m *Model) sortedTasks() []*domain.Task {
 	copy(tasks, m.tasks)
 
 	switch m.sortMode {
-	case SortByStatus:
+	case SortByStatusAsc:
 		sort.Slice(tasks, func(i, j int) bool {
 			pi := getStatusPriority(tasks[i].Status)
 			pj := getStatusPriority(tasks[j].Status)
@@ -414,9 +414,22 @@ func (m *Model) sortedTasks() []*domain.Task {
 			}
 			return tasks[i].ID < tasks[j].ID
 		})
-	case SortByID:
+	case SortByStatusDesc:
+		sort.Slice(tasks, func(i, j int) bool {
+			pi := getStatusPriority(tasks[i].Status)
+			pj := getStatusPriority(tasks[j].Status)
+			if pi != pj {
+				return pi > pj
+			}
+			return tasks[i].ID > tasks[j].ID
+		})
+	case SortByIDAsc:
 		sort.Slice(tasks, func(i, j int) bool {
 			return tasks[i].ID < tasks[j].ID
+		})
+	case SortByIDDesc:
+		sort.Slice(tasks, func(i, j int) bool {
+			return tasks[i].ID > tasks[j].ID
 		})
 	}
 
