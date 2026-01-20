@@ -3,12 +3,21 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	overlay "github.com/rmhubbert/bubbletea-overlay"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
+
+// ansiResetPattern matches ANSI reset sequences that affect background:
+// - \x1b[0m or \x1b[m (full reset)
+// - \x1b[49m (background reset only)
+var ansiResetPattern = regexp.MustCompile(`\x1b\[(0?m|49m)`)
+
+// ansiTrailingResetPattern matches trailing ANSI reset at end of string
+var ansiTrailingResetPattern = regexp.MustCompile(`\x1b\[0?m$`)
 
 const (
 	MinWidthForDetailPanel = 100
@@ -58,10 +67,18 @@ func (ds dialogStyles) renderLine(s string) string {
 // fillViewportLines pads each line of the viewport content to the dialog width
 // and fills remaining height with empty lines, all with the dialog background color.
 // This ensures the entire viewport area has consistent background color.
+//
+// The function handles ANSI escape sequences correctly by reinserting the background
+// color after any ANSI reset sequences (\x1b[0m) within the line content.
 func (ds dialogStyles) fillViewportLines(viewportContent string, height int) string {
 	lines := strings.Split(viewportContent, "\n")
 	result := make([]string, 0, height)
 	padStyle := lipgloss.NewStyle().Background(ds.bg)
+
+	// Extract the background color ANSI sequence.
+	// lipgloss.Render("") returns "\x1b[48;...m\x1b[0m" (bg + reset),
+	// so we strip the trailing reset to get just the background sequence.
+	bgSeq := ansiTrailingResetPattern.ReplaceAllString(padStyle.Render(""), "")
 
 	// Pad each content line to the full width
 	for _, line := range lines {
@@ -82,10 +99,16 @@ func (ds dialogStyles) fillViewportLines(viewportContent string, height int) str
 		if padWidth < 0 {
 			padWidth = 0
 		}
-		content := padStyle.Render(renderedLine)
-		paddedLine := content
+
+		// Reinsert background color after any ANSI reset sequences within the line.
+		// This ensures the background color is maintained even when glamour/markdown
+		// renderers emit reset codes (e.g., after bold text).
+		fixedLine := bgSeq + ansiResetPattern.ReplaceAllString(renderedLine, "$0"+bgSeq)
+
+		// Add padding with background color
+		paddedLine := fixedLine
 		if padWidth > 0 {
-			paddedLine = content + padStyle.Width(padWidth).Render("")
+			paddedLine = fixedLine + padStyle.Width(padWidth).Render("")
 		}
 		result = append(result, paddedLine)
 	}
