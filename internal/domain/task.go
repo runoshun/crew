@@ -450,10 +450,10 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 // Each block starts with "---\n# Comment: <index>\n..."
 // Returns parsed comments and any validation error.
 func parseCommentBlocks(section string) ([]ParsedComment, error) {
-	var comments []ParsedComment
-
 	// Split by comment block separator
 	blocks := splitByCommentSeparator(section)
+
+	comments := make([]ParsedComment, 0, len(blocks))
 
 	for _, block := range blocks {
 		block = trimSpace(block)

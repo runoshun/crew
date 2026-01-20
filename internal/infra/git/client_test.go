@@ -264,6 +264,9 @@ func TestClient_GetDefaultBranch_FromOriginHEAD(t *testing.T) {
 	// Push to origin
 	runGit(t, dir, "push", "-u", "origin", branch)
 
+	// Set origin/HEAD explicitly (git push doesn't set this automatically)
+	runGit(t, dir, "remote", "set-head", "origin", branch)
+
 	client, err := NewClient(dir)
 	require.NoError(t, err)
 

@@ -1137,7 +1137,7 @@ func (m *Model) viewActionMenuDialog() string {
 		taskLine = ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", taskID, taskTitle)))
 	}
 
-	var rows []string
+	rows := make([]string, 0, len(m.actionMenuItems))
 	for i, action := range m.actionMenuItems {
 		cursor := " "
 		rowStyle := labelStyle
@@ -1262,7 +1262,7 @@ func (m *Model) viewReviewActionDialog() string {
 		{"Edit Comment", "Edit the saved review comment"},
 	}
 
-	var actionRows []string
+	actionRows := make([]string, 0, len(options))
 	for i, opt := range options {
 		selected := i == m.reviewActionCursor
 		cursor := " "
