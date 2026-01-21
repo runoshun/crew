@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // ShowTaskInput contains the parameters for showing a task.
@@ -36,12 +37,9 @@ func NewShowTask(tasks domain.TaskRepository) *ShowTask {
 // Execute retrieves and returns the task details.
 func (uc *ShowTask) Execute(_ context.Context, in ShowTaskInput) (*ShowTaskOutput, error) {
 	// Get task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Get children

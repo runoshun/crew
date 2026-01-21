@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // EditCommentInput specifies the input for the EditComment UseCase.
@@ -38,12 +39,9 @@ func (uc *EditComment) Execute(_ context.Context, in EditCommentInput) error {
 	}
 
 	// Verify task exists
-	task, err := uc.tasks.Get(in.TaskID)
+	_, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return domain.ErrTaskNotFound
+		return err
 	}
 
 	// Create updated comment

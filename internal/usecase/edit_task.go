@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // EditTaskInput contains the parameters for editing a task.
@@ -75,12 +76,9 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	}
 
 	// Get existing task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Update fields
@@ -181,12 +179,9 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 // executeEditorMode handles editing a task via editor (markdown format).
 func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error) {
 	// Get existing task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Parse editor content (includes comments)

@@ -67,12 +67,9 @@ func NewMergeTask(
 // 5. Update status to closed (with CloseReasonMerged)
 func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOutput, error) {
 	// Get the task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Determine target base branch

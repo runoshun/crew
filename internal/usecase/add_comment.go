@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // AddCommentInput contains the parameters for adding a comment.
@@ -64,12 +65,9 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 	}
 
 	// Verify task exists
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Create comment

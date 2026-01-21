@@ -76,12 +76,9 @@ func NewCompleteTask(
 //   - If not skip_review: set status to reviewing (indicating review start)
 func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*CompleteTaskOutput, error) {
 	// Get the task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Validate status - must be in_progress or needs_input
