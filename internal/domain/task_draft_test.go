@@ -361,3 +361,92 @@ func TestParseLabelsValue(t *testing.T) {
 		})
 	}
 }
+
+func TestParseSingleTaskDraft(t *testing.T) {
+	tests := []struct {
+		wantErr error
+		name    string
+		content string
+		want    *TaskDraft
+	}{
+		{
+			name: "valid single task",
+			content: `---
+title: Single Task
+labels: [backend, feature]
+---
+Task description here.`,
+			want: &TaskDraft{
+				Title:       "Single Task",
+				Description: "Task description here.",
+				Labels:      []string{"backend", "feature"},
+			},
+		},
+		{
+			name: "single task without labels",
+			content: `---
+title: Simple Task
+---
+Just a description.`,
+			want: &TaskDraft{
+				Title:       "Simple Task",
+				Description: "Just a description.",
+			},
+		},
+		{
+			name: "single task without description",
+			content: `---
+title: No Body Task
+labels: [quick]
+---`,
+			want: &TaskDraft{
+				Title:  "No Body Task",
+				Labels: []string{"quick"},
+			},
+		},
+		{
+			name:    "empty content",
+			content: "",
+			wantErr: ErrEmptyFile,
+		},
+		{
+			name: "missing title",
+			content: `---
+labels: [bug]
+---
+No title here.`,
+			wantErr: ErrEmptyTitle,
+		},
+		{
+			name: "multiple tasks should error",
+			content: `---
+title: First Task
+---
+First description.
+
+---
+title: Second Task
+---
+Second description.`,
+			wantErr: ErrMultipleTasksInFile,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ParseSingleTaskDraft(tt.content)
+
+			if tt.wantErr != nil {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.Equal(t, tt.want.Title, got.Title)
+			assert.Equal(t, tt.want.Description, got.Description)
+			assert.Equal(t, tt.want.Labels, got.Labels)
+		})
+	}
+}

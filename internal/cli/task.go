@@ -624,6 +624,7 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		Description  string
 		Status       string
 		Labels       string
+		From         string
 		AddLabels    []string
 		RemoveLabels []string
 		IfStatus     []string
@@ -689,13 +690,28 @@ Examples:
 
   # Remove parent (make it a root task)
   crew edit 1 --no-parent
-  crew edit 1 --parent 0`,
+  crew edit 1 --parent 0
+
+  # Edit task from a file (updates title, body, and labels)
+  crew edit 1 --from task.md
+
+File format for --from:
+  ---
+  title: New Task Title
+  labels: [backend, feature]
+  ---
+  New task description here.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
 			taskID, err := parseTaskID(args[0])
 			if err != nil {
 				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Check if --from is specified
+			if opts.From != "" {
+				return editTaskFromFile(cmd, c, taskID, opts.From)
 			}
 
 			// Check if any flags are provided
@@ -787,6 +803,7 @@ Examples:
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Set parent task ID (0 to remove parent)")
 	cmd.Flags().BoolVar(&opts.NoParent, "no-parent", false, "Remove parent task (make this a root task)")
 	cmd.MarkFlagsMutuallyExclusive("parent", "no-parent")
+	cmd.Flags().StringVar(&opts.From, "from", "", "Edit task from a Markdown file (updates title, body, and labels)")
 
 	return cmd
 }
@@ -852,6 +869,44 @@ func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error 
 		return err
 	}
 
+	return nil
+}
+
+// editTaskFromFile updates a task from a Markdown file.
+func editTaskFromFile(cmd *cobra.Command, c *app.Container, taskID int, filePath string) error {
+	// Read file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read file: %w", err)
+	}
+
+	// Parse single task from file
+	draft, err := domain.ParseSingleTaskDraft(string(content))
+	if err != nil {
+		return err
+	}
+
+	// Build input
+	input := usecase.EditTaskInput{
+		TaskID:      taskID,
+		Title:       &draft.Title,
+		Description: &draft.Description,
+	}
+
+	// Set labels if present in the file
+	if draft.Labels != nil {
+		input.LabelsSet = true
+		input.Labels = draft.Labels
+	}
+
+	// Execute use case
+	uc := c.EditTaskUseCase()
+	_, err = uc.Execute(cmd.Context(), input)
+	if err != nil {
+		return err
+	}
+
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Updated task #%d from %s\n", taskID, filePath)
 	return nil
 }
 
