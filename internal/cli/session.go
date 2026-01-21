@@ -277,8 +277,7 @@ var ErrAutoFixMaxRetries = errors.New("auto_fix reached maximum retries")
 // newCompleteCommand creates the complete command for marking a task as complete.
 func newCompleteCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		comment    string
-		retryCount int // Internal: current retry count for auto_fix mode
+		comment string
 	}
 
 	cmd := &cobra.Command{
@@ -334,7 +333,7 @@ Examples:
 
 			// Handle auto_fix mode
 			if out.AutoFixEnabled {
-				return handleAutoFixReview(cmd, c, out, opts.retryCount)
+				return handleAutoFixReview(cmd, c, out)
 			}
 
 			if out.ShouldStartReview {
@@ -364,17 +363,18 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.comment, "comment", "m", "", "Add a completion comment")
-	// Hidden flag for internal retry tracking (used by worker agents)
-	cmd.Flags().IntVar(&opts.retryCount, "retry-count", 0, "Internal: current retry count for auto_fix mode")
-	_ = cmd.Flags().MarkHidden("retry-count")
 
 	return cmd
 }
 
 // handleAutoFixReview runs synchronous review for auto_fix mode.
 // It outputs "LGTM" if the review passes, or the review feedback if not.
-func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.CompleteTaskOutput, retryCount int) error {
-	// Check retry limit
+// On non-LGTM, it reverts task status to in_progress and increments retry count.
+func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.CompleteTaskOutput) error {
+	task := out.Task
+	retryCount := task.AutoFixRetryCount
+
+	// Check retry limit (before running review)
 	if retryCount >= out.AutoFixMaxRetries {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "auto_fix: reached maximum retries (%d)\n", out.AutoFixMaxRetries)
 		return ErrAutoFixMaxRetries
@@ -383,25 +383,36 @@ func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.Comp
 	// Run synchronous review
 	reviewUC := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 	reviewOut, reviewErr := reviewUC.Execute(cmd.Context(), usecase.ReviewTaskInput{
-		TaskID: out.Task.ID,
+		TaskID: task.ID,
 		Wait:   true, // Synchronous execution for auto_fix
 	})
 
 	if reviewErr != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Task #%d completed, but review failed: %v\n", out.Task.ID, reviewErr)
+		// Revert to in_progress on review failure
+		task.Status = domain.StatusInProgress
+		_ = c.Tasks.Save(task)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Task #%d completed, but review failed: %v\n", task.ID, reviewErr)
 		return reviewErr
 	}
 
 	// Check if LGTM
 	reviewResult := strings.TrimSpace(reviewOut.Review)
 	if isLGTM(reviewResult) {
-		// LGTM - output success message
+		// LGTM - reset retry count and output success message
+		task.AutoFixRetryCount = 0
+		_ = c.Tasks.Save(task)
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "LGTM")
 		return nil
 	}
 
-	// Not LGTM - output review feedback for worker to address
-	// The worker will see this output and make fixes, then run crew complete again
+	// Not LGTM - revert to in_progress, increment retry count, and output feedback
+	task.Status = domain.StatusInProgress
+	task.AutoFixRetryCount = retryCount + 1
+	if saveErr := c.Tasks.Save(task); saveErr != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to save task: %v\n", saveErr)
+	}
+
+	// Output review feedback for worker to address
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Review feedback (retry %d/%d):\n%s\n",
 		retryCount+1, out.AutoFixMaxRetries, reviewResult)
 	return nil

@@ -19,21 +19,22 @@ const (
 // Task represents a work unit managed by git-crew.
 // Fields are ordered to minimize memory padding.
 type Task struct {
-	Created     time.Time   `json:"created"`               // Creation time
-	Started     time.Time   `json:"started,omitempty"`     // When status became in_progress
-	ParentID    *int        `json:"parentID"`              // Parent task ID (nil = root task)
-	SkipReview  *bool       `json:"skipReview,omitempty"`  // Skip review on completion (nil=use config, true=skip, false=require review)
-	Description string      `json:"description,omitempty"` // Description (optional)
-	Agent       string      `json:"agent,omitempty"`       // Running agent name (empty if not running)
-	Session     string      `json:"session,omitempty"`     // tmux session name (empty if not running)
-	BaseBranch  string      `json:"baseBranch"`            // Base branch for worktree creation
-	Status      Status      `json:"status"`                // Current status
-	CloseReason CloseReason `json:"closeReason,omitempty"` // Why the task was closed
-	Title       string      `json:"title"`                 // Title (required)
-	Labels      []string    `json:"labels,omitempty"`      // Labels
-	ID          int         `json:"-"`                     // Task ID (stored as map key, not in value)
-	Issue       int         `json:"issue,omitempty"`       // GitHub issue number (0 = not linked)
-	PR          int         `json:"pr,omitempty"`          // GitHub PR number (0 = not created)
+	Created           time.Time   `json:"created"`                     // Creation time
+	Started           time.Time   `json:"started,omitempty"`           // When status became in_progress
+	ParentID          *int        `json:"parentID"`                    // Parent task ID (nil = root task)
+	SkipReview        *bool       `json:"skipReview,omitempty"`        // Skip review on completion (nil=use config, true=skip, false=require review)
+	Description       string      `json:"description,omitempty"`       // Description (optional)
+	Agent             string      `json:"agent,omitempty"`             // Running agent name (empty if not running)
+	Session           string      `json:"session,omitempty"`           // tmux session name (empty if not running)
+	BaseBranch        string      `json:"baseBranch"`                  // Base branch for worktree creation
+	Status            Status      `json:"status"`                      // Current status
+	CloseReason       CloseReason `json:"closeReason,omitempty"`       // Why the task was closed
+	Title             string      `json:"title"`                       // Title (required)
+	Labels            []string    `json:"labels,omitempty"`            // Labels
+	ID                int         `json:"-"`                           // Task ID (stored as map key, not in value)
+	Issue             int         `json:"issue,omitempty"`             // GitHub issue number (0 = not linked)
+	PR                int         `json:"pr,omitempty"`                // GitHub PR number (0 = not created)
+	AutoFixRetryCount int         `json:"autoFixRetryCount,omitempty"` // Current retry count for auto_fix mode
 }
 
 // IsRoot returns true if this is a root task (no parent).
