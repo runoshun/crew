@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -270,10 +271,14 @@ Examples:
 	return cmd
 }
 
+// ErrAutoFixMaxRetries is returned when auto_fix reaches the maximum retry limit.
+var ErrAutoFixMaxRetries = errors.New("auto_fix reached maximum retries")
+
 // newCompleteCommand creates the complete command for marking a task as complete.
 func newCompleteCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		comment string
+		comment    string
+		retryCount int // Internal: current retry count for auto_fix mode
 	}
 
 	cmd := &cobra.Command{
@@ -293,6 +298,12 @@ the status. If the command fails, the completion is aborted.
 If skip_review is enabled (via task setting or config), the task transitions
 directly to 'reviewed'. Otherwise, it transitions to 'reviewing' and a review
 session is started.
+
+Auto-fix mode:
+  When [complete].auto_fix is enabled, the review runs synchronously.
+  - If LGTM: outputs "LGTM" and exits successfully
+  - If not LGTM: outputs review feedback for the worker to address
+  - Use [complete].auto_fix_max_retries to limit retry attempts (default: 3)
 
 Examples:
   # Complete task by ID
@@ -321,8 +332,13 @@ Examples:
 				return err
 			}
 
+			// Handle auto_fix mode
+			if out.AutoFixEnabled {
+				return handleAutoFixReview(cmd, c, out, opts.retryCount)
+			}
+
 			if out.ShouldStartReview {
-				// Start review automatically
+				// Start review automatically (background)
 				reviewUC := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 				reviewOut, reviewErr := reviewUC.Execute(cmd.Context(), usecase.ReviewTaskInput{
 					TaskID: taskID,
@@ -348,8 +364,52 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.comment, "comment", "m", "", "Add a completion comment")
+	// Hidden flag for internal retry tracking (used by worker agents)
+	cmd.Flags().IntVar(&opts.retryCount, "retry-count", 0, "Internal: current retry count for auto_fix mode")
+	_ = cmd.Flags().MarkHidden("retry-count")
 
 	return cmd
+}
+
+// handleAutoFixReview runs synchronous review for auto_fix mode.
+// It outputs "LGTM" if the review passes, or the review feedback if not.
+func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.CompleteTaskOutput, retryCount int) error {
+	// Check retry limit
+	if retryCount >= out.AutoFixMaxRetries {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "auto_fix: reached maximum retries (%d)\n", out.AutoFixMaxRetries)
+		return ErrAutoFixMaxRetries
+	}
+
+	// Run synchronous review
+	reviewUC := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
+	reviewOut, reviewErr := reviewUC.Execute(cmd.Context(), usecase.ReviewTaskInput{
+		TaskID: out.Task.ID,
+		Wait:   true, // Synchronous execution for auto_fix
+	})
+
+	if reviewErr != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Task #%d completed, but review failed: %v\n", out.Task.ID, reviewErr)
+		return reviewErr
+	}
+
+	// Check if LGTM
+	reviewResult := strings.TrimSpace(reviewOut.Review)
+	if isLGTM(reviewResult) {
+		// LGTM - output success message
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "LGTM")
+		return nil
+	}
+
+	// Not LGTM - output review feedback for worker to address
+	// The worker will see this output and make fixes, then run crew complete again
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Review feedback (retry %d/%d):\n%s\n",
+		retryCount+1, out.AutoFixMaxRetries, reviewResult)
+	return nil
+}
+
+// isLGTM checks if the review result indicates LGTM (approved).
+func isLGTM(reviewResult string) bool {
+	return strings.HasPrefix(reviewResult, domain.ReviewLGTMPrefix)
 }
 
 // newSessionEndedCommand creates the _session-ended internal command.

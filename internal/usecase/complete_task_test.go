@@ -705,3 +705,128 @@ func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
 }
+
+func TestCompleteTask_Execute_AutoFixEnabled(t *testing.T) {
+	// Test: auto_fix enabled -> AutoFixEnabled = true, ShouldStartReview = false
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with auto_fix",
+		Status:     domain.StatusInProgress,
+		SkipReview: nil, // Not skipping review
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	git := &testutil.MockGit{
+		HasUncommittedChangesV: false,
+	}
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config = &domain.Config{
+		Complete: domain.CompleteConfig{
+			AutoFix:           true,
+			AutoFixMaxRetries: 5,
+		},
+	}
+	clock := &testutil.MockClock{}
+	executor := testutil.NewMockCommandExecutor()
+
+	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	assert.True(t, out.AutoFixEnabled)
+	assert.Equal(t, 5, out.AutoFixMaxRetries)
+	assert.False(t, out.ShouldStartReview) // Background review should NOT start
+}
+
+func TestCompleteTask_Execute_AutoFixDisabled(t *testing.T) {
+	// Test: auto_fix disabled -> AutoFixEnabled = false, ShouldStartReview = true
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task without auto_fix",
+		Status:     domain.StatusInProgress,
+		SkipReview: nil,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	git := &testutil.MockGit{
+		HasUncommittedChangesV: false,
+	}
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config = &domain.Config{
+		Complete: domain.CompleteConfig{
+			AutoFix: false,
+		},
+	}
+	clock := &testutil.MockClock{}
+	executor := testutil.NewMockCommandExecutor()
+
+	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	assert.False(t, out.AutoFixEnabled)
+	assert.True(t, out.ShouldStartReview) // Background review should start
+}
+
+func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
+	// Test: auto_fix enabled without max_retries -> default value (3)
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with auto_fix default max retries",
+		Status:     domain.StatusInProgress,
+		SkipReview: nil,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	git := &testutil.MockGit{
+		HasUncommittedChangesV: false,
+	}
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config = &domain.Config{
+		Complete: domain.CompleteConfig{
+			AutoFix:           true,
+			AutoFixMaxRetries: 0, // Not set (zero value)
+		},
+	}
+	clock := &testutil.MockClock{}
+	executor := testutil.NewMockCommandExecutor()
+
+	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.True(t, out.AutoFixEnabled)
+	assert.Equal(t, domain.DefaultAutoFixMaxRetries, out.AutoFixMaxRetries)
+}
