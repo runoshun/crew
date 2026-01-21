@@ -35,6 +35,10 @@ func (m *MockGitForBaseBranch) HasMergeConflict(_, _ string) (bool, error) {
 	return false, errors.New("not implemented")
 }
 
+func (m *MockGitForBaseBranch) GetMergeConflictFiles(_, _ string) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (m *MockGitForBaseBranch) Merge(_ string, _ bool) error {
 	return errors.New("not implemented")
 }
@@ -130,6 +134,10 @@ func (m *MockGitForNewTaskBaseBranch) HasUncommittedChanges(_ string) (bool, err
 
 func (m *MockGitForNewTaskBaseBranch) HasMergeConflict(_, _ string) (bool, error) {
 	return false, errors.New("not implemented")
+}
+
+func (m *MockGitForNewTaskBaseBranch) GetMergeConflictFiles(_, _ string) ([]string, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (m *MockGitForNewTaskBaseBranch) Merge(_ string, _ bool) error {

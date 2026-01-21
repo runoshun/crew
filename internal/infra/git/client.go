@@ -85,9 +85,102 @@ func (c *Client) HasUncommittedChanges(dir string) (bool, error) {
 }
 
 // HasMergeConflict checks if merging branch into target would conflict.
-// TODO: implement in later phase
-func (c *Client) HasMergeConflict(_, _ string) (bool, error) {
-	panic("not implemented")
+// Uses git merge-tree --write-tree for dry-run conflict detection.
+func (c *Client) HasMergeConflict(branch, target string) (bool, error) {
+	files, err := c.GetMergeConflictFiles(branch, target)
+	if err != nil {
+		return false, err
+	}
+	return len(files) > 0, nil
+}
+
+// GetMergeConflictFiles returns the list of files that would conflict
+// when merging branch into target. Returns empty slice if no conflicts.
+// Uses git merge-tree --write-tree for dry-run conflict detection.
+func (c *Client) GetMergeConflictFiles(branch, target string) ([]string, error) {
+	// git merge-tree --write-tree returns exit code 0 if no conflicts,
+	// exit code 1 if there are conflicts with conflicting files listed in output.
+	cmd := exec.Command("git", "merge-tree", "--write-tree", target, branch)
+	cmd.Dir = c.repoRoot
+	out, err := cmd.CombinedOutput()
+
+	if err == nil {
+		// No conflicts
+		return nil, nil
+	}
+
+	// Check if it's exit code 1 (conflicts) or some other error
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok || exitErr.ExitCode() != 1 {
+		return nil, fmt.Errorf("failed to run merge-tree: %w: %s", err, string(out))
+	}
+
+	// Parse output to find conflicting files
+	// Format includes lines like: "CONFLICT (content): Merge conflict in <file>"
+	return parseMergeTreeConflicts(string(out)), nil
+}
+
+// parseMergeTreeConflicts extracts conflicting file names from git merge-tree output.
+// Handles various conflict formats:
+//   - CONFLICT (content): Merge conflict in <file>
+//   - CONFLICT (add/add): Merge conflict in <file>
+//   - CONFLICT (modify/delete): <file> deleted in ... and modified in ...
+//   - CONFLICT (rename/delete): <file> renamed to <file2> in ..., but deleted in ...
+//   - CONFLICT (rename/rename): <file> renamed to <file2> in ... but renamed to <file3> in ...
+//   - CONFLICT (file/directory): directory in the way of <file>
+func parseMergeTreeConflicts(output string) []string {
+	var files []string
+	seen := make(map[string]bool)
+
+	for _, line := range strings.Split(output, "\n") {
+		if !strings.HasPrefix(line, "CONFLICT (") {
+			continue
+		}
+
+		var file string
+
+		// Pattern 1: "Merge conflict in <file>" (content, add/add)
+		if idx := strings.Index(line, "Merge conflict in "); idx >= 0 {
+			file = strings.TrimSpace(line[idx+len("Merge conflict in "):])
+		}
+
+		// Pattern 2: "<file> renamed to" (rename/delete, rename/rename)
+		// Check this before "deleted in" since rename lines may contain both patterns
+		if file == "" {
+			if idx := strings.Index(line, " renamed to "); idx >= 0 {
+				startIdx := strings.Index(line, "): ")
+				if startIdx >= 0 && startIdx < idx {
+					file = strings.TrimSpace(line[startIdx+3 : idx])
+				}
+			}
+		}
+
+		// Pattern 3: "<file> deleted in" (modify/delete, delete/modify)
+		if file == "" {
+			if idx := strings.Index(line, " deleted in "); idx >= 0 {
+				startIdx := strings.Index(line, "): ")
+				if startIdx >= 0 && startIdx < idx {
+					file = strings.TrimSpace(line[startIdx+3 : idx])
+				}
+			}
+		}
+
+		// Pattern 4: "directory in the way of <file>" (file/directory)
+		if file == "" {
+			if idx := strings.Index(line, "directory in the way of "); idx >= 0 {
+				file = strings.TrimSpace(line[idx+len("directory in the way of "):])
+				// Remove trailing period if present
+				file = strings.TrimSuffix(file, ".")
+			}
+		}
+
+		// Add unique files
+		if file != "" && !seen[file] {
+			seen[file] = true
+			files = append(files, file)
+		}
+	}
+	return files
 }
 
 // Merge merges a branch into the current branch.

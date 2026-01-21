@@ -247,10 +247,12 @@ type MockGit struct {
 	MergeErr               error
 	DeleteBranchErr        error
 	GetDefaultBranchErr    error
+	MergeConflictErr       error
 	CurrentBranchName      string
 	DefaultBranchName      string
 	MergeBranch            string
 	DeletedBranch          string
+	MergeConflictFiles     []string
 	HasUncommittedChangesV bool
 	MergeNoFF              bool
 	MergeCalled            bool
@@ -289,9 +291,20 @@ func (m *MockGit) HasUncommittedChanges(_ string) (bool, error) {
 	return m.HasUncommittedChangesV, nil
 }
 
-// HasMergeConflict is not implemented yet.
+// HasMergeConflict returns whether there are conflicts based on MergeConflictFiles.
 func (m *MockGit) HasMergeConflict(_, _ string) (bool, error) {
-	panic("not implemented")
+	if m.MergeConflictErr != nil {
+		return false, m.MergeConflictErr
+	}
+	return len(m.MergeConflictFiles) > 0, nil
+}
+
+// GetMergeConflictFiles returns the configured conflict files or error.
+func (m *MockGit) GetMergeConflictFiles(_, _ string) ([]string, error) {
+	if m.MergeConflictErr != nil {
+		return nil, m.MergeConflictErr
+	}
+	return m.MergeConflictFiles, nil
 }
 
 // Merge records the call and returns configured error.

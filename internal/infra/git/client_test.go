@@ -286,3 +286,206 @@ func TestClient_GetDefaultBranch_Fallback(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "main", branch)
 }
+
+// =============================================================================
+// HasMergeConflict / GetMergeConflictFiles Tests
+// =============================================================================
+
+func TestClient_HasMergeConflict_NoConflict(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Get the initial branch name
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+	mainBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+
+	// Create a feature branch and add a new file (no conflict)
+	runGit(t, dir, "checkout", "-b", "feature")
+	featureFile := filepath.Join(dir, "feature.txt")
+	require.NoError(t, os.WriteFile(featureFile, []byte("feature content\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Add feature")
+
+	// Switch back to main
+	runGit(t, dir, "checkout", mainBranch)
+
+	// Check for conflicts - should be none
+	hasConflict, err := client.HasMergeConflict("feature", mainBranch)
+	require.NoError(t, err)
+	assert.False(t, hasConflict)
+
+	files, err := client.GetMergeConflictFiles("feature", mainBranch)
+	require.NoError(t, err)
+	assert.Empty(t, files)
+}
+
+func TestClient_HasMergeConflict_WithConflict(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Get the initial branch name
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+	mainBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+
+	// Modify README.md on main branch
+	readme := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(readme, []byte("# Main Branch Content\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update README on main")
+
+	// Create feature branch from initial commit (before main's change)
+	runGit(t, dir, "checkout", "HEAD~1")
+	runGit(t, dir, "checkout", "-b", "feature")
+
+	// Modify the same file differently on feature branch
+	require.NoError(t, os.WriteFile(readme, []byte("# Feature Branch Content\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update README on feature")
+
+	// Switch back to main
+	runGit(t, dir, "checkout", mainBranch)
+
+	// Check for conflicts - should detect conflict
+	hasConflict, err := client.HasMergeConflict("feature", mainBranch)
+	require.NoError(t, err)
+	assert.True(t, hasConflict)
+
+	files, err := client.GetMergeConflictFiles("feature", mainBranch)
+	require.NoError(t, err)
+	assert.Contains(t, files, "README.md")
+}
+
+func TestClient_GetMergeConflictFiles_MultipleFiles(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Get the initial branch name
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+	mainBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+
+	// Add another file on main
+	readme := filepath.Join(dir, "README.md")
+	file2 := filepath.Join(dir, "file2.txt")
+	require.NoError(t, os.WriteFile(readme, []byte("# Main README\n"), 0o644))
+	require.NoError(t, os.WriteFile(file2, []byte("main file2\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update files on main")
+
+	// Create feature branch from initial commit
+	runGit(t, dir, "checkout", "HEAD~1")
+	runGit(t, dir, "checkout", "-b", "feature")
+
+	// Modify both files differently on feature
+	require.NoError(t, os.WriteFile(readme, []byte("# Feature README\n"), 0o644))
+	require.NoError(t, os.WriteFile(file2, []byte("feature file2\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update files on feature")
+
+	// Switch back to main
+	runGit(t, dir, "checkout", mainBranch)
+
+	// Check for conflicts - should detect both files
+	files, err := client.GetMergeConflictFiles("feature", mainBranch)
+	require.NoError(t, err)
+	assert.Len(t, files, 2)
+	assert.Contains(t, files, "README.md")
+	assert.Contains(t, files, "file2.txt")
+}
+
+// =============================================================================
+// parseMergeTreeConflicts Tests
+// =============================================================================
+
+func TestParseMergeTreeConflicts(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   string
+		expected []string
+	}{
+		{
+			name:     "no conflicts",
+			output:   "abc123\n",
+			expected: nil,
+		},
+		{
+			name: "single conflict",
+			output: `abc123
+CONFLICT (content): Merge conflict in README.md
+`,
+			expected: []string{"README.md"},
+		},
+		{
+			name: "multiple conflicts",
+			output: `abc123
+CONFLICT (content): Merge conflict in file1.txt
+CONFLICT (content): Merge conflict in dir/file2.txt
+`,
+			expected: []string{"file1.txt", "dir/file2.txt"},
+		},
+		{
+			name: "add/add conflict",
+			output: `abc123
+CONFLICT (add/add): Merge conflict in newfile.txt
+`,
+			expected: []string{"newfile.txt"},
+		},
+		{
+			name: "modify/delete conflict",
+			output: `abc123
+CONFLICT (modify/delete): config.json deleted in feature and modified in main. Version main of config.json left in tree.
+`,
+			expected: []string{"config.json"},
+		},
+		{
+			name: "delete/modify conflict",
+			output: `abc123
+CONFLICT (delete/modify): settings.yaml deleted in main and modified in feature. Version feature of settings.yaml left in tree.
+`,
+			expected: []string{"settings.yaml"},
+		},
+		{
+			name: "rename/delete conflict",
+			output: `abc123
+CONFLICT (rename/delete): old.txt renamed to new.txt in feature, but deleted in main.
+`,
+			expected: []string{"old.txt"},
+		},
+		{
+			name: "rename/rename conflict",
+			output: `abc123
+CONFLICT (rename/rename): original.txt renamed to feature.txt in feature but renamed to main.txt in main.
+`,
+			expected: []string{"original.txt"},
+		},
+		{
+			name: "file/directory conflict",
+			output: `abc123
+CONFLICT (file/directory): directory in the way of myfile.txt
+`,
+			expected: []string{"myfile.txt"},
+		},
+		{
+			name: "mixed conflict types",
+			output: `abc123
+CONFLICT (content): Merge conflict in README.md
+CONFLICT (modify/delete): config.json deleted in feature and modified in main. Version main of config.json left in tree.
+CONFLICT (rename/delete): old.txt renamed to new.txt in feature, but deleted in main.
+`,
+			expected: []string{"README.md", "config.json", "old.txt"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseMergeTreeConflicts(tt.output)
+			if tt.expected == nil {
+				assert.Empty(t, result)
+			} else {
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}

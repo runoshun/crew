@@ -35,8 +35,11 @@ func (m *mockGitForPrune) CurrentBranch() (string, error)                { retur
 func (m *mockGitForPrune) BranchExists(string) (bool, error)             { return true, nil }
 func (m *mockGitForPrune) HasUncommittedChanges(string) (bool, error)    { return false, nil }
 func (m *mockGitForPrune) HasMergeConflict(string, string) (bool, error) { return false, nil }
-func (m *mockGitForPrune) Merge(string, bool) error                      { return nil }
-func (m *mockGitForPrune) GetDefaultBranch() (string, error)             { return "main", nil }
+func (m *mockGitForPrune) GetMergeConflictFiles(string, string) ([]string, error) {
+	return nil, nil
+}
+func (m *mockGitForPrune) Merge(string, bool) error          { return nil }
+func (m *mockGitForPrune) GetDefaultBranch() (string, error) { return "main", nil }
 
 type mockWorktreeForPrune struct {
 	worktrees []domain.WorktreeInfo
