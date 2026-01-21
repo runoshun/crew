@@ -460,6 +460,27 @@ func TestIntegration_Comment_Multiple(t *testing.T) {
 	assert.Contains(t, out, "Second comment")
 }
 
+func TestIntegration_Show_Markdown(t *testing.T) {
+	dir := testRepo(t)
+	crewMust(t, dir, "init")
+
+	crewMust(t, dir, "new",
+		"--title", "Markdown task",
+		"--body", "Markdown description",
+		"--label", "docs",
+	)
+	crewMust(t, dir, "comment", "1", "First markdown comment")
+
+	out := crewMust(t, dir, "show", "1", "--markdown")
+	assert.Contains(t, out, "# Task #1: Markdown task")
+	assert.Contains(t, out, "**Status:** todo")
+	assert.Contains(t, out, "**Labels:** docs")
+	assert.Contains(t, out, "## Description")
+	assert.Contains(t, out, "Markdown description")
+	assert.Contains(t, out, "## Comments")
+	assert.Contains(t, out, "First markdown comment")
+}
+
 // =============================================================================
 // End-to-End Workflow Tests
 // =============================================================================

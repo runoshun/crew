@@ -454,6 +454,7 @@ func newShowCommand(c *app.Container) *cobra.Command {
 		CommentsBy string
 		JSON       bool
 		LastReview bool
+		Markdown   bool
 	}
 
 	cmd := &cobra.Command{
@@ -483,11 +484,14 @@ Examples:
   # Output in JSON format
   crew show 1 --json
 
-  # Show only the latest reviewer comment
-  crew show 1 --last-review
+		# Show only the latest reviewer comment
+		crew show 1 --last-review
 
-  # Show comments by a specific author
-  crew show 1 --comments-by reviewer`,
+		# Output in Markdown format
+		crew show 1 --markdown
+
+		# Show comments by a specific author
+		crew show 1 --comments-by reviewer`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve task ID
@@ -505,6 +509,10 @@ Examples:
 			})
 			if err != nil {
 				return err
+			}
+
+			if opts.JSON && opts.Markdown {
+				return fmt.Errorf("cannot use --json and --markdown together")
 			}
 
 			// Print output
@@ -561,12 +569,18 @@ Examples:
 				return enc.Encode(jt)
 			}
 
+			if opts.Markdown {
+				printTaskDetailsMarkdown(cmd.OutOrStdout(), out)
+				return nil
+			}
+
 			printTaskDetails(cmd.OutOrStdout(), out)
 			return nil
 		},
 	}
 
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output in JSON format")
+	cmd.Flags().BoolVar(&opts.Markdown, "markdown", false, "Output in Markdown format")
 	cmd.Flags().StringVar(&opts.CommentsBy, "comments-by", "", "Filter comments by author")
 	cmd.Flags().BoolVar(&opts.LastReview, "last-review", false, "Show only the latest review comment")
 
@@ -1201,6 +1215,79 @@ func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
 			// Indent message
 			lines := strings.Split(strings.TrimSpace(comment.Text), "\n")
 			for _, line := range lines {
+				_, _ = fmt.Fprintf(w, "  %s\n", line)
+			}
+		}
+	}
+}
+
+// printTaskDetailsMarkdown prints task details in Markdown format.
+func printTaskDetailsMarkdown(w io.Writer, out *usecase.ShowTaskOutput) {
+	const markdownTimeLayout = "2006-01-02 15:04"
+
+	task := out.Task
+
+	_, _ = fmt.Fprintf(w, "# Task #%d: %s\n\n", task.ID, task.Title)
+	_, _ = fmt.Fprintf(w, "**Status:** %s\n", task.Status)
+
+	labels := "none"
+	if len(task.Labels) > 0 {
+		labels = strings.Join(task.Labels, ", ")
+	}
+	_, _ = fmt.Fprintf(w, "**Labels:** %s\n", labels)
+
+	parent := "none"
+	if task.ParentID != nil {
+		parent = fmt.Sprintf("#%d", *task.ParentID)
+	}
+	_, _ = fmt.Fprintf(w, "**Parent:** %s\n", parent)
+	_, _ = fmt.Fprintf(w, "**Branch:** %s\n", domain.BranchName(task.ID, task.Issue))
+	_, _ = fmt.Fprintf(w, "**Created:** %s\n", task.Created.Format(markdownTimeLayout))
+
+	if task.Issue > 0 {
+		_, _ = fmt.Fprintf(w, "**Issue:** #%d\n", task.Issue)
+	}
+	if task.PR > 0 {
+		_, _ = fmt.Fprintf(w, "**PR:** #%d\n", task.PR)
+	}
+	if task.Agent != "" {
+		_, _ = fmt.Fprintf(w, "**Agent:** %s (session: %s)\n", task.Agent, task.Session)
+	}
+
+	_, _ = fmt.Fprintln(w)
+
+	if task.Description != "" {
+		_, _ = fmt.Fprintln(w, "## Description")
+		_, _ = fmt.Fprintln(w, strings.TrimSpace(task.Description))
+		_, _ = fmt.Fprintln(w)
+	}
+
+	if len(out.Children) > 0 {
+		_, _ = fmt.Fprintln(w, "## Sub-tasks")
+		for _, child := range out.Children {
+			_, _ = fmt.Fprintf(w, "- #%d [%s] %s\n", child.ID, child.Status, child.Title)
+		}
+		_, _ = fmt.Fprintln(w)
+	}
+
+	if len(out.Comments) > 0 {
+		_, _ = fmt.Fprintln(w, "## Comments")
+		for _, comment := range out.Comments {
+			authorPart := ""
+			if comment.Author != "" {
+				authorPart = " (" + comment.Author + ")"
+			}
+
+			text := strings.TrimSpace(comment.Text)
+			lines := strings.Split(text, "\n")
+			prefix := fmt.Sprintf("- %s%s", comment.Time.Format(markdownTimeLayout), authorPart)
+			if text == "" {
+				_, _ = fmt.Fprintln(w, prefix)
+				continue
+			}
+
+			_, _ = fmt.Fprintf(w, "%s: %s\n", prefix, lines[0])
+			for _, line := range lines[1:] {
 				_, _ = fmt.Fprintf(w, "  %s\n", line)
 			}
 		}
