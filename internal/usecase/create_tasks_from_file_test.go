@@ -288,28 +288,66 @@ Parent doesn't exist.`
 	assert.ErrorIs(t, err, domain.ErrParentNotFound)
 }
 
-func TestCreateTasksFromFile_Execute_DryRun_AbsoluteParentNotFound(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
-	configLoader := testutil.NewMockConfigLoader()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
-	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
+func TestCreateTasksFromFile_Execute_DryRun_AbsoluteParentNotVerified(t *testing.T) {
+	// Setup - use nil dependencies to prove dry-run doesn't need them
+	uc := NewCreateTasksFromFile(nil, nil, nil, nil, nil)
 
 	content := `---
 title: Task
 parent: 999
 ---
-Parent doesn't exist.`
+Parent doesn't exist but dry-run doesn't verify.`
 
 	// Execute with dry-run
-	_, err := uc.Execute(context.Background(), CreateTasksFromFileInput{
+	out, err := uc.Execute(context.Background(), CreateTasksFromFileInput{
 		Content: content,
 		DryRun:  true,
 	})
 
-	// Assert - dry-run should also validate absolute parent references
-	assert.ErrorIs(t, err, domain.ErrParentNotFound)
+	// Assert - dry-run does NOT verify absolute parent references (no I/O)
+	// The parent reference is simply accepted as-is for preview purposes
+	require.NoError(t, err)
+	require.Len(t, out.Tasks, 1)
+	require.NotNil(t, out.Tasks[0].ParentID)
+	assert.Equal(t, 999, *out.Tasks[0].ParentID)
+}
+
+func TestCreateTasksFromFile_Execute_DryRun_NoIODependencies(t *testing.T) {
+	// Setup - use nil for ALL dependencies to prove dry-run works without any I/O
+	uc := NewCreateTasksFromFile(nil, nil, nil, nil, nil)
+
+	content := `---
+title: Root Task
+labels: [backend, urgent]
+---
+Root description.
+
+---
+title: Child Task
+parent: 1
+---
+Child description.`
+
+	// Execute with dry-run - should succeed even with nil dependencies
+	out, err := uc.Execute(context.Background(), CreateTasksFromFileInput{
+		Content: content,
+		DryRun:  true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.Len(t, out.Tasks, 2)
+
+	// Verify task details are correctly parsed
+	assert.Equal(t, 1, out.Tasks[0].ID)
+	assert.Equal(t, "Root Task", out.Tasks[0].Title)
+	assert.Equal(t, []string{"backend", "urgent"}, out.Tasks[0].Labels)
+	assert.Nil(t, out.Tasks[0].ParentID)
+
+	assert.Equal(t, 2, out.Tasks[1].ID)
+	assert.Equal(t, "Child Task", out.Tasks[1].Title)
+	require.NotNil(t, out.Tasks[1].ParentID)
+	assert.Equal(t, 1, *out.Tasks[1].ParentID)
 }
 
 func TestCreateTasksFromFile_Execute_SaveError(t *testing.T) {

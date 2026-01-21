@@ -64,6 +64,12 @@ func (uc *CreateTasksFromFile) Execute(_ context.Context, in CreateTasksFromFile
 		return nil, err
 	}
 
+	// If dry-run, return parsed drafts without any I/O operations
+	// (no config load, no git access, no task repository access)
+	if in.DryRun {
+		return dryRunTasks(drafts)
+	}
+
 	// Load config for base branch resolution
 	var config *domain.Config
 	if uc.configLoader != nil {
@@ -79,17 +85,14 @@ func (uc *CreateTasksFromFile) Execute(_ context.Context, in CreateTasksFromFile
 		return nil, err
 	}
 
-	// If dry-run, just return parsed drafts without creating tasks
-	if in.DryRun {
-		return uc.dryRun(drafts)
-	}
-
 	// Create tasks
 	return uc.createTasks(drafts, baseBranch)
 }
 
-// dryRun validates and returns tasks that would be created.
-func (uc *CreateTasksFromFile) dryRun(drafts []domain.TaskDraft) (*CreateTasksFromFileOutput, error) {
+// dryRunTasks validates and returns tasks that would be created.
+// This is a pure function with no I/O dependencies - it only parses and validates
+// the input without accessing config, git, or task repository.
+func dryRunTasks(drafts []domain.TaskDraft) (*CreateTasksFromFileOutput, error) {
 	result := &CreateTasksFromFileOutput{
 		Tasks: make([]CreatedTask, 0, len(drafts)),
 	}
@@ -111,21 +114,9 @@ func (uc *CreateTasksFromFile) dryRun(drafts []domain.TaskDraft) (*CreateTasksFr
 			}
 
 			if resolved != nil {
-				// Check if it's a relative reference within file
-				if *resolved <= len(drafts) {
-					// Relative reference - show as relative index
-					parentID = resolved
-				} else {
-					// Absolute reference - verify task exists
-					parent, err := uc.tasks.Get(*resolved)
-					if err != nil {
-						return nil, fmt.Errorf("task %d: get parent task: %w", i+1, err)
-					}
-					if parent == nil {
-						return nil, fmt.Errorf("task %d: %w", i+1, domain.ErrParentNotFound)
-					}
-					parentID = resolved
-				}
+				// In dry-run mode, we don't verify absolute references against the database.
+				// We simply accept the reference as-is to allow previewing without I/O.
+				parentID = resolved
 			}
 		}
 
