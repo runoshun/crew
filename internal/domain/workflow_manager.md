@@ -173,6 +173,24 @@ parent: #123       # Absolute: refers to existing task #123
 
 See `crew new --help` for full format details.
 
+### Edit Task from File
+
+```bash
+# Edit an existing task from a Markdown file
+crew edit 1 --from task.md
+```
+
+File format (`task.md`):
+```markdown
+---
+title: Updated Task Title
+labels: [backend, updated]
+---
+Updated task description here.
+```
+
+The file must contain exactly one task block. This updates the task's title, description, and labels.
+
 ### Monitor Progress
 
 ```bash

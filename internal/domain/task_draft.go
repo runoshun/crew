@@ -211,6 +211,40 @@ func parseLabelsValue(value string) []string {
 	return labels
 }
 
+// ParseSingleTaskDraft parses a markdown file containing a single task definition.
+// This is used for editing an existing task from a file.
+//
+// Format:
+//
+//	---
+//	title: Task Title
+//	labels: [label1, label2]
+//	---
+//	Task description here.
+//
+// The file must contain exactly one task block.
+func ParseSingleTaskDraft(content string) (*TaskDraft, error) {
+	if content == "" {
+		return nil, ErrEmptyFile
+	}
+
+	// Split content by task blocks
+	blocks := splitTaskBlocks(content)
+	if len(blocks) == 0 {
+		return nil, ErrNoTasksInFile
+	}
+	if len(blocks) > 1 {
+		return nil, ErrMultipleTasksInFile
+	}
+
+	draft, err := parseTaskBlock(blocks[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return &draft, nil
+}
+
 // ResolveParentRef resolves a parent reference to an actual task ID.
 // ref can be:
 // - A relative index (1-based) referring to a task in the same file: "1", "2", etc.
