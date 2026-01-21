@@ -111,67 +111,47 @@ Session is still running. Options:
 
 ## Common Workflows
 
-### Create & Start a Task
+### Create Task (Recommended)
+
+1. Create a task file (e.g., `tasks.md`):
+   ```markdown
+   ---
+   title: Implement auth
+   labels: [feature, backend]
+   ---
+   ## Background
+   User authentication is needed for the dashboard.
+   
+   ## Requirements
+   - JWT-based auth
+   - Support login/logout
+   
+   ## Acceptance criteria
+   - [ ] Login endpoint works
+   - [ ] Tests pass
+   ```
+
+2. Create task(s) from the file:
+   ```bash
+   # Preview first
+   crew new --from tasks.md --dry-run
+   
+   # Create task
+   crew new --from tasks.md
+   ```
+
+3. Start with a worker:
+   ```bash
+   crew start <id> <worker>
+   ```
+
+### Quick Task Creation
+
+For simple tasks, you can use flags directly:
 
 ```bash
-# Create task with detailed requirements
-crew new --title "Implement auth" --body "$(cat <<'EOF'
-## Background
-User authentication is needed for the dashboard.
-
-## Requirements
-- JWT-based auth
-- Support login/logout
-- Session persistence
-
-## Files to modify
-- internal/auth/
-- cmd/api/
-
-## Acceptance criteria
-- [ ] Login endpoint works
-- [ ] Tests pass
-- [ ] CI green
-EOF
-)"
-
-# Check the new task
-crew show <id>
-
-# Start with a worker
-crew start <id> opencode-dev
+crew new --title "Simple fix"
 ```
-
-### Create Tasks from File
-
-```bash
-# Create tasks from a Markdown file
-crew new --from tasks.md
-
-# Preview without creating
-crew new --from tasks.md --dry-run
-```
-
-File format (`tasks.md`):
-```markdown
----
-title: Parent task
-labels: [backend, feature]
----
-Task description here.
-
----
-title: Sub-task 1
-parent: 1          # Relative: refers to task above
----
-
----
-title: Sub-task 2
-parent: #123       # Absolute: refers to existing task #123
----
-```
-
-See `crew new --help` for full format details.
 
 ### Monitor Progress
 
