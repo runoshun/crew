@@ -275,10 +275,10 @@ func TestAddComment_Execute_RequestChanges_SessionNotRunning(t *testing.T) {
 
 // MockSessionStarter is a test double for SessionStarter.
 type MockSessionStarter struct {
-	StartCalled bool
-	StartTaskID int
-	StartCont   bool
 	StartErr    error
+	StartTaskID int
+	StartCalled bool
+	StartCont   bool
 }
 
 func (m *MockSessionStarter) Start(_ context.Context, taskID int, continueFlag bool) error {

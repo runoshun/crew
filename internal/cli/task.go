@@ -21,10 +21,12 @@ func newNewCommand(c *app.Container) *cobra.Command {
 		Title       string
 		Description string
 		Base        string
+		From        string
 		Labels      []string
 		ParentID    int
 		Issue       int
 		SkipReview  bool
+		DryRun      bool
 	}
 
 	cmd := &cobra.Command{
@@ -57,8 +59,24 @@ EOF
 )"
 
   # Create a task that skips review on completion
-  crew new --title "Quick fix" --skip-review`,
+  crew new --title "Quick fix" --skip-review
+
+  # Create tasks from a file (multiple tasks supported)
+  crew new --from tasks.md
+
+  # Preview tasks from a file without creating
+  crew new --from tasks.md --dry-run`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			// Check if --from is specified
+			if opts.From != "" {
+				return createTasksFromFile(cmd, c, opts.From, opts.Base, opts.DryRun)
+			}
+
+			// Require --title when not using --from
+			if opts.Title == "" {
+				return fmt.Errorf("required flag(s) \"title\" not set")
+			}
+
 			// Build input
 			// BaseBranch: if --base is provided, use it; otherwise empty (let UseCase decide)
 			input := usecase.NewTaskInput{
@@ -91,19 +109,90 @@ EOF
 		},
 	}
 
-	// Required flags
-	cmd.Flags().StringVar(&opts.Title, "title", "", "Task title (required)")
-	_ = cmd.MarkFlagRequired("title")
-
-	// Optional flags
+	// Flags (--title is conditionally required based on --from)
+	cmd.Flags().StringVar(&opts.Title, "title", "", "Task title (required unless --from is used)")
 	cmd.Flags().StringVar(&opts.Description, "body", "", "Task description")
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Parent task ID (creates a sub-task)")
 	cmd.Flags().IntVar(&opts.Issue, "issue", 0, "Linked GitHub issue number")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Labels (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Base, "base", "", "Base branch for worktree (default: current branch)")
 	cmd.Flags().BoolVar(&opts.SkipReview, "skip-review", false, "Skip review on task completion (go directly to reviewed)")
+	cmd.Flags().StringVar(&opts.From, "from", "", "Create tasks from a Markdown file")
+	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview tasks without creating (requires --from)")
 
 	return cmd
+}
+
+// createTasksFromFile creates tasks from a Markdown file.
+func createTasksFromFile(cmd *cobra.Command, c *app.Container, filePath, baseBranch string, dryRun bool) error {
+	// Read file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("read file: %w", err)
+	}
+
+	// Execute use case
+	uc := c.CreateTasksFromFileUseCase()
+	out, err := uc.Execute(cmd.Context(), usecase.CreateTasksFromFileInput{
+		Content:    string(content),
+		BaseBranch: baseBranch,
+		DryRun:     dryRun,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Print results
+	w := cmd.OutOrStdout()
+	if dryRun {
+		_, _ = fmt.Fprintln(w, "Dry run - tasks that would be created:")
+		_, _ = fmt.Fprintln(w, "")
+	}
+
+	for i, task := range out.Tasks {
+		if dryRun {
+			_, _ = fmt.Fprintf(w, "Task %d:\n", i+1)
+		} else {
+			_, _ = fmt.Fprintf(w, "Created task #%d:\n", task.ID)
+		}
+		_, _ = fmt.Fprintf(w, "  Title: %s\n", task.Title)
+		if task.ParentID != nil {
+			if dryRun {
+				// In dry-run, show if it's a relative reference
+				if *task.ParentID <= len(out.Tasks) {
+					_, _ = fmt.Fprintf(w, "  Parent: task %d (in this file)\n", *task.ParentID)
+				} else {
+					_, _ = fmt.Fprintf(w, "  Parent: #%d\n", *task.ParentID)
+				}
+			} else {
+				_, _ = fmt.Fprintf(w, "  Parent: #%d\n", *task.ParentID)
+			}
+		}
+		if len(task.Labels) > 0 {
+			_, _ = fmt.Fprintf(w, "  Labels: [%s]\n", strings.Join(task.Labels, ", "))
+		}
+		if task.Description != "" {
+			// Show first line of description
+			lines := strings.Split(task.Description, "\n")
+			preview := lines[0]
+			if len(preview) > 50 {
+				preview = preview[:50] + "..."
+			}
+			if len(lines) > 1 {
+				preview += " ..."
+			}
+			_, _ = fmt.Fprintf(w, "  Description: %s\n", preview)
+		}
+		if i < len(out.Tasks)-1 {
+			_, _ = fmt.Fprintln(w, "")
+		}
+	}
+
+	if !dryRun {
+		_, _ = fmt.Fprintf(w, "\nCreated %d task(s)\n", len(out.Tasks))
+	}
+
+	return nil
 }
 
 // newListCommand creates the list command for listing tasks.

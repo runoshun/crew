@@ -35,4 +35,7 @@ var (
 	ErrEditorNotSet          = errors.New("no editor configured: set $EDITOR or $VISUAL environment variable")
 	ErrInvalidCommentMeta    = errors.New("invalid comment metadata (index, author, or time)")
 	ErrCommentTextEmpty      = errors.New("comment text cannot be empty")
+	ErrEmptyFile             = errors.New("file is empty")
+	ErrNoTasksInFile         = errors.New("no tasks found in file")
+	ErrInvalidParentRef      = errors.New("invalid parent reference: must be a positive number")
 )
