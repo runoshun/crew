@@ -120,7 +120,7 @@ func TestCreateTasksFromFile_Execute_AbsoluteParent(t *testing.T) {
 
 	content := `---
 title: Child Task
-parent: 100
+parent: #100
 ---
 Child of existing task.`
 
@@ -135,6 +135,52 @@ Child of existing task.`
 	assert.Equal(t, 1, out.Tasks[0].ID)
 	require.NotNil(t, out.Tasks[0].ParentID)
 	assert.Equal(t, 100, *out.Tasks[0].ParentID)
+}
+
+func TestCreateTasksFromFile_Execute_AbsoluteParentWithHashPrefix(t *testing.T) {
+	// Setup - test that #1 refers to existing task 1, not the first task in file
+	repo := testutil.NewMockTaskRepository()
+	// Pre-create existing parent task with ID 1
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Existing Task 1",
+		Status: domain.StatusTodo,
+	}
+	repo.NextIDN = 2
+
+	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
+
+	content := `---
+title: First Task in File
+---
+This is the first task.
+
+---
+title: Second Task in File
+parent: #1
+---
+This should reference existing task 1, not the first task in this file.`
+
+	// Execute
+	out, err := uc.Execute(context.Background(), CreateTasksFromFileInput{
+		Content: content,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.Len(t, out.Tasks, 2)
+
+	// First task should have no parent
+	assert.Equal(t, 2, out.Tasks[0].ID)
+	assert.Nil(t, out.Tasks[0].ParentID)
+
+	// Second task should reference existing task 1, not the first task in file (ID 2)
+	assert.Equal(t, 3, out.Tasks[1].ID)
+	require.NotNil(t, out.Tasks[1].ParentID)
+	assert.Equal(t, 1, *out.Tasks[1].ParentID) // Points to existing task 1
 }
 
 func TestCreateTasksFromFile_Execute_DryRun(t *testing.T) {

@@ -65,7 +65,24 @@ EOF
   crew new --from tasks.md
 
   # Preview tasks from a file without creating
-  crew new --from tasks.md --dry-run`,
+  crew new --from tasks.md --dry-run
+
+File format for --from:
+  ---
+  title: Task 1
+  labels: [backend]
+  ---
+  Description here.
+
+  ---
+  title: Task 2
+  parent: 1          # Relative: refers to Task 1 in this file
+  ---
+
+  ---
+  title: Task 3
+  parent: #123       # Absolute: refers to existing task #123
+  ---`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Check if --from is specified
 			if opts.From != "" {

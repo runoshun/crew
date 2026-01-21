@@ -245,6 +245,42 @@ func TestResolveParentRef(t *testing.T) {
 			want:       intPtr(500),
 		},
 		{
+			name:       "explicit absolute ref with # prefix",
+			ref:        "#123",
+			createdIDs: createdIDs,
+			want:       intPtr(123),
+		},
+		{
+			name:       "explicit absolute ref #1 bypasses relative lookup",
+			ref:        "#1",
+			createdIDs: createdIDs,
+			want:       intPtr(1), // Returns 1, not 100 (the mapped value)
+		},
+		{
+			name:       "explicit absolute ref #2 bypasses relative lookup",
+			ref:        "#2",
+			createdIDs: createdIDs,
+			want:       intPtr(2), // Returns 2, not 101 (the mapped value)
+		},
+		{
+			name:       "invalid # ref (non-numeric after #)",
+			ref:        "#abc",
+			createdIDs: createdIDs,
+			wantErr:    ErrInvalidParentRef,
+		},
+		{
+			name:       "invalid # ref (zero)",
+			ref:        "#0",
+			createdIDs: createdIDs,
+			wantErr:    ErrInvalidParentRef,
+		},
+		{
+			name:       "invalid # ref (negative)",
+			ref:        "#-1",
+			createdIDs: createdIDs,
+			wantErr:    ErrInvalidParentRef,
+		},
+		{
 			name:       "invalid ref (non-numeric)",
 			ref:        "abc",
 			createdIDs: createdIDs,

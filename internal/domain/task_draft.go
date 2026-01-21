@@ -33,6 +33,10 @@ type TaskDraft struct {
 //	parent: 1
 //	---
 //	Second task description.
+//
+// Parent references:
+//   - Relative: "parent: 1" refers to the 1st task in this file
+//   - Absolute: "parent: #123" refers to existing task ID 123 (use # prefix)
 func ParseTaskDrafts(content string) ([]TaskDraft, error) {
 	if content == "" {
 		return nil, ErrEmptyFile
@@ -209,14 +213,32 @@ func parseLabelsValue(value string) []string {
 
 // ResolveParentRef resolves a parent reference to an actual task ID.
 // ref can be:
-// - A relative index (1-based) referring to a task in the same file
-// - An absolute task ID
+// - A relative index (1-based) referring to a task in the same file: "1", "2", etc.
+// - An absolute task ID with # prefix: "#123", "#1", etc.
+//
+// The # prefix explicitly marks a reference as absolute, avoiding ambiguity
+// when the existing task ID falls within the range of relative indices.
+//
 // createdIDs maps relative index (1-based) to created task ID.
 func ResolveParentRef(ref string, createdIDs map[int]int) (*int, error) {
 	if ref == "" {
 		return nil, nil
 	}
 
+	// Check for absolute reference with # prefix
+	if len(ref) > 1 && ref[0] == '#' {
+		n, err := strToInt(ref[1:])
+		if err != nil {
+			return nil, ErrInvalidParentRef
+		}
+		if n <= 0 {
+			return nil, ErrInvalidParentRef
+		}
+		// Return as absolute ID (skip relative lookup)
+		return &n, nil
+	}
+
+	// Parse as relative reference
 	n, err := strToInt(ref)
 	if err != nil {
 		return nil, ErrInvalidParentRef
@@ -231,6 +253,7 @@ func ResolveParentRef(ref string, createdIDs map[int]int) (*int, error) {
 		return &id, nil
 	}
 
-	// Treat as absolute ID
+	// Not in createdIDs - treat as absolute ID for backwards compatibility
+	// (allows referencing existing tasks with IDs larger than file task count)
 	return &n, nil
 }
