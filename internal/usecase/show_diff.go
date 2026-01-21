@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // DefaultDiffCommand is the default diff command when not configured.
@@ -69,12 +70,9 @@ type DiffTemplateData struct {
 // This is useful for TUI which needs to execute the command via tea.Exec.
 func (uc *ShowDiff) GetCommand(_ context.Context, in ShowDiffInput) (*domain.ExecCommand, error) {
 	// Get the task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Resolve worktree path

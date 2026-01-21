@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // DefaultPeekLines is the default number of lines to display.
@@ -42,12 +43,9 @@ func NewPeekSession(
 // Execute captures and returns the last N lines from a running session.
 func (uc *PeekSession) Execute(_ context.Context, in PeekSessionInput) (*PeekSessionOutput, error) {
 	// Get task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Get session name

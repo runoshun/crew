@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // StopTaskInput contains the parameters for stopping a task session.
@@ -47,12 +48,9 @@ func NewStopTask(
 // 4. Updating status to stopped (if session exists)
 func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutput, error) {
 	// Get the task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	workSessionName := domain.SessionName(task.ID)

@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // ReviewTaskInput contains the parameters for reviewing a task.
@@ -79,12 +80,9 @@ func NewReviewTask(
 // By default, runs in background. Use Wait=true for synchronous execution.
 func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewTaskOutput, error) {
 	// Get task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Validate status - must be for_review or reviewing

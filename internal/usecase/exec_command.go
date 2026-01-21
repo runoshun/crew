@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // ExecCommandInput contains the parameters for executing a command in a task's worktree.
@@ -46,12 +47,9 @@ func (uc *ExecCommand) Execute(_ context.Context, in ExecCommandInput) (*ExecCom
 	}
 
 	// Get task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Get worktree path

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // CloseTaskInput contains the parameters for closing a task.
@@ -44,12 +45,9 @@ func NewCloseTask(
 // 4. Clearing agent info
 func (uc *CloseTask) Execute(_ context.Context, in CloseTaskInput) (*CloseTaskOutput, error) {
 	// Get the task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Validate status transition

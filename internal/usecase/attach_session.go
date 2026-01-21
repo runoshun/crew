@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // AttachSessionInput contains the parameters for attaching to a session.
@@ -38,12 +39,9 @@ func NewAttachSession(
 // This replaces the current process and does not return on success.
 func (uc *AttachSession) Execute(_ context.Context, in AttachSessionInput) (*AttachSessionOutput, error) {
 	// Get task
-	task, err := uc.tasks.Get(in.TaskID)
+	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Get session name based on mode

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // DeleteTaskInput contains the parameters for deleting a task.
@@ -34,12 +35,9 @@ func NewDeleteTask(tasks domain.TaskRepository) *DeleteTask {
 // Session termination and worktree cleanup will be added in later phases.
 func (uc *DeleteTask) Execute(_ context.Context, in DeleteTaskInput) (*DeleteTaskOutput, error) {
 	// Verify task exists
-	task, err := uc.tasks.Get(in.TaskID)
+	_, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return nil, domain.ErrTaskNotFound
+		return nil, err
 	}
 
 	// Delete task from store

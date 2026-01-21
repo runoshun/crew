@@ -60,12 +60,9 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) error {
 	}
 
 	// Get task
-	task, err := h.tasks.Get(in.TaskID)
+	task, err := GetTask(h.tasks, in.TaskID)
 	if err != nil {
-		return fmt.Errorf("get task: %w", err)
-	}
-	if task == nil {
-		return domain.ErrTaskNotFound
+		return err
 	}
 
 	// Build conflict message
