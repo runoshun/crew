@@ -243,12 +243,24 @@ func TestConflictHandler_CheckAndHandle_TaskNotFound(t *testing.T) {
 }
 
 func TestBuildConflictMessage(t *testing.T) {
-	files := []string{"file1.txt", "dir/file2.txt"}
-	msg := buildConflictMessage(files)
+	t.Run("with main branch", func(t *testing.T) {
+		files := []string{"file1.txt", "dir/file2.txt"}
+		msg := buildConflictMessage(files, "main")
 
-	assert.Contains(t, msg, "Merge conflict detected")
-	assert.Contains(t, msg, "file1.txt")
-	assert.Contains(t, msg, "dir/file2.txt")
-	assert.Contains(t, msg, "git merge main")
-	assert.Contains(t, msg, "crew complete")
+		assert.Contains(t, msg, "Merge conflict detected")
+		assert.Contains(t, msg, "file1.txt")
+		assert.Contains(t, msg, "dir/file2.txt")
+		assert.Contains(t, msg, "git fetch origin main:main")
+		assert.Contains(t, msg, "git merge main")
+		assert.Contains(t, msg, "crew complete")
+	})
+
+	t.Run("with develop branch", func(t *testing.T) {
+		files := []string{"conflict.txt"}
+		msg := buildConflictMessage(files, "develop")
+
+		assert.Contains(t, msg, "git fetch origin develop:develop")
+		assert.Contains(t, msg, "git merge develop")
+		assert.NotContains(t, msg, "main")
+	})
 }

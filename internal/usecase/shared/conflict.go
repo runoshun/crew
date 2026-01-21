@@ -69,7 +69,7 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) error {
 	}
 
 	// Build conflict message
-	message := buildConflictMessage(conflictFiles)
+	message := buildConflictMessage(conflictFiles, in.BaseBranch)
 
 	// Create comment
 	comment := domain.Comment{
@@ -93,9 +93,9 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) error {
 	sessionName := domain.SessionName(task.ID)
 	running, _ := h.sessions.IsRunning(sessionName)
 	if running {
-		notificationMsg := fmt.Sprintf(conflictNotificationTemplate, task.ID, task.ID)
+		// Include newline in message for better compatibility across environments
+		notificationMsg := fmt.Sprintf(conflictNotificationTemplate+"\n", task.ID, task.ID)
 		_ = h.sessions.Send(sessionName, notificationMsg)
-		_ = h.sessions.Send(sessionName, "Enter")
 	}
 
 	return domain.ErrMergeConflict
@@ -105,7 +105,7 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) error {
 const conflictNotificationTemplate = "Merge conflict detected. Please check the comment with 'crew show %d' and resolve the conflicts. When finished, run 'crew complete %d'."
 
 // buildConflictMessage creates a user-friendly conflict message.
-func buildConflictMessage(files []string) string {
+func buildConflictMessage(files []string, baseBranch string) string {
 	var sb strings.Builder
 	sb.WriteString("Merge conflict detected with base branch.\n\n")
 	sb.WriteString("Conflicting files:\n")
@@ -115,8 +115,8 @@ func buildConflictMessage(files []string) string {
 		sb.WriteString("\n")
 	}
 	sb.WriteString("\nPlease resolve the conflicts:\n")
-	sb.WriteString("1. git fetch origin main:main\n")
-	sb.WriteString("2. git merge main\n")
+	sb.WriteString(fmt.Sprintf("1. git fetch origin %s:%s\n", baseBranch, baseBranch))
+	sb.WriteString(fmt.Sprintf("2. git merge %s\n", baseBranch))
 	sb.WriteString("3. Resolve conflicts in the listed files\n")
 	sb.WriteString("4. git add <files> && git commit\n")
 	sb.WriteString("5. Run 'crew complete' again")
