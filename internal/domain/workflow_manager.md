@@ -142,6 +142,37 @@ crew show <id>
 crew start <id> opencode-dev
 ```
 
+### Create Tasks from File
+
+```bash
+# Create tasks from a Markdown file
+crew new --from tasks.md
+
+# Preview without creating
+crew new --from tasks.md --dry-run
+```
+
+File format (`tasks.md`):
+```markdown
+---
+title: Parent task
+labels: [backend, feature]
+---
+Task description here.
+
+---
+title: Sub-task 1
+parent: 1          # Relative: refers to task above
+---
+
+---
+title: Sub-task 2
+parent: #123       # Absolute: refers to existing task #123
+---
+```
+
+See `crew new --help` for full format details.
+
 ### Monitor Progress
 
 ```bash
