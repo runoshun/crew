@@ -148,16 +148,22 @@ func (a ConfirmAction) String() string {
 type SortMode int
 
 const (
-	SortByStatus SortMode = iota
-	SortByID
+	SortByStatusAsc SortMode = iota
+	SortByStatusDesc
+	SortByIDAsc
+	SortByIDDesc
 )
 
 func (s SortMode) String() string {
 	switch s {
-	case SortByStatus:
-		return "status"
-	case SortByID:
-		return "id"
+	case SortByStatusAsc:
+		return "status (asc)"
+	case SortByStatusDesc:
+		return "status (desc)"
+	case SortByIDAsc:
+		return "id (asc)"
+	case SortByIDDesc:
+		return "id (desc)"
 	default:
 		return "unknown"
 	}
@@ -165,11 +171,15 @@ func (s SortMode) String() string {
 
 func (s SortMode) Next() SortMode {
 	switch s {
-	case SortByStatus:
-		return SortByID
-	case SortByID:
-		return SortByStatus
+	case SortByStatusAsc:
+		return SortByStatusDesc
+	case SortByStatusDesc:
+		return SortByIDAsc
+	case SortByIDAsc:
+		return SortByIDDesc
+	case SortByIDDesc:
+		return SortByStatusAsc
 	default:
-		return SortByStatus
+		return SortByStatusAsc
 	}
 }

@@ -257,6 +257,14 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 
+	case key.Matches(msg, m.keys.PrevPage):
+		m.taskList.Paginator.PrevPage()
+		return m, nil
+
+	case key.Matches(msg, m.keys.NextPage):
+		m.taskList.Paginator.NextPage()
+		return m, nil
+
 	case key.Matches(msg, m.keys.Enter):
 		return m.handleDefaultAction()
 

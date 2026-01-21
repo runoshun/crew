@@ -5,8 +5,10 @@ import "github.com/charmbracelet/bubbles/key"
 // KeyMap defines the keybindings for the TUI.
 type KeyMap struct {
 	// Navigation
-	Up   key.Binding
-	Down key.Binding
+	Up       key.Binding
+	Down     key.Binding
+	PrevPage key.Binding
+	NextPage key.Binding
 
 	// Actions
 	Enter   key.Binding // Execute default action
@@ -53,6 +55,14 @@ func DefaultKeyMap() KeyMap {
 		Down: key.NewBinding(
 			key.WithKeys("down", "j"),
 			key.WithHelp("↓/j", "down"),
+		),
+		PrevPage: key.NewBinding(
+			key.WithKeys("left", "h"),
+			key.WithHelp("←/h", "prev page"),
+		),
+		NextPage: key.NewBinding(
+			key.WithKeys("right", "l"),
+			key.WithHelp("→/l", "next page"),
 		),
 		Enter: key.NewBinding(
 			key.WithKeys("enter"),
@@ -155,14 +165,14 @@ func DefaultKeyMap() KeyMap {
 
 // ShortHelp returns keybindings to show in the short help view.
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Up, k.Down, k.Enter, k.Default, k.Start, k.Help, k.Quit}
+	return []key.Binding{k.Up, k.Down, k.PrevPage, k.NextPage, k.Enter, k.Default, k.Start, k.Help, k.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view.
 func (k KeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
-		{k.Up, k.Down, k.Enter}, // Navigation
-		{k.Default},             // Default action
+		{k.Up, k.Down, k.PrevPage, k.NextPage, k.Enter}, // Navigation
+		{k.Default}, // Default action
 
 		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},   // Session
 		{k.New, k.Copy, k.Delete, k.Edit, k.EditStatus}, // Task management
@@ -185,6 +195,8 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 
 	addKeys(k.Up)
 	addKeys(k.Down)
+	addKeys(k.PrevPage)
+	addKeys(k.NextPage)
 	addKeys(k.Enter)
 	addKeys(k.Default)
 	addKeys(k.Start)
