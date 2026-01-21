@@ -121,19 +121,63 @@ func (c *Client) GetMergeConflictFiles(branch, target string) ([]string, error) 
 }
 
 // parseMergeTreeConflicts extracts conflicting file names from git merge-tree output.
+// Handles various conflict formats:
+//   - CONFLICT (content): Merge conflict in <file>
+//   - CONFLICT (add/add): Merge conflict in <file>
+//   - CONFLICT (modify/delete): <file> deleted in ... and modified in ...
+//   - CONFLICT (rename/delete): <file> renamed to <file2> in ..., but deleted in ...
+//   - CONFLICT (rename/rename): <file> renamed to <file2> in ... but renamed to <file3> in ...
+//   - CONFLICT (file/directory): directory in the way of <file>
 func parseMergeTreeConflicts(output string) []string {
 	var files []string
+	seen := make(map[string]bool)
+
 	for _, line := range strings.Split(output, "\n") {
-		// Look for lines like "CONFLICT (content): Merge conflict in <file>"
-		if strings.Contains(line, "CONFLICT") && strings.Contains(line, "Merge conflict in") {
-			// Extract file path after "Merge conflict in "
-			idx := strings.Index(line, "Merge conflict in ")
-			if idx >= 0 {
-				file := strings.TrimSpace(line[idx+len("Merge conflict in "):])
-				if file != "" {
-					files = append(files, file)
+		if !strings.HasPrefix(line, "CONFLICT (") {
+			continue
+		}
+
+		var file string
+
+		// Pattern 1: "Merge conflict in <file>" (content, add/add)
+		if idx := strings.Index(line, "Merge conflict in "); idx >= 0 {
+			file = strings.TrimSpace(line[idx+len("Merge conflict in "):])
+		}
+
+		// Pattern 2: "<file> renamed to" (rename/delete, rename/rename)
+		// Check this before "deleted in" since rename lines may contain both patterns
+		if file == "" {
+			if idx := strings.Index(line, " renamed to "); idx >= 0 {
+				startIdx := strings.Index(line, "): ")
+				if startIdx >= 0 && startIdx < idx {
+					file = strings.TrimSpace(line[startIdx+3 : idx])
 				}
 			}
+		}
+
+		// Pattern 3: "<file> deleted in" (modify/delete, delete/modify)
+		if file == "" {
+			if idx := strings.Index(line, " deleted in "); idx >= 0 {
+				startIdx := strings.Index(line, "): ")
+				if startIdx >= 0 && startIdx < idx {
+					file = strings.TrimSpace(line[startIdx+3 : idx])
+				}
+			}
+		}
+
+		// Pattern 4: "directory in the way of <file>" (file/directory)
+		if file == "" {
+			if idx := strings.Index(line, "directory in the way of "); idx >= 0 {
+				file = strings.TrimSpace(line[idx+len("directory in the way of "):])
+				// Remove trailing period if present
+				file = strings.TrimSuffix(file, ".")
+			}
+		}
+
+		// Add unique files
+		if file != "" && !seen[file] {
+			seen[file] = true
+			files = append(files, file)
 		}
 	}
 	return files

@@ -432,6 +432,50 @@ CONFLICT (add/add): Merge conflict in newfile.txt
 `,
 			expected: []string{"newfile.txt"},
 		},
+		{
+			name: "modify/delete conflict",
+			output: `abc123
+CONFLICT (modify/delete): config.json deleted in feature and modified in main. Version main of config.json left in tree.
+`,
+			expected: []string{"config.json"},
+		},
+		{
+			name: "delete/modify conflict",
+			output: `abc123
+CONFLICT (delete/modify): settings.yaml deleted in main and modified in feature. Version feature of settings.yaml left in tree.
+`,
+			expected: []string{"settings.yaml"},
+		},
+		{
+			name: "rename/delete conflict",
+			output: `abc123
+CONFLICT (rename/delete): old.txt renamed to new.txt in feature, but deleted in main.
+`,
+			expected: []string{"old.txt"},
+		},
+		{
+			name: "rename/rename conflict",
+			output: `abc123
+CONFLICT (rename/rename): original.txt renamed to feature.txt in feature but renamed to main.txt in main.
+`,
+			expected: []string{"original.txt"},
+		},
+		{
+			name: "file/directory conflict",
+			output: `abc123
+CONFLICT (file/directory): directory in the way of myfile.txt
+`,
+			expected: []string{"myfile.txt"},
+		},
+		{
+			name: "mixed conflict types",
+			output: `abc123
+CONFLICT (content): Merge conflict in README.md
+CONFLICT (modify/delete): config.json deleted in feature and modified in main. Version main of config.json left in tree.
+CONFLICT (rename/delete): old.txt renamed to new.txt in feature, but deleted in main.
+`,
+			expected: []string{"README.md", "config.json", "old.txt"},
+		},
 	}
 
 	for _, tt := range tests {
