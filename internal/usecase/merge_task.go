@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // MergeTaskInput contains the parameters for merging a task.
@@ -25,6 +26,7 @@ type MergeTask struct {
 	sessions  domain.SessionManager
 	worktrees domain.WorktreeManager
 	git       domain.Git
+	clock     domain.Clock
 	crewDir   string
 }
 
@@ -34,6 +36,7 @@ func NewMergeTask(
 	sessions domain.SessionManager,
 	worktrees domain.WorktreeManager,
 	git domain.Git,
+	clock domain.Clock,
 	crewDir string,
 ) *MergeTask {
 	return &MergeTask{
@@ -41,6 +44,7 @@ func NewMergeTask(
 		sessions:  sessions,
 		worktrees: worktrees,
 		git:       git,
+		clock:     clock,
 		crewDir:   crewDir,
 	}
 }
@@ -107,6 +111,16 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 
 	// Get branch name
 	branch := domain.BranchName(task.ID, task.Issue)
+
+	// Check for merge conflicts before attempting merge
+	conflictHandler := shared.NewConflictHandler(uc.tasks, uc.sessions, uc.git, uc.clock)
+	if conflictErr := conflictHandler.CheckAndHandle(shared.ConflictCheckInput{
+		TaskID:     task.ID,
+		Branch:     branch,
+		BaseBranch: targetBaseBranch,
+	}); conflictErr != nil {
+		return nil, conflictErr
+	}
 
 	// Execute git merge --no-ff first (before deleting worktree)
 	// This way, if merge fails due to conflict, worktree is preserved for resolution

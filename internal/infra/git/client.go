@@ -85,9 +85,58 @@ func (c *Client) HasUncommittedChanges(dir string) (bool, error) {
 }
 
 // HasMergeConflict checks if merging branch into target would conflict.
-// TODO: implement in later phase
-func (c *Client) HasMergeConflict(_, _ string) (bool, error) {
-	panic("not implemented")
+// Uses git merge-tree --write-tree for dry-run conflict detection.
+func (c *Client) HasMergeConflict(branch, target string) (bool, error) {
+	files, err := c.GetMergeConflictFiles(branch, target)
+	if err != nil {
+		return false, err
+	}
+	return len(files) > 0, nil
+}
+
+// GetMergeConflictFiles returns the list of files that would conflict
+// when merging branch into target. Returns empty slice if no conflicts.
+// Uses git merge-tree --write-tree for dry-run conflict detection.
+func (c *Client) GetMergeConflictFiles(branch, target string) ([]string, error) {
+	// git merge-tree --write-tree returns exit code 0 if no conflicts,
+	// exit code 1 if there are conflicts with conflicting files listed in output.
+	cmd := exec.Command("git", "merge-tree", "--write-tree", target, branch)
+	cmd.Dir = c.repoRoot
+	out, err := cmd.CombinedOutput()
+
+	if err == nil {
+		// No conflicts
+		return nil, nil
+	}
+
+	// Check if it's exit code 1 (conflicts) or some other error
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok || exitErr.ExitCode() != 1 {
+		return nil, fmt.Errorf("failed to run merge-tree: %w: %s", err, string(out))
+	}
+
+	// Parse output to find conflicting files
+	// Format includes lines like: "CONFLICT (content): Merge conflict in <file>"
+	return parseMergeTreeConflicts(string(out)), nil
+}
+
+// parseMergeTreeConflicts extracts conflicting file names from git merge-tree output.
+func parseMergeTreeConflicts(output string) []string {
+	var files []string
+	for _, line := range strings.Split(output, "\n") {
+		// Look for lines like "CONFLICT (content): Merge conflict in <file>"
+		if strings.Contains(line, "CONFLICT") && strings.Contains(line, "Merge conflict in") {
+			// Extract file path after "Merge conflict in "
+			idx := strings.Index(line, "Merge conflict in ")
+			if idx >= 0 {
+				file := strings.TrimSpace(line[idx+len("Merge conflict in "):])
+				if file != "" {
+					files = append(files, file)
+				}
+			}
+		}
+	}
+	return files
 }
 
 // Merge merges a branch into the current branch.

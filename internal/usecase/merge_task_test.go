@@ -28,7 +28,7 @@ func TestMergeTask_Execute_Success(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -69,7 +69,7 @@ func TestMergeTask_Execute_SuccessWithIssue(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -102,7 +102,7 @@ func TestMergeTask_Execute_StopsRunningSession(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute - session should be stopped after merge
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -133,7 +133,7 @@ func TestMergeTask_Execute_NoWorktree(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -154,7 +154,7 @@ func TestMergeTask_Execute_TaskNotFound(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	git := &testutil.MockGit{}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -180,7 +180,7 @@ func TestMergeTask_Execute_NotOnMain(t *testing.T) {
 		CurrentBranchName: "feature-branch", // Not on main
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -207,7 +207,7 @@ func TestMergeTask_Execute_UncommittedChanges(t *testing.T) {
 		HasUncommittedChangesV: true, // Has uncommitted changes
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -226,7 +226,7 @@ func TestMergeTask_Execute_GetTaskError(t *testing.T) {
 	worktrees := testutil.NewMockWorktreeManager()
 	git := &testutil.MockGit{}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -256,7 +256,7 @@ func TestMergeTask_Execute_MergeError(t *testing.T) {
 		MergeErr:          assert.AnError,
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -287,7 +287,7 @@ func TestMergeTask_Execute_DeleteBranchError(t *testing.T) {
 		DeleteBranchErr:   assert.AnError,
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -317,7 +317,7 @@ func TestMergeTask_Execute_SaveError(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -348,7 +348,7 @@ func TestMergeTask_Execute_StopSessionError(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute - stopping session should fail
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -378,7 +378,7 @@ func TestMergeTask_Execute_RemoveWorktreeError(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -407,7 +407,7 @@ func TestMergeTask_Execute_WithCustomBaseBranch(t *testing.T) {
 		CurrentBranchName: "feature/workspace",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -441,7 +441,7 @@ func TestMergeTask_Execute_PrioritizesInputBaseBranch(t *testing.T) {
 		DefaultBranchName: "develop",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute - input base branch should take precedence
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -474,7 +474,7 @@ func TestMergeTask_Execute_BaseBranchMismatch(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute - merge to main even though task is based on feature branch (--base override)
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -504,7 +504,7 @@ func TestMergeTask_Execute_NotOnBaseBranch(t *testing.T) {
 		CurrentBranchName: "main",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute - trying to merge to feature branch but on main
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -533,7 +533,7 @@ func TestMergeTask_Execute_UseTaskBaseBranch(t *testing.T) {
 		CurrentBranchName: "feature/workspace",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute - BaseBranch not specified, should use task's BaseBranch
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -567,7 +567,7 @@ func TestMergeTask_Execute_EmptyTaskBaseBranch(t *testing.T) {
 		DefaultBranchName: "develop",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute - BaseBranch not specified, task's BaseBranch is empty, should use GetDefaultBranch
 	out, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -598,7 +598,7 @@ func TestMergeTask_Execute_DefaultBranchMismatch(t *testing.T) {
 		DefaultBranchName: "develop",
 	}
 
-	uc := NewMergeTask(repo, sessions, worktrees, git, t.TempDir())
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
 
 	// Execute - BaseBranch not specified, default branch is develop but current is main
 	_, err := uc.Execute(context.Background(), MergeTaskInput{
@@ -608,4 +608,80 @@ func TestMergeTask_Execute_DefaultBranchMismatch(t *testing.T) {
 	// Assert
 	assert.ErrorIs(t, err, domain.ErrNotOnBaseBranch)
 	assert.True(t, git.GetDefaultBranchCalled)
+}
+
+func TestMergeTask_Execute_MergeConflict(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with conflict",
+		Status:     domain.StatusForReview,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = true
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ExistsVal = true
+	git := &testutil.MockGit{
+		CurrentBranchName:  "main",
+		MergeConflictFiles: []string{"conflict.txt"},
+	}
+
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
+
+	// Execute
+	out, err := uc.Execute(context.Background(), MergeTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	require.ErrorIs(t, err, domain.ErrMergeConflict)
+	assert.Nil(t, out)
+
+	// Task status should be in_progress
+	task := repo.Tasks[1]
+	assert.Equal(t, domain.StatusInProgress, task.Status)
+
+	// Comment should be added about conflict
+	comments := repo.Comments[1]
+	require.NotEmpty(t, comments)
+	assert.Contains(t, comments[0].Text, "conflict.txt")
+
+	// Merge should NOT have been called (conflict detected before merge)
+	assert.False(t, git.MergeCalled)
+}
+
+func TestMergeTask_Execute_NoMergeConflict(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task without conflict",
+		Status:     domain.StatusForReview,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = false
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ExistsVal = true
+	git := &testutil.MockGit{
+		CurrentBranchName:  "main",
+		MergeConflictFiles: nil, // No conflicts
+	}
+
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
+
+	// Execute
+	out, err := uc.Execute(context.Background(), MergeTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert - should succeed
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+
+	// Merge should have been called
+	assert.True(t, git.MergeCalled)
 }

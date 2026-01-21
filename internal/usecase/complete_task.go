@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // CompleteTaskInput contains the parameters for completing a task.
@@ -26,6 +27,7 @@ type CompleteTaskOutput struct {
 // Fields are ordered to minimize memory padding.
 type CompleteTask struct {
 	tasks     domain.TaskRepository
+	sessions  domain.SessionManager
 	worktrees domain.WorktreeManager
 	git       domain.Git
 	config    domain.ConfigLoader
@@ -39,6 +41,7 @@ type CompleteTask struct {
 // NewCompleteTask creates a new CompleteTask use case.
 func NewCompleteTask(
 	tasks domain.TaskRepository,
+	sessions domain.SessionManager,
 	worktrees domain.WorktreeManager,
 	git domain.Git,
 	config domain.ConfigLoader,
@@ -50,6 +53,7 @@ func NewCompleteTask(
 ) *CompleteTask {
 	return &CompleteTask{
 		tasks:     tasks,
+		sessions:  sessions,
 		worktrees: worktrees,
 		git:       git,
 		config:    config,
@@ -99,6 +103,22 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	}
 	if hasUncommitted {
 		return nil, domain.ErrUncommittedChanges
+	}
+
+	// Resolve base branch for conflict check
+	baseBranch, err := resolveBaseBranch(task, uc.git)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for merge conflicts with base branch
+	conflictHandler := shared.NewConflictHandler(uc.tasks, uc.sessions, uc.git, uc.clock)
+	if conflictErr := conflictHandler.CheckAndHandle(shared.ConflictCheckInput{
+		TaskID:     task.ID,
+		Branch:     branch,
+		BaseBranch: baseBranch,
+	}); conflictErr != nil {
+		return nil, conflictErr
 	}
 
 	// Load config and execute complete.command if configured

@@ -181,6 +181,10 @@ type Git interface {
 	// HasMergeConflict checks if merging branch into target would conflict.
 	HasMergeConflict(branch, target string) (bool, error)
 
+	// GetMergeConflictFiles returns the list of files that would conflict
+	// when merging branch into target. Returns empty slice if no conflicts.
+	GetMergeConflictFiles(branch, target string) ([]string, error)
+
 	// Merge merges a branch into the current branch.
 	Merge(branch string, noFF bool) error
 

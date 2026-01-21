@@ -286,3 +286,162 @@ func TestClient_GetDefaultBranch_Fallback(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "main", branch)
 }
+
+// =============================================================================
+// HasMergeConflict / GetMergeConflictFiles Tests
+// =============================================================================
+
+func TestClient_HasMergeConflict_NoConflict(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Get the initial branch name
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+	mainBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+
+	// Create a feature branch and add a new file (no conflict)
+	runGit(t, dir, "checkout", "-b", "feature")
+	featureFile := filepath.Join(dir, "feature.txt")
+	require.NoError(t, os.WriteFile(featureFile, []byte("feature content\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Add feature")
+
+	// Switch back to main
+	runGit(t, dir, "checkout", mainBranch)
+
+	// Check for conflicts - should be none
+	hasConflict, err := client.HasMergeConflict("feature", mainBranch)
+	require.NoError(t, err)
+	assert.False(t, hasConflict)
+
+	files, err := client.GetMergeConflictFiles("feature", mainBranch)
+	require.NoError(t, err)
+	assert.Empty(t, files)
+}
+
+func TestClient_HasMergeConflict_WithConflict(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Get the initial branch name
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+	mainBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+
+	// Modify README.md on main branch
+	readme := filepath.Join(dir, "README.md")
+	require.NoError(t, os.WriteFile(readme, []byte("# Main Branch Content\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update README on main")
+
+	// Create feature branch from initial commit (before main's change)
+	runGit(t, dir, "checkout", "HEAD~1")
+	runGit(t, dir, "checkout", "-b", "feature")
+
+	// Modify the same file differently on feature branch
+	require.NoError(t, os.WriteFile(readme, []byte("# Feature Branch Content\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update README on feature")
+
+	// Switch back to main
+	runGit(t, dir, "checkout", mainBranch)
+
+	// Check for conflicts - should detect conflict
+	hasConflict, err := client.HasMergeConflict("feature", mainBranch)
+	require.NoError(t, err)
+	assert.True(t, hasConflict)
+
+	files, err := client.GetMergeConflictFiles("feature", mainBranch)
+	require.NoError(t, err)
+	assert.Contains(t, files, "README.md")
+}
+
+func TestClient_GetMergeConflictFiles_MultipleFiles(t *testing.T) {
+	dir := setupGitRepo(t)
+
+	// Get the initial branch name
+	client, err := NewClient(dir)
+	require.NoError(t, err)
+	mainBranch, err := client.CurrentBranch()
+	require.NoError(t, err)
+
+	// Add another file on main
+	readme := filepath.Join(dir, "README.md")
+	file2 := filepath.Join(dir, "file2.txt")
+	require.NoError(t, os.WriteFile(readme, []byte("# Main README\n"), 0o644))
+	require.NoError(t, os.WriteFile(file2, []byte("main file2\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update files on main")
+
+	// Create feature branch from initial commit
+	runGit(t, dir, "checkout", "HEAD~1")
+	runGit(t, dir, "checkout", "-b", "feature")
+
+	// Modify both files differently on feature
+	require.NoError(t, os.WriteFile(readme, []byte("# Feature README\n"), 0o644))
+	require.NoError(t, os.WriteFile(file2, []byte("feature file2\n"), 0o644))
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "commit", "-m", "Update files on feature")
+
+	// Switch back to main
+	runGit(t, dir, "checkout", mainBranch)
+
+	// Check for conflicts - should detect both files
+	files, err := client.GetMergeConflictFiles("feature", mainBranch)
+	require.NoError(t, err)
+	assert.Len(t, files, 2)
+	assert.Contains(t, files, "README.md")
+	assert.Contains(t, files, "file2.txt")
+}
+
+// =============================================================================
+// parseMergeTreeConflicts Tests
+// =============================================================================
+
+func TestParseMergeTreeConflicts(t *testing.T) {
+	tests := []struct {
+		name     string
+		output   string
+		expected []string
+	}{
+		{
+			name:     "no conflicts",
+			output:   "abc123\n",
+			expected: nil,
+		},
+		{
+			name: "single conflict",
+			output: `abc123
+CONFLICT (content): Merge conflict in README.md
+`,
+			expected: []string{"README.md"},
+		},
+		{
+			name: "multiple conflicts",
+			output: `abc123
+CONFLICT (content): Merge conflict in file1.txt
+CONFLICT (content): Merge conflict in dir/file2.txt
+`,
+			expected: []string{"file1.txt", "dir/file2.txt"},
+		},
+		{
+			name: "add/add conflict",
+			output: `abc123
+CONFLICT (add/add): Merge conflict in newfile.txt
+`,
+			expected: []string{"newfile.txt"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseMergeTreeConflicts(tt.output)
+			if tt.expected == nil {
+				assert.Empty(t, result)
+			} else {
+				assert.Equal(t, tt.expected, result)
+			}
+		})
+	}
+}

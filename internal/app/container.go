@@ -252,12 +252,12 @@ func (c *Container) ShowConfigTemplateUseCase() *usecase.ShowConfigTemplate {
 // CompleteTaskUseCase returns a new CompleteTask use case.
 // stdout and stderr are used for review session output when auto-starting review.
 func (c *Container) CompleteTaskUseCase(stdout, stderr io.Writer) *usecase.CompleteTask {
-	return usecase.NewCompleteTask(c.Tasks, c.Worktrees, c.Git, c.ConfigLoader, c.Clock, c.Logger, c.Executor, c.Config.CrewDir, c.Config.RepoRoot)
+	return usecase.NewCompleteTask(c.Tasks, c.Sessions, c.Worktrees, c.Git, c.ConfigLoader, c.Clock, c.Logger, c.Executor, c.Config.CrewDir, c.Config.RepoRoot)
 }
 
 // MergeTaskUseCase returns a new MergeTask use case.
 func (c *Container) MergeTaskUseCase() *usecase.MergeTask {
-	return usecase.NewMergeTask(c.Tasks, c.Sessions, c.Worktrees, c.Git, c.Config.CrewDir)
+	return usecase.NewMergeTask(c.Tasks, c.Sessions, c.Worktrees, c.Git, c.Clock, c.Config.CrewDir)
 }
 
 // ShowDiffUseCase returns a new ShowDiff use case.
