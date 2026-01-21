@@ -18,7 +18,9 @@ type CompleteTaskInput struct {
 // Fields are ordered to minimize memory padding.
 type CompleteTaskOutput struct {
 	Task              *domain.Task // The completed task
-	ShouldStartReview bool         // True if review should be started by CLI
+	ShouldStartReview bool         // True if review should be started by CLI (for background review)
+	AutoFixEnabled    bool         // True if auto_fix mode is enabled
+	AutoFixMaxRetries int          // Maximum retry count for auto_fix
 }
 
 // CompleteTask is the use case for marking a task as complete.
@@ -184,13 +186,27 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		return nil, fmt.Errorf("save task: %w", saveErr)
 	}
 
-	// Log task completion
-	if uc.logger != nil {
-		uc.logger.Info(task.ID, "task", "completed (status: reviewing, review should start)")
+	// Determine auto_fix mode
+	autoFixEnabled := cfg != nil && cfg.Complete.AutoFix
+	autoFixMaxRetries := domain.DefaultAutoFixMaxRetries
+	if cfg != nil && cfg.Complete.AutoFixMaxRetries > 0 {
+		autoFixMaxRetries = cfg.Complete.AutoFixMaxRetries
 	}
 
+	// Log task completion
+	if uc.logger != nil {
+		if autoFixEnabled {
+			uc.logger.Info(task.ID, "task", "completed (status: reviewing, auto_fix: true)")
+		} else {
+			uc.logger.Info(task.ID, "task", "completed (status: reviewing, review should start)")
+		}
+	}
+
+	// If auto_fix is enabled, CLI will run synchronous review instead of background
 	return &CompleteTaskOutput{
 		Task:              task,
-		ShouldStartReview: true,
+		ShouldStartReview: !autoFixEnabled, // Background review only when auto_fix is off
+		AutoFixEnabled:    autoFixEnabled,
+		AutoFixMaxRetries: autoFixMaxRetries,
 	}, nil
 }

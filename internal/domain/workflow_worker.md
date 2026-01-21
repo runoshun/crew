@@ -36,6 +36,41 @@ crew complete          # Mark task as complete
 
 ---
 
+## Auto-Fix Mode
+
+When `[complete].auto_fix` is enabled in config, `crew complete` runs review synchronously and outputs the result:
+
+- **LGTM**: If review passes, outputs "LGTM" - task is done
+- **Not LGTM**: Outputs review feedback for you to address
+
+### Workflow with Auto-Fix
+
+```bash
+# 1. Make changes and commit
+git add . && git commit -m "feat: ..."
+
+# 2. Run crew complete
+crew complete
+# → If LGTM: Done!
+# → If not LGTM: Review feedback is shown
+
+# 3. If feedback received, fix issues and repeat
+git add . && git commit -m "fix: address review feedback"
+crew complete
+# → Loop until LGTM or max retries reached
+```
+
+### Configuration
+
+```toml
+[complete]
+command = "mise run ci"
+auto_fix = true           # Enable auto-fix mode
+auto_fix_max_retries = 3  # Maximum retry attempts (default: 3)
+```
+
+---
+
 ## Resolving Conflicts
 
 When conflicts occur with main branch:

@@ -16,16 +16,17 @@ var configTemplateContent string
 // Config represents the application configuration.
 // Fields are ordered to minimize memory padding.
 type Config struct {
-	Agents         map[string]Agent `toml:"agents"` // Agent definitions from [agents.<name>]
-	Warnings       []string         `toml:"-"`
-	AgentsConfig   AgentsConfig     `toml:"agents"` // Common [agents] settings
-	Complete       CompleteConfig   `toml:"complete"`
-	Diff           DiffConfig       `toml:"diff"`
-	Log            LogConfig        `toml:"log"`
-	Tasks          TasksConfig      `toml:"tasks"`
-	TUI            TUIConfig        `toml:"tui"`
-	Worktree       WorktreeConfig   `toml:"worktree"`
-	OnboardingDone bool             `toml:"onboarding_done,omitempty"` // Whether onboarding has been completed
+	Agents       map[string]Agent `toml:"agents"` // Agent definitions from [agents.<name>]
+	Warnings     []string         `toml:"-"`
+	AgentsConfig AgentsConfig     `toml:"agents"` // Common [agents] settings
+	TUI          TUIConfig        `toml:"tui"`
+	Worktree     WorktreeConfig   `toml:"worktree"`
+	Tasks        TasksConfig      `toml:"tasks"`
+	Diff         DiffConfig       `toml:"diff"`
+	Log          LogConfig        `toml:"log"`
+	Complete     CompleteConfig   `toml:"complete"`
+
+	OnboardingDone bool `toml:"onboarding_done,omitempty"` // Whether onboarding has been completed
 }
 
 // TasksConfig holds settings for task storage from [tasks] section.
@@ -204,7 +205,9 @@ func expandString(s string, data CommandData) (string, error) {
 
 // CompleteConfig holds completion gate settings from [complete] section.
 type CompleteConfig struct {
-	Command string `toml:"command,omitempty"` // Command to run as CI gate on complete
+	Command           string `toml:"command,omitempty"`              // Command to run as CI gate on complete
+	AutoFix           bool   `toml:"auto_fix,omitempty"`             // Enable auto-fix mode (run review synchronously)
+	AutoFixMaxRetries int    `toml:"auto_fix_max_retries,omitempty"` // Maximum retry count for auto-fix (default: 3)
 }
 
 // DiffConfig holds diff display settings from [diff] section.
@@ -243,6 +246,9 @@ const (
 
 // ReviewResultMarker is the marker line that separates verbose output from the final review result.
 const ReviewResultMarker = "---REVIEW_RESULT---"
+
+// ReviewLGTMPrefix is the prefix indicating the review passed (LGTM).
+const ReviewLGTMPrefix = "✅ LGTM"
 
 // DefaultSystemPrompt is the default system prompt template for workers.
 // It uses Go template syntax with CommandData fields.
@@ -326,6 +332,11 @@ func GlobalOverrideConfigPath(configHome string) string {
 	return filepath.Join(GlobalCrewDir(configHome), ConfigOverrideFileName)
 }
 
+// Default configuration values for CompleteConfig.
+const (
+	DefaultAutoFixMaxRetries = 3
+)
+
 // NewDefaultConfig returns a Config with default values.
 // This returns an empty Agents map.
 // Builtin agents should be registered by calling builtin.Register(cfg)
@@ -334,6 +345,9 @@ func NewDefaultConfig() *Config {
 	return &Config{
 		Agents:       make(map[string]Agent),
 		AgentsConfig: AgentsConfig{},
+		Complete: CompleteConfig{
+			AutoFixMaxRetries: DefaultAutoFixMaxRetries,
+		},
 		Log: LogConfig{
 			Level: DefaultLogLevel,
 		},

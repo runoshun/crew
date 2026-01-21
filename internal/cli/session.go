@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -270,6 +271,9 @@ Examples:
 	return cmd
 }
 
+// ErrAutoFixMaxRetries is returned when auto_fix reaches the maximum retry limit.
+var ErrAutoFixMaxRetries = errors.New("auto_fix reached maximum retries")
+
 // newCompleteCommand creates the complete command for marking a task as complete.
 func newCompleteCommand(c *app.Container) *cobra.Command {
 	var opts struct {
@@ -293,6 +297,12 @@ the status. If the command fails, the completion is aborted.
 If skip_review is enabled (via task setting or config), the task transitions
 directly to 'reviewed'. Otherwise, it transitions to 'reviewing' and a review
 session is started.
+
+Auto-fix mode:
+  When [complete].auto_fix is enabled, the review runs synchronously.
+  - If LGTM: outputs "LGTM" and exits successfully
+  - If not LGTM: outputs review feedback for the worker to address
+  - Use [complete].auto_fix_max_retries to limit retry attempts (default: 3)
 
 Examples:
   # Complete task by ID
@@ -321,8 +331,13 @@ Examples:
 				return err
 			}
 
+			// Handle auto_fix mode
+			if out.AutoFixEnabled {
+				return handleAutoFixReview(cmd, c, out)
+			}
+
 			if out.ShouldStartReview {
-				// Start review automatically
+				// Start review automatically (background)
 				reviewUC := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 				reviewOut, reviewErr := reviewUC.Execute(cmd.Context(), usecase.ReviewTaskInput{
 					TaskID: taskID,
@@ -350,6 +365,62 @@ Examples:
 	cmd.Flags().StringVarP(&opts.comment, "comment", "m", "", "Add a completion comment")
 
 	return cmd
+}
+
+// handleAutoFixReview runs synchronous review for auto_fix mode.
+// It outputs "LGTM" if the review passes, or the review feedback if not.
+// On non-LGTM, it reverts task status to in_progress and increments retry count.
+func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.CompleteTaskOutput) error {
+	task := out.Task
+	retryCount := task.AutoFixRetryCount
+
+	// Check retry limit (before running review)
+	if retryCount >= out.AutoFixMaxRetries {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "auto_fix: reached maximum retries (%d)\n", out.AutoFixMaxRetries)
+		return ErrAutoFixMaxRetries
+	}
+
+	// Run synchronous review
+	reviewUC := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
+	reviewOut, reviewErr := reviewUC.Execute(cmd.Context(), usecase.ReviewTaskInput{
+		TaskID: task.ID,
+		Wait:   true, // Synchronous execution for auto_fix
+	})
+
+	if reviewErr != nil {
+		// Revert to in_progress on review failure
+		task.Status = domain.StatusInProgress
+		_ = c.Tasks.Save(task)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Task #%d completed, but review failed: %v\n", task.ID, reviewErr)
+		return reviewErr
+	}
+
+	// Check if LGTM
+	reviewResult := strings.TrimSpace(reviewOut.Review)
+	if isLGTM(reviewResult) {
+		// LGTM - reset retry count and output success message
+		task.AutoFixRetryCount = 0
+		_ = c.Tasks.Save(task)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "LGTM")
+		return nil
+	}
+
+	// Not LGTM - revert to in_progress, increment retry count, and output feedback
+	task.Status = domain.StatusInProgress
+	task.AutoFixRetryCount = retryCount + 1
+	if saveErr := c.Tasks.Save(task); saveErr != nil {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to save task: %v\n", saveErr)
+	}
+
+	// Output review feedback for worker to address
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Review feedback (retry %d/%d):\n%s\n",
+		retryCount+1, out.AutoFixMaxRetries, reviewResult)
+	return nil
+}
+
+// isLGTM checks if the review result indicates LGTM (approved).
+func isLGTM(reviewResult string) bool {
+	return strings.HasPrefix(reviewResult, domain.ReviewLGTMPrefix)
 }
 
 // newSessionEndedCommand creates the _session-ended internal command.

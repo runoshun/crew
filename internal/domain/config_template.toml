@@ -59,6 +59,11 @@
 [complete]
 ## CI gate on completion
 # command = "mise run ci"
+## Auto-fix mode: run review synchronously and output feedback
+## Worker will see the feedback and can fix issues before running crew complete again
+# auto_fix = false
+## Maximum retry attempts for auto-fix mode (default: 3)
+# auto_fix_max_retries = 3
 
 [diff]
 ## Diff display settings
