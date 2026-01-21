@@ -11,8 +11,8 @@ import (
 
 // MockGitForBaseBranch is a minimal mock for testing resolveBaseBranch.
 type MockGitForBaseBranch struct {
-	defaultBranch    string
 	defaultBranchErr error
+	defaultBranch    string
 }
 
 func (m *MockGitForBaseBranch) GetDefaultBranch() (string, error) {
@@ -110,10 +110,10 @@ func TestResolveBaseBranch_Private(t *testing.T) {
 
 // MockGitForNewTaskBaseBranch is a minimal mock for testing resolveNewTaskBaseBranch.
 type MockGitForNewTaskBaseBranch struct {
-	currentBranch    string
 	currentBranchErr error
-	defaultBranch    string
 	defaultBranchErr error
+	currentBranch    string
+	defaultBranch    string
 }
 
 func (m *MockGitForNewTaskBaseBranch) GetDefaultBranch() (string, error) {
@@ -154,15 +154,15 @@ func (m *MockGitForNewTaskBaseBranch) ListBranches() ([]string, error) {
 
 func TestResolveNewTaskBaseBranch(t *testing.T) {
 	tests := []struct {
+		currentBranchErr error
+		defaultBranchErr error
 		name             string
 		baseBranch       string
-		newTaskBase      string // config.Tasks.NewTaskBase
-		configNil        bool   // set config to nil
+		newTaskBase      string
 		currentBranch    string
-		currentBranchErr error
 		defaultBranch    string
-		defaultBranchErr error
 		want             string
+		configNil        bool
 		wantErr          bool
 	}{
 		{

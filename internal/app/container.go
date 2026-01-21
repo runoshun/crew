@@ -165,6 +165,11 @@ func (c *Container) NewTaskUseCase() *usecase.NewTask {
 	return usecase.NewNewTask(c.Tasks, c.Git, c.ConfigLoader, c.Clock, c.Logger)
 }
 
+// CreateTasksFromFileUseCase returns a new CreateTasksFromFile use case.
+func (c *Container) CreateTasksFromFileUseCase() *usecase.CreateTasksFromFile {
+	return usecase.NewCreateTasksFromFile(c.Tasks, c.Git, c.ConfigLoader, c.Clock, c.Logger)
+}
+
 // ListTasksUseCase returns a new ListTasks use case.
 func (c *Container) ListTasksUseCase() *usecase.ListTasks {
 	return usecase.NewListTasks(c.Tasks, c.Sessions)

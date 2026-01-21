@@ -88,8 +88,8 @@ func TestTask_FromMarkdown(t *testing.T) {
 		markdown    string
 		wantTitle   string
 		wantDesc    string
-		wantLabels  []string
 		errContains string
+		wantLabels  []string
 		wantErr     bool
 	}{
 		{
@@ -290,8 +290,8 @@ Description`,
 
 func TestTask_RoundTrip(t *testing.T) {
 	tests := []struct {
-		name     string
 		original *Task
+		name     string
 	}{
 		{
 			name: "without labels",
@@ -339,10 +339,10 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 	later := now.Add(time.Hour)
 
 	tests := []struct {
-		name     string
 		task     *Task
-		comments []Comment
+		name     string
 		want     string
+		comments []Comment
 	}{
 		{
 			name: "no comments",
@@ -425,11 +425,11 @@ func TestParseEditorContent(t *testing.T) {
 		content       string
 		wantTitle     string
 		wantDesc      string
-		wantLabels    []string
-		wantLabelsNil bool
-		wantComments  []ParsedComment
-		wantErr       bool
 		errContains   string
+		wantLabels    []string
+		wantComments  []ParsedComment
+		wantLabelsNil bool
+		wantErr       bool
 	}{
 		{
 			name: "task only (no comments)",

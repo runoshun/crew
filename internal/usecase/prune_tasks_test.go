@@ -64,13 +64,12 @@ func (m *mockWorktreeForPrune) Exists(string) (bool, error)                     
 func TestPruneTasks_Execute_Real(t *testing.T) {
 	tests := []struct {
 		name              string
-		input             PruneTasksInput
 		tasks             []*domain.Task
 		branches          []string
 		worktrees         []domain.WorktreeInfo
 		expectedBranches  int
 		expectedWorktrees int
-		// Tasks are NOT deleted, so we verify they remain in DB
+		input             PruneTasksInput
 	}{
 		{
 			name: "prune closed tasks - only delete branches/worktrees",

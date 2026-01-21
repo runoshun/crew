@@ -274,10 +274,10 @@ func TestRenderConfigTemplate(t *testing.T) {
 
 func TestConfig_EnabledAgents(t *testing.T) {
 	tests := []struct {
-		name     string
 		config   *Config
-		wantLen  int
+		name     string
 		wantKeys []string
+		wantLen  int
 	}{
 		{
 			name: "no disabled agents",

@@ -582,8 +582,8 @@ func TestPollTask_containsStatus(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		statuses []domain.Status
 		target   domain.Status
+		statuses []domain.Status
 		expected bool
 	}{
 		{
