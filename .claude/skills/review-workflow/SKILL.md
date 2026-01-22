@@ -19,7 +19,7 @@ Register ALL TODOs at once when starting Phase 1:
 
 ```
 # Phase 1: Setup
-- [ ] Read docs/README.md, core-concepts.md, architecture.md, spec-cli.md, spec-tui.md
+- [ ] Read docs/README.md, core-concepts.md, architecture.md
 - [ ] Identify review target (PR, branch, or files) - ask user if unclear
 # Phase 2: Verify
 - [ ] Run mise run ci

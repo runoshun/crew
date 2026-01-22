@@ -111,9 +111,9 @@ Session is still running. Options:
 
 ## Common Workflows
 
-### Create Task (Recommended)
+### Create Task
 
-1. Create a task file (e.g., `tasks.md`):
+1. **Draft task file** - Create a Markdown file in `.git/crew/drafts/`:
    ```markdown
    ---
    title: Implement auth
@@ -121,46 +121,36 @@ Session is still running. Options:
    ---
    ## Background
    User authentication is needed for the dashboard.
-   
+
    ## Requirements
    - JWT-based auth
    - Support login/logout
-   
+
    ## Acceptance criteria
    - [ ] Login endpoint works
    - [ ] Tests pass
    ```
 
-2. Create task(s) from the file:
+2. **User review** - Show the file to user for confirmation before creating
+
+3. **Register task**:
    ```bash
-   # Preview first
-   crew new --from tasks.md --dry-run
-   
-   # Create task
-   crew new --from tasks.md
+   crew new --from .git/crew/drafts/task.md
    ```
 
-3. Start with a worker:
+4. **Start with a worker**:
    ```bash
    crew start <id> <worker>
    ```
-
-### Quick Task Creation
-
-For simple tasks, you can use flags directly:
-
-```bash
-crew new --title "Simple fix"
-```
 
 ### Edit Task from File
 
 ```bash
 # Edit an existing task from a Markdown file
-crew edit 1 --from task.md
+crew edit 1 --from .git/crew/drafts/task.md
 ```
 
-File format (`task.md`):
+File format (`.git/crew/drafts/task.md`):
 ```markdown
 ---
 title: Updated Task Title
@@ -284,8 +274,8 @@ See `crew --help-manager-auto` for full specifications.
 ```bash
 crew list                          # List all tasks
 crew show <id>                     # Show task details
-crew new --title "..."             # Create new task
-crew edit <id> --title "..."       # Edit task
+crew new --from .git/crew/drafts/task.md            # Create task from file
+crew edit <id> --from .git/crew/drafts/task.md      # Edit task from file
 crew comment <id> "<text>"         # Add comment
 crew close <id>                    # Close/abandon task
 ```
@@ -356,7 +346,8 @@ Make sure `.git/crew/config.toml` has:
 ## Constraints & Scope
 
 Managers are read-only orchestrators:
-- Do not edit files directly
+- Do not edit files except task drafts (`.git/crew/drafts/`)
+- May edit other files only when user explicitly instructs
 - Do not write code
 - Delegate all implementation to workers
 - Monitor and validate results
