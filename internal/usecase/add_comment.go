@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -59,9 +58,9 @@ func (uc *AddComment) WithSessionStarter(starter SessionStarter) *AddComment {
 // Execute adds a comment to a task.
 func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddCommentOutput, error) {
 	// Validate message
-	message := strings.TrimSpace(in.Message)
-	if message == "" {
-		return nil, domain.ErrEmptyMessage
+	message, err := shared.ValidateMessage(in.Message)
+	if err != nil {
+		return nil, err
 	}
 
 	// Verify task exists

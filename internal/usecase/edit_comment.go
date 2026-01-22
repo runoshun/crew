@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -33,13 +32,13 @@ func NewEditComment(tasks domain.TaskRepository, clock domain.Clock) *EditCommen
 // Execute updates an existing comment of a task.
 func (uc *EditComment) Execute(_ context.Context, in EditCommentInput) error {
 	// Validate message
-	message := strings.TrimSpace(in.Message)
-	if message == "" {
-		return domain.ErrEmptyMessage
+	message, err := shared.ValidateMessage(in.Message)
+	if err != nil {
+		return err
 	}
 
 	// Verify task exists
-	_, err := shared.GetTask(uc.tasks, in.TaskID)
+	_, err = shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
 		return err
 	}
