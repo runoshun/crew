@@ -183,3 +183,97 @@ func TestManager_InitGlobalConfig(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestManager_SetAutoFix(t *testing.T) {
+	t.Run("creates config file if not exists and sets auto_fix to true", func(t *testing.T) {
+		crewDir := t.TempDir()
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+
+		err := manager.SetAutoFix(true)
+		require.NoError(t, err)
+
+		// Verify file was created with correct content
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "[complete]")
+		assert.Contains(t, string(content), "auto_fix = true")
+	})
+
+	t.Run("creates config file if not exists and sets auto_fix to false", func(t *testing.T) {
+		crewDir := t.TempDir()
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+
+		err := manager.SetAutoFix(false)
+		require.NoError(t, err)
+
+		// Verify file was created with correct content
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "[complete]")
+		assert.Contains(t, string(content), "auto_fix = false")
+	})
+
+	t.Run("updates existing config without destroying other settings", func(t *testing.T) {
+		crewDir := t.TempDir()
+		existingContent := `[agents]
+worker_default = "claude"
+
+[log]
+level = "debug"
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(existingContent), 0644)
+		require.NoError(t, err)
+
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+		err = manager.SetAutoFix(true)
+		require.NoError(t, err)
+
+		// Verify content preserved and auto_fix added
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		require.NoError(t, err)
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "worker_default")
+		assert.Contains(t, contentStr, "level")
+		assert.Contains(t, contentStr, "[complete]")
+		assert.Contains(t, contentStr, "auto_fix = true")
+	})
+
+	t.Run("updates existing complete section", func(t *testing.T) {
+		crewDir := t.TempDir()
+		existingContent := `[complete]
+command = "mise run ci"
+auto_fix = false
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(existingContent), 0644)
+		require.NoError(t, err)
+
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+		err = manager.SetAutoFix(true)
+		require.NoError(t, err)
+
+		// Verify command preserved and auto_fix updated
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		require.NoError(t, err)
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "mise run ci")
+		assert.Contains(t, contentStr, "auto_fix = true")
+	})
+
+	t.Run("toggle auto_fix from true to false", func(t *testing.T) {
+		crewDir := t.TempDir()
+		existingContent := `[complete]
+auto_fix = true
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(existingContent), 0644)
+		require.NoError(t, err)
+
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+		err = manager.SetAutoFix(false)
+		require.NoError(t, err)
+
+		// Verify auto_fix changed to false
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "auto_fix = false")
+	})
+}

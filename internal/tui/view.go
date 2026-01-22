@@ -248,6 +248,12 @@ func (m *Model) viewHeader() string {
 	visibleCount := len(m.taskList.Items())
 	totalCount := len(m.tasks)
 
+	// Add auto-fix indicator
+	autoFixLabel := ""
+	if m.config != nil && m.config.Complete.AutoFix {
+		autoFixLabel = lipgloss.NewStyle().Foreground(Colors.Primary).Render("[AR]") + " · "
+	}
+
 	// Add filter indicator
 	filterLabel := ""
 	if m.showAll {
@@ -257,7 +263,7 @@ func (m *Model) viewHeader() string {
 	}
 
 	sortLabel := "by " + m.sortMode.String()
-	countText := fmt.Sprintf("%s%s · %d/%d", filterLabel, sortLabel, visibleCount, totalCount)
+	countText := fmt.Sprintf("%s%s%s · %d/%d", autoFixLabel, filterLabel, sortLabel, visibleCount, totalCount)
 	rightText := lipgloss.NewStyle().Foreground(Colors.Muted).Render(countText)
 
 	leftLen := lipgloss.Width(title)
@@ -696,6 +702,7 @@ func (m *Model) viewHelp() string {
 				{"o", "Sort"},
 				{"v", "Details"},
 				{"A", "Toggle all"},
+				{"t", "Toggle auto-fix"},
 			},
 		},
 		{

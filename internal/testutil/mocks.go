@@ -562,6 +562,7 @@ type MockConfigManager struct {
 	InitRepoErr        error
 	InitGlobalErr      error
 	InitOverrideErr    error
+	SetAutoFixErr      error
 	RepoConfigInfo     domain.ConfigInfo
 	GlobalConfigInfo   domain.ConfigInfo
 	RootRepoConfigInfo domain.ConfigInfo
@@ -569,6 +570,8 @@ type MockConfigManager struct {
 	InitRepoCalled     bool
 	InitGlobalCalled   bool
 	InitOverrideCalled bool
+	SetAutoFixCalled   bool
+	SetAutoFixValue    bool
 }
 
 // NewMockConfigManager creates a new MockConfigManager.
@@ -632,6 +635,13 @@ func (m *MockConfigManager) InitGlobalConfig(_ *domain.Config) error {
 func (m *MockConfigManager) InitOverrideConfig(_ *domain.Config) error {
 	m.InitOverrideCalled = true
 	return m.InitOverrideErr
+}
+
+// SetAutoFix records the call and returns configured error.
+func (m *MockConfigManager) SetAutoFix(enabled bool) error {
+	m.SetAutoFixCalled = true
+	m.SetAutoFixValue = enabled
+	return m.SetAutoFixErr
 }
 
 // === Snapshot methods (no-op for mock) ===

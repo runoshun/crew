@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
@@ -146,4 +147,45 @@ func (m *Manager) initConfig(path string, cfg *domain.Config) error {
 	content := domain.RenderConfigTemplate(cfg)
 
 	return os.WriteFile(path, []byte(content), 0600)
+}
+
+// SetAutoFix updates the auto_fix setting in the repository config file.
+// Creates the [complete] section if it doesn't exist.
+// Preserves other existing settings in the file.
+func (m *Manager) SetAutoFix(enabled bool) error {
+	path := filepath.Join(m.crewDir, domain.ConfigFileName)
+
+	// Read existing config or start with empty map
+	var data map[string]any
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		// File doesn't exist, create new structure
+		data = make(map[string]any)
+	} else {
+		// Parse existing TOML
+		if unmarshalErr := toml.Unmarshal(content, &data); unmarshalErr != nil {
+			return unmarshalErr
+		}
+	}
+
+	// Get or create [complete] section
+	completeSection, ok := data["complete"].(map[string]any)
+	if !ok {
+		completeSection = make(map[string]any)
+	}
+
+	// Update auto_fix value
+	completeSection["auto_fix"] = enabled
+	data["complete"] = completeSection
+
+	// Marshal back to TOML
+	output, err := toml.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, output, 0600)
 }

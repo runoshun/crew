@@ -38,6 +38,7 @@ type KeyMap struct {
 	Help          key.Binding // Show help
 	Detail        key.Binding // Toggle detail view
 	ToggleShowAll key.Binding // Toggle show all (including closed)
+	ToggleAutoFix key.Binding // Toggle auto-fix mode
 
 	// General
 	Quit    key.Binding // Quit application
@@ -148,6 +149,10 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("A"),
 			key.WithHelp("A", "toggle all"),
 		),
+		ToggleAutoFix: key.NewBinding(
+			key.WithKeys("t"),
+			key.WithHelp("t", "toggle auto-fix"),
+		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),
 			key.WithHelp("q", "quit"),
@@ -218,6 +223,7 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.Help)
 	addKeys(k.Detail)
 	addKeys(k.ToggleShowAll)
+	addKeys(k.ToggleAutoFix)
 	addKeys(k.Quit)
 	addKeys(k.Escape)
 	addKeys(k.Confirm)

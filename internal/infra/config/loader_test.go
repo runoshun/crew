@@ -845,3 +845,63 @@ new_task_base = "default"
 	assert.Equal(t, "default", cfg.Tasks.NewTaskBase)
 	assert.Empty(t, cfg.Warnings)
 }
+
+func TestLoader_Load_CompleteAutoFix(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write config with [complete] section containing auto_fix
+	config := `
+[complete]
+command = "mise run ci"
+auto_fix = true
+auto_fix_max_retries = 5
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify complete config
+	assert.Equal(t, "mise run ci", cfg.Complete.Command)
+	assert.True(t, cfg.Complete.AutoFix)
+	assert.Equal(t, 5, cfg.Complete.AutoFixMaxRetries)
+}
+
+func TestLoader_Load_CompleteAutoFix_Merge(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config with auto_fix false
+	globalConfig := `
+[complete]
+command = "global-cmd"
+auto_fix = false
+auto_fix_max_retries = 3
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write repo config that overrides auto_fix
+	repoConfig := `
+[complete]
+auto_fix = true
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify merging: repo overrides global
+	assert.Equal(t, "global-cmd", cfg.Complete.Command) // From global
+	assert.True(t, cfg.Complete.AutoFix)                // Overridden by repo
+	assert.Equal(t, 3, cfg.Complete.AutoFixMaxRetries)  // From global
+}

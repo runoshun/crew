@@ -239,6 +239,14 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						if s, ok := v.(string); ok {
 							res.Complete.Command = s
 						}
+					case "auto_fix":
+						if b, ok := v.(bool); ok {
+							res.Complete.AutoFix = b
+						}
+					case "auto_fix_max_retries":
+						if i, ok := v.(int64); ok {
+							res.Complete.AutoFixMaxRetries = int(i)
+						}
 					default:
 						warnings = append(warnings, fmt.Sprintf("unknown key in [complete]: %s", k))
 					}
@@ -553,6 +561,12 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	// Override other sections
 	if override.Complete.Command != "" {
 		result.Complete.Command = override.Complete.Command
+	}
+	if override.Complete.AutoFix {
+		result.Complete.AutoFix = override.Complete.AutoFix
+	}
+	if override.Complete.AutoFixMaxRetries > 0 {
+		result.Complete.AutoFixMaxRetries = override.Complete.AutoFixMaxRetries
 	}
 	if override.Diff.Command != "" {
 		result.Diff.Command = override.Diff.Command
