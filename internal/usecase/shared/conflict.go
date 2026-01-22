@@ -86,8 +86,8 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) error {
 		return fmt.Errorf("save task with comments: %w", err)
 	}
 
-	// Notify session if running (include newline for compatibility)
-	notificationMsg := fmt.Sprintf(conflictNotificationTemplate+"\n", task.ID, task.ID)
+	// Notify session if running
+	notificationMsg := fmt.Sprintf(conflictNotificationTemplate, task.ID, task.ID)
 	_ = SendSessionNotification(h.sessions, task.ID, notificationMsg)
 
 	return domain.ErrMergeConflict
