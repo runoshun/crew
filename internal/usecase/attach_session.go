@@ -44,18 +44,18 @@ func (uc *AttachSession) Execute(_ context.Context, in AttachSessionInput) (*Att
 		return nil, err
 	}
 
-	// Get session name based on mode
+	// Check if session is running and get session name
 	var sessionName string
+	var running bool
 	if in.Review {
+		running, err = shared.CheckReviewSessionRunning(uc.sessions, task.ID)
 		sessionName = domain.ReviewSessionName(task.ID)
 	} else {
+		running, err = shared.CheckSessionRunning(uc.sessions, task.ID)
 		sessionName = domain.SessionName(task.ID)
 	}
-
-	// Check if session is running
-	running, err := uc.sessions.IsRunning(sessionName)
 	if err != nil {
-		return nil, fmt.Errorf("check session: %w", err)
+		return nil, err
 	}
 	if !running {
 		return nil, fmt.Errorf("%w: session stopped or missing. Recover: crew start %d --continue, crew peek %d, or crew exec %d -- <cmd>", domain.ErrNoSession, task.ID, task.ID, task.ID)

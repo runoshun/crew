@@ -74,10 +74,9 @@ func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOu
 		// Check if session is running
 		isRunning := false
 		if uc.sessions != nil {
-			running, err := uc.sessions.IsRunning(sessionName)
-			if err == nil {
-				isRunning = running
-			}
+			// Ignore errors for list display (just show not running)
+			running, _ := uc.sessions.IsRunning(sessionName)
+			isRunning = running
 		}
 
 		info := TaskWithSession{

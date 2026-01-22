@@ -55,19 +55,12 @@ func (uc *CloseTask) Execute(_ context.Context, in CloseTaskInput) (*CloseTaskOu
 		return nil, fmt.Errorf("cannot close task in %s status: %w", task.Status, domain.ErrInvalidTransition)
 	}
 
-	// Get branch name for session and worktree operations
+	// Get branch name for worktree operations
 	branch := domain.BranchName(task.ID, task.Issue)
 
 	// Stop session if running
-	sessionName := domain.SessionName(task.ID)
-	running, err := uc.sessions.IsRunning(sessionName)
-	if err != nil {
-		return nil, fmt.Errorf("check session running: %w", err)
-	}
-	if running {
-		if stopErr := uc.sessions.Stop(sessionName); stopErr != nil {
-			return nil, fmt.Errorf("stop session: %w", stopErr)
-		}
+	if _, stopErr := shared.StopSession(uc.sessions, task.ID); stopErr != nil {
+		return nil, stopErr
 	}
 
 	// Delete worktree if it exists

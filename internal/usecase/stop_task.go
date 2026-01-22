@@ -53,11 +53,8 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		return nil, err
 	}
 
-	workSessionName := domain.SessionName(task.ID)
-	reviewSessionName := domain.ReviewSessionName(task.ID)
-
 	if in.Review {
-		sessionStopped, stopErr := uc.stopSession(reviewSessionName)
+		sessionStopped, stopErr := shared.StopReviewSession(uc.sessions, task.ID)
 		if stopErr != nil {
 			return nil, stopErr
 		}
@@ -65,7 +62,7 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		return &StopTaskOutput{Task: task, SessionName: sessionStopped}, nil
 	}
 
-	sessionStopped, err := uc.stopSession(workSessionName)
+	sessionStopped, err := shared.StopSession(uc.sessions, task.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +82,7 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		}
 	}
 
-	reviewStopped, err := uc.stopSession(reviewSessionName)
+	reviewStopped, err := shared.StopReviewSession(uc.sessions, task.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -96,21 +93,6 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 
 	uc.cleanupScriptFiles(task.ID)
 	return uc.saveStoppedTask(task, "")
-}
-
-func (uc *StopTask) stopSession(sessionName string) (string, error) {
-	running, err := uc.sessions.IsRunning(sessionName)
-	if err != nil {
-		return "", fmt.Errorf("check session running: %w", err)
-	}
-	if !running {
-		return "", nil
-	}
-
-	if stopErr := uc.sessions.Stop(sessionName); stopErr != nil {
-		return "", fmt.Errorf("stop session: %w", stopErr)
-	}
-	return sessionName, nil
 }
 
 func (uc *StopTask) saveStoppedTask(task *domain.Task, sessionStopped string) (*StopTaskOutput, error) {

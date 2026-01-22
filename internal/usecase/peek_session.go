@@ -48,16 +48,10 @@ func (uc *PeekSession) Execute(_ context.Context, in PeekSessionInput) (*PeekSes
 		return nil, err
 	}
 
-	// Get session name
-	sessionName := domain.SessionName(task.ID)
-
-	// Check if session is running
-	running, err := uc.sessions.IsRunning(sessionName)
+	// Check if session is running and get session name
+	sessionName, err := shared.RequireRunningSession(uc.sessions, task.ID)
 	if err != nil {
-		return nil, fmt.Errorf("check session: %w", err)
-	}
-	if !running {
-		return nil, domain.ErrNoSession
+		return nil, err
 	}
 
 	// Determine number of lines

@@ -92,14 +92,12 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 			return nil, fmt.Errorf("update task status: %w", err)
 		}
 
-		// Check if session is running
-		sessionName := domain.SessionName(task.ID)
-		running, _ := uc.sessions.IsRunning(sessionName)
+		// Check if session is running and send notification
+		running, _ := shared.CheckSessionRunning(uc.sessions, task.ID)
 		if running {
-			// Send notification to running session
+			// Send notification to running session (ignore errors - best effort)
 			notificationMsg := fmt.Sprintf(requestChangesNotification, task.ID, task.ID)
-			_ = uc.sessions.Send(sessionName, notificationMsg)
-			_ = uc.sessions.Send(sessionName, "Enter")
+			_ = shared.SendSessionNotification(uc.sessions, task.ID, notificationMsg)
 		} else if uc.sessionStarter != nil {
 			// Session not running - start it with --continue flag
 			if err := uc.sessionStarter.Start(ctx, task.ID, true); err != nil {
@@ -109,7 +107,7 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 			}
 			sessionStarted = true
 
-			// After starting, send the notification
+			// After starting, send the notification directly (session just started, no need to check IsRunning)
 			sessionName := domain.SessionName(task.ID)
 			notificationMsg := fmt.Sprintf(requestChangesNotification, task.ID, task.ID)
 			_ = uc.sessions.Send(sessionName, notificationMsg)
