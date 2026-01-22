@@ -1289,3 +1289,25 @@ func (m *Model) loadReviewResult(taskID int) tea.Cmd {
 		}
 	}
 }
+
+// toggleAutoFix returns a command that toggles the auto-fix setting.
+func (m *Model) toggleAutoFix() tea.Cmd {
+	return func() tea.Msg {
+		// Get current state
+		currentEnabled := false
+		if m.config != nil {
+			currentEnabled = m.config.Complete.AutoFix
+		}
+
+		// Toggle to new state
+		newEnabled := !currentEnabled
+
+		// Save to config file
+		err := m.container.ConfigManager.SetAutoFix(newEnabled)
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("toggle auto-fix: %w", err)}
+		}
+
+		return MsgAutoFixToggled{Enabled: newEnabled}
+	}
+}

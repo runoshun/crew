@@ -290,6 +290,11 @@ type ConfigManager interface {
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
 	InitOverrideConfig(cfg *Config) error
+
+	// SetAutoFix updates the auto_fix setting in the repository config file.
+	// Creates the [complete] section if it doesn't exist.
+	// Preserves other existing settings in the file.
+	SetAutoFix(enabled bool) error
 }
 
 // Clock provides time operations for testability.
