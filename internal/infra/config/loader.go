@@ -242,6 +242,7 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 					case "auto_fix":
 						if b, ok := v.(bool); ok {
 							res.Complete.AutoFix = b
+							res.Complete.AutoFixSet = true
 						}
 					case "auto_fix_max_retries":
 						if i, ok := v.(int64); ok {
@@ -562,8 +563,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	if override.Complete.Command != "" {
 		result.Complete.Command = override.Complete.Command
 	}
-	if override.Complete.AutoFix {
+	if override.Complete.AutoFixSet {
 		result.Complete.AutoFix = override.Complete.AutoFix
+		result.Complete.AutoFixSet = true
 	}
 	if override.Complete.AutoFixMaxRetries > 0 {
 		result.Complete.AutoFixMaxRetries = override.Complete.AutoFixMaxRetries

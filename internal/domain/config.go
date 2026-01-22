@@ -204,10 +204,12 @@ func expandString(s string, data CommandData) (string, error) {
 }
 
 // CompleteConfig holds completion gate settings from [complete] section.
+// Fields are ordered to minimize memory padding.
 type CompleteConfig struct {
 	Command           string `toml:"command,omitempty"`              // Command to run as CI gate on complete
-	AutoFix           bool   `toml:"auto_fix,omitempty"`             // Enable auto-fix mode (run review synchronously)
 	AutoFixMaxRetries int    `toml:"auto_fix_max_retries,omitempty"` // Maximum retry count for auto-fix (default: 3)
+	AutoFix           bool   `toml:"auto_fix,omitempty"`             // Enable auto-fix mode (run review synchronously)
+	AutoFixSet        bool   `toml:"-"`                              // True if AutoFix was explicitly set in config (not exported to TOML)
 }
 
 // DiffConfig holds diff display settings from [diff] section.

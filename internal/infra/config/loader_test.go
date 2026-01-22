@@ -905,3 +905,35 @@ auto_fix = true
 	assert.True(t, cfg.Complete.AutoFix)                // Overridden by repo
 	assert.Equal(t, 3, cfg.Complete.AutoFixMaxRetries)  // From global
 }
+
+func TestLoader_Load_CompleteAutoFix_ExplicitFalseOverridesTrue(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write global config with auto_fix = true
+	globalConfig := `
+[complete]
+command = "global-cmd"
+auto_fix = true
+`
+	err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write repo config that explicitly sets auto_fix = false
+	repoConfig := `
+[complete]
+auto_fix = false
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify: explicit false in repo should override true from global
+	assert.Equal(t, "global-cmd", cfg.Complete.Command) // From global
+	assert.False(t, cfg.Complete.AutoFix)               // Overridden by repo (explicit false)
+}
