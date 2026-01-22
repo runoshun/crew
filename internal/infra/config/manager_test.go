@@ -276,4 +276,41 @@ auto_fix = true
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "auto_fix = false")
 	})
+
+	t.Run("handles empty config file without panic", func(t *testing.T) {
+		crewDir := t.TempDir()
+		// Create empty file
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(""), 0644)
+		require.NoError(t, err)
+
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+		err = manager.SetAutoFix(true)
+		require.NoError(t, err)
+
+		// Verify auto_fix was set
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "[complete]")
+		assert.Contains(t, string(content), "auto_fix = true")
+	})
+
+	t.Run("handles comment-only config file without panic", func(t *testing.T) {
+		crewDir := t.TempDir()
+		// Create file with only comments
+		commentOnlyContent := `# This is a comment
+# Another comment
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(commentOnlyContent), 0644)
+		require.NoError(t, err)
+
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+		err = manager.SetAutoFix(true)
+		require.NoError(t, err)
+
+		// Verify auto_fix was set
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "[complete]")
+		assert.Contains(t, string(content), "auto_fix = true")
+	})
 }

@@ -169,6 +169,10 @@ func (m *Manager) SetAutoFix(enabled bool) error {
 		if unmarshalErr := toml.Unmarshal(content, &data); unmarshalErr != nil {
 			return unmarshalErr
 		}
+		// Handle empty file or comment-only file (Unmarshal leaves data as nil)
+		if data == nil {
+			data = make(map[string]any)
+		}
 	}
 
 	// Get or create [complete] section
