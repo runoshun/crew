@@ -51,6 +51,16 @@ func TestCheckReviewSessionRunning_Success(t *testing.T) {
 	assert.True(t, running)
 }
 
+func TestCheckReviewSessionRunning_Error(t *testing.T) {
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningErr = assert.AnError
+
+	_, err := shared.CheckReviewSessionRunning(sessions, 1)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "check session running")
+}
+
 func TestStopSession_Running(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true
@@ -166,6 +176,27 @@ func TestSendSessionNotification_SendError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "send notification")
+}
+
+func TestSendSessionNotification_EnterSendError(t *testing.T) {
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = true
+
+	// Use SendFunc to fail only on the second call (Enter)
+	callCount := 0
+	sessions.SendFunc = func(_ string, keys string) error {
+		callCount++
+		if keys == "Enter" {
+			return assert.AnError
+		}
+		return nil
+	}
+
+	err := shared.SendSessionNotification(sessions, 1, "test message")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "send enter")
+	assert.Equal(t, 2, callCount) // Both message and Enter were attempted
 }
 
 func TestRequireRunningSession_Running(t *testing.T) {
