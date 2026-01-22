@@ -113,7 +113,14 @@ Session is still running. Options:
 
 ### Create Task
 
-1. **Draft task file** - Create a Markdown file in `.git/crew/drafts/`:
+1. **Understand requirement** - Listen to user's request and clarify what they want
+
+2. **Investigate source** - Search and read relevant code to understand:
+   - Current implementation and architecture
+   - Related files and dependencies
+   - Potential impact and constraints
+
+3. **Draft task file** - Create a Markdown file in `.git/crew/drafts/` based on findings:
    ```markdown
    ---
    title: Implement auth
@@ -131,14 +138,14 @@ Session is still running. Options:
    - [ ] Tests pass
    ```
 
-2. **User review** - Show the file to user for confirmation before creating
+4. **User review** - Show the file to user for confirmation before creating
 
-3. **Register task**:
+5. **Register task**:
    ```bash
    crew new --from .git/crew/drafts/task.md
    ```
 
-4. **Start with a worker**:
+6. **Start with a worker**:
    ```bash
    crew start <id> <worker>
    ```
