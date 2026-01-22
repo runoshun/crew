@@ -347,6 +347,7 @@ type MockSessionManager struct {
 	PeekOutput    string
 	SentKeys      string
 	IsRunningFunc func(string) (bool, error)
+	SendFunc      func(string, string) error // Custom Send function for complex test scenarios
 	StartOpts     domain.StartSessionOptions
 	PeekLines     int
 	PeekEscape    bool
@@ -397,9 +398,12 @@ func (m *MockSessionManager) Peek(_ string, lines int, escape bool) (string, err
 }
 
 // Send records the call and returns configured error.
-func (m *MockSessionManager) Send(_ string, keys string) error {
+func (m *MockSessionManager) Send(name string, keys string) error {
 	m.SendCalled = true
 	m.SentKeys = keys
+	if m.SendFunc != nil {
+		return m.SendFunc(name, keys)
+	}
 	return m.SendErr
 }
 

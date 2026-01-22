@@ -93,12 +93,8 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 
 	// Check if review session is already running
 	sessionName := domain.ReviewSessionName(task.ID)
-	running, err := uc.sessions.IsRunning(sessionName)
-	if err != nil {
-		return nil, fmt.Errorf("check session: %w", err)
-	}
-	if running {
-		return nil, fmt.Errorf("review session is already running: %w", domain.ErrSessionRunning)
+	if runningErr := shared.EnsureNoRunningReviewSession(uc.sessions, task.ID); runningErr != nil {
+		return nil, runningErr
 	}
 
 	// Load config for agent resolution

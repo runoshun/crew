@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // ListTasksInput contains the parameters for listing tasks.
@@ -71,13 +72,10 @@ func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOu
 	for _, task := range tasks {
 		sessionName := domain.SessionName(task.ID)
 
-		// Check if session is running
+		// Check if session is running (ignore errors for list display)
 		isRunning := false
 		if uc.sessions != nil {
-			running, err := uc.sessions.IsRunning(sessionName)
-			if err == nil {
-				isRunning = running
-			}
+			isRunning, _ = shared.CheckSessionRunning(uc.sessions, task.ID)
 		}
 
 		info := TaskWithSession{

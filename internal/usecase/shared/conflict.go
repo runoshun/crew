@@ -87,13 +87,8 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) error {
 	}
 
 	// Notify session if running
-	sessionName := domain.SessionName(task.ID)
-	running, _ := h.sessions.IsRunning(sessionName)
-	if running {
-		// Include newline in message for better compatibility across environments
-		notificationMsg := fmt.Sprintf(conflictNotificationTemplate+"\n", task.ID, task.ID)
-		_ = h.sessions.Send(sessionName, notificationMsg)
-	}
+	notificationMsg := fmt.Sprintf(conflictNotificationTemplate, task.ID, task.ID)
+	_ = SendSessionNotification(h.sessions, task.ID, notificationMsg)
 
 	return domain.ErrMergeConflict
 }

@@ -125,18 +125,12 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 		return nil, fmt.Errorf("merge branch: %w", mergeErr)
 	}
 
-	// Check if session is running
-	sessionName := domain.SessionName(task.ID)
-	running, err := uc.sessions.IsRunning(sessionName)
+	// Stop session if running (after merge succeeds)
+	sessionStopped, err := shared.StopSession(uc.sessions, task.ID)
 	if err != nil {
-		return nil, fmt.Errorf("check session running: %w", err)
+		return nil, err
 	}
-
-	if running {
-		// Stop session after merge succeeds
-		if stopErr := uc.sessions.Stop(sessionName); stopErr != nil {
-			return nil, fmt.Errorf("stop session: %w", stopErr)
-		}
+	if sessionStopped != "" {
 		// Clean up script files (mirroring StopTask behavior)
 		uc.cleanupScriptFiles(task.ID)
 	}

@@ -81,12 +81,8 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 
 	// Check if session is already running
 	sessionName := domain.SessionName(task.ID)
-	running, err := uc.sessions.IsRunning(sessionName)
-	if err != nil {
-		return nil, fmt.Errorf("check session: %w", err)
-	}
-	if running {
-		return nil, fmt.Errorf("task #%d session is already running: %w", task.ID, domain.ErrSessionRunning)
+	if runningErr := shared.EnsureNoRunningSession(uc.sessions, task.ID); runningErr != nil {
+		return nil, runningErr
 	}
 
 	// Load config for agent resolution and command building
