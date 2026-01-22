@@ -105,6 +105,38 @@ func TestStopReviewSession_Running(t *testing.T) {
 	assert.True(t, sessions.StopCalled)
 }
 
+func TestStopReviewSession_NotRunning(t *testing.T) {
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = false
+
+	sessionName, err := shared.StopReviewSession(sessions, 1)
+
+	require.NoError(t, err)
+	assert.Empty(t, sessionName)
+	assert.False(t, sessions.StopCalled)
+}
+
+func TestStopReviewSession_IsRunningError(t *testing.T) {
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningErr = assert.AnError
+
+	_, err := shared.StopReviewSession(sessions, 1)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "check session running")
+}
+
+func TestStopReviewSession_StopError(t *testing.T) {
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = true
+	sessions.StopErr = assert.AnError
+
+	_, err := shared.StopReviewSession(sessions, 1)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "stop session")
+}
+
 func TestSendSessionNotification_Running(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true
@@ -176,6 +208,26 @@ func TestRequireRunningReviewSession_Running(t *testing.T) {
 	assert.Equal(t, domain.ReviewSessionName(1), sessionName)
 }
 
+func TestRequireRunningReviewSession_NotRunning(t *testing.T) {
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = false
+
+	_, err := shared.RequireRunningReviewSession(sessions, 1)
+
+	assert.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrNoSession))
+}
+
+func TestRequireRunningReviewSession_Error(t *testing.T) {
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningErr = assert.AnError
+
+	_, err := shared.RequireRunningReviewSession(sessions, 1)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "check session")
+}
+
 func TestEnsureNoRunningSession_NotRunning(t *testing.T) {
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = false
@@ -224,4 +276,14 @@ func TestEnsureNoRunningReviewSession_Running(t *testing.T) {
 	assert.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrSessionRunning))
 	assert.Contains(t, err.Error(), "review session")
+}
+
+func TestEnsureNoRunningReviewSession_Error(t *testing.T) {
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningErr = assert.AnError
+
+	err := shared.EnsureNoRunningReviewSession(sessions, 1)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "check session")
 }
