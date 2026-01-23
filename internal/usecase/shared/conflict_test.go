@@ -47,8 +47,13 @@ func (m *mockTaskRepo) SaveTaskWithComments(task *domain.Task, comments []domain
 	return nil
 }
 
-// Unused methods
-func (m *mockTaskRepo) Save(_ *domain.Task) error                             { return nil }
+func (m *mockTaskRepo) Save(task *domain.Task) error {
+	if m.saveErr != nil {
+		return m.saveErr
+	}
+	m.tasks[task.ID] = task
+	return nil
+}
 func (m *mockTaskRepo) List(_ domain.TaskFilter) ([]*domain.Task, error)      { return nil, nil }
 func (m *mockTaskRepo) GetChildren(_ int) ([]*domain.Task, error)             { return nil, nil }
 func (m *mockTaskRepo) Delete(_ int) error                                    { return nil }
@@ -134,7 +139,7 @@ func TestConflictHandler_CheckAndHandle_NoConflict(t *testing.T) {
 	handler := NewConflictHandler(tasks, sessions, git, clock)
 
 	// Execute
-	err := handler.CheckAndHandle(ConflictCheckInput{
+	out, err := handler.CheckAndHandle(ConflictCheckInput{
 		TaskID:     1,
 		Branch:     "crew-1",
 		BaseBranch: "main",
@@ -142,6 +147,8 @@ func TestConflictHandler_CheckAndHandle_NoConflict(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
+	assert.NotNil(t, out)
+	assert.Empty(t, out.Message)
 	// Task status should not change
 	task, _ := tasks.Get(1)
 	assert.Equal(t, domain.StatusInProgress, task.Status)
@@ -162,7 +169,7 @@ func TestConflictHandler_CheckAndHandle_WithConflict(t *testing.T) {
 	handler := NewConflictHandler(tasks, sessions, git, clock)
 
 	// Execute
-	err := handler.CheckAndHandle(ConflictCheckInput{
+	out, err := handler.CheckAndHandle(ConflictCheckInput{
 		TaskID:     1,
 		Branch:     "crew-1",
 		BaseBranch: "main",
@@ -170,17 +177,21 @@ func TestConflictHandler_CheckAndHandle_WithConflict(t *testing.T) {
 
 	// Assert
 	require.ErrorIs(t, err, domain.ErrMergeConflict)
+	require.NotNil(t, out)
 
 	// Task status should change to in_progress
 	savedTask := tasks.tasks[1]
 	assert.Equal(t, domain.StatusInProgress, savedTask.Status)
 
-	// Comment should be added
-	comments := tasks.comments[1]
-	require.Len(t, comments, 1)
-	assert.Contains(t, comments[0].Text, "Merge conflict detected")
-	assert.Contains(t, comments[0].Text, "file1.txt")
-	assert.Contains(t, comments[0].Text, "file2.txt")
+	// Output message should contain conflict info
+	assert.Contains(t, out.Message, "Merge conflict detected")
+	assert.Contains(t, out.Message, "file1.txt")
+	assert.Contains(t, out.Message, "file2.txt")
+	assert.Contains(t, out.Message, "git merge main")
+	assert.NotContains(t, out.Message, "git fetch")
+
+	// No comment should be added (message is returned for stdout instead)
+	assert.Empty(t, tasks.comments[1])
 
 	// Session should receive notification
 	assert.Contains(t, sessions.sentKeys, "Merge conflict detected")
@@ -201,7 +212,7 @@ func TestConflictHandler_CheckAndHandle_SessionNotRunning(t *testing.T) {
 	handler := NewConflictHandler(tasks, sessions, git, clock)
 
 	// Execute
-	err := handler.CheckAndHandle(ConflictCheckInput{
+	out, err := handler.CheckAndHandle(ConflictCheckInput{
 		TaskID:     1,
 		Branch:     "crew-1",
 		BaseBranch: "main",
@@ -209,14 +220,15 @@ func TestConflictHandler_CheckAndHandle_SessionNotRunning(t *testing.T) {
 
 	// Assert
 	require.ErrorIs(t, err, domain.ErrMergeConflict)
+	require.NotNil(t, out)
+	assert.NotEmpty(t, out.Message)
 
 	// Task status should still change
 	savedTask := tasks.tasks[1]
 	assert.Equal(t, domain.StatusInProgress, savedTask.Status)
 
-	// Comment should still be added
-	comments := tasks.comments[1]
-	require.Len(t, comments, 1)
+	// No comment should be added (message is returned for stdout)
+	assert.Empty(t, tasks.comments[1])
 
 	// No keys sent since session is not running
 	assert.Empty(t, sessions.sentKeys)
@@ -232,7 +244,7 @@ func TestConflictHandler_CheckAndHandle_TaskNotFound(t *testing.T) {
 	handler := NewConflictHandler(tasks, sessions, git, clock)
 
 	// Execute
-	err := handler.CheckAndHandle(ConflictCheckInput{
+	out, err := handler.CheckAndHandle(ConflictCheckInput{
 		TaskID:     999,
 		Branch:     "crew-999",
 		BaseBranch: "main",
@@ -240,6 +252,7 @@ func TestConflictHandler_CheckAndHandle_TaskNotFound(t *testing.T) {
 
 	// Assert
 	require.ErrorIs(t, err, domain.ErrTaskNotFound)
+	assert.Nil(t, out)
 }
 
 func TestBuildConflictMessage(t *testing.T) {
@@ -250,17 +263,17 @@ func TestBuildConflictMessage(t *testing.T) {
 		assert.Contains(t, msg, "Merge conflict detected")
 		assert.Contains(t, msg, "file1.txt")
 		assert.Contains(t, msg, "dir/file2.txt")
-		assert.Contains(t, msg, "git fetch origin main:main")
 		assert.Contains(t, msg, "git merge main")
 		assert.Contains(t, msg, "crew complete")
+		assert.NotContains(t, msg, "git fetch")
 	})
 
 	t.Run("with develop branch", func(t *testing.T) {
 		files := []string{"conflict.txt"}
 		msg := buildConflictMessage(files, "develop")
 
-		assert.Contains(t, msg, "git fetch origin develop:develop")
 		assert.Contains(t, msg, "git merge develop")
 		assert.NotContains(t, msg, "main")
+		assert.NotContains(t, msg, "git fetch")
 	})
 }

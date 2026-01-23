@@ -18,6 +18,7 @@ type CompleteTaskInput struct {
 // Fields are ordered to minimize memory padding.
 type CompleteTaskOutput struct {
 	Task              *domain.Task // The completed task
+	ConflictMessage   string       // Conflict message to display (only set when ErrMergeConflict is returned)
 	ShouldStartReview bool         // True if review should be started by CLI (for background review)
 	AutoFixEnabled    bool         // True if auto_fix mode is enabled
 	AutoFixMaxRetries int          // Maximum retry count for auto_fix
@@ -115,12 +116,13 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 
 	// Check for merge conflicts with base branch
 	conflictHandler := shared.NewConflictHandler(uc.tasks, uc.sessions, uc.git, uc.clock)
-	if conflictErr := conflictHandler.CheckAndHandle(shared.ConflictCheckInput{
+	conflictOut, conflictErr := conflictHandler.CheckAndHandle(shared.ConflictCheckInput{
 		TaskID:     task.ID,
 		Branch:     branch,
 		BaseBranch: baseBranch,
-	}); conflictErr != nil {
-		return nil, conflictErr
+	})
+	if conflictErr != nil {
+		return &CompleteTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr
 	}
 
 	// Load config and execute complete.command if configured

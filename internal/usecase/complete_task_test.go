@@ -656,16 +656,20 @@ func TestCompleteTask_Execute_MergeConflict(t *testing.T) {
 
 	// Assert
 	require.ErrorIs(t, err, domain.ErrMergeConflict)
-	assert.Nil(t, out)
+	require.NotNil(t, out)
+
+	// Conflict message should be in output (not in comment)
+	assert.Contains(t, out.ConflictMessage, "conflict.txt")
+	assert.Contains(t, out.ConflictMessage, "git merge main")
+	assert.NotContains(t, out.ConflictMessage, "git fetch")
 
 	// Task status should be in_progress
 	task := repo.Tasks[1]
 	assert.Equal(t, domain.StatusInProgress, task.Status)
 
-	// Comment should be added about conflict
+	// No comment should be added (message is returned for stdout)
 	comments := repo.Comments[1]
-	require.NotEmpty(t, comments)
-	assert.Contains(t, comments[0].Text, "conflict.txt")
+	assert.Empty(t, comments)
 }
 
 func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {

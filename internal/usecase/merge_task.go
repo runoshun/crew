@@ -17,7 +17,8 @@ type MergeTaskInput struct {
 
 // MergeTaskOutput contains the result of merging a task.
 type MergeTaskOutput struct {
-	Task *domain.Task // The merged task
+	Task            *domain.Task // The merged task
+	ConflictMessage string       // Conflict message to display (only set when ErrMergeConflict is returned)
 }
 
 // MergeTask is the use case for merging a task branch into main.
@@ -111,12 +112,13 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 
 	// Check for merge conflicts before attempting merge
 	conflictHandler := shared.NewConflictHandler(uc.tasks, uc.sessions, uc.git, uc.clock)
-	if conflictErr := conflictHandler.CheckAndHandle(shared.ConflictCheckInput{
+	conflictOut, conflictErr := conflictHandler.CheckAndHandle(shared.ConflictCheckInput{
 		TaskID:     task.ID,
 		Branch:     branch,
 		BaseBranch: targetBaseBranch,
-	}); conflictErr != nil {
-		return nil, conflictErr
+	})
+	if conflictErr != nil {
+		return &MergeTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr
 	}
 
 	// Execute git merge --no-ff first (before deleting worktree)
