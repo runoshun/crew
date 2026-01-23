@@ -503,6 +503,7 @@ type MockConfigLoader struct {
 	LoadErr      error
 	GlobalErr    error
 	RepoErr      error
+	LastOpts     domain.LoadConfigOptions // Records the last options passed to LoadWithOptions
 }
 
 // NewMockConfigLoader creates a new MockConfigLoader with default config.
@@ -552,6 +553,7 @@ func (m *MockConfigLoader) LoadRepo() (*domain.Config, error) {
 
 // LoadWithOptions returns config based on options.
 func (m *MockConfigLoader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config, error) {
+	m.LastOpts = opts
 	if m.LoadErr != nil {
 		return nil, m.LoadErr
 	}

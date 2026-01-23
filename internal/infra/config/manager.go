@@ -17,7 +17,7 @@ var _ domain.ConfigManager = (*Manager)(nil)
 type Manager struct {
 	crewDir       string // Path to .git/crew directory
 	repoRoot      string // Path to repository root
-	globalConfDir string // Path to global config directory (e.g., ~/.config/git-crew)
+	globalConfDir string // Path to global config directory (e.g., ~/.config/crew)
 }
 
 // NewManager creates a new Manager.
