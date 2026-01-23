@@ -253,6 +253,7 @@ type LoadConfigOptions struct {
 	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
 	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
 	IgnoreOverride bool // Skip loading override config (config.override.toml)
+	IgnoreRuntime  bool // Skip loading runtime config (.git/crew/config.runtime.toml)
 }
 
 // ConfigInfo holds information about a config file.

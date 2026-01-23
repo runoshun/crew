@@ -149,11 +149,11 @@ func (m *Manager) initConfig(path string, cfg *domain.Config) error {
 	return os.WriteFile(path, []byte(content), 0600)
 }
 
-// SetAutoFix updates the auto_fix setting in the repository config file.
+// SetAutoFix updates the auto_fix setting in the runtime config file.
 // Creates the [complete] section if it doesn't exist.
 // Preserves other existing settings in the file.
 func (m *Manager) SetAutoFix(enabled bool) error {
-	path := filepath.Join(m.crewDir, domain.ConfigFileName)
+	path := filepath.Join(m.crewDir, domain.ConfigRuntimeFileName)
 
 	// Read existing config or start with empty map
 	var data map[string]any
