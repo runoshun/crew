@@ -212,7 +212,7 @@ END_OF_PROMPT
 	}
 
 	// Extract final review result
-	review := extractReviewResult(stdoutBuf.String())
+	review := strings.TrimSpace(extractReviewResult(stdoutBuf.String()))
 
 	// Save review result as comment
 	if review != "" {
