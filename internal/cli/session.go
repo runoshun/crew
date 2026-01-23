@@ -283,7 +283,7 @@ func newCompleteCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "complete [id]",
 		Short: "Mark task as complete",
-		Long: `Mark a task as complete (in_progress/needs_input → reviewing).
+		Long: `Mark a task as complete and trigger review.
 
 If no ID is provided, the task ID is auto-detected from the current branch name.
 
@@ -294,14 +294,16 @@ Preconditions:
 If [complete].command is configured, it will be executed before transitioning
 the status. If the command fails, the completion is aborted.
 
-If skip_review is enabled (via task setting or config), the task transitions
-directly to 'reviewed'. Otherwise, it transitions to 'reviewing' and a review
-session is started.
+Status transitions:
+  - skip_review enabled: directly to 'reviewed'
+  - auto_fix enabled: status remains 'in_progress' during synchronous review,
+    then transitions to 'reviewed' only on LGTM
+  - normal mode: transitions to 'reviewing' and starts background review session
 
 Auto-fix mode:
   When [complete].auto_fix is enabled, the review runs synchronously.
-  - If LGTM: outputs "LGTM" and exits successfully
-  - If not LGTM: outputs review feedback for the worker to address
+  - If LGTM: sets status to 'reviewed', outputs "LGTM" and exits successfully
+  - If not LGTM: status remains 'in_progress', outputs review feedback
   - Use [complete].auto_fix_max_retries to limit retry attempts (default: 3)
 
 Examples:
@@ -369,7 +371,9 @@ Examples:
 
 // handleAutoFixReview runs synchronous review for auto_fix mode.
 // It outputs "LGTM" if the review passes, or the review feedback if not.
-// On non-LGTM, it reverts task status to in_progress and increments retry count.
+// On LGTM, it sets status to reviewed. On non-LGTM, status remains in_progress
+// and retry count is incremented. On review execution failure, retry count is
+// NOT incremented (only non-LGTM results count toward the retry limit).
 func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.CompleteTaskOutput) error {
 	task := out.Task
 	retryCount := task.AutoFixRetryCount
@@ -388,9 +392,8 @@ func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.Comp
 	})
 
 	if reviewErr != nil {
-		// Revert to in_progress on review failure
-		task.Status = domain.StatusInProgress
-		_ = c.Tasks.Save(task)
+		// Review execution failed - status remains in_progress, retry count is NOT incremented.
+		// Retry count is only incremented on non-LGTM review results, not on execution failures.
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Task #%d completed, but review failed: %v\n", task.ID, reviewErr)
 		return reviewErr
 	}
@@ -398,18 +401,20 @@ func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.Comp
 	// Check if LGTM
 	reviewResult := strings.TrimSpace(reviewOut.Review)
 	if isLGTM(reviewResult) {
-		// LGTM - reset retry count and output success message
+		// LGTM - set status to reviewed, reset retry count, and output success message
+		task.Status = domain.StatusReviewed
 		task.AutoFixRetryCount = 0
-		_ = c.Tasks.Save(task)
+		if saveErr := c.Tasks.Save(task); saveErr != nil {
+			return fmt.Errorf("save task: %w", saveErr)
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "LGTM")
 		return nil
 	}
 
-	// Not LGTM - revert to in_progress, increment retry count, and output feedback
-	task.Status = domain.StatusInProgress
+	// Not LGTM - keep status as in_progress, increment retry count, and output feedback
 	task.AutoFixRetryCount = retryCount + 1
 	if saveErr := c.Tasks.Save(task); saveErr != nil {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to save task: %v\n", saveErr)
+		return fmt.Errorf("save task: %w", saveErr)
 	}
 
 	// Output review feedback for worker to address
