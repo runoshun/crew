@@ -164,9 +164,9 @@ type MsgReviewResultLoaded struct {
 
 func (MsgReviewResultLoaded) sealed() {}
 
-// MsgAutoFixToggled is sent when auto-fix mode is toggled.
-type MsgAutoFixToggled struct {
-	Enabled bool
+// MsgReviewModeChanged is sent when review mode is changed.
+type MsgReviewModeChanged struct {
+	Mode domain.ReviewMode
 }
 
-func (MsgAutoFixToggled) sealed() {}
+func (MsgReviewModeChanged) sealed() {}

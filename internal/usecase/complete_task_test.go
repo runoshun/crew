@@ -712,7 +712,7 @@ func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {
 }
 
 func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
-	// Test: auto_fix enabled -> review runs and sets status to reviewed on LGTM
+	// Test: auto_fix mode enabled -> review runs and sets status to reviewed on LGTM
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
@@ -729,7 +729,8 @@ func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.AutoFix = true
+	configLoader.Config.Complete.ReviewMode = domain.ReviewModeAutoFix
+	configLoader.Config.Complete.ReviewModeSet = true
 	configLoader.Config.Complete.AutoFixMaxRetries = 5
 
 	clock := &testutil.MockClock{}
@@ -747,7 +748,7 @@ func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
-	assert.True(t, out.AutoFixEnabled)
+	assert.Equal(t, domain.ReviewModeAutoFix, out.ReviewMode)
 	assert.Equal(t, 5, out.AutoFixMaxRetries)
 	assert.True(t, out.AutoFixIsLGTM)
 	assert.Equal(t, 0, out.AutoFixRetryCount)
@@ -755,12 +756,12 @@ func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
 	assert.False(t, out.ShouldStartReview)
 }
 
-func TestCompleteTask_Execute_AutoFixDisabled(t *testing.T) {
-	// Test: auto_fix disabled -> AutoFixEnabled = false, ShouldStartReview = true
+func TestCompleteTask_Execute_AutoMode(t *testing.T) {
+	// Test: auto mode (default) -> ReviewMode = auto, ShouldStartReview = true
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
-		Title:      "Task without auto_fix",
+		Title:      "Task with auto mode",
 		Status:     domain.StatusInProgress,
 		SkipReview: nil,
 	}
@@ -773,7 +774,7 @@ func TestCompleteTask_Execute_AutoFixDisabled(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.AutoFix = false
+	// Default: no ReviewModeSet, no AutoFixSet -> auto mode
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
@@ -788,12 +789,12 @@ func TestCompleteTask_Execute_AutoFixDisabled(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
-	assert.False(t, out.AutoFixEnabled)
+	assert.Equal(t, domain.ReviewModeAuto, out.ReviewMode)
 	assert.True(t, out.ShouldStartReview) // Background review should start
 }
 
 func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
-	// Test: auto_fix enabled without max_retries -> default value (3) and retry count increments
+	// Test: auto_fix mode enabled without max_retries -> default value (3) and retry count increments
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
@@ -810,7 +811,8 @@ func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.AutoFix = true
+	configLoader.Config.Complete.ReviewMode = domain.ReviewModeAutoFix
+	configLoader.Config.Complete.ReviewModeSet = true
 	configLoader.Config.Complete.AutoFixMaxRetries = 0
 
 	clock := &testutil.MockClock{}
@@ -828,7 +830,7 @@ func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
-	assert.True(t, out.AutoFixEnabled)
+	assert.Equal(t, domain.ReviewModeAutoFix, out.ReviewMode)
 	assert.Equal(t, domain.DefaultAutoFixMaxRetries, out.AutoFixMaxRetries)
 	assert.False(t, out.AutoFixIsLGTM)
 	assert.Equal(t, 1, out.AutoFixRetryCount)
@@ -853,7 +855,8 @@ func TestCompleteTask_Execute_AutoFixMaxRetries(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.AutoFix = true
+	configLoader.Config.Complete.ReviewMode = domain.ReviewModeAutoFix
+	configLoader.Config.Complete.ReviewModeSet = true
 	configLoader.Config.Complete.AutoFixMaxRetries = 3
 
 	clock := &testutil.MockClock{}
@@ -869,4 +872,43 @@ func TestCompleteTask_Execute_AutoFixMaxRetries(t *testing.T) {
 	// Assert
 	require.ErrorIs(t, err, ErrAutoFixMaxRetries)
 	assert.Nil(t, out)
+}
+
+func TestCompleteTask_Execute_ManualMode(t *testing.T) {
+	// Test: manual mode -> status set to for_review, ShouldStartReview = false
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with manual mode",
+		Status:     domain.StatusInProgress,
+		SkipReview: nil,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	git := &testutil.MockGit{
+		HasUncommittedChangesV: false,
+	}
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Complete.ReviewMode = domain.ReviewModeManual
+	configLoader.Config.Complete.ReviewModeSet = true
+
+	clock := &testutil.MockClock{}
+	executor := testutil.NewMockCommandExecutor()
+
+	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusForReview, out.Task.Status)
+	assert.Equal(t, domain.ReviewModeManual, out.ReviewMode)
+	assert.False(t, out.ShouldStartReview) // No automatic review in manual mode
 }

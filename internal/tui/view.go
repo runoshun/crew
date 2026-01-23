@@ -248,12 +248,25 @@ func (m *Model) viewHeader() string {
 	visibleCount := len(m.taskList.Items())
 	totalCount := len(m.tasks)
 
-	// Add auto-fix indicator (always show to indicate ON/OFF state)
-	autoFixLabel := ""
-	if m.config != nil && m.config.Complete.AutoFix {
-		autoFixLabel = lipgloss.NewStyle().Foreground(Colors.Primary).Render("[AR:ON]") + " · "
+	// Add review mode indicator (show current mode)
+	reviewModeLabel := ""
+	if m.config != nil {
+		mode := domain.ReviewModeAuto
+		if m.config.Complete.ReviewModeSet {
+			mode = m.config.Complete.ReviewMode
+		} else if m.config.Complete.AutoFixSet && m.config.Complete.AutoFix { //nolint:staticcheck // Legacy compatibility
+			mode = domain.ReviewModeAutoFix
+		}
+		switch mode {
+		case domain.ReviewModeAutoFix:
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Primary).Render("[R:fix]") + " · "
+		case domain.ReviewModeManual:
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Warning).Render("[R:man]") + " · "
+		case domain.ReviewModeAuto:
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[R:auto]") + " · "
+		}
 	} else {
-		autoFixLabel = lipgloss.NewStyle().Foreground(Colors.Muted).Render("[AR:OFF]") + " · "
+		reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[R:auto]") + " · "
 	}
 
 	// Add filter indicator
@@ -265,7 +278,7 @@ func (m *Model) viewHeader() string {
 	}
 
 	sortLabel := "by " + m.sortMode.String()
-	countText := fmt.Sprintf("%s%s%s · %d/%d", autoFixLabel, filterLabel, sortLabel, visibleCount, totalCount)
+	countText := fmt.Sprintf("%s%s%s · %d/%d", reviewModeLabel, filterLabel, sortLabel, visibleCount, totalCount)
 	rightText := lipgloss.NewStyle().Foreground(Colors.Muted).Render(countText)
 
 	leftLen := lipgloss.Width(title)

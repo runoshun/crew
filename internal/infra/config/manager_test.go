@@ -184,33 +184,50 @@ func TestManager_InitGlobalConfig(t *testing.T) {
 	})
 }
 
-func TestManager_SetAutoFix(t *testing.T) {
-	t.Run("creates runtime config file if not exists and sets auto_fix to true", func(t *testing.T) {
+func TestManager_SetReviewMode(t *testing.T) {
+	t.Run("creates runtime config file if not exists and sets review_mode to auto", func(t *testing.T) {
 		crewDir := t.TempDir()
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
 
-		err := manager.SetAutoFix(true)
+		err := manager.SetReviewMode(domain.ReviewModeAuto)
 		require.NoError(t, err)
 
 		// Verify file was created with correct content
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "[complete]")
-		assert.Contains(t, string(content), "auto_fix = true")
+		assert.Contains(t, string(content), "review_mode")
+		assert.Contains(t, string(content), "auto")
 	})
 
-	t.Run("creates runtime config file if not exists and sets auto_fix to false", func(t *testing.T) {
+	t.Run("creates runtime config file if not exists and sets review_mode to manual", func(t *testing.T) {
 		crewDir := t.TempDir()
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
 
-		err := manager.SetAutoFix(false)
+		err := manager.SetReviewMode(domain.ReviewModeManual)
 		require.NoError(t, err)
 
 		// Verify file was created with correct content
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "[complete]")
-		assert.Contains(t, string(content), "auto_fix = false")
+		assert.Contains(t, string(content), "review_mode")
+		assert.Contains(t, string(content), "manual")
+	})
+
+	t.Run("creates runtime config file if not exists and sets review_mode to auto_fix", func(t *testing.T) {
+		crewDir := t.TempDir()
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+
+		err := manager.SetReviewMode(domain.ReviewModeAutoFix)
+		require.NoError(t, err)
+
+		// Verify file was created with correct content
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "[complete]")
+		assert.Contains(t, string(content), "review_mode")
+		assert.Contains(t, string(content), "auto_fix")
 	})
 
 	t.Run("updates existing runtime config without destroying other settings", func(t *testing.T) {
@@ -225,56 +242,59 @@ level = "debug"
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
-		err = manager.SetAutoFix(true)
+		err = manager.SetReviewMode(domain.ReviewModeAutoFix)
 		require.NoError(t, err)
 
-		// Verify content preserved and auto_fix added
+		// Verify content preserved and review_mode added
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		contentStr := string(content)
 		assert.Contains(t, contentStr, "worker_default")
 		assert.Contains(t, contentStr, "level")
 		assert.Contains(t, contentStr, "[complete]")
-		assert.Contains(t, contentStr, "auto_fix = true")
+		assert.Contains(t, contentStr, "auto_fix")
 	})
 
 	t.Run("updates existing complete section", func(t *testing.T) {
 		crewDir := t.TempDir()
 		existingContent := `[complete]
 command = "mise run ci"
-auto_fix = false
+review_mode = "auto"
 `
 		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(existingContent), 0644)
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
-		err = manager.SetAutoFix(true)
+		err = manager.SetReviewMode(domain.ReviewModeManual)
 		require.NoError(t, err)
 
-		// Verify command preserved and auto_fix updated
+		// Verify command preserved and review_mode updated
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		contentStr := string(content)
 		assert.Contains(t, contentStr, "mise run ci")
-		assert.Contains(t, contentStr, "auto_fix = true")
+		assert.Contains(t, contentStr, "manual")
 	})
 
-	t.Run("toggle auto_fix from true to false", func(t *testing.T) {
+	t.Run("cycles review_mode from auto_fix to auto", func(t *testing.T) {
 		crewDir := t.TempDir()
 		existingContent := `[complete]
-auto_fix = true
+review_mode = "auto_fix"
 `
 		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(existingContent), 0644)
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
-		err = manager.SetAutoFix(false)
+		err = manager.SetReviewMode(domain.ReviewModeAuto)
 		require.NoError(t, err)
 
-		// Verify auto_fix changed to false
+		// Verify review_mode changed to auto
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
-		assert.Contains(t, string(content), "auto_fix = false")
+		contentStr := string(content)
+		assert.Contains(t, contentStr, "review_mode")
+		assert.Contains(t, contentStr, "auto")
+		assert.NotContains(t, contentStr, "auto_fix") // Should be replaced, not appended
 	})
 
 	t.Run("handles empty runtime config file without panic", func(t *testing.T) {
@@ -284,14 +304,14 @@ auto_fix = true
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
-		err = manager.SetAutoFix(true)
+		err = manager.SetReviewMode(domain.ReviewModeAutoFix)
 		require.NoError(t, err)
 
-		// Verify auto_fix was set
+		// Verify review_mode was set
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "[complete]")
-		assert.Contains(t, string(content), "auto_fix = true")
+		assert.Contains(t, string(content), "auto_fix")
 	})
 
 	t.Run("handles comment-only runtime config file without panic", func(t *testing.T) {
@@ -304,14 +324,14 @@ auto_fix = true
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
-		err = manager.SetAutoFix(true)
+		err = manager.SetReviewMode(domain.ReviewModeManual)
 		require.NoError(t, err)
 
-		// Verify auto_fix was set
+		// Verify review_mode was set
 		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "[complete]")
-		assert.Contains(t, string(content), "auto_fix = true")
+		assert.Contains(t, string(content), "manual")
 	})
 
 	t.Run("does not modify base config.toml", func(t *testing.T) {
@@ -323,7 +343,7 @@ level = "debug"
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
-		err = manager.SetAutoFix(true)
+		err = manager.SetReviewMode(domain.ReviewModeAutoFix)
 		require.NoError(t, err)
 
 		// Verify base config.toml was not modified
@@ -331,10 +351,10 @@ level = "debug"
 		require.NoError(t, err)
 		assert.Equal(t, baseContent, string(content))
 
-		// Verify runtime config has the auto_fix setting
+		// Verify runtime config has the review_mode setting
 		runtimeContent, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
-		assert.Contains(t, string(runtimeContent), "auto_fix = true")
+		assert.Contains(t, string(runtimeContent), "auto_fix")
 	})
 
 	t.Run("creates crew directory if it does not exist", func(t *testing.T) {
@@ -342,7 +362,7 @@ level = "debug"
 		crewDir := filepath.Join(tempDir, "nonexistent", "crew")
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
 
-		err := manager.SetAutoFix(true)
+		err := manager.SetReviewMode(domain.ReviewModeAuto)
 		require.NoError(t, err)
 
 		// Verify directory was created
@@ -350,9 +370,9 @@ level = "debug"
 		require.NoError(t, err)
 		assert.True(t, info.IsDir())
 
-		// Verify runtime config has the auto_fix setting
+		// Verify runtime config has the review_mode setting
 		runtimeContent, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
-		assert.Contains(t, string(runtimeContent), "auto_fix = true")
+		assert.Contains(t, string(runtimeContent), "auto")
 	})
 }

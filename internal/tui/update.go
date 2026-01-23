@@ -184,10 +184,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateReviewViewport() // This renders content with word wrap
 		return m, nil
 
-	case MsgAutoFixToggled:
+	case MsgReviewModeChanged:
 		// Update the config in memory
 		if m.config != nil {
-			m.config.Complete.AutoFix = msg.Enabled
+			m.config.Complete.ReviewMode = msg.Mode
+			m.config.Complete.ReviewModeSet = true
 		}
 		return m, nil
 	}
@@ -418,8 +419,8 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showAll = !m.showAll
 		return m, m.loadTasks()
 
-	case key.Matches(msg, m.keys.ToggleAutoFix):
-		return m, m.toggleAutoFix()
+	case key.Matches(msg, m.keys.ToggleReviewMode):
+		return m, m.cycleReviewMode()
 	}
 
 	// Check custom keybindings

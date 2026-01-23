@@ -256,9 +256,15 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						if s, ok := v.(string); ok {
 							res.Complete.Command = s
 						}
+					case "review_mode":
+						if s, ok := v.(string); ok {
+							res.Complete.ReviewMode = domain.ReviewMode(s)
+							res.Complete.ReviewModeSet = true
+						}
 					case "auto_fix":
+						// Legacy: map auto_fix to review_mode
 						if b, ok := v.(bool); ok {
-							res.Complete.AutoFix = b
+							res.Complete.AutoFix = b //nolint:staticcheck // Legacy compatibility
 							res.Complete.AutoFixSet = true
 						}
 					case "auto_fix_max_retries":
@@ -580,8 +586,12 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	if override.Complete.Command != "" {
 		result.Complete.Command = override.Complete.Command
 	}
+	if override.Complete.ReviewModeSet {
+		result.Complete.ReviewMode = override.Complete.ReviewMode
+		result.Complete.ReviewModeSet = true
+	}
 	if override.Complete.AutoFixSet {
-		result.Complete.AutoFix = override.Complete.AutoFix
+		result.Complete.AutoFix = override.Complete.AutoFix //nolint:staticcheck // Legacy compatibility
 		result.Complete.AutoFixSet = true
 	}
 	if override.Complete.AutoFixMaxRetries > 0 {
