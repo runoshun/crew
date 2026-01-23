@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -97,134 +96,53 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, runningErr
 	}
 
-	// Load config for agent resolution
-	cfg, err := uc.configLoader.Load()
+	reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
+		ConfigLoader: uc.configLoader,
+		Worktrees:    uc.worktrees,
+		RepoRoot:     uc.repoRoot,
+	}, shared.ReviewCommandInput{
+		Task:    task,
+		Agent:   in.Agent,
+		Model:   in.Model,
+		Message: in.Message,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("load config: %w", err)
-	}
-
-	// Resolve agent from input or default
-	agentName := in.Agent
-	if agentName == "" {
-		agentName = cfg.AgentsConfig.DefaultReviewer
-	}
-
-	// Get agent configuration from enabled agents only
-	agent, ok := cfg.EnabledAgents()[agentName]
-	if !ok {
-		// Check if agent exists but is disabled
-		if _, exists := cfg.Agents[agentName]; exists {
-			return nil, fmt.Errorf("agent %q is disabled: %w", agentName, domain.ErrAgentDisabled)
-		}
-		return nil, fmt.Errorf("agent %q: %w", agentName, domain.ErrAgentNotFound)
-	}
-
-	// Resolve model priority: CLI flag > agent config > builtin default
-	model := in.Model
-	if model == "" {
-		model = agent.DefaultModel
-	}
-
-	// Get worktree path
-	branch := domain.BranchName(task.ID, task.Issue)
-	wtPath, err := uc.worktrees.Resolve(branch)
-	if err != nil {
-		return nil, fmt.Errorf("resolve worktree: %w", err)
-	}
-
-	// Build command data for template expansion
-	cmdData := domain.CommandData{
-		GitDir:      uc.repoRoot + "/.git",
-		RepoRoot:    uc.repoRoot,
-		Worktree:    wtPath,
-		Title:       task.Title,
-		Description: task.Description,
-		Branch:      branch,
-		Issue:       task.Issue,
-		TaskID:      task.ID,
-		Model:       model,
-	}
-
-	// Build user prompt (fallback for when Agent.Prompt is empty)
-	// Final priority: Agent.Prompt > in.Message > AgentsConfig.ReviewerPrompt > default
-	// Note: Agent.Prompt is applied in agent.RenderCommand() and overrides this userPrompt
-	userPrompt := in.Message
-	if userPrompt == "" {
-		userPrompt = cfg.AgentsConfig.ReviewerPrompt
-	}
-	if userPrompt == "" {
-		userPrompt = "Please review this task."
-	}
-
-	// Render command and prompt
-	defaultSystemPrompt := domain.DefaultReviewerSystemPrompt
-	result, err := agent.RenderCommand(cmdData, `"$PROMPT"`, defaultSystemPrompt, userPrompt)
-	if err != nil {
-		return nil, fmt.Errorf("render agent command: %w", err)
+		return nil, err
 	}
 
 	if in.Wait {
 		// Synchronous execution
-		return uc.executeSync(ctx, task, wtPath, result)
+		return uc.executeSync(ctx, task, reviewCmd)
 	}
 
 	// Background execution (default)
-	return uc.executeBackground(ctx, task, wtPath, result, agentName, sessionName)
+	return uc.executeBackground(ctx, task, reviewCmd.WorktreePath, reviewCmd.Result, reviewCmd.AgentName, sessionName)
 }
 
 // executeSync runs the review synchronously and returns the result.
-func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, wtPath string, result domain.RenderCommandResult) (*ReviewTaskOutput, error) {
+func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput) (*ReviewTaskOutput, error) {
 	// Update status to reviewing
 	task.Status = domain.StatusReviewing
 	if err := uc.tasks.Save(task); err != nil {
 		return nil, fmt.Errorf("save task: %w", err)
 	}
 
-	// Build the script to run
-	script := fmt.Sprintf(`#!/bin/bash
-set -o pipefail
-
-read -r -d '' PROMPT << 'END_OF_PROMPT'
-%s
-END_OF_PROMPT
-
-%s
-`, result.Prompt, result.Command)
-
-	// Build command
-	execCmd := domain.NewBashCommand(script, wtPath)
-
-	// Capture output
-	var stdoutBuf, stderrBuf bytes.Buffer
-
-	// Run the command using CommandExecutor
-	if err := uc.executor.ExecuteWithContext(ctx, execCmd, &stdoutBuf, &stderrBuf); err != nil {
+	reviewOut, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
+		Tasks:    uc.tasks,
+		Executor: uc.executor,
+		Clock:    uc.clock,
+		Stderr:   uc.stderr,
+	}, shared.ReviewInput{
+		Task:            task,
+		WorktreePath:    reviewCmd.WorktreePath,
+		Result:          reviewCmd.Result,
+		SkipStatusCheck: false,
+	})
+	if err != nil {
 		// Revert status to for_review on error
 		task.Status = domain.StatusForReview
 		_ = uc.tasks.Save(task)
-
-		// Include stderr in error message for debugging
-		errMsg := strings.TrimSpace(stderrBuf.String())
-		if errMsg != "" {
-			return nil, fmt.Errorf("run reviewer: %w: %s", err, errMsg)
-		}
-		return nil, fmt.Errorf("run reviewer: %w", err)
-	}
-
-	// Extract final review result
-	review := strings.TrimSpace(extractReviewResult(stdoutBuf.String()))
-
-	// Save review result as comment
-	if review != "" {
-		comment := domain.Comment{
-			Text:   review,
-			Time:   uc.clock.Now(),
-			Author: "reviewer",
-		}
-		if err := uc.tasks.AddComment(task.ID, comment); err != nil {
-			// Log but don't fail - the review was successful
-			_, _ = fmt.Fprintf(uc.stderr, "warning: failed to add review comment: %v\n", err)
-		}
+		return nil, err
 	}
 
 	// Update task status to reviewed
@@ -235,7 +153,7 @@ END_OF_PROMPT
 	}
 
 	return &ReviewTaskOutput{
-		Review: strings.TrimSpace(review),
+		Review: reviewOut.Review,
 		Task:   task,
 	}, nil
 }
@@ -364,13 +282,3 @@ trap 'exit 129' HUP               # hangup -> exit code 129
 # Run agent and capture output
 {{.AgentCommand}} | tee "$OUTPUT_FILE"
 `
-
-// extractReviewResult extracts the final review result from the full output.
-// It looks for domain.ReviewResultMarker and returns everything after it.
-// If the marker is not found, it returns the full output as a fallback.
-func extractReviewResult(output string) string {
-	if idx := strings.Index(output, domain.ReviewResultMarker); idx != -1 {
-		return output[idx+len(domain.ReviewResultMarker):]
-	}
-	return output // fallback: return full output
-}

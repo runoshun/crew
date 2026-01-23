@@ -28,7 +28,7 @@ func newTestCompleteTask(
 	clock *testutil.MockClock,
 	executor *testutil.MockCommandExecutor,
 ) *CompleteTask {
-	return NewCompleteTask(repo, sessions, worktrees, git, configLoader, clock, nil, executor, "/tmp/crew", "/tmp/repo")
+	return NewCompleteTask(repo, sessions, worktrees, git, configLoader, clock, nil, executor, nil, "/tmp/crew", "/tmp/repo")
 }
 
 func TestCompleteTask_Execute_Success(t *testing.T) {
@@ -711,14 +711,14 @@ func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {
 	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
 }
 
-func TestCompleteTask_Execute_AutoFixEnabled(t *testing.T) {
-	// Test: auto_fix enabled -> AutoFixEnabled = true, ShouldStartReview = false, status remains in_progress
+func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
+	// Test: auto_fix enabled -> review runs and sets status to reviewed on LGTM
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task with auto_fix",
 		Status:     domain.StatusInProgress,
-		SkipReview: nil, // Not skipping review
+		SkipReview: nil,
 	}
 
 	worktrees := testutil.NewMockWorktreeManager()
@@ -729,14 +729,12 @@ func TestCompleteTask_Execute_AutoFixEnabled(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config = &domain.Config{
-		Complete: domain.CompleteConfig{
-			AutoFix:           true,
-			AutoFixMaxRetries: 5,
-		},
-	}
+	configLoader.Config.Complete.AutoFix = true
+	configLoader.Config.Complete.AutoFixMaxRetries = 5
+
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
+	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nAll good.")
 
 	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
@@ -748,11 +746,13 @@ func TestCompleteTask_Execute_AutoFixEnabled(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// In auto_fix mode, status should remain in_progress (CLI will change to reviewed on LGTM)
-	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
+	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
 	assert.True(t, out.AutoFixEnabled)
 	assert.Equal(t, 5, out.AutoFixMaxRetries)
-	assert.False(t, out.ShouldStartReview) // Background review should NOT start
+	assert.True(t, out.AutoFixIsLGTM)
+	assert.Equal(t, 0, out.AutoFixRetryCount)
+	assert.Contains(t, out.AutoFixReview, domain.ReviewLGTMPrefix)
+	assert.False(t, out.ShouldStartReview)
 }
 
 func TestCompleteTask_Execute_AutoFixDisabled(t *testing.T) {
@@ -773,11 +773,7 @@ func TestCompleteTask_Execute_AutoFixDisabled(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config = &domain.Config{
-		Complete: domain.CompleteConfig{
-			AutoFix: false,
-		},
-	}
+	configLoader.Config.Complete.AutoFix = false
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
@@ -797,7 +793,7 @@ func TestCompleteTask_Execute_AutoFixDisabled(t *testing.T) {
 }
 
 func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
-	// Test: auto_fix enabled without max_retries -> default value (3), status remains in_progress
+	// Test: auto_fix enabled without max_retries -> default value (3) and retry count increments
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
@@ -814,14 +810,12 @@ func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config = &domain.Config{
-		Complete: domain.CompleteConfig{
-			AutoFix:           true,
-			AutoFixMaxRetries: 0, // Not set (zero value)
-		},
-	}
+	configLoader.Config.Complete.AutoFix = true
+	configLoader.Config.Complete.AutoFixMaxRetries = 0
+
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
+	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n❌ Needs changes\nFix tests.")
 
 	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
@@ -833,8 +827,46 @@ func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// In auto_fix mode, status should remain in_progress
 	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
 	assert.True(t, out.AutoFixEnabled)
 	assert.Equal(t, domain.DefaultAutoFixMaxRetries, out.AutoFixMaxRetries)
+	assert.False(t, out.AutoFixIsLGTM)
+	assert.Equal(t, 1, out.AutoFixRetryCount)
+}
+
+func TestCompleteTask_Execute_AutoFixMaxRetries(t *testing.T) {
+	// Test: auto_fix retry limit reached -> error
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:                1,
+		Title:             "Task with retries",
+		Status:            domain.StatusInProgress,
+		SkipReview:        nil,
+		AutoFixRetryCount: 3,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	git := &testutil.MockGit{
+		HasUncommittedChangesV: false,
+	}
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Complete.AutoFix = true
+	configLoader.Config.Complete.AutoFixMaxRetries = 3
+
+	clock := &testutil.MockClock{}
+	executor := testutil.NewMockCommandExecutor()
+
+	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	require.ErrorIs(t, err, ErrAutoFixMaxRetries)
+	assert.Nil(t, out)
 }
