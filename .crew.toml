@@ -70,3 +70,21 @@ setup_command = "mise trust"
 [log]
 ## Log settings
 # level = "info"  # debug, info, warn, error
+
+[tui]
+[tui.keybindings]
+[tui.keybindings.E]
+command = 'nvim'
+description = 'Open nvim in repo root'
+
+[tui.keybindings.I]
+command = 'mise run install'
+description = 'Run mise install in repo root'
+
+[tui.keybindings.'ctrl+e']
+command = 'crew exec {{.TaskID}} -- nvim'
+description = 'Open nvim in worktree'
+
+[tui.keybindings.i]
+command = 'crew exec {{.TaskID}} -- mise run install'
+description = 'Run mise install in worktree'
