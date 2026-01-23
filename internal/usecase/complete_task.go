@@ -178,14 +178,6 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}, nil
 	}
 
-	// Not skipping review: transition to reviewing directly
-	task.Status = domain.StatusReviewing
-
-	// Save task
-	if saveErr := uc.tasks.Save(task); saveErr != nil {
-		return nil, fmt.Errorf("save task: %w", saveErr)
-	}
-
 	// Determine auto_fix mode
 	autoFixEnabled := cfg != nil && cfg.Complete.AutoFix
 	autoFixMaxRetries := domain.DefaultAutoFixMaxRetries
@@ -193,10 +185,21 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		autoFixMaxRetries = cfg.Complete.AutoFixMaxRetries
 	}
 
+	// In auto_fix mode, keep status as in_progress; CLI will change to reviewed on LGTM
+	// In normal mode, transition to reviewing to signal that review should start
+	if !autoFixEnabled {
+		task.Status = domain.StatusReviewing
+	}
+
+	// Save task
+	if saveErr := uc.tasks.Save(task); saveErr != nil {
+		return nil, fmt.Errorf("save task: %w", saveErr)
+	}
+
 	// Log task completion
 	if uc.logger != nil {
 		if autoFixEnabled {
-			uc.logger.Info(task.ID, "task", "completed (status: reviewing, auto_fix: true)")
+			uc.logger.Info(task.ID, "task", "completed (status: in_progress, auto_fix: true)")
 		} else {
 			uc.logger.Info(task.ID, "task", "completed (status: reviewing, review should start)")
 		}

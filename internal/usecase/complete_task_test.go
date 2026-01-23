@@ -707,7 +707,7 @@ func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {
 }
 
 func TestCompleteTask_Execute_AutoFixEnabled(t *testing.T) {
-	// Test: auto_fix enabled -> AutoFixEnabled = true, ShouldStartReview = false
+	// Test: auto_fix enabled -> AutoFixEnabled = true, ShouldStartReview = false, status remains in_progress
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
@@ -743,7 +743,8 @@ func TestCompleteTask_Execute_AutoFixEnabled(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	// In auto_fix mode, status should remain in_progress (CLI will change to reviewed on LGTM)
+	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
 	assert.True(t, out.AutoFixEnabled)
 	assert.Equal(t, 5, out.AutoFixMaxRetries)
 	assert.False(t, out.ShouldStartReview) // Background review should NOT start
@@ -791,7 +792,7 @@ func TestCompleteTask_Execute_AutoFixDisabled(t *testing.T) {
 }
 
 func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
-	// Test: auto_fix enabled without max_retries -> default value (3)
+	// Test: auto_fix enabled without max_retries -> default value (3), status remains in_progress
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
@@ -827,6 +828,8 @@ func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
+	// In auto_fix mode, status should remain in_progress
+	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
 	assert.True(t, out.AutoFixEnabled)
 	assert.Equal(t, domain.DefaultAutoFixMaxRetries, out.AutoFixMaxRetries)
 }
