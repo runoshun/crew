@@ -369,7 +369,8 @@ Examples:
 
 // handleAutoFixReview runs synchronous review for auto_fix mode.
 // It outputs "LGTM" if the review passes, or the review feedback if not.
-// On non-LGTM, it reverts task status to in_progress and increments retry count.
+// On LGTM, it sets status to reviewed. On non-LGTM, status remains in_progress
+// and retry count is incremented.
 func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.CompleteTaskOutput) error {
 	task := out.Task
 	retryCount := task.AutoFixRetryCount
@@ -399,7 +400,10 @@ func handleAutoFixReview(cmd *cobra.Command, c *app.Container, out *usecase.Comp
 		// LGTM - set status to reviewed, reset retry count, and output success message
 		task.Status = domain.StatusReviewed
 		task.AutoFixRetryCount = 0
-		_ = c.Tasks.Save(task)
+		if saveErr := c.Tasks.Save(task); saveErr != nil {
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "warning: failed to save task: %v\n", saveErr)
+			return fmt.Errorf("save task: %w", saveErr)
+		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "LGTM")
 		return nil
 	}

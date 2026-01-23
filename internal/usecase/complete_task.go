@@ -199,7 +199,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	// Log task completion
 	if uc.logger != nil {
 		if autoFixEnabled {
-			uc.logger.Info(task.ID, "task", "completed (status: in_progress, auto_fix: true)")
+			uc.logger.Info(task.ID, "task", "completed (auto_fix pending review, status: in_progress)")
 		} else {
 			uc.logger.Info(task.ID, "task", "completed (status: reviewing, review should start)")
 		}
