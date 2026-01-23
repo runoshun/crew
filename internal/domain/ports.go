@@ -234,7 +234,8 @@ type UpdatePROptions struct {
 
 // ConfigLoader loads configuration from files.
 type ConfigLoader interface {
-	// Load returns the merged configuration (repo + global).
+	// Load returns the merged configuration.
+	// Priority (later takes precedence): global < override < .crew.toml < config.toml < config.runtime.toml
 	Load() (*Config, error)
 
 	// LoadGlobal returns only the global configuration.
@@ -253,6 +254,7 @@ type LoadConfigOptions struct {
 	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
 	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
 	IgnoreOverride bool // Skip loading override config (config.override.toml)
+	IgnoreRuntime  bool // Skip loading runtime config (.git/crew/config.runtime.toml)
 }
 
 // ConfigInfo holds information about a config file.
@@ -276,6 +278,9 @@ type ConfigManager interface {
 	// GetOverrideConfigInfo returns information about the global override config file (config.override.toml).
 	GetOverrideConfigInfo() ConfigInfo
 
+	// GetRuntimeConfigInfo returns information about the runtime config file (.git/crew/config.runtime.toml).
+	GetRuntimeConfigInfo() ConfigInfo
+
 	// InitRepoConfig creates a repository config file with default template.
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
@@ -291,7 +296,7 @@ type ConfigManager interface {
 	// Returns error if file already exists.
 	InitOverrideConfig(cfg *Config) error
 
-	// SetAutoFix updates the auto_fix setting in the repository config file.
+	// SetAutoFix updates the auto_fix setting in the runtime config file (config.runtime.toml).
 	// Creates the [complete] section if it doesn't exist.
 	// Preserves other existing settings in the file.
 	SetAutoFix(enabled bool) error

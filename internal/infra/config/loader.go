@@ -19,7 +19,7 @@ var _ domain.ConfigLoader = (*Loader)(nil)
 type Loader struct {
 	crewDir       string // Path to .git/crew directory
 	repoRoot      string // Path to repository root
-	globalConfDir string // Path to global config directory (e.g., ~/.config/git-crew)
+	globalConfDir string // Path to global config directory (e.g., ~/.config/crew)
 }
 
 // NewLoader creates a new Loader.
@@ -54,8 +54,8 @@ func defaultGlobalConfigDir() string {
 	return domain.GlobalCrewDir(configHome)
 }
 
-// Load returns the merged configuration (repo + global).
-// Repository config takes precedence over global config.
+// Load returns the merged configuration.
+// Priority (later takes precedence): global < override < .crew.toml < config.toml < config.runtime.toml
 func (l *Loader) Load() (*domain.Config, error) {
 	return l.LoadWithOptions(domain.LoadConfigOptions{})
 }
@@ -84,6 +84,12 @@ func (l *Loader) LoadRepo() (*domain.Config, error) {
 	return l.loadFile(repoPath)
 }
 
+// LoadRuntime returns only the runtime configuration (.git/crew/config.runtime.toml).
+func (l *Loader) LoadRuntime() (*domain.Config, error) {
+	runtimePath := filepath.Join(l.crewDir, domain.ConfigRuntimeFileName)
+	return l.loadFile(runtimePath)
+}
+
 // LoadOverride returns only the global override configuration (config.override.toml).
 func (l *Loader) LoadOverride() (*domain.Config, error) {
 	if l.globalConfDir == "" {
@@ -95,7 +101,7 @@ func (l *Loader) LoadOverride() (*domain.Config, error) {
 
 // LoadWithOptions returns the merged configuration with options to ignore sources.
 func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config, error) {
-	var global, override, rootRepo, repo *domain.Config
+	var global, override, rootRepo, repo, runtime *domain.Config
 	var err error
 
 	// Load global config unless ignored
@@ -130,16 +136,24 @@ func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config,
 		}
 	}
 
+	// Load runtime config unless ignored
+	if !opts.IgnoreRuntime {
+		runtime, err = l.LoadRuntime()
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+
 	// Start with default config and register builtin agents
 	base := domain.NewDefaultConfig()
 	Register(base)
 
 	// If all don't exist or are ignored, return default config
-	if global == nil && override == nil && rootRepo == nil && repo == nil {
+	if global == nil && override == nil && rootRepo == nil && repo == nil && runtime == nil {
 		return base, nil
 	}
 
-	// Merge: default <- global <- override <- rootRepo <- repo (later takes precedence)
+	// Merge: default <- global <- override <- rootRepo <- repo <- runtime (later takes precedence)
 	if global != nil {
 		base = mergeConfigs(base, global)
 	}
@@ -151,6 +165,9 @@ func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config,
 	}
 	if repo != nil {
 		base = mergeConfigs(base, repo)
+	}
+	if runtime != nil {
+		base = mergeConfigs(base, runtime)
 	}
 
 	// Resolve inheritance after merging

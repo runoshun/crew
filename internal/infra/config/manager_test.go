@@ -185,7 +185,7 @@ func TestManager_InitGlobalConfig(t *testing.T) {
 }
 
 func TestManager_SetAutoFix(t *testing.T) {
-	t.Run("creates config file if not exists and sets auto_fix to true", func(t *testing.T) {
+	t.Run("creates runtime config file if not exists and sets auto_fix to true", func(t *testing.T) {
 		crewDir := t.TempDir()
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
 
@@ -193,13 +193,13 @@ func TestManager_SetAutoFix(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify file was created with correct content
-		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "[complete]")
 		assert.Contains(t, string(content), "auto_fix = true")
 	})
 
-	t.Run("creates config file if not exists and sets auto_fix to false", func(t *testing.T) {
+	t.Run("creates runtime config file if not exists and sets auto_fix to false", func(t *testing.T) {
 		crewDir := t.TempDir()
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
 
@@ -207,13 +207,13 @@ func TestManager_SetAutoFix(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify file was created with correct content
-		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "[complete]")
 		assert.Contains(t, string(content), "auto_fix = false")
 	})
 
-	t.Run("updates existing config without destroying other settings", func(t *testing.T) {
+	t.Run("updates existing runtime config without destroying other settings", func(t *testing.T) {
 		crewDir := t.TempDir()
 		existingContent := `[agents]
 worker_default = "claude"
@@ -221,7 +221,7 @@ worker_default = "claude"
 [log]
 level = "debug"
 `
-		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(existingContent), 0644)
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(existingContent), 0644)
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
@@ -229,7 +229,7 @@ level = "debug"
 		require.NoError(t, err)
 
 		// Verify content preserved and auto_fix added
-		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		contentStr := string(content)
 		assert.Contains(t, contentStr, "worker_default")
@@ -244,7 +244,7 @@ level = "debug"
 command = "mise run ci"
 auto_fix = false
 `
-		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(existingContent), 0644)
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(existingContent), 0644)
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
@@ -252,7 +252,7 @@ auto_fix = false
 		require.NoError(t, err)
 
 		// Verify command preserved and auto_fix updated
-		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		contentStr := string(content)
 		assert.Contains(t, contentStr, "mise run ci")
@@ -264,7 +264,7 @@ auto_fix = false
 		existingContent := `[complete]
 auto_fix = true
 `
-		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(existingContent), 0644)
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(existingContent), 0644)
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
@@ -272,15 +272,15 @@ auto_fix = true
 		require.NoError(t, err)
 
 		// Verify auto_fix changed to false
-		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "auto_fix = false")
 	})
 
-	t.Run("handles empty config file without panic", func(t *testing.T) {
+	t.Run("handles empty runtime config file without panic", func(t *testing.T) {
 		crewDir := t.TempDir()
 		// Create empty file
-		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(""), 0644)
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(""), 0644)
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
@@ -288,19 +288,19 @@ auto_fix = true
 		require.NoError(t, err)
 
 		// Verify auto_fix was set
-		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "[complete]")
 		assert.Contains(t, string(content), "auto_fix = true")
 	})
 
-	t.Run("handles comment-only config file without panic", func(t *testing.T) {
+	t.Run("handles comment-only runtime config file without panic", func(t *testing.T) {
 		crewDir := t.TempDir()
 		// Create file with only comments
 		commentOnlyContent := `# This is a comment
 # Another comment
 `
-		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(commentOnlyContent), 0644)
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(commentOnlyContent), 0644)
 		require.NoError(t, err)
 
 		manager := NewManagerWithGlobalDir(crewDir, "", "")
@@ -308,9 +308,51 @@ auto_fix = true
 		require.NoError(t, err)
 
 		// Verify auto_fix was set
-		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "[complete]")
 		assert.Contains(t, string(content), "auto_fix = true")
+	})
+
+	t.Run("does not modify base config.toml", func(t *testing.T) {
+		crewDir := t.TempDir()
+		baseContent := `[log]
+level = "debug"
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(baseContent), 0644)
+		require.NoError(t, err)
+
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+		err = manager.SetAutoFix(true)
+		require.NoError(t, err)
+
+		// Verify base config.toml was not modified
+		content, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigFileName))
+		require.NoError(t, err)
+		assert.Equal(t, baseContent, string(content))
+
+		// Verify runtime config has the auto_fix setting
+		runtimeContent, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(runtimeContent), "auto_fix = true")
+	})
+
+	t.Run("creates crew directory if it does not exist", func(t *testing.T) {
+		tempDir := t.TempDir()
+		crewDir := filepath.Join(tempDir, "nonexistent", "crew")
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+
+		err := manager.SetAutoFix(true)
+		require.NoError(t, err)
+
+		// Verify directory was created
+		info, err := os.Stat(crewDir)
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
+
+		// Verify runtime config has the auto_fix setting
+		runtimeContent, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(runtimeContent), "auto_fix = true")
 	})
 }

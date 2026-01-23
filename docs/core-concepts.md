@@ -99,10 +99,13 @@ This allows you to:
 
 ## 4. Configuration System
 
-Configuration is loaded from (in priority order):
-1. Repository config: `.git/crew/config.toml`
-2. User config: `~/.config/git-crew/config.toml`
-3. Built-in defaults
+Configuration is loaded and merged from multiple sources (later takes precedence):
+1. Built-in defaults
+2. User config: `~/.config/crew/config.toml`
+3. User override: `~/.config/crew/config.override.toml`
+4. Root repo config: `.crew.toml`
+5. Repository config: `.git/crew/config.toml`
+6. Runtime config: `.git/crew/config.runtime.toml` (TUI/system state)
 
 ### Configuration Structure
 
@@ -246,6 +249,7 @@ These exclusions are applied automatically when starting a task with the agent, 
 .git/crew/
 ├── tasks.json              # Task store
 ├── config.toml             # Repository config
+├── config.runtime.toml     # Runtime config (TUI/system state)
 ├── tmux.sock               # tmux socket
 ├── tmux.conf               # tmux config
 ├── scripts/

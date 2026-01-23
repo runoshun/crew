@@ -17,7 +17,7 @@ var _ domain.ConfigManager = (*Manager)(nil)
 type Manager struct {
 	crewDir       string // Path to .git/crew directory
 	repoRoot      string // Path to repository root
-	globalConfDir string // Path to global config directory (e.g., ~/.config/git-crew)
+	globalConfDir string // Path to global config directory (e.g., ~/.config/crew)
 }
 
 // NewManager creates a new Manager.
@@ -78,6 +78,12 @@ func (m *Manager) GetOverrideConfigInfo() domain.ConfigInfo {
 		}
 	}
 	path := filepath.Join(m.globalConfDir, domain.ConfigOverrideFileName)
+	return m.getConfigInfo(path)
+}
+
+// GetRuntimeConfigInfo returns information about the runtime config file (.git/crew/config.runtime.toml).
+func (m *Manager) GetRuntimeConfigInfo() domain.ConfigInfo {
+	path := filepath.Join(m.crewDir, domain.ConfigRuntimeFileName)
 	return m.getConfigInfo(path)
 }
 
@@ -149,11 +155,16 @@ func (m *Manager) initConfig(path string, cfg *domain.Config) error {
 	return os.WriteFile(path, []byte(content), 0600)
 }
 
-// SetAutoFix updates the auto_fix setting in the repository config file.
+// SetAutoFix updates the auto_fix setting in the runtime config file.
 // Creates the [complete] section if it doesn't exist.
 // Preserves other existing settings in the file.
 func (m *Manager) SetAutoFix(enabled bool) error {
-	path := filepath.Join(m.crewDir, domain.ConfigFileName)
+	// Ensure the crew directory exists
+	if err := os.MkdirAll(m.crewDir, 0700); err != nil {
+		return err
+	}
+
+	path := filepath.Join(m.crewDir, domain.ConfigRuntimeFileName)
 
 	// Read existing config or start with empty map
 	var data map[string]any

@@ -298,6 +298,7 @@ const (
 	CrewDirName            = "crew"                 // Directory name for crew data
 	ConfigFileName         = "config.toml"          // Config file name
 	ConfigOverrideFileName = "config.override.toml" // Override config file name
+	ConfigRuntimeFileName  = "config.runtime.toml"  // Runtime config file name (TUI/system state)
 	RootConfigFileName     = ".crew.toml"           // Config file name in repository root
 )
 

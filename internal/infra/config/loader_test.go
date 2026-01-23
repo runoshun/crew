@@ -937,3 +937,144 @@ auto_fix = false
 	assert.Equal(t, "global-cmd", cfg.Complete.Command) // From global
 	assert.False(t, cfg.Complete.AutoFix)               // Overridden by repo (explicit false)
 }
+
+func TestLoader_Load_RuntimeConfig(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config
+	repoConfig := `
+[complete]
+command = "mise run ci"
+auto_fix = false
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write runtime config (should override repo config)
+	runtimeConfig := `
+[complete]
+auto_fix = true
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(runtimeConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify: runtime config overrides repo config
+	assert.Equal(t, "mise run ci", cfg.Complete.Command) // From repo (not overridden)
+	assert.True(t, cfg.Complete.AutoFix)                 // Overridden by runtime
+}
+
+func TestLoader_Load_RuntimeConfig_Priority(t *testing.T) {
+	// Setup
+	repoRootDir := t.TempDir()
+	crewDir := filepath.Join(repoRootDir, ".git", "crew")
+	err := os.MkdirAll(crewDir, 0o755)
+	require.NoError(t, err)
+	globalDir := t.TempDir()
+
+	// 1. Global config
+	globalConfig := `
+[complete]
+auto_fix = false
+auto_fix_max_retries = 1
+`
+	err = os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+	require.NoError(t, err)
+
+	// 2. Repo config
+	repoConfig := `
+[complete]
+auto_fix_max_retries = 2
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// 3. Runtime config (highest priority)
+	runtimeConfig := `
+[complete]
+auto_fix = true
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(runtimeConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, repoRootDir, globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify priority: runtime > repo > global
+	assert.True(t, cfg.Complete.AutoFix)               // Overridden by runtime
+	assert.Equal(t, 2, cfg.Complete.AutoFixMaxRetries) // From repo
+}
+
+func TestLoader_LoadRuntime(t *testing.T) {
+	t.Run("returns runtime config when file exists", func(t *testing.T) {
+		crewDir := t.TempDir()
+		globalDir := t.TempDir()
+
+		// Write runtime config
+		runtimeConfig := `
+[complete]
+auto_fix = true
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(runtimeConfig), 0o644)
+		require.NoError(t, err)
+
+		// Load runtime config
+		loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+		cfg, err := loader.LoadRuntime()
+		require.NoError(t, err)
+
+		// Verify
+		assert.True(t, cfg.Complete.AutoFix)
+	})
+
+	t.Run("returns error when file does not exist", func(t *testing.T) {
+		crewDir := t.TempDir()
+		globalDir := t.TempDir()
+
+		// Load runtime config (file doesn't exist)
+		loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+		cfg, err := loader.LoadRuntime()
+
+		// Verify: returns error for non-existent file
+		assert.ErrorIs(t, err, os.ErrNotExist)
+		assert.Nil(t, cfg)
+	})
+}
+
+func TestLoader_LoadWithOptions_IgnoreRuntime(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write repo config
+	repoConfig := `
+[complete]
+auto_fix = false
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+	require.NoError(t, err)
+
+	// Write runtime config
+	runtimeConfig := `
+[complete]
+auto_fix = true
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName), []byte(runtimeConfig), 0o644)
+	require.NoError(t, err)
+
+	// Load with IgnoreRuntime
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.LoadWithOptions(domain.LoadConfigOptions{IgnoreRuntime: true})
+	require.NoError(t, err)
+
+	// Verify: runtime config is ignored, repo config is used
+	assert.False(t, cfg.Complete.AutoFix) // From repo, runtime ignored
+}

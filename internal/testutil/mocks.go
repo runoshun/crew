@@ -503,6 +503,7 @@ type MockConfigLoader struct {
 	LoadErr      error
 	GlobalErr    error
 	RepoErr      error
+	LastOpts     domain.LoadConfigOptions // Records the last options passed to LoadWithOptions
 }
 
 // NewMockConfigLoader creates a new MockConfigLoader with default config.
@@ -552,6 +553,7 @@ func (m *MockConfigLoader) LoadRepo() (*domain.Config, error) {
 
 // LoadWithOptions returns config based on options.
 func (m *MockConfigLoader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config, error) {
+	m.LastOpts = opts
 	if m.LoadErr != nil {
 		return nil, m.LoadErr
 	}
@@ -571,6 +573,7 @@ type MockConfigManager struct {
 	GlobalConfigInfo   domain.ConfigInfo
 	RootRepoConfigInfo domain.ConfigInfo
 	OverrideConfigInfo domain.ConfigInfo
+	RuntimeConfigInfo  domain.ConfigInfo
 	InitRepoCalled     bool
 	InitGlobalCalled   bool
 	InitOverrideCalled bool
@@ -586,7 +589,7 @@ func NewMockConfigManager() *MockConfigManager {
 			Exists: false,
 		},
 		GlobalConfigInfo: domain.ConfigInfo{
-			Path:   "/home/test/.config/git-crew/config.toml",
+			Path:   "/home/test/.config/crew/config.toml",
 			Exists: false,
 		},
 		RootRepoConfigInfo: domain.ConfigInfo{
@@ -594,7 +597,11 @@ func NewMockConfigManager() *MockConfigManager {
 			Exists: false,
 		},
 		OverrideConfigInfo: domain.ConfigInfo{
-			Path:   "/home/test/.config/git-crew/config.override.toml",
+			Path:   "/home/test/.config/crew/config.override.toml",
+			Exists: false,
+		},
+		RuntimeConfigInfo: domain.ConfigInfo{
+			Path:   "/test/.git/crew/config.runtime.toml",
 			Exists: false,
 		},
 	}
@@ -621,6 +628,11 @@ func (m *MockConfigManager) GetRootRepoConfigInfo() domain.ConfigInfo {
 // GetOverrideConfigInfo returns the configured override config info.
 func (m *MockConfigManager) GetOverrideConfigInfo() domain.ConfigInfo {
 	return m.OverrideConfigInfo
+}
+
+// GetRuntimeConfigInfo returns the configured runtime config info.
+func (m *MockConfigManager) GetRuntimeConfigInfo() domain.ConfigInfo {
+	return m.RuntimeConfigInfo
 }
 
 // InitRepoConfig records the call and returns configured error.

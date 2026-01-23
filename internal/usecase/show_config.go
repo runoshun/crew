@@ -13,6 +13,7 @@ type ShowConfigInput struct {
 	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
 	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
 	IgnoreOverride bool // Skip loading override config (config.override.toml)
+	IgnoreRuntime  bool // Skip loading runtime config (.git/crew/config.runtime.toml)
 }
 
 // ShowConfigOutput contains the output of the ShowConfig use case.
@@ -22,6 +23,7 @@ type ShowConfigOutput struct {
 	OverrideConfig  domain.ConfigInfo // Override config file info (config.override.toml)
 	RepoConfig      domain.ConfigInfo // Repository config file info (.git/crew/config.toml)
 	RootRepoConfig  domain.ConfigInfo // Root repository config file info (.crew.toml)
+	RuntimeConfig   domain.ConfigInfo // Runtime config file info (.git/crew/config.runtime.toml)
 }
 
 // ShowConfig displays configuration file information.
@@ -55,6 +57,9 @@ func (uc *ShowConfig) Execute(_ context.Context, input ShowConfigInput) (*ShowCo
 	if !input.IgnoreRootRepo {
 		output.RootRepoConfig = uc.configManager.GetRootRepoConfigInfo()
 	}
+	if !input.IgnoreRuntime {
+		output.RuntimeConfig = uc.configManager.GetRuntimeConfigInfo()
+	}
 
 	// Load effective config with options
 	effectiveConfig, err := uc.configLoader.LoadWithOptions(domain.LoadConfigOptions{
@@ -62,6 +67,7 @@ func (uc *ShowConfig) Execute(_ context.Context, input ShowConfigInput) (*ShowCo
 		IgnoreRepo:     input.IgnoreRepo,
 		IgnoreRootRepo: input.IgnoreRootRepo,
 		IgnoreOverride: input.IgnoreOverride,
+		IgnoreRuntime:  input.IgnoreRuntime,
 	})
 	if err != nil {
 		return nil, err
