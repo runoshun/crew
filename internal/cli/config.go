@@ -32,7 +32,7 @@ func newConfigCommand(c *app.Container) *cobra.Command {
 
 // newConfigShowCommand creates the config show subcommand.
 func newConfigShowCommand(c *app.Container) *cobra.Command {
-	var ignoreGlobal, ignoreOverride, ignoreRepo, ignoreRootRepo bool
+	var ignoreGlobal, ignoreOverride, ignoreRepo, ignoreRootRepo, ignoreRuntime bool
 
 	cmd := &cobra.Command{
 		Use:   "show",
@@ -40,7 +40,9 @@ func newConfigShowCommand(c *app.Container) *cobra.Command {
 		Long: `Display effective configuration after merging all sources.
 
 Shows which config files were loaded and the final merged configuration.
-Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to exclude specific sources for debugging.`,
+Priority (later takes precedence): global < override < .crew.toml < config.toml < config.runtime.toml
+
+Use --ignore-* flags to exclude specific sources for debugging.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			uc := c.ShowConfigUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.ShowConfigInput{
@@ -48,6 +50,7 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 				IgnoreOverride: ignoreOverride,
 				IgnoreRepo:     ignoreRepo,
 				IgnoreRootRepo: ignoreRootRepo,
+				IgnoreRuntime:  ignoreRuntime,
 			})
 			if err != nil {
 				return err
@@ -85,6 +88,13 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 					_, _ = fmt.Fprintf(w, "- %s (not found)\n", out.RepoConfig.Path)
 				}
 			}
+			if !ignoreRuntime {
+				if out.RuntimeConfig.Exists {
+					_, _ = fmt.Fprintf(w, "- %s\n", out.RuntimeConfig.Path)
+				} else {
+					_, _ = fmt.Fprintf(w, "- %s (not found)\n", out.RuntimeConfig.Path)
+				}
+			}
 
 			_, _ = fmt.Fprintln(w)
 
@@ -102,6 +112,7 @@ Use --ignore-global, --ignore-override, --ignore-repo or --ignore-root-repo to e
 	cmd.Flags().BoolVar(&ignoreOverride, "ignore-override", false, "Ignore override configuration (config.override.toml)")
 	cmd.Flags().BoolVar(&ignoreRepo, "ignore-repo", false, "Ignore repository configuration (.git/crew/config.toml)")
 	cmd.Flags().BoolVar(&ignoreRootRepo, "ignore-root-repo", false, "Ignore root repository configuration (.crew.toml)")
+	cmd.Flags().BoolVar(&ignoreRuntime, "ignore-runtime", false, "Ignore runtime configuration (.git/crew/config.runtime.toml)")
 
 	return cmd
 }
@@ -190,6 +201,7 @@ It does not depend on existing configuration files and will work even if they ar
 				IgnoreOverride: true,
 				IgnoreRootRepo: true,
 				IgnoreRepo:     true,
+				IgnoreRuntime:  true,
 			})
 			if err != nil {
 				return err

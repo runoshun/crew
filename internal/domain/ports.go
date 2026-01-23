@@ -278,6 +278,9 @@ type ConfigManager interface {
 	// GetOverrideConfigInfo returns information about the global override config file (config.override.toml).
 	GetOverrideConfigInfo() ConfigInfo
 
+	// GetRuntimeConfigInfo returns information about the runtime config file (.git/crew/config.runtime.toml).
+	GetRuntimeConfigInfo() ConfigInfo
+
 	// InitRepoConfig creates a repository config file with default template.
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.

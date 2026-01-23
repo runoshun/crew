@@ -81,6 +81,12 @@ func (m *Manager) GetOverrideConfigInfo() domain.ConfigInfo {
 	return m.getConfigInfo(path)
 }
 
+// GetRuntimeConfigInfo returns information about the runtime config file (.git/crew/config.runtime.toml).
+func (m *Manager) GetRuntimeConfigInfo() domain.ConfigInfo {
+	path := filepath.Join(m.crewDir, domain.ConfigRuntimeFileName)
+	return m.getConfigInfo(path)
+}
+
 // getConfigInfo reads a config file and returns its info.
 func (m *Manager) getConfigInfo(path string) domain.ConfigInfo {
 	content, err := os.ReadFile(path)

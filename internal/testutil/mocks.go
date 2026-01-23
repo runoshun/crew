@@ -571,6 +571,7 @@ type MockConfigManager struct {
 	GlobalConfigInfo   domain.ConfigInfo
 	RootRepoConfigInfo domain.ConfigInfo
 	OverrideConfigInfo domain.ConfigInfo
+	RuntimeConfigInfo  domain.ConfigInfo
 	InitRepoCalled     bool
 	InitGlobalCalled   bool
 	InitOverrideCalled bool
@@ -597,6 +598,10 @@ func NewMockConfigManager() *MockConfigManager {
 			Path:   "/home/test/.config/git-crew/config.override.toml",
 			Exists: false,
 		},
+		RuntimeConfigInfo: domain.ConfigInfo{
+			Path:   "/test/.git/crew/config.runtime.toml",
+			Exists: false,
+		},
 	}
 }
 
@@ -621,6 +626,11 @@ func (m *MockConfigManager) GetRootRepoConfigInfo() domain.ConfigInfo {
 // GetOverrideConfigInfo returns the configured override config info.
 func (m *MockConfigManager) GetOverrideConfigInfo() domain.ConfigInfo {
 	return m.OverrideConfigInfo
+}
+
+// GetRuntimeConfigInfo returns the configured runtime config info.
+func (m *MockConfigManager) GetRuntimeConfigInfo() domain.ConfigInfo {
+	return m.RuntimeConfigInfo
 }
 
 // InitRepoConfig records the call and returns configured error.
