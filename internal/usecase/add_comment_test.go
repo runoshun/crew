@@ -356,6 +356,38 @@ func TestAddComment_Execute_RequestChanges_SessionStartError(t *testing.T) {
 	assert.True(t, starter.StartCalled)
 }
 
+func TestAddComment_Execute_RequestChanges_ResetsAutoFixRetryCount(t *testing.T) {
+	// Setup - task starts from StatusReviewing with non-zero AutoFixRetryCount
+	// (simulates auto_fix scenario where worker completed but review failed)
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:                1,
+		Title:             "Test task",
+		Status:            domain.StatusReviewing, // Start from non-in_progress status
+		AutoFixRetryCount: 2,                      // Simulates 2 previous failed review attempts
+	}
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = true
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
+	uc := NewAddComment(repo, sessions, clock)
+
+	// Execute with RequestChanges
+	out, err := uc.Execute(context.Background(), AddCommentInput{
+		TaskID:         1,
+		Message:        "修正してください",
+		RequestChanges: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "修正してください", out.Comment.Text)
+
+	// Verify status transition and AutoFixRetryCount reset
+	task := repo.Tasks[1]
+	assert.Equal(t, domain.StatusInProgress, task.Status, "Status should transition to in_progress")
+	assert.Equal(t, 0, task.AutoFixRetryCount, "AutoFixRetryCount should be reset to 0 on RequestChanges")
+}
+
 func TestAddComment_Execute_WithAuthor(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
