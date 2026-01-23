@@ -326,6 +326,10 @@ Examples:
 				Comment: opts.comment,
 			})
 			if err != nil {
+				// Print conflict message to stdout if present
+				if out != nil && out.ConflictMessage != "" {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.ConflictMessage)
+				}
 				return err
 			}
 
@@ -720,11 +724,15 @@ Examples:
 
 			// Execute use case
 			uc := c.MergeTaskUseCase()
-			_, err = uc.Execute(cmd.Context(), usecase.MergeTaskInput{
+			out, err := uc.Execute(cmd.Context(), usecase.MergeTaskInput{
 				TaskID:     taskID,
 				BaseBranch: opts.base,
 			})
 			if err != nil {
+				// Print conflict message to stdout if present
+				if out != nil && out.ConflictMessage != "" {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.ConflictMessage)
+				}
 				return err
 			}
 

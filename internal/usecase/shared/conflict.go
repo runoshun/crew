@@ -36,68 +36,62 @@ func NewConflictHandler(
 type ConflictCheckInput struct {
 	Branch     string // Task branch to merge
 	BaseBranch string // Target branch to merge into
+	Command    string // Command name for retry message (e.g., "complete", "merge")
 	TaskID     int    // Task ID
+}
+
+// ConflictCheckOutput contains the result of conflict checking.
+type ConflictCheckOutput struct {
+	Message string // Conflict message to display (empty if no conflict)
 }
 
 // CheckAndHandle checks for merge conflicts and handles them if found.
 // If conflicts exist:
 // - Transitions task status to in_progress
-// - Adds a comment with conflict file list
 // - Notifies the running session (if any)
-// - Returns ErrMergeConflict
+// - Returns a ConflictCheckOutput with the message and ErrMergeConflict
 //
-// If no conflicts, returns nil.
-func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) error {
+// The caller is responsible for displaying the conflict message to stdout.
+// Always returns a non-nil ConflictCheckOutput (empty on error or no conflict).
+func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) (*ConflictCheckOutput, error) {
 	// Get conflicting files
 	conflictFiles, err := h.git.GetMergeConflictFiles(in.Branch, in.BaseBranch)
 	if err != nil {
-		return fmt.Errorf("check merge conflict: %w", err)
+		return &ConflictCheckOutput{}, fmt.Errorf("check merge conflict: %w", err)
 	}
 
 	if len(conflictFiles) == 0 {
 		// No conflicts
-		return nil
+		return &ConflictCheckOutput{}, nil
 	}
 
 	// Get task
 	task, err := GetTask(h.tasks, in.TaskID)
 	if err != nil {
-		return err
+		return &ConflictCheckOutput{}, err
 	}
 
 	// Build conflict message
-	message := buildConflictMessage(conflictFiles, in.BaseBranch)
+	message := buildConflictMessage(conflictFiles, in.BaseBranch, in.Command)
 
-	// Create comment
-	comment := domain.Comment{
-		Text: message,
-		Time: h.clock.Now(),
-	}
-
-	// Transition status to in_progress and add comment atomically
+	// Transition status to in_progress
 	task.Status = domain.StatusInProgress
-	comments, err := h.tasks.GetComments(task.ID)
-	if err != nil {
-		return fmt.Errorf("get comments: %w", err)
-	}
-	comments = append(comments, comment)
-
-	if err := h.tasks.SaveTaskWithComments(task, comments); err != nil {
-		return fmt.Errorf("save task with comments: %w", err)
+	if err := h.tasks.Save(task); err != nil {
+		return &ConflictCheckOutput{}, fmt.Errorf("save task: %w", err)
 	}
 
 	// Notify session if running
-	notificationMsg := fmt.Sprintf(conflictNotificationTemplate, task.ID, task.ID)
+	notificationMsg := fmt.Sprintf(conflictNotificationTemplate, in.Command, task.ID)
 	_ = SendSessionNotification(h.sessions, task.ID, notificationMsg)
 
-	return domain.ErrMergeConflict
+	return &ConflictCheckOutput{Message: message}, domain.ErrMergeConflict
 }
 
 // conflictNotificationTemplate is the notification message for conflict resolution.
-const conflictNotificationTemplate = "Merge conflict detected. Please check the comment with 'crew show %d' and resolve the conflicts. When finished, run 'crew complete %d'."
+const conflictNotificationTemplate = "Merge conflict detected. Please resolve the conflicts and run 'crew %s %d'."
 
 // buildConflictMessage creates a user-friendly conflict message.
-func buildConflictMessage(files []string, baseBranch string) string {
+func buildConflictMessage(files []string, baseBranch, command string) string {
 	var sb strings.Builder
 	sb.WriteString("Merge conflict detected with base branch.\n\n")
 	sb.WriteString("Conflicting files:\n")
@@ -107,10 +101,9 @@ func buildConflictMessage(files []string, baseBranch string) string {
 		sb.WriteString("\n")
 	}
 	sb.WriteString("\nPlease resolve the conflicts:\n")
-	sb.WriteString(fmt.Sprintf("1. git fetch origin %s:%s\n", baseBranch, baseBranch))
-	sb.WriteString(fmt.Sprintf("2. git merge %s\n", baseBranch))
-	sb.WriteString("3. Resolve conflicts in the listed files\n")
-	sb.WriteString("4. git add <files> && git commit\n")
-	sb.WriteString("5. Run 'crew complete' again")
+	sb.WriteString(fmt.Sprintf("1. git merge %s\n", baseBranch))
+	sb.WriteString("2. Resolve conflicts in the listed files\n")
+	sb.WriteString("3. git add <files> && git commit\n")
+	sb.WriteString(fmt.Sprintf("4. Run 'crew %s' again", command))
 	return sb.String()
 }
