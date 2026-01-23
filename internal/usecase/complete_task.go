@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -18,15 +20,18 @@ type CompleteTaskInput struct {
 // Fields are ordered to minimize memory padding.
 type CompleteTaskOutput struct {
 	Task              *domain.Task // The completed task
+	AutoFixReview     string       // Review output when auto_fix runs synchronously
+	AutoFixMaxRetries int          // Maximum retry count for auto_fix
+	AutoFixRetryCount int          // Current retry count after auto_fix review
 	ShouldStartReview bool         // True if review should be started by CLI (for background review)
 	AutoFixEnabled    bool         // True if auto_fix mode is enabled
-	AutoFixMaxRetries int          // Maximum retry count for auto_fix
+	AutoFixIsLGTM     bool         // True if auto_fix review passed
 }
 
 // CompleteTask is the use case for marking a task as complete.
 // Status transitions depend on configuration:
 //   - skip_review: directly to reviewed
-//   - auto_fix: status remains in_progress (CLI handles transition after review)
+//   - auto_fix: runs synchronous review and sets status to reviewed on LGTM
 //   - normal: transitions to reviewing, signals CLI to start background review
 //
 // Fields are ordered to minimize memory padding.
@@ -39,6 +44,7 @@ type CompleteTask struct {
 	clock     domain.Clock
 	logger    domain.Logger
 	executor  domain.CommandExecutor
+	stderr    io.Writer
 	crewDir   string
 	repoRoot  string
 }
@@ -53,6 +59,7 @@ func NewCompleteTask(
 	clock domain.Clock,
 	logger domain.Logger,
 	executor domain.CommandExecutor,
+	stderr io.Writer,
 	crewDir string,
 	repoRoot string,
 ) *CompleteTask {
@@ -65,10 +72,14 @@ func NewCompleteTask(
 		clock:     clock,
 		logger:    logger,
 		executor:  executor,
+		stderr:    stderr,
 		crewDir:   crewDir,
 		repoRoot:  repoRoot,
 	}
 }
+
+// ErrAutoFixMaxRetries is returned when auto_fix reaches the maximum retry limit.
+var ErrAutoFixMaxRetries = errors.New("auto_fix reached maximum retries")
 
 // Execute marks a task as complete.
 // Preconditions:
@@ -188,11 +199,70 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		autoFixMaxRetries = cfg.Complete.AutoFixMaxRetries
 	}
 
-	// In auto_fix mode, keep status as in_progress; CLI will change to reviewed on LGTM
-	// In normal mode, transition to reviewing to signal that review should start
-	if !autoFixEnabled {
-		task.Status = domain.StatusReviewing
+	if autoFixEnabled {
+		retryCount := task.AutoFixRetryCount
+		if retryCount >= autoFixMaxRetries {
+			return nil, fmt.Errorf("auto_fix: reached maximum retries (%d): %w", autoFixMaxRetries, ErrAutoFixMaxRetries)
+		}
+
+		reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
+			ConfigLoader: uc.config,
+			Worktrees:    uc.worktrees,
+			RepoRoot:     uc.repoRoot,
+		}, shared.ReviewCommandInput{
+			Task: task,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		reviewOut, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
+			Tasks:    uc.tasks,
+			Executor: uc.executor,
+			Clock:    uc.clock,
+			Stderr:   uc.stderr,
+		}, shared.ReviewInput{
+			Task:            task,
+			WorktreePath:    reviewCmd.WorktreePath,
+			Result:          reviewCmd.Result,
+			SkipStatusCheck: true,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("task #%d completed, but review failed: %w", task.ID, err)
+		}
+
+		if reviewOut.IsLGTM {
+			task.Status = domain.StatusReviewed
+			task.AutoFixRetryCount = 0
+		} else {
+			task.AutoFixRetryCount = retryCount + 1
+		}
+
+		if saveErr := uc.tasks.Save(task); saveErr != nil {
+			return nil, fmt.Errorf("save task: %w", saveErr)
+		}
+
+		if uc.logger != nil {
+			if reviewOut.IsLGTM {
+				uc.logger.Info(task.ID, "task", "completed (auto_fix LGTM, status: reviewed)")
+			} else {
+				uc.logger.Info(task.ID, "task", "completed (auto_fix review feedback, status: in_progress)")
+			}
+		}
+
+		return &CompleteTaskOutput{
+			Task:              task,
+			ShouldStartReview: false,
+			AutoFixEnabled:    true,
+			AutoFixMaxRetries: autoFixMaxRetries,
+			AutoFixReview:     reviewOut.Review,
+			AutoFixIsLGTM:     reviewOut.IsLGTM,
+			AutoFixRetryCount: task.AutoFixRetryCount,
+		}, nil
 	}
+
+	// In normal mode, transition to reviewing to signal that review should start
+	task.Status = domain.StatusReviewing
 
 	// Save task
 	if saveErr := uc.tasks.Save(task); saveErr != nil {
@@ -201,18 +271,13 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 
 	// Log task completion
 	if uc.logger != nil {
-		if autoFixEnabled {
-			uc.logger.Info(task.ID, "task", "completed (auto_fix pending review, status: in_progress)")
-		} else {
-			uc.logger.Info(task.ID, "task", "completed (status: reviewing, review should start)")
-		}
+		uc.logger.Info(task.ID, "task", "completed (status: reviewing, review should start)")
 	}
 
-	// If auto_fix is enabled, CLI will run synchronous review instead of background
 	return &CompleteTaskOutput{
 		Task:              task,
-		ShouldStartReview: !autoFixEnabled, // Background review only when auto_fix is off
-		AutoFixEnabled:    autoFixEnabled,
+		ShouldStartReview: true,
+		AutoFixEnabled:    false,
 		AutoFixMaxRetries: autoFixMaxRetries,
 	}, nil
 }
