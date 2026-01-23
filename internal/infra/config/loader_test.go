@@ -408,6 +408,25 @@ unknown_log_key = "value"
 	assert.Equal(t, expected, cfg.Warnings)
 }
 
+func TestLoader_Load_InvalidReviewMode(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	config := `
+[complete]
+review_mode = "invalid"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	assert.False(t, cfg.Complete.ReviewModeSet)
+	assert.Contains(t, cfg.Warnings, "invalid value for complete.review_mode: \"invalid\" (expected \"auto\", \"manual\", or \"auto_fix\")")
+}
+
 func TestLoader_Load_WorktreeConfig(t *testing.T) {
 	// Setup
 	crewDir := t.TempDir()
@@ -868,7 +887,7 @@ auto_fix_max_retries = 5
 
 	// Verify complete config
 	assert.Equal(t, "mise run ci", cfg.Complete.Command)
-	assert.True(t, cfg.Complete.AutoFix)
+	assert.True(t, cfg.Complete.AutoFix) //nolint:staticcheck // Testing legacy field
 	assert.Equal(t, 5, cfg.Complete.AutoFixMaxRetries)
 }
 
@@ -902,7 +921,7 @@ auto_fix = true
 
 	// Verify merging: repo overrides global
 	assert.Equal(t, "global-cmd", cfg.Complete.Command) // From global
-	assert.True(t, cfg.Complete.AutoFix)                // Overridden by repo
+	assert.True(t, cfg.Complete.AutoFix)                //nolint:staticcheck // Testing legacy field - Overridden by repo
 	assert.Equal(t, 3, cfg.Complete.AutoFixMaxRetries)  // From global
 }
 
@@ -935,7 +954,7 @@ auto_fix = false
 
 	// Verify: explicit false in repo should override true from global
 	assert.Equal(t, "global-cmd", cfg.Complete.Command) // From global
-	assert.False(t, cfg.Complete.AutoFix)               // Overridden by repo (explicit false)
+	assert.False(t, cfg.Complete.AutoFix)               //nolint:staticcheck // Testing legacy field - Overridden by repo (explicit false)
 }
 
 func TestLoader_Load_RuntimeConfig(t *testing.T) {
@@ -967,7 +986,7 @@ auto_fix = true
 
 	// Verify: runtime config overrides repo config
 	assert.Equal(t, "mise run ci", cfg.Complete.Command) // From repo (not overridden)
-	assert.True(t, cfg.Complete.AutoFix)                 // Overridden by runtime
+	assert.True(t, cfg.Complete.AutoFix)                 //nolint:staticcheck // Testing legacy field - Overridden by runtime
 }
 
 func TestLoader_Load_RuntimeConfig_Priority(t *testing.T) {
@@ -1009,7 +1028,7 @@ auto_fix = true
 	require.NoError(t, err)
 
 	// Verify priority: runtime > repo > global
-	assert.True(t, cfg.Complete.AutoFix)               // Overridden by runtime
+	assert.True(t, cfg.Complete.AutoFix)               //nolint:staticcheck // Testing legacy field - Overridden by runtime
 	assert.Equal(t, 2, cfg.Complete.AutoFixMaxRetries) // From repo
 }
 
@@ -1032,7 +1051,7 @@ auto_fix = true
 		require.NoError(t, err)
 
 		// Verify
-		assert.True(t, cfg.Complete.AutoFix)
+		assert.True(t, cfg.Complete.AutoFix) //nolint:staticcheck // Testing legacy field
 	})
 
 	t.Run("returns error when file does not exist", func(t *testing.T) {
@@ -1076,5 +1095,5 @@ auto_fix = true
 	require.NoError(t, err)
 
 	// Verify: runtime config is ignored, repo config is used
-	assert.False(t, cfg.Complete.AutoFix) // From repo, runtime ignored
+	assert.False(t, cfg.Complete.AutoFix) //nolint:staticcheck // Testing legacy field - From repo, runtime ignored
 }

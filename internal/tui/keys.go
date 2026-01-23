@@ -32,13 +32,13 @@ type KeyMap struct {
 	PR    key.Binding // Create PR (future)
 
 	// View
-	Refresh       key.Binding // Refresh task list
-	Filter        key.Binding // Enter filter mode
-	Sort          key.Binding // Toggle sort mode
-	Help          key.Binding // Show help
-	Detail        key.Binding // Toggle detail view
-	ToggleShowAll key.Binding // Toggle show all (including closed)
-	ToggleAutoFix key.Binding // Toggle auto-fix mode
+	Refresh          key.Binding // Refresh task list
+	Filter           key.Binding // Enter filter mode
+	Sort             key.Binding // Toggle sort mode
+	Help             key.Binding // Show help
+	Detail           key.Binding // Toggle detail view
+	ToggleShowAll    key.Binding // Toggle show all (including closed)
+	ToggleReviewMode key.Binding // Cycle review mode (auto -> manual -> auto_fix)
 
 	// General
 	Quit    key.Binding // Quit application
@@ -149,9 +149,9 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("A"),
 			key.WithHelp("A", "toggle all"),
 		),
-		ToggleAutoFix: key.NewBinding(
+		ToggleReviewMode: key.NewBinding(
 			key.WithKeys("t"),
-			key.WithHelp("t", "toggle auto-fix"),
+			key.WithHelp("t", "review mode"),
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),
@@ -223,7 +223,7 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.Help)
 	addKeys(k.Detail)
 	addKeys(k.ToggleShowAll)
-	addKeys(k.ToggleAutoFix)
+	addKeys(k.ToggleReviewMode)
 	addKeys(k.Quit)
 	addKeys(k.Escape)
 	addKeys(k.Confirm)

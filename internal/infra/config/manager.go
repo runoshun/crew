@@ -3,6 +3,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -155,10 +156,13 @@ func (m *Manager) initConfig(path string, cfg *domain.Config) error {
 	return os.WriteFile(path, []byte(content), 0600)
 }
 
-// SetAutoFix updates the auto_fix setting in the runtime config file.
+// SetReviewMode updates the review_mode setting in the runtime config file.
 // Creates the [complete] section if it doesn't exist.
 // Preserves other existing settings in the file.
-func (m *Manager) SetAutoFix(enabled bool) error {
+func (m *Manager) SetReviewMode(mode domain.ReviewMode) error {
+	if !mode.IsValid() {
+		return fmt.Errorf("invalid review mode %q: %w", mode, domain.ErrInvalidReviewMode)
+	}
 	// Ensure the crew directory exists
 	if err := os.MkdirAll(m.crewDir, 0700); err != nil {
 		return err
@@ -192,8 +196,8 @@ func (m *Manager) SetAutoFix(enabled bool) error {
 		completeSection = make(map[string]any)
 	}
 
-	// Update auto_fix value
-	completeSection["auto_fix"] = enabled
+	// Update review_mode value
+	completeSection["review_mode"] = string(mode)
 	data["complete"] = completeSection
 
 	// Marshal back to TOML

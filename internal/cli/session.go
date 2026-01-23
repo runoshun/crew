@@ -334,7 +334,7 @@ Examples:
 			}
 
 			// Handle auto_fix mode
-			if out.AutoFixEnabled {
+			if out.ReviewMode == domain.ReviewModeAutoFix {
 				if out.AutoFixIsLGTM {
 					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "LGTM")
 					return nil

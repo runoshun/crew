@@ -1290,24 +1290,27 @@ func (m *Model) loadReviewResult(taskID int) tea.Cmd {
 	}
 }
 
-// toggleAutoFix returns a command that toggles the auto-fix setting.
-func (m *Model) toggleAutoFix() tea.Cmd {
+// cycleReviewMode returns a command that cycles through review modes.
+func (m *Model) cycleReviewMode() tea.Cmd {
 	return func() tea.Msg {
-		// Get current state
-		currentEnabled := false
-		if m.config != nil {
-			currentEnabled = m.config.Complete.AutoFix
+		// Get current mode
+		currentMode := domain.ReviewModeAuto
+		if m.config != nil && m.config.Complete.ReviewModeSet {
+			currentMode = m.config.Complete.ReviewMode
+		} else if m.config != nil && m.config.Complete.AutoFixSet && m.config.Complete.AutoFix { //nolint:staticcheck // Legacy compatibility
+			// Legacy: auto_fix=true maps to auto_fix mode
+			currentMode = domain.ReviewModeAutoFix
 		}
 
-		// Toggle to new state
-		newEnabled := !currentEnabled
+		// Cycle to next mode
+		newMode := currentMode.NextMode()
 
 		// Save to config file
-		err := m.container.ConfigManager.SetAutoFix(newEnabled)
+		err := m.container.ConfigManager.SetReviewMode(newMode)
 		if err != nil {
-			return MsgError{Err: fmt.Errorf("toggle auto-fix: %w", err)}
+			return MsgError{Err: fmt.Errorf("change review mode: %w", err)}
 		}
 
-		return MsgAutoFixToggled{Enabled: newEnabled}
+		return MsgReviewModeChanged{Mode: newMode}
 	}
 }

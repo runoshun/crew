@@ -203,13 +203,77 @@ func expandString(s string, data CommandData) (string, error) {
 	return buf.String(), nil
 }
 
+// ReviewMode specifies how the review process should be handled on completion.
+type ReviewMode string
+
+const (
+	// ReviewModeAuto starts review asynchronously in background after completion.
+	// This is the default mode and matches the previous auto_fix=false behavior.
+	ReviewModeAuto ReviewMode = "auto"
+
+	// ReviewModeManual does not start review automatically.
+	// Sets status to for_review and waits for manual review initiation.
+	ReviewModeManual ReviewMode = "manual"
+
+	// ReviewModeAutoFix starts review synchronously and attempts auto-correction.
+	// Matches the previous auto_fix=true behavior.
+	ReviewModeAutoFix ReviewMode = "auto_fix"
+)
+
+// AllReviewModes returns all valid review mode values.
+func AllReviewModes() []ReviewMode {
+	return []ReviewMode{ReviewModeAuto, ReviewModeManual, ReviewModeAutoFix}
+}
+
+// IsValid returns true if the review mode is a known valid value.
+func (m ReviewMode) IsValid() bool {
+	switch m {
+	case ReviewModeAuto, ReviewModeManual, ReviewModeAutoFix:
+		return true
+	default:
+		return false
+	}
+}
+
+// Display returns a human-readable representation of the review mode.
+func (m ReviewMode) Display() string {
+	switch m {
+	case ReviewModeAuto:
+		return "Auto"
+	case ReviewModeManual:
+		return "Manual"
+	case ReviewModeAutoFix:
+		return "Auto-fix"
+	default:
+		return string(m)
+	}
+}
+
+// NextMode returns the next review mode in the cycle: auto -> manual -> auto_fix -> auto.
+func (m ReviewMode) NextMode() ReviewMode {
+	switch m {
+	case ReviewModeAuto:
+		return ReviewModeManual
+	case ReviewModeManual:
+		return ReviewModeAutoFix
+	case ReviewModeAutoFix:
+		return ReviewModeAuto
+	default:
+		return ReviewModeAuto
+	}
+}
+
 // CompleteConfig holds completion gate settings from [complete] section.
 // Fields are ordered to minimize memory padding.
 type CompleteConfig struct {
-	Command           string `toml:"command,omitempty"`              // Command to run as CI gate on complete
-	AutoFixMaxRetries int    `toml:"auto_fix_max_retries,omitempty"` // Maximum retry count for auto-fix (default: 3)
-	AutoFix           bool   `toml:"auto_fix,omitempty"`             // Enable auto-fix mode (run review synchronously)
-	AutoFixSet        bool   `toml:"-"`                              // True if AutoFix was explicitly set in config (not exported to TOML)
+	Command           string     `toml:"command,omitempty"`              // Command to run as CI gate on complete
+	ReviewMode        ReviewMode `toml:"review_mode,omitempty"`          // Review mode: auto (default), manual, auto_fix
+	AutoFixMaxRetries int        `toml:"auto_fix_max_retries,omitempty"` // Maximum retry count for auto-fix mode (default: 3)
+	ReviewModeSet     bool       `toml:"-"`                              // True if ReviewMode was explicitly set in config (not exported to TOML)
+
+	// Deprecated: Use ReviewMode instead. Kept for backward compatibility with existing configs.
+	AutoFix    bool `toml:"auto_fix,omitempty"` // Enable auto-fix mode (run review synchronously)
+	AutoFixSet bool `toml:"-"`                  // True if AutoFix was explicitly set in config (not exported to TOML)
 }
 
 // DiffConfig holds diff display settings from [diff] section.
