@@ -258,8 +258,13 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						}
 					case "review_mode":
 						if s, ok := v.(string); ok {
-							res.Complete.ReviewMode = domain.ReviewMode(s)
-							res.Complete.ReviewModeSet = true
+							mode := domain.ReviewMode(s)
+							if mode.IsValid() {
+								res.Complete.ReviewMode = mode
+								res.Complete.ReviewModeSet = true
+							} else {
+								warnings = append(warnings, fmt.Sprintf("invalid value for complete.review_mode: %q (expected \"auto\", \"manual\", or \"auto_fix\")", s))
+							}
 						}
 					case "auto_fix":
 						// Legacy: map auto_fix to review_mode

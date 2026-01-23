@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -791,6 +792,55 @@ func TestCompleteTask_Execute_AutoMode(t *testing.T) {
 	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
 	assert.Equal(t, domain.ReviewModeAuto, out.ReviewMode)
 	assert.True(t, out.ShouldStartReview) // Background review should start
+}
+
+func TestCompleteTask_Execute_InvalidReviewModeFallsBackToAuto(t *testing.T) {
+	// Test: invalid review mode falls back to auto and logs warning
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with invalid review mode",
+		Status:     domain.StatusInProgress,
+		SkipReview: nil,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	git := &testutil.MockGit{
+		HasUncommittedChangesV: false,
+	}
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Complete.ReviewMode = domain.ReviewMode("broken")
+	configLoader.Config.Complete.ReviewModeSet = true
+
+	clock := &testutil.MockClock{}
+	executor := testutil.NewMockCommandExecutor()
+	logger := testutil.NewMockLogger()
+
+	uc := NewCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, logger, executor, nil, "/tmp/crew", "/tmp/repo")
+
+	// Execute
+	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	assert.Equal(t, domain.ReviewModeAuto, out.ReviewMode)
+	assert.True(t, out.ShouldStartReview)
+
+	var warned bool
+	for _, entry := range logger.Entries {
+		if entry.Level == "WARN" && entry.TaskID == 1 && entry.Category == "task" && strings.Contains(entry.Msg, "invalid review_mode") {
+			warned = true
+			break
+		}
+	}
+	assert.True(t, warned)
 }
 
 func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {

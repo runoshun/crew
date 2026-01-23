@@ -206,6 +206,12 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 			reviewMode = domain.ReviewModeAutoFix
 		}
 	}
+	if !reviewMode.IsValid() {
+		if uc.logger != nil {
+			uc.logger.Warn(task.ID, "task", fmt.Sprintf("invalid review_mode %q; falling back to auto", reviewMode))
+		}
+		reviewMode = domain.ReviewModeAuto
+	}
 
 	autoFixMaxRetries := domain.DefaultAutoFixMaxRetries
 	if cfg != nil && cfg.Complete.AutoFixMaxRetries > 0 {
@@ -314,6 +320,5 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}, nil
 	}
 
-	// unreachable: all ReviewMode cases are handled above
-	panic("unreachable: unknown review mode")
+	return nil, fmt.Errorf("unexpected review mode: %q", reviewMode)
 }

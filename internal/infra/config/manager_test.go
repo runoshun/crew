@@ -230,6 +230,15 @@ func TestManager_SetReviewMode(t *testing.T) {
 		assert.Contains(t, string(content), "auto_fix")
 	})
 
+	t.Run("returns error for invalid review_mode", func(t *testing.T) {
+		crewDir := t.TempDir()
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+
+		err := manager.SetReviewMode(domain.ReviewMode("invalid"))
+
+		assert.ErrorIs(t, err, domain.ErrInvalidReviewMode)
+	})
+
 	t.Run("updates existing runtime config without destroying other settings", func(t *testing.T) {
 		crewDir := t.TempDir()
 		existingContent := `[agents]

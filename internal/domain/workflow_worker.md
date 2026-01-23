@@ -36,14 +36,15 @@ crew complete          # Mark task as complete
 
 ---
 
-## Auto-Fix Mode
+## Review Mode
 
-When `[complete].auto_fix` is enabled in config, `crew complete` runs review synchronously and outputs the result:
+`[complete].review_mode` controls how reviews run on completion:
 
-- **LGTM**: If review passes, outputs "LGTM" - task is done
-- **Not LGTM**: Outputs review feedback for you to address
+- **auto** (default): Start review asynchronously in the background
+- **manual**: Set status to `for_review` without starting review automatically
+- **auto_fix**: Run review synchronously and output the result
 
-### Workflow with Auto-Fix
+### Workflow with auto_fix
 
 ```bash
 # 1. Make changes and commit
@@ -65,7 +66,7 @@ crew complete
 ```toml
 [complete]
 command = "mise run ci"
-auto_fix = true           # Enable auto-fix mode
+review_mode = "auto_fix"  # auto, manual, or auto_fix
 auto_fix_max_retries = 3  # Maximum retry attempts (default: 3)
 ```
 

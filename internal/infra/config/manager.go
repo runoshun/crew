@@ -3,6 +3,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -159,6 +160,9 @@ func (m *Manager) initConfig(path string, cfg *domain.Config) error {
 // Creates the [complete] section if it doesn't exist.
 // Preserves other existing settings in the file.
 func (m *Manager) SetReviewMode(mode domain.ReviewMode) error {
+	if !mode.IsValid() {
+		return fmt.Errorf("invalid review mode %q: %w", mode, domain.ErrInvalidReviewMode)
+	}
 	// Ensure the crew directory exists
 	if err := os.MkdirAll(m.crewDir, 0700); err != nil {
 		return err

@@ -408,6 +408,25 @@ unknown_log_key = "value"
 	assert.Equal(t, expected, cfg.Warnings)
 }
 
+func TestLoader_Load_InvalidReviewMode(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	config := `
+[complete]
+review_mode = "invalid"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	assert.False(t, cfg.Complete.ReviewModeSet)
+	assert.Contains(t, cfg.Warnings, "invalid value for complete.review_mode: \"invalid\" (expected \"auto\", \"manual\", or \"auto_fix\")")
+}
+
 func TestLoader_Load_WorktreeConfig(t *testing.T) {
 	// Setup
 	crewDir := t.TempDir()
