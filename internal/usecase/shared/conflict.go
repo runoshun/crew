@@ -36,6 +36,7 @@ func NewConflictHandler(
 type ConflictCheckInput struct {
 	Branch     string // Task branch to merge
 	BaseBranch string // Target branch to merge into
+	Command    string // Command name for retry message (e.g., "complete", "merge")
 	TaskID     int    // Task ID
 }
 
@@ -71,7 +72,7 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) (*ConflictCheckO
 	}
 
 	// Build conflict message
-	message := buildConflictMessage(conflictFiles, in.BaseBranch)
+	message := buildConflictMessage(conflictFiles, in.BaseBranch, in.Command)
 
 	// Transition status to in_progress
 	task.Status = domain.StatusInProgress
@@ -80,17 +81,17 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) (*ConflictCheckO
 	}
 
 	// Notify session if running
-	notificationMsg := fmt.Sprintf(conflictNotificationTemplate, task.ID)
+	notificationMsg := fmt.Sprintf(conflictNotificationTemplate, in.Command, task.ID)
 	_ = SendSessionNotification(h.sessions, task.ID, notificationMsg)
 
 	return &ConflictCheckOutput{Message: message}, domain.ErrMergeConflict
 }
 
 // conflictNotificationTemplate is the notification message for conflict resolution.
-const conflictNotificationTemplate = "Merge conflict detected. Please resolve the conflicts and run 'crew complete %d'."
+const conflictNotificationTemplate = "Merge conflict detected. Please resolve the conflicts and run 'crew %s %d'."
 
 // buildConflictMessage creates a user-friendly conflict message.
-func buildConflictMessage(files []string, baseBranch string) string {
+func buildConflictMessage(files []string, baseBranch, command string) string {
 	var sb strings.Builder
 	sb.WriteString("Merge conflict detected with base branch.\n\n")
 	sb.WriteString("Conflicting files:\n")
@@ -103,6 +104,6 @@ func buildConflictMessage(files []string, baseBranch string) string {
 	sb.WriteString(fmt.Sprintf("1. git merge %s\n", baseBranch))
 	sb.WriteString("2. Resolve conflicts in the listed files\n")
 	sb.WriteString("3. git add <files> && git commit\n")
-	sb.WriteString("4. Run 'crew complete' again")
+	sb.WriteString(fmt.Sprintf("4. Run 'crew %s' again", command))
 	return sb.String()
 }

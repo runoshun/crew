@@ -661,6 +661,7 @@ func TestCompleteTask_Execute_MergeConflict(t *testing.T) {
 	// Conflict message should be in output (not in comment)
 	assert.Contains(t, out.ConflictMessage, "conflict.txt")
 	assert.Contains(t, out.ConflictMessage, "git merge main")
+	assert.Contains(t, out.ConflictMessage, "crew complete")
 	assert.NotContains(t, out.ConflictMessage, "git fetch")
 
 	// Task status should be in_progress
