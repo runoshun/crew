@@ -181,6 +181,7 @@ func (uc *ReviewTask) executeBackground(ctx context.Context, task *domain.Task, 
 		TaskID:    task.ID,
 		TaskTitle: task.Title,
 		TaskAgent: agentName,
+		IsReview:  true,
 	}); err != nil {
 		// Rollback status
 		task.Status = domain.StatusForReview
