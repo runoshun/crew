@@ -14,7 +14,7 @@ type AddCommentInput struct {
 	Message        string // Comment text (required)
 	Author         string // Author name (optional)
 	TaskID         int    // Task ID (required)
-	RequestChanges bool   // If true, change status to in_progress and notify session
+	RequestChanges bool   // If true, change status to in_progress, reset auto_fix retry count, and notify session
 }
 
 // AddCommentOutput contains the result of adding a comment.

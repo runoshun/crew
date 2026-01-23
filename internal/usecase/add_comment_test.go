@@ -357,13 +357,14 @@ func TestAddComment_Execute_RequestChanges_SessionStartError(t *testing.T) {
 }
 
 func TestAddComment_Execute_RequestChanges_ResetsAutoFixRetryCount(t *testing.T) {
-	// Setup - task has non-zero AutoFixRetryCount (e.g., after failed review attempts)
+	// Setup - task starts from StatusReviewing with non-zero AutoFixRetryCount
+	// (simulates auto_fix scenario where worker completed but review failed)
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:                1,
 		Title:             "Test task",
-		Status:            domain.StatusInProgress,
-		AutoFixRetryCount: 2, // Simulates 2 previous failed review attempts
+		Status:            domain.StatusReviewing, // Start from non-in_progress status
+		AutoFixRetryCount: 2,                      // Simulates 2 previous failed review attempts
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true
@@ -381,10 +382,10 @@ func TestAddComment_Execute_RequestChanges_ResetsAutoFixRetryCount(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, "修正してください", out.Comment.Text)
 
-	// Verify AutoFixRetryCount is reset to 0
+	// Verify status transition and AutoFixRetryCount reset
 	task := repo.Tasks[1]
+	assert.Equal(t, domain.StatusInProgress, task.Status, "Status should transition to in_progress")
 	assert.Equal(t, 0, task.AutoFixRetryCount, "AutoFixRetryCount should be reset to 0 on RequestChanges")
-	assert.Equal(t, domain.StatusInProgress, task.Status)
 }
 
 func TestAddComment_Execute_WithAuthor(t *testing.T) {
