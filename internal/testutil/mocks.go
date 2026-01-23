@@ -587,7 +587,7 @@ func NewMockConfigManager() *MockConfigManager {
 			Exists: false,
 		},
 		GlobalConfigInfo: domain.ConfigInfo{
-			Path:   "/home/test/.config/git-crew/config.toml",
+			Path:   "/home/test/.config/crew/config.toml",
 			Exists: false,
 		},
 		RootRepoConfigInfo: domain.ConfigInfo{
@@ -595,7 +595,7 @@ func NewMockConfigManager() *MockConfigManager {
 			Exists: false,
 		},
 		OverrideConfigInfo: domain.ConfigInfo{
-			Path:   "/home/test/.config/git-crew/config.override.toml",
+			Path:   "/home/test/.config/crew/config.override.toml",
 			Exists: false,
 		},
 		RuntimeConfigInfo: domain.ConfigInfo{

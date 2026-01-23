@@ -19,7 +19,7 @@ var _ domain.ConfigLoader = (*Loader)(nil)
 type Loader struct {
 	crewDir       string // Path to .git/crew directory
 	repoRoot      string // Path to repository root
-	globalConfDir string // Path to global config directory (e.g., ~/.config/git-crew)
+	globalConfDir string // Path to global config directory (e.g., ~/.config/crew)
 }
 
 // NewLoader creates a new Loader.

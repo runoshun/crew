@@ -159,6 +159,11 @@ func (m *Manager) initConfig(path string, cfg *domain.Config) error {
 // Creates the [complete] section if it doesn't exist.
 // Preserves other existing settings in the file.
 func (m *Manager) SetAutoFix(enabled bool) error {
+	// Ensure the crew directory exists
+	if err := os.MkdirAll(m.crewDir, 0700); err != nil {
+		return err
+	}
+
 	path := filepath.Join(m.crewDir, domain.ConfigRuntimeFileName)
 
 	// Read existing config or start with empty map

@@ -336,4 +336,23 @@ level = "debug"
 		require.NoError(t, err)
 		assert.Contains(t, string(runtimeContent), "auto_fix = true")
 	})
+
+	t.Run("creates crew directory if it does not exist", func(t *testing.T) {
+		tempDir := t.TempDir()
+		crewDir := filepath.Join(tempDir, "nonexistent", "crew")
+		manager := NewManagerWithGlobalDir(crewDir, "", "")
+
+		err := manager.SetAutoFix(true)
+		require.NoError(t, err)
+
+		// Verify directory was created
+		info, err := os.Stat(crewDir)
+		require.NoError(t, err)
+		assert.True(t, info.IsDir())
+
+		// Verify runtime config has the auto_fix setting
+		runtimeContent, err := os.ReadFile(filepath.Join(crewDir, domain.ConfigRuntimeFileName))
+		require.NoError(t, err)
+		assert.Contains(t, string(runtimeContent), "auto_fix = true")
+	})
 }
