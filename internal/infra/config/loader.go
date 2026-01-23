@@ -54,8 +54,8 @@ func defaultGlobalConfigDir() string {
 	return domain.GlobalCrewDir(configHome)
 }
 
-// Load returns the merged configuration (repo + global).
-// Repository config takes precedence over global config.
+// Load returns the merged configuration.
+// Priority (later takes precedence): global < override < .crew.toml < config.toml < config.runtime.toml
 func (l *Loader) Load() (*domain.Config, error) {
 	return l.LoadWithOptions(domain.LoadConfigOptions{})
 }

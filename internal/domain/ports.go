@@ -234,7 +234,8 @@ type UpdatePROptions struct {
 
 // ConfigLoader loads configuration from files.
 type ConfigLoader interface {
-	// Load returns the merged configuration (repo + global).
+	// Load returns the merged configuration.
+	// Priority (later takes precedence): global < override < .crew.toml < config.toml < config.runtime.toml
 	Load() (*Config, error)
 
 	// LoadGlobal returns only the global configuration.
@@ -292,7 +293,7 @@ type ConfigManager interface {
 	// Returns error if file already exists.
 	InitOverrideConfig(cfg *Config) error
 
-	// SetAutoFix updates the auto_fix setting in the repository config file.
+	// SetAutoFix updates the auto_fix setting in the runtime config file (config.runtime.toml).
 	// Creates the [complete] section if it doesn't exist.
 	// Preserves other existing settings in the file.
 	SetAutoFix(enabled bool) error
