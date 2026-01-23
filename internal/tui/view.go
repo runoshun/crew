@@ -717,7 +717,7 @@ func (m *Model) viewHelp() string {
 				{"o", "Sort"},
 				{"v", "Details"},
 				{"A", "Toggle all"},
-				{"t", "Toggle auto-fix"},
+				{"t", "Toggle review mode"},
 			},
 		},
 		{

@@ -267,7 +267,7 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 							}
 						}
 					case "auto_fix":
-						// Legacy: map auto_fix to review_mode
+						// Legacy: preserve auto_fix for use case compatibility
 						if b, ok := v.(bool); ok {
 							res.Complete.AutoFix = b //nolint:staticcheck // Legacy compatibility
 							res.Complete.AutoFixSet = true

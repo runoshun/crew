@@ -192,6 +192,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		return &CompleteTaskOutput{
 			Task:              task,
 			ShouldStartReview: false,
+			ReviewMode:        domain.ReviewModeAuto,
 		}, nil
 	}
 
