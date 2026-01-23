@@ -83,10 +83,12 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 
 	var sessionStarted bool
 
-	// If RequestChanges is true, update status to in_progress and notify session
+	// If RequestChanges is true, update status to in_progress, reset retry count, and notify session
 	if in.RequestChanges {
-		// Update status to in_progress
+		// Update status to in_progress and reset auto_fix retry count
+		// (this is a new attempt by the user, so reset the counter)
 		task.Status = domain.StatusInProgress
+		task.AutoFixRetryCount = 0
 		if err := uc.tasks.Save(task); err != nil {
 			return nil, fmt.Errorf("update task status: %w", err)
 		}
