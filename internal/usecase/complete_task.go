@@ -24,8 +24,11 @@ type CompleteTaskOutput struct {
 }
 
 // CompleteTask is the use case for marking a task as complete.
-// It transitions the task from in_progress to reviewing (or reviewed if skip_review).
-// If not skipping review, it signals to the CLI that review should be started.
+// Status transitions depend on configuration:
+//   - skip_review: directly to reviewed
+//   - auto_fix: status remains in_progress (CLI handles transition after review)
+//   - normal: transitions to reviewing, signals CLI to start background review
+//
 // Fields are ordered to minimize memory padding.
 type CompleteTask struct {
 	tasks     domain.TaskRepository

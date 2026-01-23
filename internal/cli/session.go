@@ -283,7 +283,7 @@ func newCompleteCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "complete [id]",
 		Short: "Mark task as complete",
-		Long: `Mark a task as complete (in_progress/needs_input → reviewing).
+		Long: `Mark a task as complete and trigger review.
 
 If no ID is provided, the task ID is auto-detected from the current branch name.
 
@@ -294,14 +294,16 @@ Preconditions:
 If [complete].command is configured, it will be executed before transitioning
 the status. If the command fails, the completion is aborted.
 
-If skip_review is enabled (via task setting or config), the task transitions
-directly to 'reviewed'. Otherwise, it transitions to 'reviewing' and a review
-session is started.
+Status transitions:
+  - skip_review enabled: directly to 'reviewed'
+  - auto_fix enabled: status remains 'in_progress' during synchronous review,
+    then transitions to 'reviewed' only on LGTM
+  - normal mode: transitions to 'reviewing' and starts background review session
 
 Auto-fix mode:
   When [complete].auto_fix is enabled, the review runs synchronously.
-  - If LGTM: outputs "LGTM" and exits successfully
-  - If not LGTM: outputs review feedback for the worker to address
+  - If LGTM: sets status to 'reviewed', outputs "LGTM" and exits successfully
+  - If not LGTM: status remains 'in_progress', outputs review feedback
   - Use [complete].auto_fix_max_retries to limit retry attempts (default: 3)
 
 Examples:
