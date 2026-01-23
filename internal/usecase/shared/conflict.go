@@ -51,12 +51,12 @@ type ConflictCheckOutput struct {
 // - Returns a ConflictCheckOutput with the message and ErrMergeConflict
 //
 // The caller is responsible for displaying the conflict message to stdout.
-// If no conflicts, returns an empty output and nil error.
+// Always returns a non-nil ConflictCheckOutput (empty on error or no conflict).
 func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) (*ConflictCheckOutput, error) {
 	// Get conflicting files
 	conflictFiles, err := h.git.GetMergeConflictFiles(in.Branch, in.BaseBranch)
 	if err != nil {
-		return nil, fmt.Errorf("check merge conflict: %w", err)
+		return &ConflictCheckOutput{}, fmt.Errorf("check merge conflict: %w", err)
 	}
 
 	if len(conflictFiles) == 0 {
@@ -67,7 +67,7 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) (*ConflictCheckO
 	// Get task
 	task, err := GetTask(h.tasks, in.TaskID)
 	if err != nil {
-		return nil, err
+		return &ConflictCheckOutput{}, err
 	}
 
 	// Build conflict message
@@ -76,18 +76,18 @@ func (h *ConflictHandler) CheckAndHandle(in ConflictCheckInput) (*ConflictCheckO
 	// Transition status to in_progress
 	task.Status = domain.StatusInProgress
 	if err := h.tasks.Save(task); err != nil {
-		return nil, fmt.Errorf("save task: %w", err)
+		return &ConflictCheckOutput{}, fmt.Errorf("save task: %w", err)
 	}
 
 	// Notify session if running
-	notificationMsg := fmt.Sprintf(conflictNotificationTemplate, task.ID, task.ID)
+	notificationMsg := fmt.Sprintf(conflictNotificationTemplate, task.ID)
 	_ = SendSessionNotification(h.sessions, task.ID, notificationMsg)
 
 	return &ConflictCheckOutput{Message: message}, domain.ErrMergeConflict
 }
 
 // conflictNotificationTemplate is the notification message for conflict resolution.
-const conflictNotificationTemplate = "Merge conflict detected. Please resolve the conflicts and run 'crew complete %d'. (Task ID: %d)"
+const conflictNotificationTemplate = "Merge conflict detected. Please resolve the conflicts and run 'crew complete %d'."
 
 // buildConflictMessage creates a user-friendly conflict message.
 func buildConflictMessage(files []string, baseBranch string) string {

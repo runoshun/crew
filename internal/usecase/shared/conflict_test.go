@@ -252,7 +252,8 @@ func TestConflictHandler_CheckAndHandle_TaskNotFound(t *testing.T) {
 
 	// Assert
 	require.ErrorIs(t, err, domain.ErrTaskNotFound)
-	assert.Nil(t, out)
+	require.NotNil(t, out)
+	assert.Empty(t, out.Message)
 }
 
 func TestBuildConflictMessage(t *testing.T) {
