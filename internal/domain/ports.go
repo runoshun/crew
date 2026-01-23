@@ -138,6 +138,7 @@ type StartSessionOptions struct {
 	TaskTitle string // Task title for status bar
 	TaskAgent string // Agent name for status bar
 	TaskID    int    // Associated task ID
+	IsReview  bool   // Whether this is a review session
 }
 
 // WorktreeManager manages git worktrees.
