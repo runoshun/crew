@@ -334,19 +334,13 @@ func printTaskList(w io.Writer, tasks []*domain.Task, clock domain.Clock) {
 			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
 		}
 
-		// Add blocked indicator
-		titleStr := task.Title
-		if task.IsBlocked() {
-			titleStr = "[BLOCKED] " + titleStr
-		}
-
 		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\n",
 			task.ID,
 			parentStr,
 			statusStr,
 			agentStr,
 			labelsStr,
-			titleStr,
+			formatTaskTitle(task),
 		)
 	}
 }
@@ -389,12 +383,6 @@ func printTaskListWithSessions(w io.Writer, tasksWithInfo []usecase.TaskWithSess
 			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
 		}
 
-		// Add blocked indicator
-		titleStr := task.Title
-		if task.IsBlocked() {
-			titleStr = "[BLOCKED] " + titleStr
-		}
-
 		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			task.ID,
 			parentStr,
@@ -402,7 +390,7 @@ func printTaskListWithSessions(w io.Writer, tasksWithInfo []usecase.TaskWithSess
 			agentStr,
 			sessionStr,
 			labelsStr,
-			titleStr,
+			formatTaskTitle(task),
 		)
 	}
 }
@@ -597,6 +585,14 @@ Examples:
 	cmd.Flags().BoolVar(&opts.LastReview, "last-review", false, "Show only the latest review comment")
 
 	return cmd
+}
+
+// formatTaskTitle adds [BLOCKED] prefix if the task is blocked.
+func formatTaskTitle(task *domain.Task) string {
+	if task.IsBlocked() {
+		return "[BLOCKED] " + task.Title
+	}
+	return task.Title
 }
 
 // resolveTaskID resolves the task ID from arguments or current branch.
@@ -818,6 +814,9 @@ File format for --from:
 				empty := ""
 				input.BlockReason = &empty
 			} else if cmd.Flags().Changed("block") {
+				if opts.Block == "" {
+					return fmt.Errorf("--block requires a non-empty reason (use --unblock to clear)")
+				}
 				input.BlockReason = &opts.Block
 			}
 

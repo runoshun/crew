@@ -76,6 +76,9 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 
 	title := task.Title
+	if task.IsBlocked() {
+		title = "[BLOCKED] " + title
+	}
 	if runewidth.StringWidth(title) > maxTitleLen {
 		title = runewidth.Truncate(title, maxTitleLen-3, "...")
 	}
