@@ -380,6 +380,92 @@ func TestConfig_EnabledAgents(t *testing.T) {
 	}
 }
 
+func TestConfig_GetReviewerAgents(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *Config
+		want   []string
+	}{
+		{
+			name: "returns only reviewer role agents",
+			config: &Config{
+				Agents: map[string]Agent{
+					"worker1":   {Role: RoleWorker},
+					"reviewer1": {Role: RoleReviewer},
+					"reviewer2": {Role: RoleReviewer},
+					"manager1":  {Role: RoleManager},
+				},
+			},
+			want: []string{"reviewer1", "reviewer2"},
+		},
+		{
+			name: "excludes hidden reviewer agents",
+			config: &Config{
+				Agents: map[string]Agent{
+					"reviewer1":        {Role: RoleReviewer},
+					"reviewer2":        {Role: RoleReviewer, Hidden: true},
+					"reviewer3":        {Role: RoleReviewer},
+					"hidden-reviewer4": {Role: RoleReviewer, Hidden: true},
+				},
+			},
+			want: []string{"reviewer1", "reviewer3"},
+		},
+		{
+			name: "excludes disabled agents",
+			config: &Config{
+				Agents: map[string]Agent{
+					"reviewer1":  {Role: RoleReviewer},
+					"reviewer2":  {Role: RoleReviewer},
+					"oc-reviews": {Role: RoleReviewer},
+				},
+				AgentsConfig: AgentsConfig{
+					DisabledAgents: []string{"oc-*"},
+				},
+			},
+			want: []string{"reviewer1", "reviewer2"},
+		},
+		{
+			name: "returns sorted list",
+			config: &Config{
+				Agents: map[string]Agent{
+					"z-reviewer": {Role: RoleReviewer},
+					"a-reviewer": {Role: RoleReviewer},
+					"m-reviewer": {Role: RoleReviewer},
+				},
+			},
+			want: []string{"a-reviewer", "m-reviewer", "z-reviewer"},
+		},
+		{
+			name: "returns empty slice when no reviewers",
+			config: &Config{
+				Agents: map[string]Agent{
+					"worker1":  {Role: RoleWorker},
+					"manager1": {Role: RoleManager},
+				},
+			},
+			want: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.GetReviewerAgents()
+
+			if len(got) != len(tt.want) {
+				t.Errorf("GetReviewerAgents() returned %d agents, want %d: got %v, want %v",
+					len(got), len(tt.want), got, tt.want)
+				return
+			}
+
+			for i, name := range tt.want {
+				if got[i] != name {
+					t.Errorf("GetReviewerAgents()[%d] = %q, want %q", i, got[i], name)
+				}
+			}
+		})
+	}
+}
+
 func TestConfig_ResolveInheritance(t *testing.T) {
 	tests := []struct {
 		wantErr error

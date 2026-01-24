@@ -530,11 +530,11 @@ func (c *Config) EnabledAgents() map[string]Agent {
 }
 
 // GetReviewerAgents returns a sorted list of enabled reviewer agent names.
-// It filters for agents with RoleReviewer and not disabled.
+// It filters for agents with RoleReviewer, not disabled, and not hidden.
 func (c *Config) GetReviewerAgents() []string {
 	var reviewers []string
 	for name, agent := range c.EnabledAgents() {
-		if agent.Role == RoleReviewer {
+		if agent.Role == RoleReviewer && !agent.Hidden {
 			reviewers = append(reviewers, name)
 		}
 	}
