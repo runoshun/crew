@@ -845,7 +845,7 @@ func TestTask_IsBlocked(t *testing.T) {
 		},
 		{
 			name:        "non-empty block reason - blocked",
-			blockReason: "親タスク",
+			blockReason: "Parent task",
 			want:        true,
 		},
 		{
@@ -855,7 +855,7 @@ func TestTask_IsBlocked(t *testing.T) {
 		},
 		{
 			name:        "dependency block reason",
-			blockReason: "依存: #42 の完了待ち",
+			blockReason: "Depends on #42",
 			want:        true,
 		},
 	}

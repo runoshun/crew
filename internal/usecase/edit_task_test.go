@@ -1558,7 +1558,7 @@ func TestEditTask_Execute_SetBlockReason(t *testing.T) {
 	uc := NewEditTask(repo)
 
 	// Execute - set block reason
-	blockReason := "親タスク - 子タスクを先に完了してください"
+	blockReason := "Parent task - complete children first"
 	out, err := uc.Execute(context.Background(), EditTaskInput{
 		TaskID:      1,
 		BlockReason: &blockReason,
@@ -1566,7 +1566,7 @@ func TestEditTask_Execute_SetBlockReason(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, "親タスク - 子タスクを先に完了してください", out.Task.BlockReason)
+	assert.Equal(t, "Parent task - complete children first", out.Task.BlockReason)
 	assert.True(t, out.Task.IsBlocked())
 }
 
@@ -1577,7 +1577,7 @@ func TestEditTask_Execute_UnblockTask(t *testing.T) {
 		ID:          1,
 		Title:       "Test task",
 		Status:      domain.StatusTodo,
-		BlockReason: "依存: #42 の完了待ち",
+		BlockReason: "Depends on #42",
 	}
 	uc := NewEditTask(repo)
 

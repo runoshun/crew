@@ -717,8 +717,8 @@ Examples:
   crew edit 1 --parent 0
 
   # Block a task (prevent starting)
-  crew edit 1 --block "親タスク - 子タスクを先に完了してください"
-  crew edit 1 --block "依存: #42 の完了待ち"
+  crew edit 1 --block "Parent task - complete children first"
+  crew edit 1 --block "Depends on #42"
 
   # Unblock a task (allow starting)
   crew edit 1 --unblock

@@ -30,7 +30,7 @@ type Task struct {
 	Status            Status      `json:"status"`                      // Current status
 	CloseReason       CloseReason `json:"closeReason,omitempty"`       // Why the task was closed
 	Title             string      `json:"title"`                       // Title (required)
-	BlockReason       string      `json:"blockReason,omitempty"`       // Non-empty if task cannot be started (e.g., "親タスク", "依存: #42")
+	BlockReason       string      `json:"blockReason,omitempty"`       // Non-empty if task cannot be started (e.g., "Parent task", "Depends on #42")
 	Labels            []string    `json:"labels,omitempty"`            // Labels
 	ID                int         `json:"-"`                           // Task ID (stored as map key, not in value)
 	Issue             int         `json:"issue,omitempty"`             // GitHub issue number (0 = not linked)

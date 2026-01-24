@@ -289,8 +289,8 @@ crew close <id>                    # Close/abandon task
 
 ### Task Blocking
 ```bash
-crew edit <id> --block "親タスク"           # Block task (prevent starting)
-crew edit <id> --block "依存: #42 の完了待ち" # Block with dependency reason
+crew edit <id> --block "Parent task"        # Block task (prevent starting)
+crew edit <id> --block "Depends on #42"     # Block with dependency reason
 crew edit <id> --unblock                    # Unblock task (allow starting)
 ```
 

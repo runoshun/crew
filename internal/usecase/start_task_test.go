@@ -1303,7 +1303,7 @@ func TestStartTask_Execute_BlockedTask(t *testing.T) {
 		Title:       "Blocked task",
 		Status:      domain.StatusTodo,
 		BaseBranch:  "main",
-		BlockReason: "依存: #42 の完了待ち",
+		BlockReason: "Depends on #42",
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -1321,7 +1321,7 @@ func TestStartTask_Execute_BlockedTask(t *testing.T) {
 	// Assert
 	require.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrTaskBlocked)
-	assert.Contains(t, err.Error(), "依存: #42 の完了待ち")
+	assert.Contains(t, err.Error(), "Depends on #42")
 
 	// Verify session was not started
 	assert.False(t, sessions.StartCalled)
