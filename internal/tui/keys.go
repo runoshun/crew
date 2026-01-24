@@ -191,7 +191,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 
 		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},   // Session
 		{k.New, k.Copy, k.Delete, k.Edit, k.EditStatus}, // Task management
-		{k.Merge, k.Close, k.Block},                     // Workflow
+		{k.Merge, k.Close, k.Block, k.Manager},          // Workflow
 		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
 	}
 }
