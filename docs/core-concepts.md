@@ -151,7 +151,6 @@ command = "mise run ci"
 # Diff display
 [diff]
 command = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}}{{end}}"
-tui_command = "git diff --color {{.BaseBranch}}...HEAD | less -R"
 
 # Logging
 [log]

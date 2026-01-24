@@ -74,9 +74,7 @@
 ##   - {{.BaseBranch}}: Task's base branch (e.g., "main")
 ##   - {{.Args}}: Additional arguments passed to the diff command
 ##     The command runs from the worktree directory.
-## - tui_command: Command for TUI diff display (optional)
 # command = "git diff {{.BaseBranch}}...HEAD{{if .Args}} {{.Args}}{{end}}"
-# tui_command = "git diff --color {{.BaseBranch}}...HEAD | less -R"
 
 [log]
 ## Log settings
