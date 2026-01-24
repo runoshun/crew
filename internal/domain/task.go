@@ -30,6 +30,7 @@ type Task struct {
 	Status            Status      `json:"status"`                      // Current status
 	CloseReason       CloseReason `json:"closeReason,omitempty"`       // Why the task was closed
 	Title             string      `json:"title"`                       // Title (required)
+	BlockReason       string      `json:"blockReason,omitempty"`       // Non-empty if task cannot be started (e.g., "親タスク", "依存: #42")
 	Labels            []string    `json:"labels,omitempty"`            // Labels
 	ID                int         `json:"-"`                           // Task ID (stored as map key, not in value)
 	Issue             int         `json:"issue,omitempty"`             // GitHub issue number (0 = not linked)
@@ -45,6 +46,11 @@ func (t *Task) IsRoot() bool {
 // IsRunning returns true if the task has an active session.
 func (t *Task) IsRunning() bool {
 	return t.Session != ""
+}
+
+// IsBlocked returns true if the task has a block reason set.
+func (t *Task) IsBlocked() bool {
+	return t.BlockReason != ""
 }
 
 // ToMarkdown converts the task to a Markdown format with frontmatter.

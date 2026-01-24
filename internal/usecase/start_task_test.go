@@ -1292,3 +1292,39 @@ func TestStartTask_Execute_WithEmptyAdditionalPrompts(t *testing.T) {
 	// Verify default prompt is also present
 	assert.Contains(t, script, "Task #1")
 }
+
+func TestStartTask_Execute_BlockedTask(t *testing.T) {
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Blocked task",
+		Status:      domain.StatusTodo,
+		BaseBranch:  "main",
+		BlockReason: "依存: #42 の完了待ち",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	configLoader := testutil.NewMockConfigLoader()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute - should fail because task is blocked
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "claude",
+	})
+
+	// Assert
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrTaskBlocked)
+	assert.Contains(t, err.Error(), "依存: #42 の完了待ち")
+
+	// Verify session was not started
+	assert.False(t, sessions.StartCalled)
+	// Verify worktree was not created
+	assert.False(t, worktrees.CreateCalled)
+}

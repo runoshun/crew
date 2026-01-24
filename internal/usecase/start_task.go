@@ -79,6 +79,11 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, err
 	}
 
+	// Check if task is blocked
+	if task.IsBlocked() {
+		return nil, fmt.Errorf("%w: %s", domain.ErrTaskBlocked, task.BlockReason)
+	}
+
 	// Check if session is already running
 	sessionName := domain.SessionName(task.ID)
 	if runningErr := shared.EnsureNoRunningSession(uc.sessions, task.ID); runningErr != nil {

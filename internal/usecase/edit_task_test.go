@@ -1546,3 +1546,76 @@ Description`
 	// Assert
 	assert.ErrorIs(t, err, domain.ErrInvalidParentID)
 }
+
+func TestEditTask_Execute_SetBlockReason(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - set block reason
+	blockReason := "親タスク - 子タスクを先に完了してください"
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:      1,
+		BlockReason: &blockReason,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "親タスク - 子タスクを先に完了してください", out.Task.BlockReason)
+	assert.True(t, out.Task.IsBlocked())
+}
+
+func TestEditTask_Execute_UnblockTask(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Test task",
+		Status:      domain.StatusTodo,
+		BlockReason: "依存: #42 の完了待ち",
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - clear block reason (unblock)
+	emptyReason := ""
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:      1,
+		BlockReason: &emptyReason,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "", out.Task.BlockReason)
+	assert.False(t, out.Task.IsBlocked())
+}
+
+func TestEditTask_Execute_BlockWithOtherFields(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Original title",
+		Status: domain.StatusTodo,
+	}
+	uc := NewEditTask(repo)
+
+	// Execute - set block reason and update title
+	blockReason := "設計レビュー待ち"
+	newTitle := "Updated title"
+	out, err := uc.Execute(context.Background(), EditTaskInput{
+		TaskID:      1,
+		BlockReason: &blockReason,
+		Title:       &newTitle,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "Updated title", out.Task.Title)
+	assert.Equal(t, "設計レビュー待ち", out.Task.BlockReason)
+	assert.True(t, out.Task.IsBlocked())
+}

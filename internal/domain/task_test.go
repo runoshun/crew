@@ -831,3 +831,43 @@ func TestRoundTripWithComments(t *testing.T) {
 func intPtr(n int) *int {
 	return &n
 }
+
+func TestTask_IsBlocked(t *testing.T) {
+	tests := []struct {
+		name        string
+		blockReason string
+		want        bool
+	}{
+		{
+			name:        "empty block reason - not blocked",
+			blockReason: "",
+			want:        false,
+		},
+		{
+			name:        "non-empty block reason - blocked",
+			blockReason: "親タスク",
+			want:        true,
+		},
+		{
+			name:        "block reason with whitespace only is still blocked",
+			blockReason: " ",
+			want:        true,
+		},
+		{
+			name:        "dependency block reason",
+			blockReason: "依存: #42 の完了待ち",
+			want:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{
+				Title:       "Test Task",
+				BlockReason: tt.blockReason,
+			}
+			got := task.IsBlocked()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

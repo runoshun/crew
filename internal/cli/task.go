@@ -334,13 +334,19 @@ func printTaskList(w io.Writer, tasks []*domain.Task, clock domain.Clock) {
 			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
 		}
 
+		// Add blocked indicator
+		titleStr := task.Title
+		if task.IsBlocked() {
+			titleStr = "[BLOCKED] " + titleStr
+		}
+
 		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\n",
 			task.ID,
 			parentStr,
 			statusStr,
 			agentStr,
 			labelsStr,
-			task.Title,
+			titleStr,
 		)
 	}
 }
@@ -383,6 +389,12 @@ func printTaskListWithSessions(w io.Writer, tasksWithInfo []usecase.TaskWithSess
 			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
 		}
 
+		// Add blocked indicator
+		titleStr := task.Title
+		if task.IsBlocked() {
+			titleStr = "[BLOCKED] " + titleStr
+		}
+
 		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			task.ID,
 			parentStr,
@@ -390,7 +402,7 @@ func printTaskListWithSessions(w io.Writer, tasksWithInfo []usecase.TaskWithSess
 			agentStr,
 			sessionStr,
 			labelsStr,
-			task.Title,
+			titleStr,
 		)
 	}
 }
@@ -639,6 +651,7 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		Status       string
 		Labels       string
 		From         string
+		Block        string
 		AddLabels    []string
 		RemoveLabels []string
 		IfStatus     []string
@@ -646,6 +659,7 @@ func newEditCommand(c *app.Container) *cobra.Command {
 		SkipReview   bool
 		NoSkipReview bool
 		NoParent     bool
+		Unblock      bool
 	}
 
 	cmd := &cobra.Command{
@@ -706,6 +720,13 @@ Examples:
   crew edit 1 --no-parent
   crew edit 1 --parent 0
 
+  # Block a task (prevent starting)
+  crew edit 1 --block "親タスク - 子タスクを先に完了してください"
+  crew edit 1 --block "依存: #42 の完了待ち"
+
+  # Unblock a task (allow starting)
+  crew edit 1 --unblock
+
   # Edit task from a file (updates title, body, and labels)
   crew edit 1 --from task.md
 
@@ -739,7 +760,9 @@ File format for --from:
 				cmd.Flags().Changed("skip-review") ||
 				cmd.Flags().Changed("no-skip-review") ||
 				cmd.Flags().Changed("parent") ||
-				cmd.Flags().Changed("no-parent")
+				cmd.Flags().Changed("no-parent") ||
+				cmd.Flags().Changed("block") ||
+				cmd.Flags().Changed("unblock")
 
 			if !hasFlags {
 				// Editor mode: open task in editor
@@ -791,6 +814,12 @@ File format for --from:
 			} else if cmd.Flags().Changed("parent") {
 				input.ParentID = &opts.ParentID
 			}
+			if cmd.Flags().Changed("unblock") {
+				empty := ""
+				input.BlockReason = &empty
+			} else if cmd.Flags().Changed("block") {
+				input.BlockReason = &opts.Block
+			}
 
 			// Execute use case
 			uc := c.EditTaskUseCase()
@@ -817,6 +846,9 @@ File format for --from:
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Set parent task ID (0 to remove parent)")
 	cmd.Flags().BoolVar(&opts.NoParent, "no-parent", false, "Remove parent task (make this a root task)")
 	cmd.MarkFlagsMutuallyExclusive("parent", "no-parent")
+	cmd.Flags().StringVar(&opts.Block, "block", "", "Block task with reason (prevents starting)")
+	cmd.Flags().BoolVar(&opts.Unblock, "unblock", false, "Unblock task (allow starting)")
+	cmd.MarkFlagsMutuallyExclusive("block", "unblock")
 	cmd.Flags().StringVar(&opts.From, "from", "", "Edit task from a Markdown file (updates title, body, and labels)")
 
 	return cmd

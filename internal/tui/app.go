@@ -600,7 +600,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return task.Status.CanStart()
+				return task.Status.CanStart() && !task.IsBlocked()
 			},
 		},
 		{

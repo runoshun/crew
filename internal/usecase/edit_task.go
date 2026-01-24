@@ -18,6 +18,7 @@ type EditTaskInput struct {
 	Status       *domain.Status  // New status (nil = no change)
 	SkipReview   *bool           // New skip_review setting (nil = no change)
 	ParentID     *int            // New parent ID (nil = no change, 0 = remove parent)
+	BlockReason  *string         // New block reason (nil = no change, "" = unblock)
 	EditorText   string          // Markdown text from editor (only used when EditorEdit is true)
 	Labels       []string        // Labels to set (replaces all existing labels, nil = no change)
 	AddLabels    []string        // Labels to add
@@ -54,7 +55,7 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	}
 
 	// Validate that at least one field is being updated
-	if in.Title == nil && in.Description == nil && in.Status == nil && in.SkipReview == nil && in.ParentID == nil && !in.RemoveParent && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
+	if in.Title == nil && in.Description == nil && in.Status == nil && in.SkipReview == nil && in.ParentID == nil && in.BlockReason == nil && !in.RemoveParent && !in.LabelsSet && len(in.AddLabels) == 0 && len(in.RemoveLabels) == 0 {
 		return nil, domain.ErrNoFieldsToUpdate
 	}
 
@@ -114,6 +115,11 @@ func (uc *EditTask) Execute(_ context.Context, in EditTaskInput) (*EditTaskOutpu
 	// Handle skip_review
 	if in.SkipReview != nil {
 		task.SkipReview = in.SkipReview
+	}
+
+	// Handle block reason
+	if in.BlockReason != nil {
+		task.BlockReason = *in.BlockReason
 	}
 
 	// Handle parent change
