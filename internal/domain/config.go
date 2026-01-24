@@ -298,6 +298,7 @@ type TUIKeybinding struct {
 	Command     string `toml:"command"`     // Command to execute
 	Description string `toml:"description"` // Description shown in help
 	Override    bool   `toml:"override"`    // Allow overriding existing keybindings
+	Worktree    bool   `toml:"worktree"`    // Execute in task worktree instead of repository root
 }
 
 // TUIConfig holds TUI customization settings from [tui] section.

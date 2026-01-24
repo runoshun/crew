@@ -1097,3 +1097,45 @@ auto_fix = true
 	// Verify: runtime config is ignored, repo config is used
 	assert.False(t, cfg.Complete.AutoFix) //nolint:staticcheck // Testing legacy field - From repo, runtime ignored
 }
+
+func TestLoader_Load_TUIKeybindings(t *testing.T) {
+	// Setup
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	// Write config with TUI keybindings including worktree flag
+	config := `
+[tui.keybindings]
+"g" = { command = "git log --oneline -10", description = "repo git log" }
+"s" = { command = "git status", description = "worktree status", worktree = true }
+"o" = { command = "echo override", description = "override test", override = true }
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	// Load config
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	// Verify keybindings
+	require.Len(t, cfg.TUI.Keybindings, 3)
+
+	// "g" - default worktree = false
+	gBinding := cfg.TUI.Keybindings["g"]
+	assert.Equal(t, "git log --oneline -10", gBinding.Command)
+	assert.Equal(t, "repo git log", gBinding.Description)
+	assert.False(t, gBinding.Worktree) // Default value
+
+	// "s" - worktree = true
+	sBinding := cfg.TUI.Keybindings["s"]
+	assert.Equal(t, "git status", sBinding.Command)
+	assert.Equal(t, "worktree status", sBinding.Description)
+	assert.True(t, sBinding.Worktree)
+
+	// "o" - override = true
+	oBinding := cfg.TUI.Keybindings["o"]
+	assert.Equal(t, "echo override", oBinding.Command)
+	assert.True(t, oBinding.Override)
+	assert.False(t, oBinding.Worktree) // Default value
+}

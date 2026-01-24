@@ -965,8 +965,8 @@ type execDiffMsg struct {
 	cmd *domain.ExecCommand
 }
 
-// executeCommand returns a tea.Cmd that executes a command in a task's worktree.
-func (m *Model) executeCommand(command string) tea.Cmd {
+// executeCommandInWorktree returns a tea.Cmd that executes a command in a task's worktree.
+func (m *Model) executeCommandInWorktree(command string) tea.Cmd {
 	task := m.SelectedTask()
 	if task == nil {
 		return func() tea.Msg {
@@ -988,6 +988,14 @@ func (m *Model) executeCommand(command string) tea.Cmd {
 	})
 }
 
+// executeCommandInRepoRoot returns a tea.Cmd that executes a command in the repository root.
+func (m *Model) executeCommandInRepoRoot(command string) tea.Cmd {
+	cmd := domain.NewShellCommand(command, m.container.Config.RepoRoot)
+	return tea.Exec(&domainExecCmd{cmd: cmd}, func(err error) tea.Msg {
+		return MsgReloadTasks{}
+	})
+}
+
 // handleCustomKeybinding handles a custom keybinding action.
 func (m *Model) handleCustomKeybinding(binding domain.TUIKeybinding) (tea.Model, tea.Cmd) {
 	task := m.SelectedTask()
@@ -1002,8 +1010,11 @@ func (m *Model) handleCustomKeybinding(binding domain.TUIKeybinding) (tea.Model,
 		return m, nil
 	}
 
-	// Execute the command
-	return m, m.executeCommand(command)
+	// Execute the command in worktree or repository root
+	if binding.Worktree {
+		return m, m.executeCommandInWorktree(command)
+	}
+	return m, m.executeCommandInRepoRoot(command)
 }
 
 // renderKeybindingTemplate renders a keybinding command template with task data.
