@@ -183,6 +183,9 @@ Use --help-manager-auto to see the auto mode guide.`,
 	pollCmd := newPollCommand(c)
 	pollCmd.GroupID = groupSession
 
+	logsCmd := newLogsCommand(c)
+	logsCmd.GroupID = groupSession
+
 	pruneCmd := newPruneCommand(c)
 	pruneCmd.GroupID = groupTask
 
@@ -229,6 +232,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 		mergeCmd,
 		reviewCmd,
 		pollCmd,
+		logsCmd,
 		pruneCmd,
 		tuiCmd,
 		managerCmd,

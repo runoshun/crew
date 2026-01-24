@@ -136,6 +136,22 @@ func TestPathFunctions(t *testing.T) {
 		}
 	})
 
+	t.Run("SessionLogPath", func(t *testing.T) {
+		got := SessionLogPath(crewDir, "crew-1")
+		want := "/repo/.git/crew/logs/crew-1.log"
+		if got != want {
+			t.Errorf("SessionLogPath(%q, %q) = %q, want %q", crewDir, "crew-1", got, want)
+		}
+	})
+
+	t.Run("SessionLogPath_review", func(t *testing.T) {
+		got := SessionLogPath(crewDir, "crew-1-review")
+		want := "/repo/.git/crew/logs/crew-1-review.log"
+		if got != want {
+			t.Errorf("SessionLogPath(%q, %q) = %q, want %q", crewDir, "crew-1-review", got, want)
+		}
+	})
+
 	t.Run("TasksStorePath", func(t *testing.T) {
 		got := TasksStorePath(crewDir)
 		want := "/repo/.git/crew/tasks.json"

@@ -60,6 +60,12 @@ func (c *Client) Start(ctx context.Context, opts domain.StartSessionOptions) err
 		return domain.ErrSessionRunning
 	}
 
+	// Write session header to log file before starting
+	logPath := domain.SessionLogPath(c.crewDir, opts.Name)
+	if err := c.writeSessionHeader(logPath, opts); err != nil {
+		return fmt.Errorf("write session header: %w", err)
+	}
+
 	// Build tmux command
 	// tmux -S <socket> -f <config> new-session -d -s <name> -c <dir> <command>
 	args := []string{
@@ -81,6 +87,11 @@ func (c *Client) Start(ctx context.Context, opts domain.StartSessionOptions) err
 
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("start session: %w: %s", err, string(out))
+	}
+
+	// Configure session logging with pipe-pane
+	if err := c.configureSessionLogging(opts.Name, logPath); err != nil {
+		return fmt.Errorf("configure session logging: %w", err)
 	}
 
 	// Configure status bar
@@ -512,4 +523,51 @@ func (c *Client) GetPaneProcesses(sessionName string) ([]domain.ProcessInfo, err
 	collectProcesses(rootPID)
 
 	return result, nil
+}
+
+// writeSessionHeader writes the session metadata header to the log file.
+// This includes timestamp, session name, command, and working directory.
+func (c *Client) writeSessionHeader(logPath string, opts domain.StartSessionOptions) error {
+	// Ensure logs directory exists
+	logsDir := filepath.Dir(logPath)
+	if err := os.MkdirAll(logsDir, 0750); err != nil {
+		return fmt.Errorf("create logs directory: %w", err)
+	}
+
+	// Format header
+	header := fmt.Sprintf(`================================================================================
+Session: %s
+Started: %s
+Directory: %s
+Command: %s
+================================================================================
+
+`, opts.Name, time.Now().Format(time.RFC3339), opts.Dir, opts.Command)
+
+	// Write header (truncate existing file)
+	// G306: Using 0600 as the log file is user-private
+	if err := os.WriteFile(logPath, []byte(header), 0600); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+
+	return nil
+}
+
+// configureSessionLogging sets up pipe-pane to capture session output to a log file.
+func (c *Client) configureSessionLogging(sessionName, logPath string) error {
+	// tmux pipe-pane -t <session> 'cat >> <logPath>'
+	// This captures all output from the session pane and appends it to the log file.
+	// Session names follow our naming convention (crew-N) and are safe to pass to tmux.
+	cmd := exec.Command("tmux", //nolint:gosec // sessionName follows crew-N naming convention
+		"-S", c.socketPath,
+		"pipe-pane",
+		"-t", sessionName,
+		fmt.Sprintf("cat >> %q", logPath),
+	)
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("pipe-pane: %w: %s", err, string(out))
+	}
+
+	return nil
 }

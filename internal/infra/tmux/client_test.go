@@ -544,3 +544,68 @@ func TestClient_Attach_ExecError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "attach session")
 }
+
+func TestClient_Start_CreatesSessionLog(t *testing.T) {
+	socketPath, crewDir, cleanup := setupTestEnv(t)
+	defer cleanup()
+
+	client := NewClient(socketPath, crewDir)
+	sessionName := "crew-1"
+
+	// Start session
+	err := client.Start(context.Background(), domain.StartSessionOptions{
+		Name:      sessionName,
+		Dir:       crewDir,
+		Command:   "echo 'test output'; sleep 60",
+		TaskID:    1,
+		TaskTitle: "Test Task",
+		TaskAgent: "test-agent",
+	})
+	require.NoError(t, err)
+
+	// Check that log file was created
+	logPath := domain.SessionLogPath(crewDir, sessionName)
+	_, err = os.Stat(logPath)
+	require.NoError(t, err, "log file should exist")
+
+	// Read log file and verify header
+	content, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+
+	contentStr := string(content)
+	assert.Contains(t, contentStr, "Session: "+sessionName)
+	assert.Contains(t, contentStr, "Started:")
+	assert.Contains(t, contentStr, "Directory: "+crewDir)
+	assert.Contains(t, contentStr, "Command: echo 'test output'; sleep 60")
+}
+
+func TestClient_writeSessionHeader(t *testing.T) {
+	crewDir := t.TempDir()
+	socketPath := filepath.Join(crewDir, "tmux.sock")
+
+	client := NewClient(socketPath, crewDir)
+	logPath := filepath.Join(crewDir, "logs", "test-session.log")
+
+	opts := domain.StartSessionOptions{
+		Name:      "test-session",
+		Dir:       "/path/to/dir",
+		Command:   "test command",
+		TaskID:    1,
+		TaskTitle: "Test Title",
+		TaskAgent: "test-agent",
+	}
+
+	// Write header
+	err := client.writeSessionHeader(logPath, opts)
+	require.NoError(t, err)
+
+	// Read and verify
+	content, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+
+	contentStr := string(content)
+	assert.Contains(t, contentStr, "Session: test-session")
+	assert.Contains(t, contentStr, "Started:")
+	assert.Contains(t, contentStr, "Directory: /path/to/dir")
+	assert.Contains(t, contentStr, "Command: test command")
+}
