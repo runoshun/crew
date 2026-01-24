@@ -74,6 +74,7 @@ type Model struct {
 	commentCounts   map[int]int // taskID -> comment count
 	builtinAgents   []string
 	customAgents    []string
+	reviewerAgents  []string // List of available reviewer agents
 	agentCommands   map[string]string
 	customKeybinds  map[string]domain.TUIKeybinding
 	keybindWarnings []string
@@ -112,6 +113,7 @@ type Model struct {
 	height               int
 	confirmTaskID        int
 	agentCursor          int
+	reviewerCursor       int
 	statusCursor         int
 	actionMenuCursor     int
 	reviewTaskID         int // Task being reviewed
@@ -750,7 +752,18 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			Desc:     "Run reviewer session",
 			Key:      "R",
 			Action: func() (tea.Model, tea.Cmd) {
-				return m, m.reviewTask(task.ID)
+				m.mode = ModeSelectReviewer
+				m.reviewerCursor = 0
+				// Set default cursor position if default reviewer is found
+				if m.config != nil {
+					for i, r := range m.reviewerAgents {
+						if r == m.config.AgentsConfig.DefaultReviewer {
+							m.reviewerCursor = i
+							break
+						}
+					}
+				}
+				return m, nil
 			},
 			IsAvailable: func() bool {
 				return m.hasWorktree(task)
@@ -916,6 +929,9 @@ func (m *Model) updateAgents() {
 	// Sort agent lists for stable alphabetical order
 	sort.Strings(m.builtinAgents)
 	sort.Strings(m.customAgents)
+
+	// Populate reviewer agents
+	m.reviewerAgents = m.config.GetReviewerAgents()
 
 	// Set cursor to default agent
 	allAgents := m.allAgents()
@@ -1131,11 +1147,12 @@ func renderTemplate(tmpl string, data any) (string, error) {
 }
 
 // reviewTask returns a command that reviews a task using the AI reviewer.
-func (m *Model) reviewTask(taskID int) tea.Cmd {
+func (m *Model) reviewTask(taskID int, agent string) tea.Cmd {
 	return func() tea.Msg {
 		uc := m.container.ReviewTaskUseCase(io.Discard, io.Discard)
 		_, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
 			TaskID: taskID,
+			Agent:  agent,
 			Wait:   false, // TUI uses background execution (tmux review session)
 		})
 		if err != nil {
