@@ -226,6 +226,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleNewTaskMode(msg)
 	case ModeStart:
 		return m.handleStartMode(msg)
+	case ModeSelectManager:
+		return m.handleSelectManagerMode(msg)
 	case ModeHelp:
 		return m.handleHelpMode(msg)
 	case ModeChangeStatus:
@@ -449,7 +451,12 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Manager):
-		// Start or attach to manager session
+		task := m.SelectedTask()
+		if task != nil {
+			m.mode = ModeSelectManager
+			return m, nil
+		}
+		// Start or attach to global manager session if no task selected
 		return m, m.startOrAttachManagerSession()
 	}
 
@@ -861,6 +868,52 @@ func (m *Model) handleStartModeCustomInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	var cmd tea.Cmd
 	m.customInput, cmd = m.customInput.Update(msg)
 	return m, cmd
+}
+
+// handleSelectManagerMode handles keys in manager selection mode.
+func (m *Model) handleSelectManagerMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		if m.managerAgentCursor > 0 {
+			m.managerAgentCursor--
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		if m.managerAgentCursor < len(m.managerAgents)-1 {
+			m.managerAgentCursor++
+		}
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		task := m.SelectedTask()
+		if task == nil {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		if len(m.managerAgents) == 0 {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		agent := m.managerAgents[m.managerAgentCursor]
+		m.mode = ModeNormal
+
+		// If session exists (running), attach to it.
+		if task.IsRunning() {
+			return m, func() tea.Msg {
+				return MsgAttachSession{TaskID: task.ID}
+			}
+		}
+
+		// If session does not exist, start with manager agent.
+		return m, m.startTask(task.ID, agent)
+	}
+
+	return m, nil
 }
 
 // handleHelpMode handles keys in help mode.

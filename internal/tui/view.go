@@ -149,6 +149,8 @@ func (m *Model) View() string {
 		dialog = m.viewNewTaskDialog()
 	case ModeStart:
 		dialog = m.viewAgentPicker()
+	case ModeSelectManager:
+		dialog = m.viewSelectManagerDialog()
 	case ModeHelp:
 		dialog = m.viewHelp()
 	case ModeChangeStatus:
@@ -633,6 +635,42 @@ func (m *Model) renderAgentRow(agent string, selected bool, ds dialogStyles) str
 	return ds.renderLine(baseStyle.Render("    ") + ds.text.Render(name) + doubleSpace + ds.muted.Render(cmdPreview))
 }
 
+func (m *Model) viewSelectManagerDialog() string {
+	task := m.SelectedTask()
+	if task == nil {
+		return ""
+	}
+
+	ds := m.newDialogStyles()
+
+	title := ds.renderLine(ds.label.Render("Select Manager"))
+	taskTitle := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+
+	// Build manager rows
+	rows := make([]string, 0, len(m.managerAgents))
+	if len(m.managerAgents) == 0 {
+		rows = append(rows, ds.renderLine(ds.muted.Render("  No manager agents configured")))
+	} else {
+		for i, agent := range m.managerAgents {
+			rows = append(rows, m.renderAgentRow(agent, i == m.managerAgentCursor, ds))
+		}
+	}
+
+	hint := ds.renderLine(
+		ds.key.Render("↑↓") + ds.text.Render(" select  ") +
+			ds.key.Render("enter") + ds.text.Render(" confirm  ") +
+			ds.key.Render("esc") + ds.text.Render(" cancel"))
+
+	// Build content
+	lines := make([]string, 0, 4+len(rows)+2)
+	lines = append(lines, title, taskTitle, ds.emptyLine())
+	lines = append(lines, rows...)
+	lines = append(lines, ds.emptyLine(), hint)
+
+	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	return m.dialogStyle().Render(content)
+}
+
 func (m *Model) viewFooter() string {
 	var content string
 	switch m.mode {
@@ -652,7 +690,7 @@ func (m *Model) viewFooter() string {
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeSelectManager, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock:
 		return ""
 	default:
 		return ""

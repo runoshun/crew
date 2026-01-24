@@ -74,6 +74,7 @@ type Model struct {
 	commentCounts   map[int]int // taskID -> comment count
 	builtinAgents   []string
 	customAgents    []string
+	managerAgents   []string
 	agentCommands   map[string]string
 	customKeybinds  map[string]domain.TUIKeybinding
 	keybindWarnings []string
@@ -112,6 +113,7 @@ type Model struct {
 	height               int
 	confirmTaskID        int
 	agentCursor          int
+	managerAgentCursor   int
 	statusCursor         int
 	actionMenuCursor     int
 	reviewTaskID         int // Task being reviewed
@@ -195,6 +197,7 @@ func New(c *app.Container) *Model {
 		reviewViewport:     reviewVp,
 		builtinAgents:      []string{"claude", "opencode", "codex"},
 		customAgents:       nil,
+		managerAgents:      nil,
 		agentCommands:      make(map[string]string),
 		customKeybinds:     make(map[string]domain.TUIKeybinding),
 		keybindWarnings:    nil,
@@ -897,12 +900,25 @@ func (m *Model) updateAgents() {
 	// EnabledAgents() already filters out disabled agents
 	m.builtinAgents = []string{}
 	m.customAgents = []string{}
+	m.managerAgents = []string{}
 	for name, agentDef := range m.config.EnabledAgents() {
-		// Skip hidden agents and non-worker roles
-		if agentDef.Hidden || (agentDef.Role != "" && agentDef.Role != domain.RoleWorker) {
+		// Skip hidden agents
+		if agentDef.Hidden {
 			continue
 		}
-		m.builtinAgents = append(m.builtinAgents, name)
+
+		// Add to appropriate list based on role
+		switch agentDef.Role {
+		case domain.RoleWorker, "":
+			m.builtinAgents = append(m.builtinAgents, name)
+		case domain.RoleManager:
+			m.managerAgents = append(m.managerAgents, name)
+		case domain.RoleReviewer:
+			continue
+		default:
+			continue
+		}
+
 		// Extract command from command template (simplified - first word)
 		cmdTemplate := agentDef.CommandTemplate
 		if cmdTemplate != "" {
@@ -916,12 +932,21 @@ func (m *Model) updateAgents() {
 	// Sort agent lists for stable alphabetical order
 	sort.Strings(m.builtinAgents)
 	sort.Strings(m.customAgents)
+	sort.Strings(m.managerAgents)
 
 	// Set cursor to default agent
 	allAgents := m.allAgents()
 	for i, a := range allAgents {
 		if a == m.config.AgentsConfig.DefaultWorker {
 			m.agentCursor = i
+			break
+		}
+	}
+
+	// Set manager cursor to default manager
+	for i, a := range m.managerAgents {
+		if a == m.config.AgentsConfig.DefaultManager {
+			m.managerAgentCursor = i
 			break
 		}
 	}
