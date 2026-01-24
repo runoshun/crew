@@ -27,10 +27,11 @@ type KeyMap struct {
 	EditStatus key.Binding // Change task status
 
 	// Workflow
-	Merge key.Binding // Merge task
-	Close key.Binding // Close task
-	Block key.Binding // Block/unblock task
-	PR    key.Binding // Create PR (future)
+	Merge   key.Binding // Merge task
+	Close   key.Binding // Close task
+	Block   key.Binding // Block/unblock task
+	PR      key.Binding // Create PR (future)
+	Manager key.Binding // Start/attach manager session
 
 	// View
 	Refresh          key.Binding // Refresh task list
@@ -130,6 +131,10 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("p"),
 			key.WithHelp("p", "create PR"),
 		),
+		Manager: key.NewBinding(
+			key.WithKeys("M"),
+			key.WithHelp("M", "manager"),
+		),
 		Refresh: key.NewBinding(
 			key.WithKeys("r"),
 			key.WithHelp("r", "refresh"),
@@ -186,7 +191,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 
 		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},   // Session
 		{k.New, k.Copy, k.Delete, k.Edit, k.EditStatus}, // Task management
-		{k.Merge, k.Close, k.Block},                     // Workflow
+		{k.Merge, k.Close, k.Block, k.Manager},          // Workflow
 		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
 	}
 }
@@ -223,6 +228,7 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.Close)
 	addKeys(k.Block)
 	addKeys(k.PR)
+	addKeys(k.Manager)
 	addKeys(k.Refresh)
 	addKeys(k.Filter)
 	addKeys(k.Sort)

@@ -28,6 +28,12 @@ func ReviewSessionName(taskID int) string {
 	return fmt.Sprintf("crew-%d-review", taskID)
 }
 
+// ManagerSessionName returns the tmux session name for the manager.
+// Format: crew-manager (fixed, only one manager session)
+func ManagerSessionName() string {
+	return "crew-manager"
+}
+
 // ScriptPath returns the path to the task script.
 func ScriptPath(crewDir string, taskID int) string {
 	return filepath.Join(crewDir, "scripts", fmt.Sprintf("task-%d.sh", taskID))

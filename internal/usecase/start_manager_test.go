@@ -13,11 +13,13 @@ import (
 func TestStartManager_Execute_Success(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Use builtin claude-manager agent (already resolved by NewMockConfigLoader)
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -36,11 +38,13 @@ func TestStartManager_Execute_Success(t *testing.T) {
 func TestStartManager_Execute_ManagerNotFound(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// No managers configured
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartManagerInput{
@@ -54,11 +58,13 @@ func TestStartManager_Execute_ManagerNotFound(t *testing.T) {
 func TestStartManager_Execute_ConfigLoadError(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
 	configLoader.LoadErr = assert.AnError
+	sessions := testutil.NewMockSessionManager()
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), StartManagerInput{
@@ -73,8 +79,10 @@ func TestStartManager_Execute_ConfigLoadError(t *testing.T) {
 func TestStartManager_Execute_WithModelOverride(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Configure a custom manager agent (fully resolved, no inheritance)
 	configLoader.Config.Agents["custom-manager"] = domain.Agent{
 		Role:            domain.RoleManager,
@@ -83,7 +91,7 @@ func TestStartManager_Execute_WithModelOverride(t *testing.T) {
 		SystemPrompt:    domain.DefaultManagerSystemPrompt,
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute with model override
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -101,8 +109,10 @@ func TestStartManager_Execute_WithModelOverride(t *testing.T) {
 func TestStartManager_Execute_WithConfigModel(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Configure a custom manager agent (fully resolved, no inheritance)
 	configLoader.Config.Agents["custom-manager"] = domain.Agent{
 		Role:            domain.RoleManager,
@@ -111,7 +121,7 @@ func TestStartManager_Execute_WithConfigModel(t *testing.T) {
 		SystemPrompt:    domain.DefaultManagerSystemPrompt,
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute without model override
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -126,8 +136,10 @@ func TestStartManager_Execute_WithConfigModel(t *testing.T) {
 func TestStartManager_Execute_WithManagerArgs(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Configure a custom manager agent (fully resolved, no inheritance)
 	configLoader.Config.Agents["custom-manager"] = domain.Agent{
 		Role:            domain.RoleManager,
@@ -136,7 +148,7 @@ func TestStartManager_Execute_WithManagerArgs(t *testing.T) {
 		SystemPrompt:    domain.DefaultManagerSystemPrompt,
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -152,11 +164,13 @@ func TestStartManager_Execute_WithManagerArgs(t *testing.T) {
 func TestStartManager_Execute_WithBuiltinAgent(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Use builtin manager agent (opencode-manager)
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -171,11 +185,13 @@ func TestStartManager_Execute_WithBuiltinAgent(t *testing.T) {
 func TestStartManager_Execute_DefaultManager(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Default manager is set to "opencode-manager" by builtin.Register
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute with empty name (should use default)
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -299,8 +315,10 @@ func TestSplitCommand(t *testing.T) {
 func TestStartManager_Execute_WithManagerPrompt(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Set ManagerPrompt in AgentsConfig
 	configLoader.Config.AgentsConfig.ManagerPrompt = "Custom manager prompt from config"
 	// Use an agent without a custom prompt (so ManagerPrompt should be used)
@@ -310,7 +328,7 @@ func TestStartManager_Execute_WithManagerPrompt(t *testing.T) {
 		// Prompt is empty, so ManagerPrompt should be used
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -326,8 +344,10 @@ func TestStartManager_Execute_WithManagerPrompt(t *testing.T) {
 func TestStartManager_Execute_AgentPromptOverridesManagerPrompt(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Set both ManagerPrompt and Agent.Prompt
 	configLoader.Config.AgentsConfig.ManagerPrompt = "Manager prompt from config"
 	configLoader.Config.Agents["test-manager"] = domain.Agent{
@@ -336,7 +356,7 @@ func TestStartManager_Execute_AgentPromptOverridesManagerPrompt(t *testing.T) {
 		Prompt:          "Agent-specific prompt", // This should take precedence
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -364,8 +384,9 @@ func TestStartManager_Execute_WithDisabledAgent(t *testing.T) {
 		},
 	}
 	mockLoader := &testutil.MockConfigLoader{Config: cfg}
+	sessions := testutil.NewMockSessionManager()
 
-	uc := NewStartManager(mockLoader, "/test", "/test/.git")
+	uc := NewStartManager(sessions, mockLoader, "/test", "/test/.git", "/test/.git/crew")
 
 	// Execute with disabled agent
 	_, err := uc.Execute(context.Background(), StartManagerInput{
@@ -381,15 +402,17 @@ func TestStartManager_Execute_WithDisabledAgent(t *testing.T) {
 func TestStartManager_Execute_RoleMismatch(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Configure a worker agent (RoleWorker)
 	configLoader.Config.Agents["test-worker"] = domain.Agent{
 		Role:            domain.RoleWorker,
 		CommandTemplate: "worker-cmd",
 	}
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute with worker agent (should fail)
 	_, err := uc.Execute(context.Background(), StartManagerInput{
@@ -405,11 +428,13 @@ func TestStartManager_Execute_RoleMismatch(t *testing.T) {
 func TestStartManager_Execute_WithAdditionalPrompt(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 	// Use builtin claude-manager agent
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute with additional prompt
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -429,10 +454,12 @@ func TestStartManager_Execute_WithAdditionalPrompt(t *testing.T) {
 func TestStartManager_Execute_WithoutAdditionalPrompt(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
 
 	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
 
-	uc := NewStartManager(configLoader, repoRoot, gitDir)
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
 
 	// Execute without additional prompt (empty)
 	out, err := uc.Execute(context.Background(), StartManagerInput{
@@ -447,4 +474,52 @@ func TestStartManager_Execute_WithoutAdditionalPrompt(t *testing.T) {
 	assert.Contains(t, out.Prompt, "crew --help-manager")
 	// Prompt should NOT contain double newlines from empty additional prompt
 	assert.NotContains(t, out.Prompt, "\n\n\n")
+}
+
+func TestStartManager_Execute_SessionMode(t *testing.T) {
+	repoRoot := t.TempDir()
+	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
+
+	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
+
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
+
+	// Execute with session mode
+	out, err := uc.Execute(context.Background(), StartManagerInput{
+		Name:    "claude-manager",
+		Session: true,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, "crew-manager", out.SessionName)
+	assert.True(t, sessions.StartCalled)
+	assert.Equal(t, "crew-manager", sessions.StartOpts.Name)
+	assert.Equal(t, repoRoot, sessions.StartOpts.Dir)
+	assert.Equal(t, "Manager", sessions.StartOpts.TaskTitle)
+	assert.Equal(t, "claude-manager", sessions.StartOpts.TaskAgent)
+}
+
+func TestStartManager_Execute_SessionMode_AlreadyRunning(t *testing.T) {
+	repoRoot := t.TempDir()
+	gitDir := repoRoot + "/.git"
+	crewDir := gitDir + "/crew"
+
+	configLoader := testutil.NewMockConfigLoader()
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = true // Session already running
+
+	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
+
+	// Execute with session mode
+	_, err := uc.Execute(context.Background(), StartManagerInput{
+		Name:    "claude-manager",
+		Session: true,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrSessionRunning)
+	assert.Contains(t, err.Error(), "crew-manager")
 }

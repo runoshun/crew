@@ -294,7 +294,7 @@ func (c *Container) ExecCommandUseCase() *usecase.ExecCommand {
 
 // StartManagerUseCase returns a new StartManager use case.
 func (c *Container) StartManagerUseCase() *usecase.StartManager {
-	return usecase.NewStartManager(c.ConfigLoader, c.Config.RepoRoot, c.Config.GitDir)
+	return usecase.NewStartManager(c.Sessions, c.ConfigLoader, c.Config.RepoRoot, c.Config.GitDir, c.Config.CrewDir)
 }
 
 // ReviewTaskUseCase returns a new ReviewTask use case.

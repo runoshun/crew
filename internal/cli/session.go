@@ -158,21 +158,25 @@ Examples:
 
 // newAttachCommand creates the attach command for attaching to a session.
 func newAttachCommand(c *app.Container) *cobra.Command {
-	var review bool
+	var opts struct {
+		review  bool
+		manager bool
+	}
 
 	cmd := &cobra.Command{
-		Use:   "attach <id>",
+		Use:   "attach [id]",
 		Short: "Attach to a running session",
-		Long: `Attach to a running tmux session for a task.
+		Long: `Attach to a running tmux session for a task or manager.
 
 This replaces the current process with the tmux session.
 Use Ctrl+G to detach from the session (configured in .git/crew/tmux.conf).
 
 By default, attaches to the work session (crew-<id>).
 Use --review to attach to the review session (crew-<id>-review).
+Use --manager to attach to the manager session (crew-manager).
 
 Preconditions:
-  - Task must exist
+  - Task must exist (unless --manager is used)
   - Session must be running
 
 Examples:
@@ -180,9 +184,30 @@ Examples:
   crew attach 1
 
   # Attach to review session for task #1
-  crew attach 1 --review`,
-		Args: cobra.ExactArgs(1),
+  crew attach 1 --review
+
+  # Attach to manager session
+  crew attach --manager`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Handle manager session
+			if opts.manager {
+				sessionName := domain.ManagerSessionName()
+				running, err := c.Sessions.IsRunning(sessionName)
+				if err != nil {
+					return fmt.Errorf("check session: %w", err)
+				}
+				if !running {
+					return fmt.Errorf("manager session %q: %w", sessionName, domain.ErrNoSession)
+				}
+				return c.Sessions.Attach(sessionName)
+			}
+
+			// Require task ID for non-manager operations
+			if len(args) == 0 {
+				return fmt.Errorf("task ID is required (or use --manager for manager session)")
+			}
+
 			// Parse task ID
 			taskID, err := parseTaskID(args[0])
 			if err != nil {
@@ -193,7 +218,7 @@ Examples:
 			uc := c.AttachSessionUseCase()
 			_, err = uc.Execute(cmd.Context(), usecase.AttachSessionInput{
 				TaskID: taskID,
-				Review: review,
+				Review: opts.review,
 			})
 			if err != nil {
 				return err
@@ -204,7 +229,9 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVar(&review, "review", false, "Attach to review session instead of work session")
+	cmd.Flags().BoolVar(&opts.review, "review", false, "Attach to review session instead of work session")
+	cmd.Flags().BoolVar(&opts.manager, "manager", false, "Attach to manager session (crew-manager)")
+	cmd.MarkFlagsMutuallyExclusive("review", "manager")
 
 	return cmd
 }
@@ -519,13 +546,14 @@ Examples:
 // newStopCommand creates the stop command for stopping a task session.
 func newStopCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		review bool
+		review  bool
+		manager bool
 	}
 
 	cmd := &cobra.Command{
-		Use:   "stop <id>",
+		Use:   "stop [id]",
 		Short: "Stop a session",
-		Long: `Stop a running session for a task.
+		Long: `Stop a running session for a task or manager.
 
 This terminates the tmux session and cleans up generated scripts.
 When stopping a work session, it clears agent info and updates the
@@ -538,9 +566,38 @@ Examples:
   crew stop 1
 
   # Stop review session for task #1
-  crew stop 1 --review`,
-		Args: cobra.ExactArgs(1),
+  crew stop 1 --review
+
+  # Stop manager session
+  crew stop --manager`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Handle manager session
+			if opts.manager {
+				sessionName := domain.ManagerSessionName()
+				running, err := c.Sessions.IsRunning(sessionName)
+				if err != nil {
+					return fmt.Errorf("check session: %w", err)
+				}
+				if !running {
+					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No manager session running")
+					return nil
+				}
+				if err := c.Sessions.Stop(sessionName); err != nil {
+					return fmt.Errorf("stop manager session: %w", err)
+				}
+				// Clean up manager script
+				scriptPath := domain.ManagerScriptPath(c.Config.CrewDir)
+				_ = os.Remove(scriptPath)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Stopped manager session %s\n", sessionName)
+				return nil
+			}
+
+			// Require task ID for non-manager operations
+			if len(args) == 0 {
+				return fmt.Errorf("task ID is required (or use --manager for manager session)")
+			}
+
 			// Parse task ID
 			taskID, err := parseTaskID(args[0])
 			if err != nil {
@@ -576,6 +633,8 @@ Examples:
 	}
 
 	cmd.Flags().BoolVarP(&opts.review, "review", "r", false, "Stop the reviewer session instead of the work session")
+	cmd.Flags().BoolVar(&opts.manager, "manager", false, "Stop the manager session (crew-manager)")
+	cmd.MarkFlagsMutuallyExclusive("review", "manager")
 
 	return cmd
 }

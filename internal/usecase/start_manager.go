@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"text/template"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -15,38 +17,47 @@ type StartManagerInput struct {
 	Name             string // Manager agent name
 	Model            string // Model name override (optional)
 	AdditionalPrompt string // Additional prompt to append (optional)
+	Session          bool   // Start in tmux session (--session flag)
 }
 
 // StartManagerOutput contains the result of starting a manager.
 type StartManagerOutput struct {
-	Command string // The full command to execute
-	Prompt  string // The prompt content
+	Command     string // The full command to execute
+	Prompt      string // The prompt content
+	SessionName string // Session name (only set when Session=true)
 }
 
 // StartManager is the use case for starting a manager agent.
 type StartManager struct {
+	sessions     domain.SessionManager
 	configLoader domain.ConfigLoader
 	repoRoot     string
 	gitDir       string
+	crewDir      string
 }
 
 // NewStartManager creates a new StartManager use case.
 func NewStartManager(
+	sessions domain.SessionManager,
 	configLoader domain.ConfigLoader,
 	repoRoot string,
 	gitDir string,
+	crewDir string,
 ) *StartManager {
 	return &StartManager{
+		sessions:     sessions,
 		configLoader: configLoader,
 		repoRoot:     repoRoot,
 		gitDir:       gitDir,
+		crewDir:      crewDir,
 	}
 }
 
 // Execute starts a manager with the given input.
 // Returns the command and prompt to execute; the caller is responsible for
 // actually running the command (e.g., via syscall.Exec).
-func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*StartManagerOutput, error) {
+// When Session=true, starts a tmux session and returns the session name.
+func (uc *StartManager) Execute(ctx context.Context, in StartManagerInput) (*StartManagerOutput, error) {
 	// Load config
 	cfg, err := uc.configLoader.Load()
 	if err != nil {
@@ -107,10 +118,66 @@ func (uc *StartManager) Execute(_ context.Context, in StartManagerInput) (*Start
 		}
 	}
 
-	return &StartManagerOutput{
+	output := &StartManagerOutput{
 		Command: result.Command,
 		Prompt:  finalPrompt,
-	}, nil
+	}
+
+	// If session mode, start a tmux session
+	if in.Session {
+		sessionName := domain.ManagerSessionName()
+
+		// Check if session is already running
+		running, err := uc.sessions.IsRunning(sessionName)
+		if err != nil {
+			return nil, fmt.Errorf("check session: %w", err)
+		}
+		if running {
+			return nil, fmt.Errorf("manager session %q: %w", sessionName, domain.ErrSessionRunning)
+		}
+
+		// Generate script file
+		scriptPath, err := uc.generateManagerScript(output)
+		if err != nil {
+			return nil, fmt.Errorf("generate script: %w", err)
+		}
+
+		// Start session
+		if err := uc.sessions.Start(ctx, domain.StartSessionOptions{
+			Name:      sessionName,
+			Dir:       uc.repoRoot,
+			Command:   scriptPath,
+			TaskTitle: "Manager",
+			TaskAgent: name,
+			TaskID:    0, // Manager has no task ID
+		}); err != nil {
+			_ = os.Remove(scriptPath) // Cleanup on failure
+			return nil, fmt.Errorf("start session: %w", err)
+		}
+
+		output.SessionName = sessionName
+	}
+
+	return output, nil
+}
+
+// generateManagerScript creates the manager script file.
+func (uc *StartManager) generateManagerScript(out *StartManagerOutput) (string, error) {
+	scriptsDir := filepath.Join(uc.crewDir, "scripts")
+	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
+		return "", fmt.Errorf("create scripts directory: %w", err)
+	}
+
+	scriptPath := domain.ManagerScriptPath(uc.crewDir)
+	script := out.BuildScript()
+
+	// Write script file (executable)
+	// G306: We intentionally use 0700 because this is an executable script
+	if err := os.WriteFile(scriptPath, []byte(script), 0700); err != nil { //nolint:gosec // executable script requires execute permission
+		return "", fmt.Errorf("write script file: %w", err)
+	}
+
+	return scriptPath, nil
 }
 
 // GetCommand returns the executable path and arguments for the manager command.
