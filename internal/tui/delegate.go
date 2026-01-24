@@ -58,6 +58,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 	task := ti.task
 	selected := index == m.Index()
+	blocked := task.IsBlocked()
 
 	indicatorChar := " "
 	if selected {
@@ -76,28 +77,46 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 
 	title := task.Title
-	if task.IsBlocked() {
-		title = "[BLOCKED] " + title
-	}
 	if runewidth.StringWidth(title) > maxTitleLen {
 		title = runewidth.Truncate(title, maxTitleLen-3, "...")
 	}
 
+	// Blocked tasks use gray style for all elements
+	// Inherit Width/MarginRight from original styles to maintain alignment
+	blockedStyle := lipgloss.NewStyle().Foreground(Colors.Blocked)
+	blockedIDStyle := d.styles.TaskID.Foreground(Colors.Blocked)
+
 	var line string
 	if selected {
 		indicator := d.styles.SelectionIndicator.Bold(true).Render(indicatorChar)
-		idPart := d.styles.TaskID.Bold(true).Render(idStr)
-		iconPart := d.styles.StatusStyle(task.Status).Bold(true).Render(statusIcon)
-		textPart := d.styles.StatusStyle(task.Status).Bold(true).Render(statusText)
-		titlePart := d.styles.TaskTitle.Bold(true).Render(title)
+		var idPart, iconPart, textPart, titlePart string
+		if blocked {
+			idPart = blockedIDStyle.Bold(true).Render(idStr)
+			iconPart = blockedStyle.Bold(true).Render(statusIcon)
+			textPart = blockedStyle.Bold(true).Render(statusText)
+			titlePart = blockedStyle.Bold(true).Render(title)
+		} else {
+			idPart = d.styles.TaskID.Bold(true).Render(idStr)
+			iconPart = d.styles.StatusStyle(task.Status).Bold(true).Render(statusIcon)
+			textPart = d.styles.StatusStyle(task.Status).Bold(true).Render(statusText)
+			titlePart = d.styles.TaskTitle.Bold(true).Render(title)
+		}
 
 		line = "  " + indicator + " " + idPart + "  " + iconPart + " " + textPart + "  " + titlePart
 	} else {
 		indicator := d.styles.SelectionIndicator.Render(indicatorChar)
-		idPart := d.styles.TaskID.Render(idStr)
-		iconPart := d.styles.StatusStyle(task.Status).Render(statusIcon)
-		textPart := d.styles.StatusStyle(task.Status).Render(statusText)
-		titlePart := d.styles.TaskTitle.Render(title)
+		var idPart, iconPart, textPart, titlePart string
+		if blocked {
+			idPart = blockedIDStyle.Render(idStr)
+			iconPart = blockedStyle.Render(statusIcon)
+			textPart = blockedStyle.Render(statusText)
+			titlePart = blockedStyle.Render(title)
+		} else {
+			idPart = d.styles.TaskID.Render(idStr)
+			iconPart = d.styles.StatusStyle(task.Status).Render(statusIcon)
+			textPart = d.styles.StatusStyle(task.Status).Render(statusText)
+			titlePart = d.styles.TaskTitle.Render(title)
+		}
 
 		line = "  " + indicator + " " + idPart + "  " + iconPart + " " + textPart + "  " + titlePart
 	}
@@ -115,9 +134,15 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 	var metaParts []metaPart
 
+	// For blocked tasks, use blockedStyle for all metadata
 	grayStyle := lipgloss.NewStyle().Foreground(Colors.DescNormal) // Gray for metadata
 	greenStyle := lipgloss.NewStyle().Foreground(Colors.Success)   // Green for play icon
 	blueStyle := lipgloss.NewStyle().Foreground(Colors.Primary)    // Blue for GitHub
+	if blocked {
+		grayStyle = blockedStyle
+		greenStyle = blockedStyle
+		blueStyle = blockedStyle
+	}
 
 	// 1. Base branch (always shown)
 	metaParts = append(metaParts, metaPart{
@@ -136,7 +161,12 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	if len(task.Labels) > 0 {
 		labelsStrs := []string{}
 		for _, label := range task.Labels {
-			labelStyle := lipgloss.NewStyle().Bold(true).Foreground(labelColor(label))
+			var labelStyle lipgloss.Style
+			if blocked {
+				labelStyle = blockedStyle.Bold(true)
+			} else {
+				labelStyle = lipgloss.NewStyle().Bold(true).Foreground(labelColor(label))
+			}
 			labelsStrs = append(labelsStrs, labelStyle.Render(label))
 		}
 		metaParts = append(metaParts, metaPart{

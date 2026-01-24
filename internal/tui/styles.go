@@ -43,6 +43,9 @@ var Colors = struct {
 
 	// Group header
 	GroupLine lipgloss.Color
+
+	// Blocked state
+	Blocked lipgloss.Color
 }{
 	// Modern Dark Palette (Catppuccin-inspired - Modern Soft Variant)
 	Primary:    lipgloss.Color("#89B4FA"), // Blue
@@ -74,6 +77,9 @@ var Colors = struct {
 
 	// Group header / UI Elements
 	GroupLine: lipgloss.Color("#313244"), // Surface0
+
+	// Blocked state
+	Blocked: lipgloss.Color("#585B70"), // Surface2 - dim gray for blocked tasks
 }
 
 // Styles contains all the lipgloss styles for the TUI.
