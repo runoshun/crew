@@ -42,12 +42,18 @@ type dialogStyles struct {
 func (m *Model) newDialogStyles() dialogStyles {
 	bg := Colors.Background
 	width := m.dialogWidth() - 4
+
+	keyColor := Colors.Maroon
+	if m.isReviewMode() {
+		keyColor = Colors.KeyText
+	}
+
 	return dialogStyles{
 		width:      width,
 		bg:         bg,
 		line:       lipgloss.NewStyle().Background(bg).Width(width),
 		text:       lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal),
-		key:        lipgloss.NewStyle().Background(bg).Foreground(Colors.Maroon).Bold(true),
+		key:        lipgloss.NewStyle().Background(bg).Foreground(keyColor).Bold(true),
 		muted:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
 		label:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true),
 		labelMuted: lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
@@ -243,8 +249,27 @@ func (m *Model) headerFooterContentWidth() int {
 	return width
 }
 
+// isReviewMode returns true if the current mode is related to code review.
+func (m *Model) isReviewMode() bool {
+	switch m.mode { //nolint:exhaustive
+	case ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
+		return true
+	default:
+		return false
+	}
+}
+
+// viewHeader renders the header section.
 func (m *Model) viewHeader() string {
-	title := m.styles.HeaderText.Render("Tasks")
+	headerStyle := m.styles.HeaderWarm
+	textStyle := m.styles.HeaderTextWarm
+
+	if m.isReviewMode() {
+		headerStyle = m.styles.Header
+		textStyle = m.styles.HeaderText
+	}
+
+	title := textStyle.Render("Tasks")
 
 	contentWidth := m.headerFooterContentWidth()
 	visibleCount := len(m.taskList.Items())
@@ -294,7 +319,7 @@ func (m *Model) viewHeader() string {
 
 	content := title + strings.Repeat(" ", spacing) + rightText
 	// Set width dynamically to match list width
-	return m.styles.Header.Width(contentWidth).Render(content)
+	return headerStyle.Width(contentWidth).Render(content)
 }
 
 func (m *Model) viewTaskList() string {
@@ -634,17 +659,22 @@ func (m *Model) renderAgentRow(agent string, selected bool, ds dialogStyles) str
 }
 
 func (m *Model) viewFooter() string {
+	keyStyle := m.styles.FooterKeyWarm
+	if m.isReviewMode() {
+		keyStyle = m.styles.FooterKey
+	}
+
 	var content string
 	switch m.mode {
 	case ModeNormal:
-		content = m.styles.FooterKey.Render("j/k") + " nav  " +
-			m.styles.FooterKey.Render("enter") + " default  " +
-			m.styles.FooterKey.Render("space") + " actions  " +
-			m.styles.FooterKey.Render("n") + " new  " +
-			m.styles.FooterKey.Render("?") + " help  " +
-			m.styles.FooterKey.Render("q") + " quit"
+		content = keyStyle.Render("j/k") + " nav  " +
+			keyStyle.Render("enter") + " default  " +
+			keyStyle.Render("space") + " actions  " +
+			keyStyle.Render("n") + " new  " +
+			keyStyle.Render("?") + " help  " +
+			keyStyle.Render("q") + " quit"
 		if m.canStopSelectedTask(m.SelectedTask()) {
-			content = content + "  " + m.styles.FooterKey.Render("S") + " stop"
+			content = content + "  " + keyStyle.Render("S") + " stop"
 		}
 	case ModeFilter:
 		content = "enter apply · esc cancel"

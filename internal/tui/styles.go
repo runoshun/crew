@@ -101,6 +101,10 @@ type Styles struct {
 	Header     lipgloss.Style
 	HeaderText lipgloss.Style
 
+	// Header (Warm)
+	HeaderWarm     lipgloss.Style
+	HeaderTextWarm lipgloss.Style
+
 	// Task list
 	TaskList           lipgloss.Style
 	TaskItem           lipgloss.Style
@@ -155,6 +159,9 @@ type Styles struct {
 	Footer    lipgloss.Style
 	FooterKey lipgloss.Style
 
+	// Footer (Warm)
+	FooterKeyWarm lipgloss.Style
+
 	// Pagination
 	PaginationDot       lipgloss.Style
 	PaginationDotActive lipgloss.Style
@@ -186,13 +193,25 @@ func DefaultStyles() Styles {
 
 		Header: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.Peach).
+			Foreground(Colors.Primary).
 			Border(lipgloss.NormalBorder(), false, false, true, false).
 			BorderForeground(Colors.GroupLine).
 			Padding(0, 1).
 			MarginBottom(1),
 
 		HeaderText: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(Colors.Primary),
+
+		HeaderWarm: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(Colors.Peach).
+			Border(lipgloss.NormalBorder(), false, false, true, false).
+			BorderForeground(Colors.GroupLine).
+			Padding(0, 1).
+			MarginBottom(1),
+
+		HeaderTextWarm: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(Colors.Peach),
 
@@ -356,6 +375,11 @@ func DefaultStyles() Styles {
 			MarginTop(1),
 
 		FooterKey: lipgloss.NewStyle().
+			Foreground(Colors.KeyText).
+			Background(Colors.GroupLine).
+			Padding(0, 1),
+
+		FooterKeyWarm: lipgloss.NewStyle().
 			Foreground(Colors.Maroon).
 			Background(Colors.GroupLine).
 			Padding(0, 1),
