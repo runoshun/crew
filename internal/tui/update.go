@@ -902,15 +902,9 @@ func (m *Model) handleSelectManagerMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		agent := m.managerAgents[m.managerAgentCursor]
 		m.mode = ModeNormal
 
-		// If session exists (running), attach to it.
-		if task.IsRunning() {
-			return m, func() tea.Msg {
-				return MsgAttachSession{TaskID: task.ID}
-			}
-		}
-
-		// If session does not exist, start with manager agent.
-		return m, m.startTask(task.ID, agent)
+		// Start or attach to manager session with task context.
+		// The selected manager agent is used to start the session.
+		return m, m.startOrAttachManagerSessionForTask(task.ID, agent)
 	}
 
 	return m, nil

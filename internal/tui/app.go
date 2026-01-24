@@ -1445,6 +1445,46 @@ func (m *Model) attachToManagerSession() tea.Cmd {
 	})
 }
 
+// startOrAttachManagerSessionForTask returns a tea.Cmd that starts or attaches to manager session
+// with context for a specific task.
+func (m *Model) startOrAttachManagerSessionForTask(taskID int, managerAgent string) tea.Cmd {
+	return func() tea.Msg {
+		sessionName := domain.ManagerSessionName()
+
+		// Check if session is already running
+		running, err := m.container.Sessions.IsRunning(sessionName)
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
+		}
+
+		if running {
+			// Attach to existing session
+			return MsgAttachManagerSession{}
+		}
+
+		// Build task context prompt
+		task, err := m.container.Tasks.Get(taskID)
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("get task: %w", err)}
+		}
+
+		taskPrompt := fmt.Sprintf("You are working on Task #%d.\n\nIMPORTANT: First run 'crew show' and follow the workflow instructions exactly.", task.ID)
+
+		// Start new manager session with task context
+		uc := m.container.StartManagerUseCase()
+		out, err := uc.Execute(context.Background(), usecase.StartManagerInput{
+			Name:             managerAgent,
+			Session:          true,
+			AdditionalPrompt: taskPrompt,
+		})
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("start manager session: %w", err)}
+		}
+
+		return MsgManagerSessionStarted{SessionName: out.SessionName}
+	}
+}
+
 // cycleReviewMode returns a command that cycles through review modes.
 func (m *Model) cycleReviewMode() tea.Cmd {
 	return func() tea.Msg {
