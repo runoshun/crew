@@ -278,8 +278,7 @@ type CompleteConfig struct {
 
 // DiffConfig holds diff display settings from [diff] section.
 type DiffConfig struct {
-	Command    string `toml:"command,omitempty"`     // Command to display diff (with {{.Args}} template support)
-	TUICommand string `toml:"tui_command,omitempty"` // Command for TUI diff display
+	Command string `toml:"command,omitempty"` // Command to display diff (with {{.Args}} template support)
 }
 
 // LogConfig holds logging settings from [log] section.

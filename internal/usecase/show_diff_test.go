@@ -375,128 +375,6 @@ func TestShowDiff_Execute_EmptyBaseBranchDefaultsToMain(t *testing.T) {
 	assert.Equal(t, "git diff main...HEAD", executor.ExecutedCmd.Args[1])
 }
 
-func TestShowDiff_Execute_UseTUICommand(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Task with TUI diff",
-		Status:     domain.StatusInProgress,
-		BaseBranch: "main",
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config = &domain.Config{
-		Diff: domain.DiffConfig{
-			Command:    "git diff main...HEAD | delta",
-			TUICommand: "git diff --color main...HEAD | less -R",
-		},
-		Agents: make(map[string]domain.Agent),
-	}
-
-	executor := testutil.NewMockCommandExecutor()
-
-	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, executor, &stdout, &stderr)
-
-	// Execute with UseTUICommand = true
-	_, err := uc.Execute(context.Background(), ShowDiffInput{
-		TaskID:        1,
-		UseTUICommand: true,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	assert.True(t, executor.ExecuteWithContextCalled)
-	// Verify TUICommand was used instead of Command
-	assert.Contains(t, executor.ExecutedCmd.Args[1], "less -R")
-	assert.NotContains(t, executor.ExecutedCmd.Args[1], "delta")
-}
-
-func TestShowDiff_Execute_UseTUICommandFallbackToCommand(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Task with no TUI command",
-		Status:     domain.StatusInProgress,
-		BaseBranch: "main",
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config = &domain.Config{
-		Diff: domain.DiffConfig{
-			Command:    "git diff main...HEAD | delta",
-			TUICommand: "", // Empty TUICommand
-		},
-		Agents: make(map[string]domain.Agent),
-	}
-
-	executor := testutil.NewMockCommandExecutor()
-
-	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, executor, &stdout, &stderr)
-
-	// Execute with UseTUICommand = true but TUICommand is empty
-	_, err := uc.Execute(context.Background(), ShowDiffInput{
-		TaskID:        1,
-		UseTUICommand: true,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	assert.True(t, executor.ExecuteWithContextCalled)
-	// Verify Command was used as fallback when TUICommand is empty
-	assert.Contains(t, executor.ExecutedCmd.Args[1], "delta")
-}
-
-func TestShowDiff_Execute_UseTUICommandFalse(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Task with CLI diff",
-		Status:     domain.StatusInProgress,
-		BaseBranch: "main",
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config = &domain.Config{
-		Diff: domain.DiffConfig{
-			Command:    "git diff main...HEAD | delta",
-			TUICommand: "git diff --color main...HEAD | less -R",
-		},
-		Agents: make(map[string]domain.Agent),
-	}
-
-	executor := testutil.NewMockCommandExecutor()
-
-	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, executor, &stdout, &stderr)
-
-	// Execute with UseTUICommand = false (default)
-	_, err := uc.Execute(context.Background(), ShowDiffInput{
-		TaskID:        1,
-		UseTUICommand: false,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	assert.True(t, executor.ExecuteWithContextCalled)
-	// Verify Command was used (not TUICommand) when UseTUICommand is false
-	assert.Contains(t, executor.ExecutedCmd.Args[1], "delta")
-	assert.NotContains(t, executor.ExecutedCmd.Args[1], "less -R")
-}
-
 func TestShowDiff_Execute_WithCustomDiffCommand(t *testing.T) {
 	// Setup
 	task := &domain.Task{
@@ -521,8 +399,7 @@ func TestShowDiff_Execute_WithCustomDiffCommand(t *testing.T) {
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowDiffInput{
-		TaskID:        1,
-		UseTUICommand: false,
+		TaskID: 1,
 	})
 
 	// Assert
@@ -530,41 +407,4 @@ func TestShowDiff_Execute_WithCustomDiffCommand(t *testing.T) {
 	assert.True(t, executor.ExecuteWithContextCalled)
 	// Verify custom diff.command was used
 	assert.Contains(t, executor.ExecutedCmd.Args[1], "my-custom-diff-viewer")
-}
-
-func TestShowDiff_Execute_WithCustomTUICommand(t *testing.T) {
-	// Setup
-	task := &domain.Task{
-		ID:     1,
-		Title:  "Test task",
-		Status: domain.StatusInProgress,
-	}
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = task
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	configLoader := testutil.NewMockConfigLoader()
-	// Set custom diff.tui_command
-	configLoader.Config.Diff.Command = "git diff {{.BaseBranch}}... | delta"
-	configLoader.Config.Diff.TUICommand = "git diff {{.BaseBranch}}... | my-tui-viewer"
-
-	executor := testutil.NewMockCommandExecutor()
-
-	var stdout, stderr bytes.Buffer
-	uc := NewShowDiff(repo, worktrees, &testutil.MockGit{}, configLoader, executor, &stdout, &stderr)
-
-	// Execute with UseTUICommand = true
-	_, err := uc.Execute(context.Background(), ShowDiffInput{
-		TaskID:        1,
-		UseTUICommand: true,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	assert.True(t, executor.ExecuteWithContextCalled)
-	// Verify tui_command was used (not Command) when UseTUICommand is true
-	assert.Contains(t, executor.ExecutedCmd.Args[1], "my-tui-viewer")
-	assert.NotContains(t, executor.ExecutedCmd.Args[1], "delta")
 }
