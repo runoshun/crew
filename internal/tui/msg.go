@@ -170,3 +170,15 @@ type MsgReviewModeChanged struct {
 }
 
 func (MsgReviewModeChanged) sealed() {}
+
+// MsgManagerSessionStarted is sent when manager session is started.
+type MsgManagerSessionStarted struct {
+	SessionName string
+}
+
+func (MsgManagerSessionStarted) sealed() {}
+
+// MsgAttachManagerSession is sent to trigger manager session attachment.
+type MsgAttachManagerSession struct{}
+
+func (MsgAttachManagerSession) sealed() {}

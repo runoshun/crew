@@ -1380,6 +1380,46 @@ func (m *Model) loadReviewResult(taskID int) tea.Cmd {
 	}
 }
 
+// startOrAttachManagerSession returns a tea.Cmd that starts or attaches to manager session.
+// If the session is already running, it attaches; otherwise, it starts a new session.
+func (m *Model) startOrAttachManagerSession() tea.Cmd {
+	return func() tea.Msg {
+		sessionName := domain.ManagerSessionName()
+
+		// Check if session is already running
+		running, err := m.container.Sessions.IsRunning(sessionName)
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
+		}
+
+		if running {
+			// Attach to existing session
+			return MsgAttachManagerSession{}
+		}
+
+		// Start new manager session
+		uc := m.container.StartManagerUseCase()
+		out, err := uc.Execute(context.Background(), usecase.StartManagerInput{
+			Session: true,
+		})
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("start manager session: %w", err)}
+		}
+
+		return MsgManagerSessionStarted{SessionName: out.SessionName}
+	}
+}
+
+// attachToManagerSession returns a tea.Cmd that attaches to the manager session.
+func (m *Model) attachToManagerSession() tea.Cmd {
+	socketPath := m.container.Config.SocketPath
+	sessionName := domain.ManagerSessionName()
+	cmd := domain.NewCommand("tmux", []string{"-S", socketPath, "attach", "-t", sessionName}, "")
+	return tea.Exec(&domainExecCmd{cmd: cmd}, func(err error) tea.Msg {
+		return MsgReloadTasks{}
+	})
+}
+
 // cycleReviewMode returns a command that cycles through review modes.
 func (m *Model) cycleReviewMode() tea.Cmd {
 	return func() tea.Msg {

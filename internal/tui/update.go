@@ -191,6 +191,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.config.Complete.ReviewModeSet = true
 		}
 		return m, nil
+
+	case MsgManagerSessionStarted:
+		// Manager session started, now attach to it
+		return m, m.attachToManagerSession()
+
+	case MsgAttachManagerSession:
+		// Attach to manager session
+		return m, m.attachToManagerSession()
 	}
 
 	return m, nil
@@ -439,6 +447,10 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.blockInput.Focus()
 		return m, nil
+
+	case key.Matches(msg, m.keys.Manager):
+		// Start or attach to manager session
+		return m, m.startOrAttachManagerSession()
 	}
 
 	// Check custom keybindings
