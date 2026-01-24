@@ -58,6 +58,12 @@ func GlobalLogPath(crewDir string) string {
 	return filepath.Join(crewDir, "logs", "crew.log")
 }
 
+// SessionLogPath returns the path to the session log file.
+// The session log captures stdout/stderr from the tmux session.
+func SessionLogPath(crewDir string, sessionName string) string {
+	return filepath.Join(crewDir, "logs", sessionName+".log")
+}
+
 // TasksStorePath returns the path to the tasks.json file.
 func TasksStorePath(crewDir string) string {
 	return filepath.Join(crewDir, "tasks.json")

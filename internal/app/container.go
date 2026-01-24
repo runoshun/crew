@@ -314,3 +314,8 @@ func (c *Container) ReviewSessionEndedUseCase(stderr io.Writer) *usecase.ReviewS
 func (c *Container) PollTaskUseCase(stdout, stderr io.Writer) *usecase.PollTask {
 	return usecase.NewPollTask(c.Tasks, c.Clock, c.Executor, stdout, stderr)
 }
+
+// ShowLogsUseCase returns a new ShowLogs use case.
+func (c *Container) ShowLogsUseCase() *usecase.ShowLogs {
+	return usecase.NewShowLogs(c.Tasks, c.Config.CrewDir)
+}

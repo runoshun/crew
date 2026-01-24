@@ -639,6 +639,67 @@ Examples:
 	return cmd
 }
 
+// newLogsCommand creates the logs command for viewing session logs.
+func newLogsCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		lines  int
+		review bool
+	}
+
+	cmd := &cobra.Command{
+		Use:   "logs <id>",
+		Short: "View session logs",
+		Long: `View the log file for a task's session.
+
+The session log contains:
+  - Session start timestamp and metadata
+  - Session command output (stdout/stderr)
+  - All terminal output captured during the session
+
+Logs persist after the session ends, allowing debugging of
+startup errors and reviewing session history.
+
+Examples:
+  # View logs for task #1
+  crew logs 1
+
+  # View last 50 lines of logs
+  crew logs 1 --lines 50
+  crew logs 1 -n 50
+
+  # View review session logs
+  crew logs 1 --review`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Parse task ID
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			// Execute use case
+			uc := c.ShowLogsUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.ShowLogsInput{
+				TaskID: taskID,
+				Lines:  opts.lines,
+				Review: opts.review,
+			})
+			if err != nil {
+				return err
+			}
+
+			// Print log content
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), out.Content)
+			return nil
+		},
+	}
+
+	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 0, "Number of lines to display from the end (0 = all)")
+	cmd.Flags().BoolVar(&opts.review, "review", false, "View review session logs instead of work session")
+
+	return cmd
+}
+
 // newMergeCommand creates the merge command for merging a task branch into a base branch.
 func newMergeCommand(c *app.Container) *cobra.Command {
 	var opts struct {
