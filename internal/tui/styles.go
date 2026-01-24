@@ -23,6 +23,11 @@ var Colors = struct {
 	Warning    lipgloss.Color
 	Background lipgloss.Color
 
+	// Warm colors (Manager)
+	Peach    lipgloss.Color
+	Maroon   lipgloss.Color
+	Flamingo lipgloss.Color
+
 	// Title/text colors
 	TitleNormal   lipgloss.Color
 	TitleSelected lipgloss.Color
@@ -56,6 +61,11 @@ var Colors = struct {
 	Success:    lipgloss.Color("#A6E3A1"), // Green
 	Warning:    lipgloss.Color("#F9E2AF"), // Yellow
 	Background: lipgloss.Color("#1E1E2E"), // Base
+
+	// Warm colors
+	Peach:    lipgloss.Color("#FAB387"), // Peach
+	Maroon:   lipgloss.Color("#EBA0AC"), // Maroon
+	Flamingo: lipgloss.Color("#F2CDCD"), // Flamingo
 
 	// Text colors
 	TitleNormal:   lipgloss.Color("#CDD6F4"), // Text
@@ -176,7 +186,7 @@ func DefaultStyles() Styles {
 
 		Header: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.Primary).
+			Foreground(Colors.Peach).
 			Border(lipgloss.NormalBorder(), false, false, true, false).
 			BorderForeground(Colors.GroupLine).
 			Padding(0, 1).
@@ -184,7 +194,7 @@ func DefaultStyles() Styles {
 
 		HeaderText: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(Colors.Primary),
+			Foreground(Colors.Peach),
 
 		TaskList: lipgloss.NewStyle().
 			MarginBottom(1),
@@ -346,7 +356,7 @@ func DefaultStyles() Styles {
 			MarginTop(1),
 
 		FooterKey: lipgloss.NewStyle().
-			Foreground(Colors.KeyText).
+			Foreground(Colors.Maroon).
 			Background(Colors.GroupLine).
 			Padding(0, 1),
 

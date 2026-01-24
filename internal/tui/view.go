@@ -47,7 +47,7 @@ func (m *Model) newDialogStyles() dialogStyles {
 		bg:         bg,
 		line:       lipgloss.NewStyle().Background(bg).Width(width),
 		text:       lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal),
-		key:        lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true),
+		key:        lipgloss.NewStyle().Background(bg).Foreground(Colors.Maroon).Bold(true),
 		muted:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
 		label:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true),
 		labelMuted: lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
@@ -317,7 +317,7 @@ func (m *Model) viewEmptyState() string {
 
 	titleStyle := m.styles.HeaderText
 	bodyStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
-	keyStyle := lipgloss.NewStyle().Foreground(Colors.KeyText).Bold(true)
+	keyStyle := lipgloss.NewStyle().Foreground(Colors.Maroon).Bold(true)
 	cmdStyle := lipgloss.NewStyle().Foreground(Colors.Primary)
 
 	// ASCII logo - compact to fit narrow terminals
@@ -395,7 +395,7 @@ func (m *Model) viewFilteredEmptyState() string {
 
 	titleStyle := m.styles.HeaderText
 	bodyStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
-	hintStyle := lipgloss.NewStyle().Foreground(Colors.KeyText).Bold(true)
+	hintStyle := lipgloss.NewStyle().Foreground(Colors.Maroon).Bold(true)
 
 	title := titleStyle.Render("No matching tasks")
 	primary := bodyStyle.Render("Clear the filter to see all tasks")
