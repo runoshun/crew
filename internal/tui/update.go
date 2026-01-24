@@ -971,7 +971,7 @@ func (m *Model) handleExecMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.mode = ModeNormal
 		m.execInput.Reset()
-		return m, m.executeCommand(cmdStr)
+		return m, m.executeCommandInWorktree(cmdStr)
 	}
 
 	var cmd tea.Cmd

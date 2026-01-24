@@ -387,6 +387,10 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 											if b, ok := bv.(bool); ok {
 												kb.Override = b
 											}
+										case "worktree":
+											if b, ok := bv.(bool); ok {
+												kb.Worktree = b
+											}
 										default:
 											warnings = append(warnings, fmt.Sprintf("unknown key in [tui.keybindings.%s]: %s", key, bk))
 										}
