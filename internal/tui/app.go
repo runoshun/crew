@@ -1017,6 +1017,19 @@ func (m *Model) handleCustomKeybinding(binding domain.TUIKeybinding) (tea.Model,
 	return m, m.executeCommandInRepoRoot(command)
 }
 
+// KeybindingTemplateData contains data available for keybinding command templates.
+type KeybindingTemplateData struct {
+	// Task provides access to all task fields (e.g., {{.Task.BaseBranch}})
+	Task *domain.Task
+
+	// Convenience fields for backward compatibility
+	TaskTitle    string // Same as .Task.Title
+	TaskStatus   string // Same as string(.Task.Status)
+	Branch       string // Branch name derived from task ID and issue
+	WorktreePath string // Worktree path (empty if not created)
+	TaskID       int    // Same as .Task.ID
+}
+
 // renderKeybindingTemplate renders a keybinding command template with task data.
 func (m *Model) renderKeybindingTemplate(cmdTemplate string, task *domain.Task) (string, error) {
 	branch := domain.BranchName(task.ID, task.Issue)
@@ -1025,19 +1038,20 @@ func (m *Model) renderKeybindingTemplate(cmdTemplate string, task *domain.Task) 
 		wtPath = "" // Worktree may not exist yet
 	}
 
-	data := map[string]interface{}{
-		"TaskID":       task.ID,
-		"TaskTitle":    task.Title,
-		"TaskStatus":   string(task.Status),
-		"Branch":       branch,
-		"WorktreePath": wtPath,
+	data := KeybindingTemplateData{
+		Task:         task,
+		TaskID:       task.ID,
+		TaskTitle:    task.Title,
+		TaskStatus:   string(task.Status),
+		Branch:       branch,
+		WorktreePath: wtPath,
 	}
 
 	return renderTemplate(cmdTemplate, data)
 }
 
 // renderTemplate renders a template string with the given data.
-func renderTemplate(tmpl string, data map[string]interface{}) (string, error) {
+func renderTemplate(tmpl string, data any) (string, error) {
 	t, err := template.New("keybinding").Parse(tmpl)
 	if err != nil {
 		return "", err
