@@ -100,6 +100,9 @@ type Model struct {
 	reviewViewport   viewport.Model // For scrollable review result
 	editCommentInput textinput.Model
 
+	// Block dialog components
+	blockInput textinput.Model
+
 	// Numeric state (smaller types last)
 	mode                 Mode
 	confirmAction        ConfirmAction
@@ -118,6 +121,7 @@ type Model struct {
 	showAll              bool
 	detailFocused        bool // Right pane is focused for scrolling
 	confirmReviewSession bool
+	blockFocusUnblock    bool // True when Unblock button is focused in Block dialog
 }
 
 // New creates a new TUI Model with the given container.
@@ -154,6 +158,10 @@ func New(c *app.Container) *Model {
 	eci.Placeholder = "Edit review comment..."
 	eci.CharLimit = 2000
 
+	bi := textinput.New()
+	bi.Placeholder = "Enter block reason..."
+	bi.CharLimit = 200
+
 	styles := DefaultStyles()
 	delegate := newTaskDelegate(styles)
 	taskList := list.New([]list.Item{}, delegate, 0, 0)
@@ -183,6 +191,7 @@ func New(c *app.Container) *Model {
 		execInput:          ei,
 		reviewMessageInput: ri,
 		editCommentInput:   eci,
+		blockInput:         bi,
 		reviewViewport:     reviewVp,
 		builtinAgents:      []string{"claude", "opencode", "codex"},
 		customAgents:       nil,
@@ -582,6 +591,41 @@ func (m *Model) updateStatus(taskID int, status domain.Status) tea.Cmd {
 	}
 }
 
+// blockTask returns a command that blocks a task with a reason.
+func (m *Model) blockTask(taskID int, reason string) tea.Cmd {
+	return func() tea.Msg {
+		_, err := m.container.EditTaskUseCase().Execute(
+			context.Background(),
+			usecase.EditTaskInput{
+				TaskID:      taskID,
+				BlockReason: &reason,
+			},
+		)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgReloadTasks{}
+	}
+}
+
+// unblockTask returns a command that unblocks a task.
+func (m *Model) unblockTask(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		emptyReason := ""
+		_, err := m.container.EditTaskUseCase().Execute(
+			context.Background(),
+			usecase.EditTaskInput{
+				TaskID:      taskID,
+				BlockReason: &emptyReason,
+			},
+		)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		return MsgReloadTasks{}
+	}
+}
+
 // updateAgents updates the agent lists from config.
 // Agents with role=worker and hidden=false are shown in the TUI.
 func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
@@ -793,6 +837,28 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			},
 			IsAvailable: func() bool {
 				return true
+			},
+		},
+		{
+			ActionID: "block",
+			Label:    "Block",
+			Desc:     "Block or unblock task",
+			Key:      "b",
+			Action: func() (tea.Model, tea.Cmd) {
+				m.mode = ModeBlock
+				m.blockFocusUnblock = false
+				// Pre-fill with existing block reason if any
+				if task.IsBlocked() {
+					m.blockInput.SetValue(task.BlockReason)
+				} else {
+					m.blockInput.Reset()
+				}
+				m.blockInput.Focus()
+				return m, nil
+			},
+			IsAvailable: func() bool {
+				// Block is available for non-terminal tasks
+				return !task.Status.IsTerminal()
 			},
 		},
 	}

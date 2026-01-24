@@ -29,6 +29,7 @@ type KeyMap struct {
 	// Workflow
 	Merge key.Binding // Merge task
 	Close key.Binding // Close task
+	Block key.Binding // Block/unblock task
 	PR    key.Binding // Create PR (future)
 
 	// View
@@ -121,6 +122,10 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("c"),
 			key.WithHelp("c", "close"),
 		),
+		Block: key.NewBinding(
+			key.WithKeys("B"),
+			key.WithHelp("B", "block"),
+		),
 		PR: key.NewBinding(
 			key.WithKeys("p"),
 			key.WithHelp("p", "create PR"),
@@ -181,7 +186,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 
 		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},   // Session
 		{k.New, k.Copy, k.Delete, k.Edit, k.EditStatus}, // Task management
-		{k.Merge, k.Close}, // Workflow
+		{k.Merge, k.Close, k.Block},                     // Workflow
 		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
 	}
 }
@@ -216,6 +221,7 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.EditStatus)
 	addKeys(k.Merge)
 	addKeys(k.Close)
+	addKeys(k.Block)
 	addKeys(k.PR)
 	addKeys(k.Refresh)
 	addKeys(k.Filter)

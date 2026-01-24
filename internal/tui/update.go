@@ -234,6 +234,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleReviewMessageMode(msg)
 	case ModeEditReviewComment:
 		return m.handleEditReviewCommentMode(msg)
+	case ModeBlock:
+		return m.handleBlockMode(msg)
 	}
 
 	return m, nil
@@ -421,6 +423,22 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.ToggleReviewMode):
 		return m, m.cycleReviewMode()
+
+	case key.Matches(msg, m.keys.Block):
+		task := m.SelectedTask()
+		if task == nil || task.Status.IsTerminal() {
+			return m, nil
+		}
+		m.mode = ModeBlock
+		m.blockFocusUnblock = false
+		// Pre-fill with existing block reason if any
+		if task.IsBlocked() {
+			m.blockInput.SetValue(task.BlockReason)
+		} else {
+			m.blockInput.Reset()
+		}
+		m.blockInput.Focus()
+		return m, nil
 	}
 
 	// Check custom keybindings
@@ -1109,4 +1127,63 @@ func (m *Model) handleEditReviewCommentMode(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	var cmd tea.Cmd
 	m.editCommentInput, cmd = m.editCommentInput.Update(msg)
 	return m, cmd
+}
+
+// handleBlockMode handles keys in block dialog mode.
+func (m *Model) handleBlockMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		m.blockInput.Blur()
+		m.blockInput.Reset()
+		m.blockFocusUnblock = false
+		return m, nil
+
+	case msg.Type == tea.KeyTab:
+		// Toggle between reason input and unblock button
+		m.blockFocusUnblock = !m.blockFocusUnblock
+		if m.blockFocusUnblock {
+			m.blockInput.Blur()
+		} else {
+			m.blockInput.Focus()
+		}
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		task := m.SelectedTask()
+		if task == nil {
+			m.mode = ModeNormal
+			return m, nil
+		}
+
+		if m.blockFocusUnblock {
+			// Unblock the task
+			m.mode = ModeNormal
+			m.blockInput.Blur()
+			m.blockInput.Reset()
+			m.blockFocusUnblock = false
+			return m, m.unblockTask(task.ID)
+		}
+
+		// Block the task with the entered reason
+		reason := m.blockInput.Value()
+		if reason == "" {
+			// Need a reason to block
+			return m, nil
+		}
+		m.mode = ModeNormal
+		m.blockInput.Blur()
+		m.blockInput.Reset()
+		m.blockFocusUnblock = false
+		return m, m.blockTask(task.ID, reason)
+	}
+
+	// Forward to text input if reason input is focused
+	if !m.blockFocusUnblock {
+		var cmd tea.Cmd
+		m.blockInput, cmd = m.blockInput.Update(msg)
+		return m, cmd
+	}
+
+	return m, nil
 }

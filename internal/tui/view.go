@@ -165,6 +165,8 @@ func (m *Model) View() string {
 		dialog = m.viewReviewMessageDialog()
 	case ModeEditReviewComment:
 		dialog = m.viewEditReviewCommentDialog()
+	case ModeBlock:
+		dialog = m.viewBlockDialog()
 	}
 
 	if dialog != "" {
@@ -650,7 +652,7 @@ func (m *Model) viewFooter() string {
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock:
 		return ""
 	default:
 		return ""
@@ -1393,6 +1395,67 @@ func (m *Model) viewEditReviewCommentDialog() string {
 		taskLine, ds.emptyLine(),
 		description,
 		inputLine, ds.emptyLine(),
+		hint,
+	)
+
+	return m.dialogStyle().Render(content)
+}
+
+func (m *Model) viewBlockDialog() string {
+	task := m.SelectedTask()
+	if task == nil {
+		return ""
+	}
+
+	ds := m.newDialogStyles()
+	baseStyle := lipgloss.NewStyle().Background(ds.bg)
+
+	title := ds.renderLine(ds.label.Render("Block Task"))
+	taskLine := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+
+	// Show current status if blocked
+	var statusLine string
+	if task.IsBlocked() {
+		statusLine = ds.renderLine(ds.muted.Render("Currently blocked: ") + ds.text.Render(task.BlockReason))
+	} else {
+		statusLine = ds.renderLine(ds.muted.Render("Not currently blocked"))
+	}
+
+	// Reason input
+	reasonLabel := ds.labelMuted.Render("Reason:")
+	if !m.blockFocusUnblock {
+		reasonLabel = ds.label.Render("Reason:")
+	}
+	inputLine := ds.renderLine(m.blockInput.View())
+
+	// Unblock button
+	unblockLabel := ds.muted.Render("[ Unblock ]")
+	if m.blockFocusUnblock {
+		unblockLabel = ds.label.Render("[ Unblock ]")
+	}
+	unblockLine := ds.renderLine(baseStyle.Render("  ") + unblockLabel)
+
+	// Hint
+	var hint string
+	if m.blockFocusUnblock {
+		hint = ds.renderLine(
+			ds.key.Render("tab") + ds.text.Render(" reason  ") +
+				ds.key.Render("enter") + ds.text.Render(" unblock  ") +
+				ds.key.Render("esc") + ds.text.Render(" cancel"))
+	} else {
+		hint = ds.renderLine(
+			ds.key.Render("tab") + ds.text.Render(" unblock  ") +
+				ds.key.Render("enter") + ds.text.Render(" block  ") +
+				ds.key.Render("esc") + ds.text.Render(" cancel"))
+	}
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title, ds.emptyLine(),
+		taskLine,
+		statusLine, ds.emptyLine(),
+		ds.renderLine(reasonLabel),
+		inputLine, ds.emptyLine(),
+		unblockLine, ds.emptyLine(),
 		hint,
 	)
 
