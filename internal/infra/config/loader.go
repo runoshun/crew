@@ -289,10 +289,6 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						if s, ok := v.(string); ok {
 							res.Diff.Command = s
 						}
-					case "tui_command":
-						if s, ok := v.(string); ok {
-							res.Diff.TUICommand = s
-						}
 					default:
 						warnings = append(warnings, fmt.Sprintf("unknown key in [diff]: %s", k))
 					}
@@ -608,9 +604,6 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.Diff.Command != "" {
 		result.Diff.Command = override.Diff.Command
-	}
-	if override.Diff.TUICommand != "" {
-		result.Diff.TUICommand = override.Diff.TUICommand
 	}
 	if override.Log.Level != "" {
 		result.Log.Level = override.Log.Level
