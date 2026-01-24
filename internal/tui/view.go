@@ -521,48 +521,17 @@ func (m *Model) viewSelectReviewerDialog() string {
 	return m.dialogStyle().Render(content)
 }
 
-
+func (m *Model) viewTitleInput() string {
 	ds := m.newDialogStyles()
-	baseStyle := lipgloss.NewStyle().Background(ds.bg)
 
-	title := ds.renderLine(ds.label.Render("Select Reviewer"))
-	taskLine := ds.renderLine(ds.text.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
-	selectLabel := ds.renderLine(ds.label.Render("Reviewer Agent:"))
-
-	var reviewerRows []string
-	if len(m.reviewerAgents) == 0 {
-		reviewerRows = append(reviewerRows, ds.renderLine(ds.muted.Render("  No reviewer agents configured")))
-	} else {
-		for i, agent := range m.reviewerAgents {
-			selected := i == m.reviewerCursor
-			cursor := " "
-			cursorStyle := ds.label.Foreground(Colors.Primary)
-			style := ds.text
-			if selected {
-				cursor = "▸"
-				style = ds.label
-			}
-
-			// Mark default reviewer
-			defaultTag := ""
-			if m.config != nil && agent == m.config.AgentsConfig.DefaultReviewer {
-				defaultTag = ds.muted.Render(" (default)")
-			}
-
-			row := ds.renderLine(baseStyle.Render("  ") + cursorStyle.Render(cursor) + baseStyle.Render(" ") + style.Render(agent) + defaultTag)
-			reviewerRows = append(reviewerRows, row)
-		}
-	}
-
-	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" select · ") +
+	title := ds.renderLine(ds.label.Render("New Task"))
+	stepInfo := ds.renderLine(ds.muted.Render("Step 1 of 2"))
+	label := ds.renderLine(ds.label.Render("Title"))
+	input := ds.renderLine(m.titleInput.View())
+	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" next  ") +
 		ds.key.Render("esc") + ds.text.Render(" cancel"))
 
-	lines := make([]string, 0, 5+len(reviewerRows)+2)
-	lines = append(lines, title, ds.emptyLine(), taskLine, ds.emptyLine(), selectLabel)
-	lines = append(lines, reviewerRows...)
-	lines = append(lines, ds.emptyLine(), hint)
-
-	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
+	content := lipgloss.JoinVertical(lipgloss.Left, title, stepInfo, ds.emptyLine(), label, input, ds.emptyLine(), hint)
 	return m.dialogStyle().Render(content)
 }
 
@@ -736,7 +705,7 @@ func (m *Model) viewFooter() string {
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock, ModeSelectReviewer:
 		return ""
 	default:
 		return ""
