@@ -287,6 +287,18 @@ crew comment <id> "<text>"         # Add comment
 crew close <id>                    # Close/abandon task
 ```
 
+### Task Blocking
+```bash
+crew edit <id> --block "親タスク"           # Block task (prevent starting)
+crew edit <id> --block "依存: #42 の完了待ち" # Block with dependency reason
+crew edit <id> --unblock                    # Unblock task (allow starting)
+```
+
+Blocked tasks cannot be started with `crew start` until unblocked. Use this for:
+- Parent tasks that should wait for children
+- Tasks with external dependencies
+- Tasks waiting for design review
+
 ### Session Management
 ```bash
 crew start <id> <worker>           # Start task with worker
