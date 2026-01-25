@@ -25,15 +25,13 @@ type PollStatusOutput struct {
 // PollStatus is the use case for polling tasks by status.
 type PollStatus struct {
 	tasks  domain.TaskRepository
-	clock  domain.Clock
 	stdout io.Writer
 }
 
 // NewPollStatus creates a new PollStatus use case.
-func NewPollStatus(tasks domain.TaskRepository, clock domain.Clock, stdout io.Writer) *PollStatus {
+func NewPollStatus(tasks domain.TaskRepository, stdout io.Writer) *PollStatus {
 	return &PollStatus{
 		tasks:  tasks,
-		clock:  clock,
 		stdout: stdout,
 	}
 }
@@ -79,11 +77,8 @@ func (uc *PollStatus) Execute(ctx context.Context, in PollStatusInput) (*PollSta
 	for {
 		select {
 		case <-ctx.Done():
-			// Context canceled is a normal exit
-			if ctx.Err() == context.Canceled {
-				return nil, nil
-			}
-			return nil, ctx.Err()
+			// Context cancellation (Ctrl+C, SIGTERM, deadline) is normal exit for CLI
+			return nil, nil
 		case <-timeoutChan:
 			// Timeout reached - exit without finding task
 			return nil, nil

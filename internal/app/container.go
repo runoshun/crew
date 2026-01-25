@@ -318,7 +318,7 @@ func (c *Container) PollTaskUseCase(stdout, stderr io.Writer) *usecase.PollTask 
 // PollStatusUseCase returns a new PollStatus use case.
 // stdout is the writer for output.
 func (c *Container) PollStatusUseCase(stdout io.Writer) *usecase.PollStatus {
-	return usecase.NewPollStatus(c.Tasks, c.Clock, stdout)
+	return usecase.NewPollStatus(c.Tasks, stdout)
 }
 
 // ShowLogsUseCase returns a new ShowLogs use case.

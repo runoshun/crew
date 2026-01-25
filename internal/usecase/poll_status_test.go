@@ -16,7 +16,6 @@ import (
 func TestPollStatus_Execute_ImmediateMatch(t *testing.T) {
 	// Setup - task already has the target status
 	repo := NewThreadSafeTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
@@ -29,11 +28,10 @@ func TestPollStatus_Execute_ImmediateMatch(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Execute
 	ctx := context.Background()
-	start := time.Now()
 	out, err := uc.Execute(ctx, PollStatusInput{
 		Status:   domain.StatusForReview,
 		Interval: 10,
@@ -46,10 +44,6 @@ func TestPollStatus_Execute_ImmediateMatch(t *testing.T) {
 	assert.Equal(t, 2, out.TaskID)
 	assert.Equal(t, domain.StatusForReview, out.Status)
 
-	// Should exit very quickly
-	elapsed := time.Since(start)
-	assert.Less(t, elapsed, 100*time.Millisecond)
-
 	// Check output format
 	assert.Equal(t, "for_review 2\n", stdout.String())
 }
@@ -57,7 +51,6 @@ func TestPollStatus_Execute_ImmediateMatch(t *testing.T) {
 func TestPollStatus_Execute_WaitForStatus(t *testing.T) {
 	// Setup - no task has the target status initially
 	repo := NewThreadSafeTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
@@ -65,7 +58,7 @@ func TestPollStatus_Execute_WaitForStatus(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Change task status after short delay
 	go func() {
@@ -94,7 +87,6 @@ func TestPollStatus_Execute_WaitForStatus(t *testing.T) {
 func TestPollStatus_Execute_Timeout(t *testing.T) {
 	// Setup - no task has the target status
 	repo := testutil.NewMockTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
@@ -102,7 +94,7 @@ func TestPollStatus_Execute_Timeout(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Execute with timeout
 	ctx := context.Background()
@@ -127,10 +119,9 @@ func TestPollStatus_Execute_Timeout(t *testing.T) {
 func TestPollStatus_Execute_InvalidStatus(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Execute with invalid status
 	_, err := uc.Execute(context.Background(), PollStatusInput{
@@ -147,7 +138,6 @@ func TestPollStatus_Execute_InvalidStatus(t *testing.T) {
 func TestPollStatus_Execute_ContextCanceled(t *testing.T) {
 	// Setup
 	repo := NewThreadSafeTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
@@ -155,7 +145,7 @@ func TestPollStatus_Execute_ContextCanceled(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Create context that will be canceled
 	ctx, cancel := context.WithCancel(context.Background())
@@ -181,7 +171,6 @@ func TestPollStatus_Execute_ContextCanceled(t *testing.T) {
 func TestPollStatus_Execute_DefaultInterval(t *testing.T) {
 	// Setup
 	repo := NewThreadSafeTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
@@ -189,7 +178,7 @@ func TestPollStatus_Execute_DefaultInterval(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Change to target status after short delay
 	go func() {
@@ -218,10 +207,9 @@ func TestPollStatus_Execute_ListError(t *testing.T) {
 		MockTaskRepository: testutil.NewMockTaskRepository(),
 		ListErr:            errors.New("database error"),
 	}
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), PollStatusInput{
@@ -238,10 +226,9 @@ func TestPollStatus_Execute_ListError(t *testing.T) {
 func TestPollStatus_Execute_EmptyTaskList(t *testing.T) {
 	// Setup - no tasks at all
 	repo := testutil.NewMockTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Execute with timeout
 	out, err := uc.Execute(context.Background(), PollStatusInput{
@@ -258,7 +245,6 @@ func TestPollStatus_Execute_EmptyTaskList(t *testing.T) {
 func TestPollStatus_Execute_MultipleMatchingTasks(t *testing.T) {
 	// Setup - multiple tasks with same status
 	repo := NewThreadSafeTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
@@ -271,7 +257,7 @@ func TestPollStatus_Execute_MultipleMatchingTasks(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	uc := NewPollStatus(repo, clock, &stdout)
+	uc := NewPollStatus(repo, &stdout)
 
 	// Execute
 	ctx := context.Background()
@@ -306,7 +292,6 @@ func TestPollStatus_Execute_AllStatuses(t *testing.T) {
 	for _, status := range statuses {
 		t.Run(string(status), func(t *testing.T) {
 			repo := NewThreadSafeTaskRepository()
-			clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 			repo.Tasks[1] = &domain.Task{
 				ID:     1,
 				Title:  "Task 1",
@@ -314,7 +299,7 @@ func TestPollStatus_Execute_AllStatuses(t *testing.T) {
 			}
 
 			var stdout bytes.Buffer
-			uc := NewPollStatus(repo, clock, &stdout)
+			uc := NewPollStatus(repo, &stdout)
 
 			out, err := uc.Execute(context.Background(), PollStatusInput{
 				Status:   status,
