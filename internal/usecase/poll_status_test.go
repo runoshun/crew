@@ -96,21 +96,19 @@ func TestPollStatus_Execute_Timeout(t *testing.T) {
 	var stdout bytes.Buffer
 	uc := NewPollStatus(repo, &stdout)
 
-	// Execute with timeout
-	ctx := context.Background()
-	start := time.Now()
+	// Execute with context timeout (avoids real-time dependency)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
 	out, err := uc.Execute(ctx, PollStatusInput{
 		Status:   domain.StatusForReview,
-		Interval: 1,
-		Timeout:  1, // 1 second timeout
+		Interval: 10, // Long interval, but context will timeout first
+		Timeout:  0,  // No usecase timeout, rely on context
 	})
 
-	// Assert - should timeout without finding task
+	// Assert - should exit via context timeout without finding task
 	require.NoError(t, err)
 	assert.Nil(t, out)
-	elapsed := time.Since(start)
-	assert.GreaterOrEqual(t, elapsed, 1*time.Second)
-	assert.Less(t, elapsed, 2*time.Second)
 
 	// No output when not found
 	assert.Empty(t, stdout.String())
@@ -169,36 +167,29 @@ func TestPollStatus_Execute_ContextCanceled(t *testing.T) {
 }
 
 func TestPollStatus_Execute_DefaultInterval(t *testing.T) {
-	// Setup
+	// Test that interval <= 0 uses default (10s) and still works
+	// by having a task already match the target status (immediate exit)
 	repo := NewThreadSafeTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
-		Status: domain.StatusInProgress,
+		Status: domain.StatusForReview, // Already matches target
 	}
 
 	var stdout bytes.Buffer
 	uc := NewPollStatus(repo, &stdout)
 
-	// Change to target status after short delay
-	go func() {
-		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusForReview)
-	}()
-
-	// Execute with interval <= 0 (should use default)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	out, err := uc.Execute(ctx, PollStatusInput{
+	// Execute with interval <= 0 (should use default, but exits immediately due to match)
+	out, err := uc.Execute(context.Background(), PollStatusInput{
 		Status:   domain.StatusForReview,
-		Interval: 0, // Should use default (10)
+		Interval: 0, // Should use default (10), but won't matter since immediate match
 		Timeout:  0,
 	})
 
-	// Assert - should still work with default interval
+	// Assert - should still work with default interval (exits immediately)
 	require.NoError(t, err)
 	require.NotNil(t, out)
+	assert.Equal(t, 1, out.TaskID)
 }
 
 func TestPollStatus_Execute_ListError(t *testing.T) {

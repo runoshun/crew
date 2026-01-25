@@ -91,7 +91,14 @@ Examples:
 
   # Use as a trigger for next action
   crew poll 175 176 --expect in_progress --command 'crew complete {{.TaskID}}'`,
-		Args: cobra.ArbitraryArgs,
+		Args: func(cmd *cobra.Command, args []string) error {
+			// Custom Args validator: require task IDs only when --status is not specified
+			statusFlag, _ := cmd.Flags().GetString("status")
+			if statusFlag == "" && len(args) == 0 {
+				return fmt.Errorf("requires at least 1 task ID or --status flag")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Setup signal handling for graceful shutdown
 			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
@@ -124,11 +131,6 @@ Examples:
 					Timeout:  opts.Timeout,
 				})
 				return err
-			}
-
-			// Task ID mode: require at least one task ID
-			if len(args) == 0 {
-				return fmt.Errorf("requires at least 1 task ID or --status flag")
 			}
 
 			// Parse task IDs
