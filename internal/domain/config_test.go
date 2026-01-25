@@ -100,7 +100,7 @@ func TestAgent_RenderCommand(t *testing.T) {
 			wantPrompt:          "Work on: Add feature",
 		},
 		{
-			name: "agent-specific prompt overrides default",
+			name: "agent-specific prompt concatenates with default",
 			agent: Agent{
 				CommandTemplate: "agent {{.Prompt}}",
 				SystemPrompt:    "Sys: {{.TaskID}}",
@@ -112,9 +112,34 @@ func TestAgent_RenderCommand(t *testing.T) {
 			},
 			promptOverride:      `"$PROMPT"`,
 			defaultSystemPrompt: "This should not be used",
-			defaultPrompt:       "Nor this",
+			defaultPrompt:       "Default prompt",
 			wantCommand:         `agent "$PROMPT"`,
-			wantPrompt:          "Sys: 42\n\nCustom: Fix the bug (Task #42)",
+			wantPrompt:          "Sys: 42\n\nDefault prompt\n\nCustom: Fix the bug (Task #42)",
+		},
+		{
+			name: "agent prompt only (no default prompt)",
+			agent: Agent{
+				CommandTemplate: "agent {{.Prompt}}",
+				Prompt:          "Agent specific prompt",
+			},
+			data:                CommandData{TaskID: 1},
+			promptOverride:      `"$PROMPT"`,
+			defaultSystemPrompt: "System",
+			defaultPrompt:       "",
+			wantCommand:         `agent "$PROMPT"`,
+			wantPrompt:          "System\n\nAgent specific prompt",
+		},
+		{
+			name: "default prompt only (no agent prompt)",
+			agent: Agent{
+				CommandTemplate: "agent {{.Prompt}}",
+			},
+			data:                CommandData{TaskID: 1},
+			promptOverride:      `"$PROMPT"`,
+			defaultSystemPrompt: "System",
+			defaultPrompt:       "Default prompt",
+			wantCommand:         `agent "$PROMPT"`,
+			wantPrompt:          "System\n\nDefault prompt",
 		},
 	}
 

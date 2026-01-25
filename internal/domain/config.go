@@ -141,10 +141,16 @@ func (a *Agent) RenderCommand(data CommandData, promptOverride, defaultSystemPro
 		return RenderCommandResult{}, err
 	}
 
-	userPromptTemplate := a.Prompt
-	if userPromptTemplate == "" {
-		userPromptTemplate = defaultPrompt
+	// Concatenate defaultPrompt and a.Prompt (skip if empty to avoid extra newlines)
+	var userPromptParts []string
+	if defaultPrompt != "" {
+		userPromptParts = append(userPromptParts, defaultPrompt)
 	}
+	if a.Prompt != "" {
+		userPromptParts = append(userPromptParts, a.Prompt)
+	}
+	userPromptTemplate := strings.Join(userPromptParts, "\n\n")
+
 	userPromptContent, err := expandString(userPromptTemplate, data)
 	if err != nil {
 		return RenderCommandResult{}, err
