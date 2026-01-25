@@ -914,9 +914,9 @@ func (m *Model) handleSelectManagerMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		agent := m.managerAgents[m.managerAgentCursor]
 		m.mode = ModeNormal
 
-		// Start or attach to manager session with task context.
+		// Start or attach to manager session.
 		// The selected manager agent is used to start the session.
-		return m, m.startOrAttachManagerSessionForTask(task.ID, agent)
+		return m, m.startOrAttachManagerSessionForTask(agent)
 	}
 
 	return m, nil

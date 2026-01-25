@@ -1462,11 +1462,10 @@ func (m *Model) attachToManagerSession() tea.Cmd {
 	})
 }
 
-// startOrAttachManagerSessionForTask returns a tea.Cmd that starts or attaches to manager session
-// with context for a specific task.
+// startOrAttachManagerSessionForTask returns a tea.Cmd that starts or attaches to manager session.
 // If a manager session is already running, it attaches to the existing session to preserve the conversation.
 // The selected agent is only used when starting a new session.
-func (m *Model) startOrAttachManagerSessionForTask(taskID int, managerAgent string) tea.Cmd {
+func (m *Model) startOrAttachManagerSessionForTask(managerAgent string) tea.Cmd {
 	return func() tea.Msg {
 		sessionName := domain.ManagerSessionName()
 
@@ -1482,20 +1481,11 @@ func (m *Model) startOrAttachManagerSessionForTask(taskID int, managerAgent stri
 			return MsgAttachManagerSession{}
 		}
 
-		// Build task context prompt
-		task, err := m.container.Tasks.Get(taskID)
-		if err != nil {
-			return MsgError{Err: fmt.Errorf("get task: %w", err)}
-		}
-
-		taskPrompt := fmt.Sprintf("You are working on Task #%d.\n\nIMPORTANT: First run 'crew show' and follow the workflow instructions exactly.", task.ID)
-
-		// Start new manager session with task context
+		// Start new manager session
 		uc := m.container.StartManagerUseCase()
 		out, err := uc.Execute(context.Background(), usecase.StartManagerInput{
-			Name:             managerAgent,
-			Session:          true,
-			AdditionalPrompt: taskPrompt,
+			Name:    managerAgent,
+			Session: true,
 		})
 		if err != nil {
 			return MsgError{Err: fmt.Errorf("start manager session: %w", err)}
