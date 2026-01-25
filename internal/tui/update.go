@@ -246,6 +246,8 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEditReviewCommentMode(msg)
 	case ModeBlock:
 		return m.handleBlockMode(msg)
+	case ModeSelectReviewer:
+		return m.handleSelectReviewerMode(msg)
 	}
 
 	return m, nil
@@ -336,8 +338,18 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.hasWorktree(task) {
 			return m, nil
 		}
-		// Start review in background (tmux review session)
-		return m, m.reviewTask(task.ID)
+		// Start review selection
+		m.mode = ModeSelectReviewer
+		m.reviewerCursor = 0
+		if m.config != nil {
+			for i, r := range m.reviewerAgents {
+				if r == m.config.AgentsConfig.DefaultReviewer {
+					m.reviewerCursor = i
+					break
+				}
+			}
+		}
+		return m, nil
 
 	case key.Matches(msg, m.keys.New):
 		m.mode = ModeNewTask
@@ -1242,6 +1254,44 @@ func (m *Model) handleBlockMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.blockInput, cmd = m.blockInput.Update(msg)
 		return m, cmd
+	}
+
+	return m, nil
+}
+
+// handleSelectReviewerMode handles keys in reviewer selection mode.
+func (m *Model) handleSelectReviewerMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.mode = ModeNormal
+		return m, nil
+
+	case key.Matches(msg, m.keys.Up):
+		if m.reviewerCursor > 0 {
+			m.reviewerCursor--
+		}
+		return m, nil
+
+	case key.Matches(msg, m.keys.Down):
+		if m.reviewerCursor < len(m.reviewerAgents)-1 {
+			m.reviewerCursor++
+		}
+		return m, nil
+
+	case msg.Type == tea.KeyEnter:
+		task := m.SelectedTask()
+		if task == nil {
+			m.mode = ModeNormal
+			return m, nil
+		}
+		if len(m.reviewerAgents) == 0 {
+			// No reviewers available, use default
+			m.mode = ModeNormal
+			return m, m.reviewTask(task.ID, "")
+		}
+		agent := m.reviewerAgents[m.reviewerCursor]
+		m.mode = ModeNormal
+		return m, m.reviewTask(task.ID, agent)
 	}
 
 	return m, nil

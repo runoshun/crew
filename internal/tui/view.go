@@ -42,12 +42,18 @@ type dialogStyles struct {
 func (m *Model) newDialogStyles() dialogStyles {
 	bg := Colors.Background
 	width := m.dialogWidth() - 4
+
+	keyColor := Colors.Maroon
+	if m.isReviewMode() {
+		keyColor = Colors.KeyText
+	}
+
 	return dialogStyles{
 		width:      width,
 		bg:         bg,
 		line:       lipgloss.NewStyle().Background(bg).Width(width),
 		text:       lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal),
-		key:        lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true),
+		key:        lipgloss.NewStyle().Background(bg).Foreground(keyColor).Bold(true),
 		muted:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
 		label:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true),
 		labelMuted: lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
@@ -169,9 +175,12 @@ func (m *Model) View() string {
 		dialog = m.viewEditReviewCommentDialog()
 	case ModeBlock:
 		dialog = m.viewBlockDialog()
+	case ModeSelectReviewer:
+		dialog = m.viewSelectReviewerDialog()
 	}
 
 	if dialog != "" {
+
 		return m.styles.App.Render(m.overlayDialog(base, dialog))
 	}
 
@@ -245,8 +254,27 @@ func (m *Model) headerFooterContentWidth() int {
 	return width
 }
 
+// isReviewMode returns true if the current mode is related to code review.
+func (m *Model) isReviewMode() bool {
+	switch m.mode { //nolint:exhaustive
+	case ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
+		return true
+	default:
+		return false
+	}
+}
+
+// viewHeader renders the header section.
 func (m *Model) viewHeader() string {
-	title := m.styles.HeaderText.Render("Tasks")
+	headerStyle := m.styles.HeaderWarm
+	textStyle := m.styles.HeaderTextWarm
+
+	if m.isReviewMode() {
+		headerStyle = m.styles.Header
+		textStyle = m.styles.HeaderText
+	}
+
+	title := textStyle.Render("Tasks")
 
 	contentWidth := m.headerFooterContentWidth()
 	visibleCount := len(m.taskList.Items())
@@ -296,7 +324,7 @@ func (m *Model) viewHeader() string {
 
 	content := title + strings.Repeat(" ", spacing) + rightText
 	// Set width dynamically to match list width
-	return m.styles.Header.Width(contentWidth).Render(content)
+	return headerStyle.Width(contentWidth).Render(content)
 }
 
 func (m *Model) viewTaskList() string {
@@ -319,7 +347,7 @@ func (m *Model) viewEmptyState() string {
 
 	titleStyle := m.styles.HeaderText
 	bodyStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
-	keyStyle := lipgloss.NewStyle().Foreground(Colors.KeyText).Bold(true)
+	keyStyle := lipgloss.NewStyle().Foreground(Colors.Maroon).Bold(true)
 	cmdStyle := lipgloss.NewStyle().Foreground(Colors.Primary)
 
 	// ASCII logo - compact to fit narrow terminals
@@ -397,7 +425,7 @@ func (m *Model) viewFilteredEmptyState() string {
 
 	titleStyle := m.styles.HeaderText
 	bodyStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
-	hintStyle := lipgloss.NewStyle().Foreground(Colors.KeyText).Bold(true)
+	hintStyle := lipgloss.NewStyle().Foreground(Colors.Maroon).Bold(true)
 
 	title := titleStyle.Render("No matching tasks")
 	primary := bodyStyle.Render("Clear the filter to see all tasks")
@@ -467,6 +495,56 @@ func (m *Model) viewConfirmDialog() string {
 		buttons,
 	)
 
+	return m.dialogStyle().Render(content)
+}
+
+func (m *Model) viewSelectReviewerDialog() string {
+	task := m.SelectedTask()
+	if task == nil {
+		return ""
+	}
+
+	ds := m.newDialogStyles()
+	baseStyle := lipgloss.NewStyle().Background(ds.bg)
+
+	title := ds.renderLine(ds.label.Render("Select Reviewer"))
+	taskLine := ds.renderLine(ds.text.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
+	selectLabel := ds.renderLine(ds.label.Render("Reviewer Agent:"))
+
+	var reviewerRows []string
+	if len(m.reviewerAgents) == 0 {
+		reviewerRows = append(reviewerRows, ds.renderLine(ds.muted.Render("  No reviewer agents configured")))
+	} else {
+		for i, agent := range m.reviewerAgents {
+			selected := i == m.reviewerCursor
+			cursor := " "
+			cursorStyle := ds.label.Foreground(Colors.Primary)
+			style := ds.text
+			if selected {
+				cursor = "▸"
+				style = ds.label
+			}
+
+			// Mark default reviewer
+			defaultTag := ""
+			if m.config != nil && agent == m.config.AgentsConfig.DefaultReviewer {
+				defaultTag = ds.muted.Render(" (default)")
+			}
+
+			row := ds.renderLine(baseStyle.Render("  ") + cursorStyle.Render(cursor) + baseStyle.Render(" ") + style.Render(agent) + defaultTag)
+			reviewerRows = append(reviewerRows, row)
+		}
+	}
+
+	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" select · ") +
+		ds.key.Render("esc") + ds.text.Render(" cancel"))
+
+	lines := make([]string, 0, 5+len(reviewerRows)+2)
+	lines = append(lines, title, ds.emptyLine(), taskLine, ds.emptyLine(), selectLabel)
+	lines = append(lines, reviewerRows...)
+	lines = append(lines, ds.emptyLine(), hint)
+
+	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
 	return m.dialogStyle().Render(content)
 }
 
@@ -672,17 +750,22 @@ func (m *Model) viewSelectManagerDialog() string {
 }
 
 func (m *Model) viewFooter() string {
+	keyStyle := m.styles.FooterKeyWarm
+	if m.isReviewMode() {
+		keyStyle = m.styles.FooterKey
+	}
+
 	var content string
 	switch m.mode {
 	case ModeNormal:
-		content = m.styles.FooterKey.Render("j/k") + " nav  " +
-			m.styles.FooterKey.Render("enter") + " default  " +
-			m.styles.FooterKey.Render("space") + " actions  " +
-			m.styles.FooterKey.Render("n") + " new  " +
-			m.styles.FooterKey.Render("?") + " help  " +
-			m.styles.FooterKey.Render("q") + " quit"
+		content = keyStyle.Render("j/k") + " nav  " +
+			keyStyle.Render("enter") + " default  " +
+			keyStyle.Render("space") + " actions  " +
+			keyStyle.Render("n") + " new  " +
+			keyStyle.Render("?") + " help  " +
+			keyStyle.Render("q") + " quit"
 		if m.canStopSelectedTask(m.SelectedTask()) {
-			content = content + "  " + m.styles.FooterKey.Render("S") + " stop"
+			content = content + "  " + keyStyle.Render("S") + " stop"
 		}
 	case ModeFilter:
 		content = "enter apply · esc cancel"
@@ -690,7 +773,7 @@ func (m *Model) viewFooter() string {
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeSelectManager, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeSelectManager, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock, ModeSelectReviewer:
 		return ""
 	default:
 		return ""

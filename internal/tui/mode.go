@@ -22,6 +22,7 @@ const (
 	ModeReviewMessage                 // Review message input mode (for Request Changes)
 	ModeEditReviewComment             // Edit review comment mode
 	ModeBlock                         // Block task dialog mode
+	ModeSelectReviewer                // Select reviewer agent mode
 )
 
 // String returns the string representation of the mode.
@@ -61,6 +62,8 @@ func (m Mode) String() string {
 		return "edit_review_comment"
 	case ModeBlock:
 		return "block"
+	case ModeSelectReviewer:
+		return "select_reviewer"
 	default:
 		return "unknown"
 	}
@@ -82,7 +85,7 @@ func (m Mode) IsInputMode() bool {
 	switch m {
 	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec, ModeReviewMessage, ModeEditReviewComment, ModeBlock:
 		return true
-	case ModeNormal, ModeConfirm, ModeStart, ModeSelectManager, ModeHelp, ModeChangeStatus, ModeActionMenu, ModeReviewResult, ModeReviewAction:
+	case ModeNormal, ModeConfirm, ModeStart, ModeSelectManager, ModeHelp, ModeChangeStatus, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeSelectReviewer:
 		return false
 	}
 	return false

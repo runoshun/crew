@@ -23,6 +23,11 @@ var Colors = struct {
 	Warning    lipgloss.Color
 	Background lipgloss.Color
 
+	// Warm colors (Manager)
+	Peach    lipgloss.Color
+	Maroon   lipgloss.Color
+	Flamingo lipgloss.Color
+
 	// Title/text colors
 	TitleNormal   lipgloss.Color
 	TitleSelected lipgloss.Color
@@ -57,6 +62,11 @@ var Colors = struct {
 	Warning:    lipgloss.Color("#F9E2AF"), // Yellow
 	Background: lipgloss.Color("#1E1E2E"), // Base
 
+	// Warm colors
+	Peach:    lipgloss.Color("#FAB387"), // Peach
+	Maroon:   lipgloss.Color("#EBA0AC"), // Maroon
+	Flamingo: lipgloss.Color("#F2CDCD"), // Flamingo
+
 	// Text colors
 	TitleNormal:   lipgloss.Color("#CDD6F4"), // Text
 	TitleSelected: lipgloss.Color("#CDD6F4"), // Text (keep white on selection for contrast)
@@ -90,6 +100,10 @@ type Styles struct {
 	// Header
 	Header     lipgloss.Style
 	HeaderText lipgloss.Style
+
+	// Header (Warm)
+	HeaderWarm     lipgloss.Style
+	HeaderTextWarm lipgloss.Style
 
 	// Task list
 	TaskList           lipgloss.Style
@@ -145,6 +159,9 @@ type Styles struct {
 	Footer    lipgloss.Style
 	FooterKey lipgloss.Style
 
+	// Footer (Warm)
+	FooterKeyWarm lipgloss.Style
+
 	// Pagination
 	PaginationDot       lipgloss.Style
 	PaginationDotActive lipgloss.Style
@@ -185,6 +202,18 @@ func DefaultStyles() Styles {
 		HeaderText: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(Colors.Primary),
+
+		HeaderWarm: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(Colors.Peach).
+			Border(lipgloss.NormalBorder(), false, false, true, false).
+			BorderForeground(Colors.GroupLine).
+			Padding(0, 1).
+			MarginBottom(1),
+
+		HeaderTextWarm: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(Colors.Peach),
 
 		TaskList: lipgloss.NewStyle().
 			MarginBottom(1),
@@ -347,6 +376,11 @@ func DefaultStyles() Styles {
 
 		FooterKey: lipgloss.NewStyle().
 			Foreground(Colors.KeyText).
+			Background(Colors.GroupLine).
+			Padding(0, 1),
+
+		FooterKeyWarm: lipgloss.NewStyle().
+			Foreground(Colors.Maroon).
 			Background(Colors.GroupLine).
 			Padding(0, 1),
 
