@@ -36,7 +36,6 @@ func Register(cfg *domain.Config) {
 		manager.Inherit = name // Inherit from worker agent
 		manager.Role = domain.RoleManager
 		manager.SystemPrompt = domain.DefaultManagerSystemPrompt
-		manager.Hidden = true
 		cfg.Agents[managerName] = manager
 
 		// Register reviewer agent (use complete definition from agentSet)
@@ -44,7 +43,6 @@ func Register(cfg *domain.Config) {
 		reviewer := agentSet.Reviewer
 		reviewer.Role = domain.RoleReviewer
 		reviewer.SystemPrompt = domain.DefaultReviewerSystemPrompt
-		reviewer.Hidden = true
 		cfg.Agents[reviewerName] = reviewer
 	}
 

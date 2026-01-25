@@ -42,9 +42,6 @@ func TestRegister(t *testing.T) {
 		if agent.Role != domain.RoleManager {
 			t.Errorf("agent %q should have Role=manager, got %q", name, agent.Role)
 		}
-		if !agent.Hidden {
-			t.Errorf("manager agent %q should be hidden by default", name)
-		}
 		// Manager should have CommandTemplate set (from builtin definition)
 		if agent.CommandTemplate == "" {
 			t.Errorf("manager agent %q should have a CommandTemplate", name)
