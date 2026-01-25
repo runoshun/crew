@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -508,10 +509,18 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 						Args:            "--base-arg",
 						Prompt:          "base prompt",
 						DefaultModel:    "base-model",
+						Env: map[string]string{
+							"DEBUG": "0",
+							"TOKEN": "base",
+						},
 					},
 					"child": {
 						Inherit:      "base",
 						DefaultModel: "child-model",
+						Env: map[string]string{
+							"TOKEN": "child",
+							"TRACE": "1",
+						},
 					},
 				},
 			},
@@ -521,12 +530,21 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 					Args:            "--base-arg",
 					Prompt:          "base prompt",
 					DefaultModel:    "base-model",
+					Env: map[string]string{
+						"DEBUG": "0",
+						"TOKEN": "base",
+					},
 				},
 				"child": {
 					CommandTemplate: "agent {{.Args}}",
 					Args:            "--base-arg",
 					Prompt:          "base prompt",
 					DefaultModel:    "child-model",
+					Env: map[string]string{
+						"DEBUG": "0",
+						"TOKEN": "child",
+						"TRACE": "1",
+					},
 				},
 			},
 			wantErr: nil,
@@ -667,6 +685,9 @@ func TestConfig_ResolveInheritance(t *testing.T) {
 				}
 				if got.DefaultModel != want.DefaultModel {
 					t.Errorf("agent %q: DefaultModel = %q, want %q", name, got.DefaultModel, want.DefaultModel)
+				}
+				if !reflect.DeepEqual(got.Env, want.Env) {
+					t.Errorf("agent %q: Env = %v, want %v", name, got.Env, want.Env)
 				}
 			}
 		})

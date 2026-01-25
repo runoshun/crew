@@ -581,11 +581,59 @@ func TestStartTask_ScriptGeneration(t *testing.T) {
 	assert.Contains(t, script, "opencode")
 	assert.Contains(t, script, "--prompt")
 	assert.Contains(t, script, "\"$PROMPT\"")
+	// Env exports should not appear when none are configured
+	assert.NotContains(t, script, "export ")
 
 	// Verify script is executable (mode 0700)
 	info, err := os.Stat(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o700), info.Mode().Perm(), "script should have 0700 permissions")
+}
+
+func TestStartTask_ScriptIncludesAgentEnv(t *testing.T) {
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Agents["env-agent"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "env-agent {{.Prompt}}",
+		Env: map[string]string{
+			"DEBUG": "1",
+			"PATH":  "/custom/path",
+			"TOKEN": "a'b",
+		},
+	}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "env-agent",
+	})
+
+	require.NoError(t, err)
+
+	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
+	require.NoError(t, err)
+	script := string(scriptContent)
+
+	assert.Contains(t, script, "export DEBUG='1'")
+	assert.Contains(t, script, "export PATH='/custom/path'")
+	assert.Contains(t, script, `export TOKEN='a\'b'`)
 }
 
 func TestStartTask_CleanupScript(t *testing.T) {
