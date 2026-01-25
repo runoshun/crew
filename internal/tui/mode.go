@@ -12,6 +12,7 @@ const (
 	ModeInputDesc                     // Description input mode (for new task) - deprecated, use ModeNewTask
 	ModeNewTask                       // New task form mode (title, desc, parent)
 	ModeStart                         // Agent picker mode
+	ModeSelectManager                 // Manager picker mode
 	ModeHelp                          // Help overlay mode
 	ModeChangeStatus                  // Status change mode
 	ModeExec                          // Execute command mode
@@ -41,6 +42,8 @@ func (m Mode) String() string {
 		return "new_task"
 	case ModeStart:
 		return "start"
+	case ModeSelectManager:
+		return "select_manager"
 	case ModeHelp:
 		return "help"
 	case ModeChangeStatus:
@@ -82,7 +85,7 @@ func (m Mode) IsInputMode() bool {
 	switch m {
 	case ModeFilter, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeExec, ModeReviewMessage, ModeEditReviewComment, ModeBlock:
 		return true
-	case ModeNormal, ModeConfirm, ModeStart, ModeHelp, ModeChangeStatus, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeSelectReviewer:
+	case ModeNormal, ModeConfirm, ModeStart, ModeSelectManager, ModeHelp, ModeChangeStatus, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeSelectReviewer:
 		return false
 	}
 	return false

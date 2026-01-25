@@ -253,6 +253,17 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent d
 	defaultSystemPrompt := domain.DefaultSystemPrompt
 	defaultPrompt := cfg.AgentsConfig.WorkerPrompt
 
+	switch agent.Role {
+	case domain.RoleManager:
+		defaultSystemPrompt = domain.DefaultManagerSystemPrompt
+		defaultPrompt = cfg.AgentsConfig.ManagerPrompt
+	case domain.RoleReviewer:
+		defaultSystemPrompt = domain.DefaultReviewerSystemPrompt
+		defaultPrompt = cfg.AgentsConfig.ReviewerPrompt
+	case domain.RoleWorker:
+		// Already set as defaults
+	}
+
 	// Render command and prompt using Agent.RenderCommand
 	// Pass shell variable reference as promptOverride - will be expanded at runtime
 	result, err := agent.RenderCommand(cmdData, `"$PROMPT"`, defaultSystemPrompt, defaultPrompt)

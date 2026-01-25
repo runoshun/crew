@@ -74,6 +74,7 @@ type Model struct {
 	commentCounts   map[int]int // taskID -> comment count
 	builtinAgents   []string
 	customAgents    []string
+	managerAgents   []string
 	reviewerAgents  []string // List of available reviewer agents
 	agentCommands   map[string]string
 	customKeybinds  map[string]domain.TUIKeybinding
@@ -113,6 +114,7 @@ type Model struct {
 	height               int
 	confirmTaskID        int
 	agentCursor          int
+	managerAgentCursor   int
 	reviewerCursor       int
 	statusCursor         int
 	actionMenuCursor     int
@@ -197,6 +199,7 @@ func New(c *app.Container) *Model {
 		reviewViewport:     reviewVp,
 		builtinAgents:      []string{"claude", "opencode", "codex"},
 		customAgents:       nil,
+		managerAgents:      nil,
 		agentCommands:      make(map[string]string),
 		customKeybinds:     make(map[string]domain.TUIKeybinding),
 		keybindWarnings:    nil,
@@ -910,12 +913,25 @@ func (m *Model) updateAgents() {
 	// EnabledAgents() already filters out disabled agents
 	m.builtinAgents = []string{}
 	m.customAgents = []string{}
+	m.managerAgents = []string{}
 	for name, agentDef := range m.config.EnabledAgents() {
-		// Skip hidden agents and non-worker roles
-		if agentDef.Hidden || (agentDef.Role != "" && agentDef.Role != domain.RoleWorker) {
+		// Skip hidden agents
+		if agentDef.Hidden {
 			continue
 		}
-		m.builtinAgents = append(m.builtinAgents, name)
+
+		// Add to appropriate list based on role
+		switch agentDef.Role {
+		case domain.RoleWorker, "":
+			m.builtinAgents = append(m.builtinAgents, name)
+		case domain.RoleManager:
+			m.managerAgents = append(m.managerAgents, name)
+		case domain.RoleReviewer:
+			continue
+		default:
+			continue
+		}
+
 		// Extract command from command template (simplified - first word)
 		cmdTemplate := agentDef.CommandTemplate
 		if cmdTemplate != "" {
@@ -929,6 +945,7 @@ func (m *Model) updateAgents() {
 	// Sort agent lists for stable alphabetical order
 	sort.Strings(m.builtinAgents)
 	sort.Strings(m.customAgents)
+	sort.Strings(m.managerAgents)
 
 	// Populate reviewer agents
 	m.reviewerAgents = m.config.GetReviewerAgents()
@@ -938,6 +955,14 @@ func (m *Model) updateAgents() {
 	for i, a := range allAgents {
 		if a == m.config.AgentsConfig.DefaultWorker {
 			m.agentCursor = i
+			break
+		}
+	}
+
+	// Set manager cursor to default manager
+	for i, a := range m.managerAgents {
+		if a == m.config.AgentsConfig.DefaultManager {
+			m.managerAgentCursor = i
 			break
 		}
 	}
@@ -1435,6 +1460,49 @@ func (m *Model) attachToManagerSession() tea.Cmd {
 	return tea.Exec(&domainExecCmd{cmd: cmd}, func(err error) tea.Msg {
 		return MsgReloadTasks{}
 	})
+}
+
+// startOrAttachManagerSessionForTask returns a tea.Cmd that starts or attaches to manager session
+// with context for a specific task.
+// If a manager session is already running, it attaches to the existing session to preserve the conversation.
+// The selected agent is only used when starting a new session.
+func (m *Model) startOrAttachManagerSessionForTask(taskID int, managerAgent string) tea.Cmd {
+	return func() tea.Msg {
+		sessionName := domain.ManagerSessionName()
+
+		// Check if session is already running
+		running, err := m.container.Sessions.IsRunning(sessionName)
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
+		}
+
+		// If running, attach to existing session to preserve conversation
+		// User should stop the session first if they want to switch agents
+		if running {
+			return MsgAttachManagerSession{}
+		}
+
+		// Build task context prompt
+		task, err := m.container.Tasks.Get(taskID)
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("get task: %w", err)}
+		}
+
+		taskPrompt := fmt.Sprintf("You are working on Task #%d.\n\nIMPORTANT: First run 'crew show' and follow the workflow instructions exactly.", task.ID)
+
+		// Start new manager session with task context
+		uc := m.container.StartManagerUseCase()
+		out, err := uc.Execute(context.Background(), usecase.StartManagerInput{
+			Name:             managerAgent,
+			Session:          true,
+			AdditionalPrompt: taskPrompt,
+		})
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("start manager session: %w", err)}
+		}
+
+		return MsgManagerSessionStarted{SessionName: out.SessionName}
+	}
 }
 
 // cycleReviewMode returns a command that cycles through review modes.
