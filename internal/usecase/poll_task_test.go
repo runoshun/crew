@@ -56,6 +56,22 @@ func (r *ThreadSafeTaskRepository) UpdateStatus(id int, status domain.Status) {
 	}
 }
 
+func (r *ThreadSafeTaskRepository) List(filter domain.TaskFilter) ([]*domain.Task, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	tasks, err := r.MockTaskRepository.List(filter)
+	if err != nil {
+		return nil, err
+	}
+	// Return copies to avoid race conditions
+	result := make([]*domain.Task, len(tasks))
+	for i, t := range tasks {
+		taskCopy := *t
+		result[i] = &taskCopy
+	}
+	return result, nil
+}
+
 func TestPollTask_Execute_StatusChange(t *testing.T) {
 	// Setup
 	repo := NewThreadSafeTaskRepository()

@@ -18,45 +18,65 @@ func newPollCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		Command  string
 		Expect   string
+		Status   string
 		Interval int
 		Timeout  int
 	}
 
 	cmd := &cobra.Command{
-		Use:   "poll <TASK_ID> [TASK_ID...]",
+		Use:   "poll [<TASK_ID>...]",
 		Short: "Poll task status and exit after one change detection (default timeout: 5m)",
-		Long: `Monitor one or more tasks' status and execute a command once when any status changes.
+		Long: `Monitor tasks and wait for status changes.
 
-The poll command checks the task status at regular intervals and executes
-a command template as soon as a status change is detected on any of the
-monitored tasks. It exits immediately after executing the command for the
-first detected change (single-shot).
+Two modes are available:
 
-Polling stops automatically when the timeout is reached (default: 300s).
+1. Task ID Mode (default):
+   Monitor specific tasks by ID and execute a command when any status changes.
+   Usage: crew poll <TASK_ID> [TASK_ID...]
 
-Multiple Task Monitoring (Recommended):
-  Always list all related task IDs so a change in any one triggers the action.
-  The command exits when ANY of the specified tasks changes status.
+2. Status Mode (--status):
+   Wait for any task with the specified status to appear.
+   Usage: crew poll --status <status>
+   Output: "<status> <task_id>" when found (e.g., "for_review 42")
 
-Expected Status Check (Optional):
-  Use --expect to specify expected status(es).
-  - If specified and ANY task's current status already differs from the expected status(es)
-    on startup, the command is executed immediately and the poll command exits.
-  - If all tasks match or if --expect is not specified, the command waits for the first
-    status change on any task.
+Task ID Mode Details:
+  The poll command checks the task status at regular intervals and executes
+  a command template as soon as a status change is detected on any of the
+  monitored tasks. It exits immediately after executing the command for the
+  first detected change (single-shot).
 
-Command Template:
-  The command template can use the following variables:
-    {{.TaskID}}    - Task ID (the task that changed)
-    {{.OldStatus}} - Previous status (or expected status if --expect is used)
-    {{.NewStatus}} - New status
+  Polling stops automatically when the timeout is reached (default: 300s).
 
-Terminal States:
-  Reaching a terminal state is also treated as a status change:
-    - closed - Task closed (merged or abandoned)
-    - error  - Task session terminated with error
+  Multiple Task Monitoring (Recommended):
+    Always list all related task IDs so a change in any one triggers the action.
+    The command exits when ANY of the specified tasks changes status.
+
+  Expected Status Check (Optional):
+    Use --expect to specify expected status(es).
+    - If specified and ANY task's current status already differs from the expected status(es)
+      on startup, the command is executed immediately and the poll command exits.
+    - If all tasks match or if --expect is not specified, the command waits for the first
+      status change on any task.
+
+  Command Template:
+    The command template can use the following variables:
+      {{.TaskID}}    - Task ID (the task that changed)
+      {{.OldStatus}} - Previous status (or expected status if --expect is used)
+      {{.NewStatus}} - New status
+
+  Terminal States:
+    Reaching a terminal state is also treated as a status change:
+      - closed - Task closed (merged or abandoned)
+      - error  - Task session terminated with error
 
 Examples:
+  # Status mode: Wait for any task with for_review status
+  crew poll --status for_review
+  # Output: "for_review 42" (when task 42 becomes for_review)
+
+  # Status mode with timeout
+  crew poll --status for_review --timeout 60
+
   # Poll multiple tasks (exit when any changes)
   crew poll 220 221 222 --command 'echo "Task {{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"'
 
@@ -71,8 +91,46 @@ Examples:
 
   # Use as a trigger for next action
   crew poll 175 176 --expect in_progress --command 'crew complete {{.TaskID}}'`,
-		Args: cobra.MinimumNArgs(1),
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Setup signal handling for graceful shutdown
+			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer cancel()
+
+			// Status mode: --status flag is specified
+			if opts.Status != "" {
+				// Validate: --status mode cannot use task IDs or other task-specific flags
+				if len(args) > 0 {
+					return fmt.Errorf("cannot specify task IDs with --status flag")
+				}
+				if opts.Expect != "" {
+					return fmt.Errorf("cannot use --expect with --status flag")
+				}
+				if opts.Command != "" {
+					return fmt.Errorf("cannot use --command with --status flag")
+				}
+
+				// Parse status
+				status := domain.Status(opts.Status)
+				if !status.IsValid() {
+					return fmt.Errorf("invalid status: %s", opts.Status)
+				}
+
+				// Execute status mode use case
+				uc := c.PollStatusUseCase(cmd.OutOrStdout())
+				_, err := uc.Execute(ctx, usecase.PollStatusInput{
+					Status:   status,
+					Interval: opts.Interval,
+					Timeout:  opts.Timeout,
+				})
+				return err
+			}
+
+			// Task ID mode: require at least one task ID
+			if len(args) == 0 {
+				return fmt.Errorf("requires at least 1 task ID or --status flag")
+			}
+
 			// Parse task IDs
 			var taskIDs []int
 			for _, arg := range args {
@@ -101,10 +159,6 @@ Examples:
 				opts.Command = `echo "{{.TaskID}}: {{.OldStatus}} → {{.NewStatus}}"`
 			}
 
-			// Setup signal handling for graceful shutdown
-			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
-			defer cancel()
-
 			// Execute use case
 			uc := c.PollTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 			_, err := uc.Execute(ctx, usecase.PollTaskInput{
@@ -120,6 +174,7 @@ Examples:
 	}
 
 	// Flags
+	cmd.Flags().StringVarP(&opts.Status, "status", "s", "", "Wait for any task with this status (e.g., 'for_review')")
 	cmd.Flags().StringVarP(&opts.Expect, "expect", "e", "", "Expected status(es) - comma-separated (e.g., 'in_progress' or 'in_progress,needs_input')")
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", 10, "Polling interval in seconds")
 	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 300, "Timeout in seconds")
