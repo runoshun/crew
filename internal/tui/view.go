@@ -796,6 +796,8 @@ func (m *Model) viewHelp() string {
 			}{
 				{"↑/k", "Move up"},
 				{"↓/j", "Move down"},
+				{"←/h", "Prev page"},
+				{"→/l", "Next page"},
 				{"enter", "Default"},
 				{"space", "Actions"},
 				{"/", "Filter"},
@@ -822,6 +824,9 @@ func (m *Model) viewHelp() string {
 				{"E", "Edit Task"},
 				{"d", "Delete"},
 				{"c", "Close"},
+				{"y", "Copy"},
+				{"m", "Merge"},
+				{"B", "Block/Unblock"},
 			},
 		},
 		{
@@ -832,6 +837,8 @@ func (m *Model) viewHelp() string {
 			}{
 				{"r", "Refresh"},
 				{"?", "Close Help"},
+				{"M", "Manager"},
+				{"esc", "Cancel"},
 				{"q", "Quit"},
 			},
 		},
