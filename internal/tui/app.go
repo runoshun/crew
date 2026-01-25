@@ -1464,7 +1464,8 @@ func (m *Model) attachToManagerSession() tea.Cmd {
 
 // startOrAttachManagerSessionForTask returns a tea.Cmd that starts or attaches to manager session
 // with context for a specific task.
-// If a manager session is already running, it will be stopped and restarted with the selected agent.
+// If a manager session is already running, it attaches to the existing session to preserve the conversation.
+// The selected agent is only used when starting a new session.
 func (m *Model) startOrAttachManagerSessionForTask(taskID int, managerAgent string) tea.Cmd {
 	return func() tea.Msg {
 		sessionName := domain.ManagerSessionName()
@@ -1475,14 +1476,10 @@ func (m *Model) startOrAttachManagerSessionForTask(taskID int, managerAgent stri
 			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
 		}
 
-		// If running, stop the existing session to restart with the selected agent
+		// If running, attach to existing session to preserve conversation
+		// User should stop the session first if they want to switch agents
 		if running {
-			if stopErr := m.container.Sessions.Stop(sessionName); stopErr != nil {
-				return MsgError{Err: fmt.Errorf("stop existing manager session: %w", stopErr)}
-			}
-			// Clean up manager script
-			scriptPath := domain.ManagerScriptPath(m.container.Config.CrewDir)
-			_ = os.Remove(scriptPath)
+			return MsgAttachManagerSession{}
 		}
 
 		// Build task context prompt

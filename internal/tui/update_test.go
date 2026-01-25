@@ -314,3 +314,92 @@ func TestUpdate_NormalModeSpace_OpensActionMenu(t *testing.T) {
 	assert.Equal(t, ModeNormal, result.mode)
 	assert.Empty(t, result.actionMenuItems)
 }
+
+func TestHandleSelectManagerMode_Escape(t *testing.T) {
+	m := &Model{
+		keys:          DefaultKeyMap(),
+		mode:          ModeSelectManager,
+		managerAgents: []string{"manager-1", "manager-2"},
+	}
+
+	updatedModel, cmd := m.handleSelectManagerMode(tea.KeyMsg{Type: tea.KeyEsc})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode, "Escape should return to normal mode")
+}
+
+func TestHandleSelectManagerMode_UpDown(t *testing.T) {
+	m := &Model{
+		keys:               DefaultKeyMap(),
+		mode:               ModeSelectManager,
+		managerAgents:      []string{"manager-1", "manager-2", "manager-3"},
+		managerAgentCursor: 1,
+	}
+
+	// Test Up key
+	updatedModel, cmd := m.handleSelectManagerMode(tea.KeyMsg{Type: tea.KeyUp})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, 0, result.managerAgentCursor, "Up should decrease cursor")
+
+	// Test Up at top (should not go negative)
+	result.managerAgentCursor = 0
+	updatedModel, cmd = result.handleSelectManagerMode(tea.KeyMsg{Type: tea.KeyUp})
+	assert.Nil(t, cmd)
+	result, ok = updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, 0, result.managerAgentCursor, "Cursor should stay at 0")
+
+	// Test Down key
+	result.managerAgentCursor = 1
+	updatedModel, cmd = result.handleSelectManagerMode(tea.KeyMsg{Type: tea.KeyDown})
+	assert.Nil(t, cmd)
+	result, ok = updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, 2, result.managerAgentCursor, "Down should increase cursor")
+
+	// Test Down at bottom (should not exceed length)
+	updatedModel, cmd = result.handleSelectManagerMode(tea.KeyMsg{Type: tea.KeyDown})
+	assert.Nil(t, cmd)
+	result, ok = updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, 2, result.managerAgentCursor, "Cursor should stay at max")
+}
+
+func TestHandleSelectManagerMode_Enter_NoTask(t *testing.T) {
+	m := &Model{
+		keys:               DefaultKeyMap(),
+		mode:               ModeSelectManager,
+		managerAgents:      []string{"manager-1"},
+		managerAgentCursor: 0,
+		taskList:           list.New([]list.Item{}, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	updatedModel, cmd := m.handleSelectManagerMode(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode, "Enter with no task should return to normal mode")
+}
+
+func TestHandleSelectManagerMode_Enter_NoAgents(t *testing.T) {
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
+	items := []list.Item{taskItem{task: task}}
+
+	m := &Model{
+		keys:               DefaultKeyMap(),
+		mode:               ModeSelectManager,
+		managerAgents:      []string{},
+		managerAgentCursor: 0,
+		tasks:              []*domain.Task{task},
+		taskList:           list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	updatedModel, cmd := m.handleSelectManagerMode(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode, "Enter with no agents should return to normal mode")
+}
