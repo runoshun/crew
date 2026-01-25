@@ -101,7 +101,7 @@ func buildConflictMessage(files []string, baseBranch, command string) string {
 		sb.WriteString("\n")
 	}
 	sb.WriteString("\nPlease resolve the conflicts:\n")
-	sb.WriteString(fmt.Sprintf("1. git merge %s\n", baseBranch))
+	sb.WriteString(fmt.Sprintf("1. Run 'git merge %s' (use local branch directly - no fetch needed)\n", baseBranch))
 	sb.WriteString("2. Resolve conflicts in the listed files\n")
 	sb.WriteString("3. git add <files> && git commit\n")
 	sb.WriteString(fmt.Sprintf("4. Run 'crew %s' again", command))

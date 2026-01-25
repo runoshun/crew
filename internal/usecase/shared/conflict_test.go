@@ -189,6 +189,7 @@ func TestConflictHandler_CheckAndHandle_WithConflict(t *testing.T) {
 	assert.Contains(t, out.Message, "file1.txt")
 	assert.Contains(t, out.Message, "file2.txt")
 	assert.Contains(t, out.Message, "git merge main")
+	assert.Contains(t, out.Message, "no fetch needed")
 	assert.Contains(t, out.Message, "crew complete")
 	assert.NotContains(t, out.Message, "git fetch")
 
@@ -271,6 +272,7 @@ func TestBuildConflictMessage(t *testing.T) {
 		assert.Contains(t, msg, "file1.txt")
 		assert.Contains(t, msg, "dir/file2.txt")
 		assert.Contains(t, msg, "git merge main")
+		assert.Contains(t, msg, "no fetch needed")
 		assert.Contains(t, msg, "crew complete")
 		assert.NotContains(t, msg, "git fetch")
 	})
@@ -280,6 +282,7 @@ func TestBuildConflictMessage(t *testing.T) {
 		msg := buildConflictMessage(files, "develop", "merge")
 
 		assert.Contains(t, msg, "git merge develop")
+		assert.Contains(t, msg, "no fetch needed")
 		assert.Contains(t, msg, "crew merge")
 		assert.NotContains(t, msg, "main")
 		assert.NotContains(t, msg, "git fetch")
