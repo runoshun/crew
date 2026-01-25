@@ -245,6 +245,8 @@ type ManagerScriptData struct {
 	AgentCommand string
 	Prompt       string
 	Shell        string
+	SessionName  string
+	TaskCommand  string
 }
 
 // BuildScript creates a shell script that sets PROMPT and executes the command.
@@ -254,6 +256,19 @@ func (out *StartManagerOutput) BuildScript() string {
 
 	const scriptTemplate = `#!{{.Shell}}
 set -o pipefail
+
+# Session log (stderr only)
+LOG="$(git rev-parse --git-common-dir)/crew/logs/{{.SessionName}}.log"
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+{
+  printf '================================================================================\n'
+  printf 'Session: %s\n' '{{.SessionName}}'
+  printf 'Started: %s\n' "$STARTED_AT"
+  printf 'Directory: %s\n' "$PWD"
+  printf 'Command: %s\n' '{{.TaskCommand}}'
+  printf '================================================================================\n\n'
+} >"$LOG"
+exec 2>>"$LOG"
 
 # Embedded prompt
 read -r -d '' PROMPT << 'END_OF_PROMPT'
@@ -269,6 +284,8 @@ END_OF_PROMPT
 		AgentCommand: out.Command,
 		Prompt:       out.Prompt,
 		Shell:        shell,
+		SessionName:  domain.ManagerSessionName(),
+		TaskCommand:  out.Command,
 	}
 
 	var buf bytes.Buffer
