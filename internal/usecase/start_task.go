@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"text/template"
@@ -290,6 +291,11 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent d
 
 	tmpl := template.Must(template.New("script").Parse(scriptTemplate))
 
+	envExports, err := buildEnvExports(agent.Env)
+	if err != nil {
+		return "", err
+	}
+
 	data := scriptTemplateData{
 		AgentCommand: result.Command,
 		Prompt:       finalPrompt,
@@ -298,7 +304,7 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent d
 		TaskDir:      worktreePath,
 		TaskCommand:  result.Command,
 		TaskID:       task.ID,
-		EnvExports:   buildEnvExports(agent.Env),
+		EnvExports:   envExports,
 	}
 
 	var script strings.Builder
@@ -315,9 +321,9 @@ func (uc *StartTask) cleanupScript(taskID int) {
 	_ = os.Remove(scriptPath)
 }
 
-func buildEnvExports(env map[string]string) string {
+func buildEnvExports(env map[string]string) (string, error) {
 	if len(env) == 0 {
-		return ""
+		return "", nil
 	}
 
 	keys := make([]string, 0, len(env))
@@ -328,6 +334,9 @@ func buildEnvExports(env map[string]string) string {
 
 	var builder strings.Builder
 	for _, key := range keys {
+		if !envNamePattern.MatchString(key) {
+			return "", fmt.Errorf("%w: %q", domain.ErrInvalidEnvVarName, key)
+		}
 		builder.WriteString("export ")
 		builder.WriteString(key)
 		builder.WriteString("=")
@@ -335,11 +344,16 @@ func buildEnvExports(env map[string]string) string {
 		builder.WriteString("\n")
 	}
 
-	return strings.TrimRight(builder.String(), "\n")
+	return strings.TrimRight(builder.String(), "\n"), nil
 }
 
+var envNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
 func shellQuote(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", `\'`) + "'"
+	if value == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
 // scriptTemplate is the template for the task script.

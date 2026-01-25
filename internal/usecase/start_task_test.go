@@ -633,7 +633,44 @@ func TestStartTask_ScriptIncludesAgentEnv(t *testing.T) {
 
 	assert.Contains(t, script, "export DEBUG='1'")
 	assert.Contains(t, script, "export PATH='/custom/path'")
-	assert.Contains(t, script, `export TOKEN='a\'b'`)
+	assert.Contains(t, script, `export TOKEN='a'"'"'b'`)
+}
+
+func TestStartTask_ScriptIncludesAgentEnv_InvalidName(t *testing.T) {
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	worktreeDir := setupTestWorktree(t)
+
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Test task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.CreatePath = worktreeDir
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Agents["env-agent"] = domain.Agent{
+		Role:            domain.RoleWorker,
+		CommandTemplate: "env-agent {{.Prompt}}",
+		Env: map[string]string{
+			"BAD-NAME": "1",
+		},
+	}
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+	uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+	// Execute
+	_, err := uc.Execute(context.Background(), StartTaskInput{
+		TaskID: 1,
+		Agent:  "env-agent",
+	})
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrInvalidEnvVarName)
 }
 
 func TestStartTask_CleanupScript(t *testing.T) {

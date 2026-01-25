@@ -40,5 +40,6 @@ var (
 	ErrMultipleTasksInFile   = errors.New("file contains multiple tasks (expected single task for edit)")
 	ErrInvalidParentRef      = errors.New("invalid parent reference: must be a positive number")
 	ErrInvalidReviewMode     = errors.New("invalid review mode")
+	ErrInvalidEnvVarName     = errors.New("invalid environment variable name")
 	ErrTaskBlocked           = errors.New("task is blocked")
 )
