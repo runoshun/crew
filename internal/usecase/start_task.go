@@ -221,6 +221,9 @@ type scriptTemplateData struct {
 	AgentCommand string
 	Prompt       string
 	CrewBin      string
+	SessionName  string
+	TaskDir      string
+	TaskCommand  string
 	TaskID       int
 }
 
@@ -286,10 +289,13 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent d
 	tmpl := template.Must(template.New("script").Parse(scriptTemplate))
 
 	data := scriptTemplateData{
-		TaskID:       task.ID,
 		AgentCommand: result.Command,
 		Prompt:       finalPrompt,
 		CrewBin:      crewBin,
+		SessionName:  domain.SessionName(task.ID),
+		TaskDir:      worktreePath,
+		TaskCommand:  result.Command,
+		TaskID:       task.ID,
 	}
 
 	var script strings.Builder
@@ -310,6 +316,19 @@ func (uc *StartTask) cleanupScript(taskID int) {
 // The prompt is embedded using a heredoc to avoid escaping issues.
 const scriptTemplate = `#!/bin/bash
 set -o pipefail
+
+# Session log (stderr only)
+LOG="$(git rev-parse --git-common-dir)/crew/logs/{{.SessionName}}.log"
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+{
+  printf '================================================================================\n'
+  printf 'Session: %s\n' '{{.SessionName}}'
+  printf 'Started: %s\n' "$STARTED_AT"
+  printf 'Directory: %s\n' '{{.TaskDir}}'
+  printf 'Command: %s\n' '{{.TaskCommand}}'
+  printf '================================================================================\n\n'
+} >"$LOG"
+exec 2>>"$LOG"
 
 # Embedded prompt
 read -r -d '' PROMPT << 'END_OF_PROMPT'

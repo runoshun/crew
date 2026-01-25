@@ -161,7 +161,7 @@ func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, review
 // executeBackground starts the review in a background tmux session.
 func (uc *ReviewTask) executeBackground(ctx context.Context, task *domain.Task, wtPath string, result domain.RenderCommandResult, agentName, sessionName string) (*ReviewTaskOutput, error) {
 	// Generate the review script
-	scriptPath, err := uc.generateReviewScript(task, result)
+	scriptPath, err := uc.generateReviewScript(task, wtPath, result)
 	if err != nil {
 		return nil, fmt.Errorf("generate review script: %w", err)
 	}
@@ -202,7 +202,7 @@ func (uc *ReviewTask) executeBackground(ctx context.Context, task *domain.Task, 
 }
 
 // generateReviewScript creates the review script with embedded prompt.
-func (uc *ReviewTask) generateReviewScript(task *domain.Task, result domain.RenderCommandResult) (string, error) {
+func (uc *ReviewTask) generateReviewScript(task *domain.Task, worktreePath string, result domain.RenderCommandResult) (string, error) {
 	scriptsDir := filepath.Join(uc.crewDir, "scripts")
 	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
 		return "", fmt.Errorf("create scripts directory: %w", err)
@@ -218,10 +218,13 @@ func (uc *ReviewTask) generateReviewScript(task *domain.Task, result domain.Rend
 	tmpl := template.Must(template.New("review-script").Parse(reviewScriptTemplate))
 
 	data := reviewScriptData{
-		TaskID:       task.ID,
 		AgentCommand: result.Command,
 		Prompt:       result.Prompt,
 		CrewBin:      crewBin,
+		SessionName:  domain.ReviewSessionName(task.ID),
+		TaskDir:      worktreePath,
+		TaskCommand:  result.Command,
+		TaskID:       task.ID,
 	}
 
 	var script strings.Builder
@@ -250,6 +253,9 @@ type reviewScriptData struct {
 	AgentCommand string
 	Prompt       string
 	CrewBin      string
+	SessionName  string
+	TaskDir      string
+	TaskCommand  string
 	TaskID       int
 }
 
@@ -258,6 +264,19 @@ type reviewScriptData struct {
 // Output is captured and sent to _review-session-ended on completion.
 const reviewScriptTemplate = `#!/bin/bash
 set -o pipefail
+
+# Session log (stderr only)
+LOG="$(git rev-parse --git-common-dir)/crew/logs/{{.SessionName}}.log"
+STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+{
+  printf '================================================================================\n'
+  printf 'Session: %s\n' '{{.SessionName}}'
+  printf 'Started: %s\n' "$STARTED_AT"
+  printf 'Directory: %s\n' '{{.TaskDir}}'
+  printf 'Command: %s\n' '{{.TaskCommand}}'
+  printf '================================================================================\n\n'
+} >"$LOG"
+exec 2>>"$LOG"
 
 # Output capture file
 OUTPUT_FILE=$(mktemp)
