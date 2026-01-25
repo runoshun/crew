@@ -1044,7 +1044,7 @@ func TestStartTask_Execute_WithWorkerPrompt(t *testing.T) {
 	assert.Contains(t, string(scriptContent), "Custom worker prompt from config")
 }
 
-func TestStartTask_Execute_AgentPromptOverridesWorkerPrompt(t *testing.T) {
+func TestStartTask_Execute_AgentPromptConcatenatesWithWorkerPrompt(t *testing.T) {
 	crewDir := t.TempDir()
 	repoRoot := t.TempDir()
 	worktreeDir := setupTestWorktree(t)
@@ -1065,7 +1065,7 @@ func TestStartTask_Execute_AgentPromptOverridesWorkerPrompt(t *testing.T) {
 	configLoader.Config.Agents["test-agent"] = domain.Agent{
 		Role:            domain.RoleWorker,
 		CommandTemplate: "test-cmd {{.Prompt}}",
-		Prompt:          "Agent-specific prompt", // This should take precedence
+		Prompt:          "Agent-specific prompt", // This should be concatenated after WorkerPrompt
 	}
 	git := &testutil.MockGit{}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
@@ -1081,12 +1081,12 @@ func TestStartTask_Execute_AgentPromptOverridesWorkerPrompt(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 
-	// Verify Agent.Prompt takes precedence over WorkerPrompt
+	// Verify both WorkerPrompt and Agent.Prompt are present (concatenated)
 	scriptContent, err := os.ReadFile(domain.ScriptPath(crewDir, 1))
 	require.NoError(t, err)
 	script := string(scriptContent)
+	assert.Contains(t, script, "Worker prompt from config")
 	assert.Contains(t, script, "Agent-specific prompt")
-	assert.NotContains(t, script, "Worker prompt from config")
 }
 
 func TestStartTask_Execute_WorktreeConfigPassed(t *testing.T) {

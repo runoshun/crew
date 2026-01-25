@@ -342,7 +342,7 @@ func TestStartManager_Execute_WithManagerPrompt(t *testing.T) {
 	assert.Contains(t, out.Prompt, "Custom manager prompt from config")
 }
 
-func TestStartManager_Execute_AgentPromptOverridesManagerPrompt(t *testing.T) {
+func TestStartManager_Execute_AgentPromptConcatenatesWithManagerPrompt(t *testing.T) {
 	repoRoot := t.TempDir()
 	gitDir := repoRoot + "/.git"
 	crewDir := gitDir + "/crew"
@@ -354,7 +354,7 @@ func TestStartManager_Execute_AgentPromptOverridesManagerPrompt(t *testing.T) {
 	configLoader.Config.Agents["test-manager"] = domain.Agent{
 		Role:            domain.RoleManager,
 		CommandTemplate: "test-cmd {{.Prompt}}",
-		Prompt:          "Agent-specific prompt", // This should take precedence
+		Prompt:          "Agent-specific prompt", // This should be concatenated after ManagerPrompt
 	}
 
 	uc := NewStartManager(sessions, configLoader, repoRoot, gitDir, crewDir)
@@ -366,9 +366,9 @@ func TestStartManager_Execute_AgentPromptOverridesManagerPrompt(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	// Verify Agent.Prompt takes precedence over ManagerPrompt
+	// Verify both ManagerPrompt and Agent.Prompt are present (concatenated)
+	assert.Contains(t, out.Prompt, "Manager prompt from config")
 	assert.Contains(t, out.Prompt, "Agent-specific prompt")
-	assert.NotContains(t, out.Prompt, "Manager prompt from config")
 }
 
 func TestStartManager_Execute_WithDisabledAgent(t *testing.T) {
