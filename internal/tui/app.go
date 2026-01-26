@@ -1425,7 +1425,11 @@ func (m *Model) loadReviewResult(taskID int) tea.Cmd {
 // isManagerSessionRunning checks if the manager session is currently running.
 // Returns (running, error). This is a shared helper to avoid duplicating
 // session existence checks across multiple methods.
+// Returns an error if container or Sessions is nil (defensive guard for partially initialized models).
 func (m *Model) isManagerSessionRunning() (bool, error) {
+	if m.container == nil || m.container.Sessions == nil {
+		return false, fmt.Errorf("session manager not initialized")
+	}
 	sessionName := domain.ManagerSessionName()
 	return m.container.Sessions.IsRunning(sessionName)
 }

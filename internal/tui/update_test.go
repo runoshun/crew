@@ -494,24 +494,89 @@ func TestCheckAndAttachOrSelectManager_Error(t *testing.T) {
 	assert.Contains(t, errMsg.Err.Error(), "check manager session")
 }
 
-func TestManagerKey_WithTaskSelected_ReturnsCommand(t *testing.T) {
-	// When M key is pressed with a task selected, should return a command
-	// (checkAndAttachOrSelectManager) not directly change mode
+func TestManagerKey_WithTaskSelected_SessionRunning_FullFlow(t *testing.T) {
+	// Test full flow: M key -> cmd() -> Update(msg) -> attach
+	// When manager session is running, M key should lead to MsgAttachManagerSession
 	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
 	items := []list.Item{taskItem{task: task}}
 
+	mockSessions := &mockSessionManager{isRunningResult: true}
+	container := &app.Container{Sessions: mockSessions}
+
 	m := &Model{
-		keys:     DefaultKeyMap(),
-		mode:     ModeNormal,
-		tasks:    []*domain.Task{task},
-		taskList: list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+		keys:      DefaultKeyMap(),
+		mode:      ModeNormal,
+		tasks:     []*domain.Task{task},
+		taskList:  list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+		container: container,
 	}
 
+	// Step 1: Press M key
 	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'M'}})
 	result, ok := updatedModel.(*Model)
 	assert.True(t, ok)
-	// Mode should NOT change immediately (async command is returned)
-	assert.Equal(t, ModeNormal, result.mode)
-	// A command should be returned for session check
-	assert.NotNil(t, cmd, "Should return a command for session check")
+	assert.Equal(t, ModeNormal, result.mode, "Mode should not change immediately")
+	assert.NotNil(t, cmd, "Should return a command")
+
+	// Step 2: Execute the command to get the message
+	msg := cmd()
+	_, isMsgAttach := msg.(MsgAttachManagerSession)
+	assert.True(t, isMsgAttach, "Command should return MsgAttachManagerSession when session is running")
+}
+
+func TestManagerKey_WithTaskSelected_SessionNotRunning_FullFlow(t *testing.T) {
+	// Test full flow: M key -> cmd() -> Update(msg) -> show manager select
+	// When manager session is not running, M key should lead to MsgShowManagerSelect -> ModeSelectManager
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
+	items := []list.Item{taskItem{task: task}}
+
+	mockSessions := &mockSessionManager{isRunningResult: false}
+	container := &app.Container{Sessions: mockSessions}
+
+	m := &Model{
+		keys:      DefaultKeyMap(),
+		mode:      ModeNormal,
+		tasks:     []*domain.Task{task},
+		taskList:  list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+		container: container,
+	}
+
+	// Step 1: Press M key
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'M'}})
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode, "Mode should not change immediately")
+	assert.NotNil(t, cmd, "Should return a command")
+
+	// Step 2: Execute the command to get the message
+	msg := cmd()
+	_, isMsgShowSelect := msg.(MsgShowManagerSelect)
+	assert.True(t, isMsgShowSelect, "Command should return MsgShowManagerSelect when session is not running")
+
+	// Step 3: Pass the message to Update to verify mode transition
+	updatedModel2, _ := result.Update(msg)
+	result2, ok := updatedModel2.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeSelectManager, result2.mode, "Mode should change to ModeSelectManager after receiving MsgShowManagerSelect")
+}
+
+func TestIsManagerSessionRunning_NilContainer(t *testing.T) {
+	// Test defensive guard: nil container should return error, not panic
+	m := &Model{container: nil}
+
+	running, err := m.isManagerSessionRunning()
+	assert.False(t, running)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "session manager not initialized")
+}
+
+func TestIsManagerSessionRunning_NilSessions(t *testing.T) {
+	// Test defensive guard: nil Sessions should return error, not panic
+	container := &app.Container{Sessions: nil}
+	m := &Model{container: container}
+
+	running, err := m.isManagerSessionRunning()
+	assert.False(t, running)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "session manager not initialized")
 }
