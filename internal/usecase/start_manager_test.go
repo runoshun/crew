@@ -256,7 +256,7 @@ func TestStartManagerOutput_BuildScript(t *testing.T) {
 	// Assert script structure
 	assert.Contains(t, script, "#!/bin/bash")
 	assert.Contains(t, script, "set -o pipefail")
-	assert.Contains(t, script, "Session: %s\\n' 'crew-manager'")
+	assert.Contains(t, script, "exec 2>>") // Redirect stderr to log
 	assert.Contains(t, script, "END_OF_PROMPT")
 	assert.Contains(t, script, "This is the manager prompt.")
 	assert.Contains(t, script, "claude --model opus")

@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -223,10 +224,8 @@ type scriptTemplateData struct {
 	AgentCommand string
 	Prompt       string
 	CrewBin      string
-	SessionName  string
-	TaskDir      string
-	TaskCommand  string
 	EnvExports   string
+	LogPath      string
 	TaskID       int
 }
 
@@ -296,15 +295,20 @@ func (uc *StartTask) buildScript(task *domain.Task, worktreePath string, agent d
 		return "", err
 	}
 
+	sessionName := domain.SessionName(task.ID)
+	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
 	data := scriptTemplateData{
 		AgentCommand: result.Command,
 		Prompt:       finalPrompt,
 		CrewBin:      crewBin,
-		SessionName:  domain.SessionName(task.ID),
-		TaskDir:      worktreePath,
-		TaskCommand:  result.Command,
 		TaskID:       task.ID,
 		EnvExports:   envExports,
+		LogPath:      logPath,
+	}
+
+	// Write session log header before script execution
+	if err := writeSessionLogHeader(logPath, sessionName, worktreePath, result.Command); err != nil {
+		return "", fmt.Errorf("write session log header: %w", err)
 	}
 
 	var script strings.Builder
@@ -356,23 +360,39 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
+// writeSessionLogHeader writes the session metadata header to the log file.
+// This is done in Go to avoid shell escaping issues with command strings.
+func writeSessionLogHeader(logPath, sessionName, workDir, command string) error {
+	// Ensure logs directory exists
+	logsDir := filepath.Dir(logPath)
+	if err := os.MkdirAll(logsDir, 0750); err != nil {
+		return fmt.Errorf("create logs directory: %w", err)
+	}
+
+	header := fmt.Sprintf(`================================================================================
+Session: %s
+Started: %s
+Directory: %s
+Command: %s
+================================================================================
+
+`, sessionName, time.Now().UTC().Format(time.RFC3339), workDir, command)
+
+	// Write header (truncate existing file)
+	if err := os.WriteFile(logPath, []byte(header), 0600); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+
+	return nil
+}
+
 // scriptTemplate is the template for the task script.
 // The prompt is embedded using a heredoc to avoid escaping issues.
 const scriptTemplate = `#!/bin/bash
 set -o pipefail
 
-# Session log (stderr only)
-LOG="$(git rev-parse --git-common-dir)/crew/logs/{{.SessionName}}.log"
-STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-{
-  printf '================================================================================\n'
-  printf 'Session: %s\n' '{{.SessionName}}'
-  printf 'Started: %s\n' "$STARTED_AT"
-  printf 'Directory: %s\n' '{{.TaskDir}}'
-  printf 'Command: %s\n' '{{.TaskCommand}}'
-  printf '================================================================================\n\n'
-} >"$LOG"
-exec 2>>"$LOG"
+# Redirect stderr to session log
+exec 2>>"{{.LogPath}}"
 
 # Embedded prompt
 read -r -d '' PROMPT << 'END_OF_PROMPT'

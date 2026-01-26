@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"text/template"
+	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -25,6 +26,7 @@ type StartManagerOutput struct {
 	Command     string // The full command to execute
 	Prompt      string // The prompt content
 	SessionName string // Session name (only set when Session=true)
+	LogPath     string // Path to session log file
 }
 
 // StartManager is the use case for starting a manager agent.
@@ -118,14 +120,15 @@ func (uc *StartManager) Execute(ctx context.Context, in StartManagerInput) (*Sta
 		}
 	}
 
+	sessionName := domain.ManagerSessionName()
 	output := &StartManagerOutput{
 		Command: result.Command,
 		Prompt:  finalPrompt,
+		LogPath: domain.SessionLogPath(uc.crewDir, sessionName),
 	}
 
 	// If session mode, start a tmux session
 	if in.Session {
-		sessionName := domain.ManagerSessionName()
 
 		// Check if session is already running
 		running, err := uc.sessions.IsRunning(sessionName)
@@ -168,6 +171,12 @@ func (uc *StartManager) generateManagerScript(out *StartManagerOutput) (string, 
 		return "", fmt.Errorf("create scripts directory: %w", err)
 	}
 
+	// Write session log header before script execution
+	sessionName := domain.ManagerSessionName()
+	if err := writeManagerSessionLogHeader(out.LogPath, sessionName, uc.repoRoot, out.Command); err != nil {
+		return "", fmt.Errorf("write session log header: %w", err)
+	}
+
 	scriptPath := domain.ManagerScriptPath(uc.crewDir)
 	script := out.BuildScript()
 
@@ -178,6 +187,29 @@ func (uc *StartManager) generateManagerScript(out *StartManagerOutput) (string, 
 	}
 
 	return scriptPath, nil
+}
+
+// writeManagerSessionLogHeader writes the session metadata header to the log file.
+func writeManagerSessionLogHeader(logPath, sessionName, workDir, command string) error {
+	logsDir := filepath.Dir(logPath)
+	if err := os.MkdirAll(logsDir, 0750); err != nil {
+		return fmt.Errorf("create logs directory: %w", err)
+	}
+
+	header := fmt.Sprintf(`================================================================================
+Session: %s
+Started: %s
+Directory: %s
+Command: %s
+================================================================================
+
+`, sessionName, time.Now().UTC().Format(time.RFC3339), workDir, command)
+
+	if err := os.WriteFile(logPath, []byte(header), 0600); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+
+	return nil
 }
 
 // GetCommand returns the executable path and arguments for the manager command.
@@ -245,8 +277,7 @@ type ManagerScriptData struct {
 	AgentCommand string
 	Prompt       string
 	Shell        string
-	SessionName  string
-	TaskCommand  string
+	LogPath      string
 }
 
 // BuildScript creates a shell script that sets PROMPT and executes the command.
@@ -257,18 +288,8 @@ func (out *StartManagerOutput) BuildScript() string {
 	const scriptTemplate = `#!{{.Shell}}
 set -o pipefail
 
-# Session log (stderr only)
-LOG="$(git rev-parse --git-common-dir)/crew/logs/{{.SessionName}}.log"
-STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-{
-  printf '================================================================================\n'
-  printf 'Session: %s\n' '{{.SessionName}}'
-  printf 'Started: %s\n' "$STARTED_AT"
-  printf 'Directory: %s\n' "$PWD"
-  printf 'Command: %s\n' '{{.TaskCommand}}'
-  printf '================================================================================\n\n'
-} >"$LOG"
-exec 2>>"$LOG"
+# Redirect stderr to session log
+exec 2>>"{{.LogPath}}"
 
 # Embedded prompt
 read -r -d '' PROMPT << 'END_OF_PROMPT'
@@ -284,8 +305,7 @@ END_OF_PROMPT
 		AgentCommand: out.Command,
 		Prompt:       out.Prompt,
 		Shell:        shell,
-		SessionName:  domain.ManagerSessionName(),
-		TaskCommand:  out.Command,
+		LogPath:      out.LogPath,
 	}
 
 	var buf bytes.Buffer

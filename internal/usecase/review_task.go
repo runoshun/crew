@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -215,15 +216,21 @@ func (uc *ReviewTask) generateReviewScript(task *domain.Task, worktreePath strin
 		crewBin = "crew"
 	}
 
+	sessionName := domain.ReviewSessionName(task.ID)
+	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+
+	// Write session log header before script execution
+	if err := writeReviewSessionLogHeader(logPath, sessionName, worktreePath, result.Command); err != nil {
+		return "", fmt.Errorf("write session log header: %w", err)
+	}
+
 	tmpl := template.Must(template.New("review-script").Parse(reviewScriptTemplate))
 
 	data := reviewScriptData{
 		AgentCommand: result.Command,
 		Prompt:       result.Prompt,
 		CrewBin:      crewBin,
-		SessionName:  domain.ReviewSessionName(task.ID),
-		TaskDir:      worktreePath,
-		TaskCommand:  result.Command,
+		LogPath:      logPath,
 		TaskID:       task.ID,
 	}
 
@@ -242,6 +249,29 @@ func (uc *ReviewTask) generateReviewScript(task *domain.Task, worktreePath strin
 	return scriptPath, nil
 }
 
+// writeReviewSessionLogHeader writes the session metadata header to the log file.
+func writeReviewSessionLogHeader(logPath, sessionName, workDir, command string) error {
+	logsDir := filepath.Dir(logPath)
+	if err := os.MkdirAll(logsDir, 0750); err != nil {
+		return fmt.Errorf("create logs directory: %w", err)
+	}
+
+	header := fmt.Sprintf(`================================================================================
+Session: %s
+Started: %s
+Directory: %s
+Command: %s
+================================================================================
+
+`, sessionName, time.Now().UTC().Format(time.RFC3339), workDir, command)
+
+	if err := os.WriteFile(logPath, []byte(header), 0600); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+
+	return nil
+}
+
 // cleanupScript removes the generated review script file.
 func (uc *ReviewTask) cleanupScript(taskID int) {
 	scriptPath := domain.ReviewScriptPath(uc.crewDir, taskID)
@@ -253,9 +283,7 @@ type reviewScriptData struct {
 	AgentCommand string
 	Prompt       string
 	CrewBin      string
-	SessionName  string
-	TaskDir      string
-	TaskCommand  string
+	LogPath      string
 	TaskID       int
 }
 
@@ -265,18 +293,8 @@ type reviewScriptData struct {
 const reviewScriptTemplate = `#!/bin/bash
 set -o pipefail
 
-# Session log (stderr only)
-LOG="$(git rev-parse --git-common-dir)/crew/logs/{{.SessionName}}.log"
-STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-{
-  printf '================================================================================\n'
-  printf 'Session: %s\n' '{{.SessionName}}'
-  printf 'Started: %s\n' "$STARTED_AT"
-  printf 'Directory: %s\n' '{{.TaskDir}}'
-  printf 'Command: %s\n' '{{.TaskCommand}}'
-  printf '================================================================================\n\n'
-} >"$LOG"
-exec 2>>"$LOG"
+# Redirect stderr to session log
+exec 2>>"{{.LogPath}}"
 
 # Output capture file
 OUTPUT_FILE=$(mktemp)

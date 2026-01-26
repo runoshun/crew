@@ -570,7 +570,7 @@ func TestStartTask_ScriptGeneration(t *testing.T) {
 	// Check required script elements
 	assert.Contains(t, script, "#!/bin/bash")
 	assert.Contains(t, script, "set -o pipefail")
-	assert.Contains(t, script, "Session: %s\\n' 'crew-1'")
+	assert.Contains(t, script, "exec 2>>")      // Redirect stderr to log
 	assert.Contains(t, script, "END_OF_PROMPT") // Heredoc marker
 	assert.Contains(t, script, "SESSION_ENDED()")
 	assert.Contains(t, script, "_session-ended 1")
