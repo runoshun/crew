@@ -84,7 +84,7 @@ func (c *Client) Start(ctx context.Context, opts domain.StartSessionOptions) err
 	}
 
 	// Configure status bar
-	if err := c.configureStatusBar(opts.Name, opts.TaskID, opts.TaskTitle, opts.TaskAgent, opts.IsReview); err != nil {
+	if err := c.configureStatusBar(opts.Name, opts.TaskID, opts.TaskTitle, opts.TaskAgent, opts.Type); err != nil {
 		return fmt.Errorf("configure status bar: %w", err)
 	}
 
@@ -301,21 +301,22 @@ func (c *Client) IsRunning(sessionName string) (bool, error) {
 }
 
 // configureStatusBar configures the status bar for a tmux session.
-func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, taskAgent string, isReview bool) error {
-	// Colors
-	blue := "#1e66f5"     // Catppuccin Blue - worker main background
-	blueDark := "#1146b4" // Darker blue for C-g keybind
+func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, taskAgent string, sessionType domain.SessionType) error {
+	// Colors by session type
+	var mainBg, keyBg string
 
-	purple := "#8839ef"     // Catppuccin Mauve - reviewer main background
-	purpleDark := "#6023c0" // Darker mauve for C-g keybind
-
-	mainBg := blue
-	keyBg := blueDark
-
-	// Use purple for reviewer sessions
-	if isReview {
-		mainBg = purple
-		keyBg = purpleDark
+	switch sessionType {
+	case domain.SessionTypeReviewer:
+		mainBg = "#8839ef" // Catppuccin Mauve - reviewer main background
+		keyBg = "#6023c0"  // Darker mauve for C-g keybind
+	case domain.SessionTypeManager:
+		mainBg = "#40a02b" // Catppuccin Green - manager main background
+		keyBg = "#2a7a1a"  // Darker green for C-g keybind
+	case domain.SessionTypeWorker:
+		fallthrough
+	default:
+		mainBg = "#1e66f5" // Catppuccin Blue - worker main background
+		keyBg = "#1146b4"  // Darker blue for C-g keybind
 	}
 
 	btnBg := "#ffffff"     // White background for arrow button
