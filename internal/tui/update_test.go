@@ -403,3 +403,17 @@ func TestHandleSelectManagerMode_Enter_NoAgents(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, ModeNormal, result.mode, "Enter with no agents should return to normal mode")
 }
+
+func TestUpdate_MsgShowManagerSelect(t *testing.T) {
+	m := &Model{
+		mode: ModeNormal,
+	}
+
+	msg := MsgShowManagerSelect{}
+
+	updatedModel, cmd := m.Update(msg)
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeSelectManager, result.mode, "MsgShowManagerSelect should switch to ModeSelectManager")
+}

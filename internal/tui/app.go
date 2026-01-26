@@ -1495,6 +1495,29 @@ func (m *Model) startOrAttachManagerSessionForTask(managerAgent string) tea.Cmd 
 	}
 }
 
+// checkAndAttachOrSelectManager checks if manager session is running and returns
+// appropriate message. If running, returns MsgAttachManagerSession for immediate attach.
+// If not running, returns MsgShowManagerSelect to show agent selection UI.
+func (m *Model) checkAndAttachOrSelectManager() tea.Cmd {
+	return func() tea.Msg {
+		sessionName := domain.ManagerSessionName()
+
+		// Check if session is already running
+		running, err := m.container.Sessions.IsRunning(sessionName)
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
+		}
+
+		if running {
+			// Attach to existing session immediately (skip agent selection)
+			return MsgAttachManagerSession{}
+		}
+
+		// Session not running, show agent selection UI
+		return MsgShowManagerSelect{}
+	}
+}
+
 // cycleReviewMode returns a command that cycles through review modes.
 func (m *Model) cycleReviewMode() tea.Cmd {
 	return func() tea.Msg {
