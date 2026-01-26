@@ -153,6 +153,7 @@ func (uc *StartManager) Execute(ctx context.Context, in StartManagerInput) (*Sta
 			TaskTitle: "Manager",
 			TaskAgent: name,
 			TaskID:    0, // Manager has no task ID
+			Type:      domain.SessionTypeManager,
 		}); err != nil {
 			_ = os.Remove(scriptPath) // Cleanup on failure
 			return nil, fmt.Errorf("start session: %w", err)

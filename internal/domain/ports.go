@@ -130,15 +130,27 @@ type SessionManager interface {
 	GetPaneProcesses(sessionName string) ([]ProcessInfo, error)
 }
 
+// SessionType represents the type of session for status bar styling.
+type SessionType int
+
+const (
+	// SessionTypeWorker is a worker session (blue status bar).
+	SessionTypeWorker SessionType = iota
+	// SessionTypeReviewer is a reviewer session (purple status bar).
+	SessionTypeReviewer
+	// SessionTypeManager is a manager session (green status bar).
+	SessionTypeManager
+)
+
 // StartSessionOptions configures session creation.
 type StartSessionOptions struct {
-	Name      string // Session name
-	Dir       string // Working directory
-	Command   string // Command to run
-	TaskTitle string // Task title for status bar
-	TaskAgent string // Agent name for status bar
-	TaskID    int    // Associated task ID
-	IsReview  bool   // Whether this is a review session
+	Name      string      // Session name
+	Dir       string      // Working directory
+	Command   string      // Command to run
+	TaskTitle string      // Task title for status bar
+	TaskAgent string      // Agent name for status bar
+	TaskID    int         // Associated task ID
+	Type      SessionType // Session type for status bar styling
 }
 
 // WorktreeManager manages git worktrees.

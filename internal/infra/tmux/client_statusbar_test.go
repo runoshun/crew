@@ -19,18 +19,23 @@ func TestClient_ConfigureStatusBar_Colors(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		isReview       bool
+		sessionType    domain.SessionType
 		expectedMainBg string
 	}{
 		{
 			name:           "Worker Session",
-			isReview:       false,
+			sessionType:    domain.SessionTypeWorker,
 			expectedMainBg: "bg=#1e66f5", // Blue
 		},
 		{
 			name:           "Reviewer Session",
-			isReview:       true,
+			sessionType:    domain.SessionTypeReviewer,
 			expectedMainBg: "bg=#8839ef", // Purple
+		},
+		{
+			name:           "Manager Session",
+			sessionType:    domain.SessionTypeManager,
+			expectedMainBg: "bg=#40a02b", // Green
 		},
 	}
 
@@ -45,7 +50,7 @@ func TestClient_ConfigureStatusBar_Colors(t *testing.T) {
 				TaskID:    1,
 				TaskTitle: "Test Task",
 				TaskAgent: "test-agent",
-				IsReview:  tt.isReview,
+				Type:      tt.sessionType,
 			})
 			require.NoError(t, err)
 

@@ -160,6 +160,7 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		TaskID:    task.ID,
 		TaskTitle: task.Title,
 		TaskAgent: agentName,
+		Type:      domain.SessionTypeWorker,
 	}); err != nil {
 		// Rollback: cleanup script and worktree
 		uc.cleanupScript(task.ID)
