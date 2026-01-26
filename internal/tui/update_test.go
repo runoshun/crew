@@ -1,15 +1,51 @@
 package tui
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
+
+// mockSessionManager is a test double for domain.SessionManager.
+type mockSessionManager struct {
+	isRunningResult bool
+	isRunningErr    error
+}
+
+func (m *mockSessionManager) Start(_ context.Context, _ domain.StartSessionOptions) error {
+	return nil
+}
+
+func (m *mockSessionManager) Stop(_ string) error {
+	return nil
+}
+
+func (m *mockSessionManager) Attach(_ string) error {
+	return nil
+}
+
+func (m *mockSessionManager) Peek(_ string, _ int, _ bool) (string, error) {
+	return "", nil
+}
+
+func (m *mockSessionManager) Send(_ string, _ string) error {
+	return nil
+}
+
+func (m *mockSessionManager) IsRunning(_ string) (bool, error) {
+	return m.isRunningResult, m.isRunningErr
+}
+
+func (m *mockSessionManager) GetPaneProcesses(_ string) ([]domain.ProcessInfo, error) {
+	return nil, nil
+}
 
 func TestUpdate_MsgCommentsLoaded(t *testing.T) {
 	m := &Model{
@@ -416,4 +452,66 @@ func TestUpdate_MsgShowManagerSelect(t *testing.T) {
 	result, ok := updatedModel.(*Model)
 	assert.True(t, ok)
 	assert.Equal(t, ModeSelectManager, result.mode, "MsgShowManagerSelect should switch to ModeSelectManager")
+}
+
+func TestCheckAndAttachOrSelectManager_SessionRunning(t *testing.T) {
+	// When manager session is running, should return MsgAttachManagerSession
+	mockSessions := &mockSessionManager{isRunningResult: true}
+	container := &app.Container{Sessions: mockSessions}
+	m := &Model{container: container}
+
+	cmd := m.checkAndAttachOrSelectManager()
+	msg := cmd()
+
+	_, ok := msg.(MsgAttachManagerSession)
+	assert.True(t, ok, "Should return MsgAttachManagerSession when session is running")
+}
+
+func TestCheckAndAttachOrSelectManager_SessionNotRunning(t *testing.T) {
+	// When manager session is not running, should return MsgShowManagerSelect
+	mockSessions := &mockSessionManager{isRunningResult: false}
+	container := &app.Container{Sessions: mockSessions}
+	m := &Model{container: container}
+
+	cmd := m.checkAndAttachOrSelectManager()
+	msg := cmd()
+
+	_, ok := msg.(MsgShowManagerSelect)
+	assert.True(t, ok, "Should return MsgShowManagerSelect when session is not running")
+}
+
+func TestCheckAndAttachOrSelectManager_Error(t *testing.T) {
+	// When IsRunning returns an error, should return MsgError
+	mockSessions := &mockSessionManager{isRunningErr: assert.AnError}
+	container := &app.Container{Sessions: mockSessions}
+	m := &Model{container: container}
+
+	cmd := m.checkAndAttachOrSelectManager()
+	msg := cmd()
+
+	errMsg, ok := msg.(MsgError)
+	assert.True(t, ok, "Should return MsgError when IsRunning fails")
+	assert.Contains(t, errMsg.Err.Error(), "check manager session")
+}
+
+func TestManagerKey_WithTaskSelected_ReturnsCommand(t *testing.T) {
+	// When M key is pressed with a task selected, should return a command
+	// (checkAndAttachOrSelectManager) not directly change mode
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
+	items := []list.Item{taskItem{task: task}}
+
+	m := &Model{
+		keys:     DefaultKeyMap(),
+		mode:     ModeNormal,
+		tasks:    []*domain.Task{task},
+		taskList: list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+	}
+
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'M'}})
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	// Mode should NOT change immediately (async command is returned)
+	assert.Equal(t, ModeNormal, result.mode)
+	// A command should be returned for session check
+	assert.NotNil(t, cmd, "Should return a command for session check")
 }

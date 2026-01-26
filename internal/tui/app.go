@@ -1422,14 +1422,19 @@ func (m *Model) loadReviewResult(taskID int) tea.Cmd {
 	}
 }
 
+// isManagerSessionRunning checks if the manager session is currently running.
+// Returns (running, error). This is a shared helper to avoid duplicating
+// session existence checks across multiple methods.
+func (m *Model) isManagerSessionRunning() (bool, error) {
+	sessionName := domain.ManagerSessionName()
+	return m.container.Sessions.IsRunning(sessionName)
+}
+
 // startOrAttachManagerSession returns a tea.Cmd that starts or attaches to manager session.
 // If the session is already running, it attaches; otherwise, it starts a new session.
 func (m *Model) startOrAttachManagerSession() tea.Cmd {
 	return func() tea.Msg {
-		sessionName := domain.ManagerSessionName()
-
-		// Check if session is already running
-		running, err := m.container.Sessions.IsRunning(sessionName)
+		running, err := m.isManagerSessionRunning()
 		if err != nil {
 			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
 		}
@@ -1467,10 +1472,7 @@ func (m *Model) attachToManagerSession() tea.Cmd {
 // The selected agent is only used when starting a new session.
 func (m *Model) startOrAttachManagerSessionForTask(managerAgent string) tea.Cmd {
 	return func() tea.Msg {
-		sessionName := domain.ManagerSessionName()
-
-		// Check if session is already running
-		running, err := m.container.Sessions.IsRunning(sessionName)
+		running, err := m.isManagerSessionRunning()
 		if err != nil {
 			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
 		}
@@ -1500,10 +1502,7 @@ func (m *Model) startOrAttachManagerSessionForTask(managerAgent string) tea.Cmd 
 // If not running, returns MsgShowManagerSelect to show agent selection UI.
 func (m *Model) checkAndAttachOrSelectManager() tea.Cmd {
 	return func() tea.Msg {
-		sessionName := domain.ManagerSessionName()
-
-		// Check if session is already running
-		running, err := m.container.Sessions.IsRunning(sessionName)
+		running, err := m.isManagerSessionRunning()
 		if err != nil {
 			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
 		}
