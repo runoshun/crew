@@ -20,6 +20,12 @@
 ## default_model = "opus" # (optional) Default model for this agent
 ## description = "..."    # (optional) Description of the agent's purpose
 ## setup_script = "..."   # (optional) Script to run after worktree creation
+## env = { KEY = "value" } # (optional) Environment variables for the agent
+##
+## # Multi-line env example:
+## [agents.<name>.env]
+## KEY = "value"
+## DEBUG = "1"
 ## hidden = false         # (optional) Hide from TUI agent list (default: false)
 ##
 

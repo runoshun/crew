@@ -62,6 +62,9 @@ const (
 // Agent defines a unified agent configuration that can serve as worker, reviewer, or manager.
 // This replaces the previous separate Worker and Manager types.
 type Agent struct {
+	// Environment variables (for agent process)
+	Env map[string]string `toml:"env,omitempty"`
+
 	// Inheritance
 	Inherit string `toml:"inherit,omitempty"` // Name of agent to inherit from (optional)
 
@@ -634,6 +637,7 @@ func (c *Config) resolveAgent(name string, visited, resolving map[string]bool) e
 	if agent.SetupScript != "" {
 		resolved.SetupScript = agent.SetupScript
 	}
+	resolved.Env = mergeEnv(parent.Env, agent.Env)
 	// Hidden is a boolean, only override if explicitly set to true
 	if agent.Hidden {
 		resolved.Hidden = agent.Hidden
@@ -650,4 +654,18 @@ func (c *Config) resolveAgent(name string, visited, resolving map[string]bool) e
 	visited[name] = true
 
 	return nil
+}
+
+func mergeEnv(parent, child map[string]string) map[string]string {
+	if parent == nil && child == nil {
+		return nil
+	}
+	merged := make(map[string]string)
+	for key, value := range parent {
+		merged[key] = value
+	}
+	for key, value := range child {
+		merged[key] = value
+	}
+	return merged
 }
