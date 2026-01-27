@@ -15,7 +15,7 @@ func TestShowConfig_Execute(t *testing.T) {
 	t.Run("returns both config infos and effective config", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RepoConfigInfo = domain.ConfigInfo{
-			Path:    "/test/.git/crew/config.toml",
+			Path:    "/test/.crew/config.toml",
 			Content: "default_agent = \"claude\"",
 			Exists:  true,
 		}
@@ -42,7 +42,7 @@ func TestShowConfig_Execute(t *testing.T) {
 		out, err := uc.Execute(context.Background(), usecase.ShowConfigInput{})
 
 		require.NoError(t, err)
-		assert.Equal(t, "/test/.git/crew/config.toml", out.RepoConfig.Path)
+		assert.Equal(t, "/test/.crew/config.toml", out.RepoConfig.Path)
 		assert.Equal(t, "default_agent = \"claude\"", out.RepoConfig.Content)
 		assert.True(t, out.RepoConfig.Exists)
 		assert.Equal(t, "/home/test/.config/crew/config.toml", out.GlobalConfig.Path)
@@ -57,7 +57,7 @@ func TestShowConfig_Execute(t *testing.T) {
 	t.Run("handles non-existent files", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RepoConfigInfo = domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.toml",
+			Path:   "/test/.crew/config.toml",
 			Exists: false,
 		}
 		manager.GlobalConfigInfo = domain.ConfigInfo{
@@ -83,7 +83,7 @@ func TestShowConfig_Execute(t *testing.T) {
 	t.Run("ignores global config when flag is set", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RepoConfigInfo = domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.toml",
+			Path:   "/test/.crew/config.toml",
 			Exists: true,
 		}
 		manager.GlobalConfigInfo = domain.ConfigInfo{
@@ -104,7 +104,7 @@ func TestShowConfig_Execute(t *testing.T) {
 		assert.Empty(t, out.GlobalConfig.Path)
 		assert.False(t, out.GlobalConfig.Exists)
 		// RepoConfig should still be present
-		assert.Equal(t, "/test/.git/crew/config.toml", out.RepoConfig.Path)
+		assert.Equal(t, "/test/.crew/config.toml", out.RepoConfig.Path)
 		// RootRepoConfig should still be present
 		assert.Equal(t, "/test/.crew.toml", out.RootRepoConfig.Path)
 	})
@@ -112,7 +112,7 @@ func TestShowConfig_Execute(t *testing.T) {
 	t.Run("ignores root repo config when flag is set", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RepoConfigInfo = domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.toml",
+			Path:   "/test/.crew/config.toml",
 			Exists: true,
 		}
 		manager.RootRepoConfigInfo = domain.ConfigInfo{
@@ -133,13 +133,13 @@ func TestShowConfig_Execute(t *testing.T) {
 		assert.Empty(t, out.RootRepoConfig.Path)
 		assert.False(t, out.RootRepoConfig.Exists)
 		// RepoConfig should still be present
-		assert.Equal(t, "/test/.git/crew/config.toml", out.RepoConfig.Path)
+		assert.Equal(t, "/test/.crew/config.toml", out.RepoConfig.Path)
 	})
 
 	t.Run("ignores repo config when flag is set", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RepoConfigInfo = domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.toml",
+			Path:   "/test/.crew/config.toml",
 			Exists: true,
 		}
 		manager.GlobalConfigInfo = domain.ConfigInfo{
@@ -168,7 +168,7 @@ func TestShowConfig_Execute(t *testing.T) {
 	t.Run("returns runtime config info", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RuntimeConfigInfo = domain.ConfigInfo{
-			Path:    "/test/.git/crew/config.runtime.toml",
+			Path:    "/test/.crew/config.runtime.toml",
 			Content: "[complete]\nauto_fix = true",
 			Exists:  true,
 		}
@@ -180,7 +180,7 @@ func TestShowConfig_Execute(t *testing.T) {
 		out, err := uc.Execute(context.Background(), usecase.ShowConfigInput{})
 
 		require.NoError(t, err)
-		assert.Equal(t, "/test/.git/crew/config.runtime.toml", out.RuntimeConfig.Path)
+		assert.Equal(t, "/test/.crew/config.runtime.toml", out.RuntimeConfig.Path)
 		assert.Equal(t, "[complete]\nauto_fix = true", out.RuntimeConfig.Content)
 		assert.True(t, out.RuntimeConfig.Exists)
 	})
@@ -188,11 +188,11 @@ func TestShowConfig_Execute(t *testing.T) {
 	t.Run("ignores runtime config when flag is set", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RuntimeConfigInfo = domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.runtime.toml",
+			Path:   "/test/.crew/config.runtime.toml",
 			Exists: true,
 		}
 		manager.RepoConfigInfo = domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.toml",
+			Path:   "/test/.crew/config.toml",
 			Exists: true,
 		}
 
@@ -209,7 +209,7 @@ func TestShowConfig_Execute(t *testing.T) {
 		assert.Empty(t, out.RuntimeConfig.Path)
 		assert.False(t, out.RuntimeConfig.Exists)
 		// RepoConfig should still be present
-		assert.Equal(t, "/test/.git/crew/config.toml", out.RepoConfig.Path)
+		assert.Equal(t, "/test/.crew/config.toml", out.RepoConfig.Path)
 		// Verify that IgnoreRuntime was passed to loader
 		assert.True(t, loader.LastOpts.IgnoreRuntime)
 	})

@@ -20,7 +20,7 @@ type Client struct {
 
 // NewClient creates a new worktree client.
 // repoRoot is the main repository root directory.
-// worktreeDir is the directory where worktrees will be created (typically .git/crew/worktrees).
+// worktreeDir is the directory where worktrees will be created (typically .crew/worktrees).
 func NewClient(repoRoot, worktreeDir string) *Client {
 	return &Client{
 		repoRoot:    repoRoot,

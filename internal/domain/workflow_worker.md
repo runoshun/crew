@@ -131,7 +131,7 @@ crew complete
 
 ## Agent Configuration Tips
 
-- Repository owners can set per-worker defaults in `.git/crew/config.toml` using the `model = "<provider/model>"` field.
+- Repository owners can set per-worker defaults in `.crew/config.toml` using the `model = "<provider/model>"` field.
 - `crew start -m <model>` overrides the config value when a specific model is required.
 
 ---

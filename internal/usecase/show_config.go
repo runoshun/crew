@@ -10,10 +10,10 @@ import (
 // ShowConfigInput contains the input for the ShowConfig use case.
 type ShowConfigInput struct {
 	IgnoreGlobal   bool // Skip loading global config
-	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
+	IgnoreRepo     bool // Skip loading repo config (.crew/config.toml)
 	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
 	IgnoreOverride bool // Skip loading override config (config.override.toml)
-	IgnoreRuntime  bool // Skip loading runtime config (.git/crew/config.runtime.toml)
+	IgnoreRuntime  bool // Skip loading runtime config (.crew/config.runtime.toml)
 }
 
 // ShowConfigOutput contains the output of the ShowConfig use case.
@@ -21,9 +21,9 @@ type ShowConfigOutput struct {
 	EffectiveConfig *domain.Config    // Merged effective configuration
 	GlobalConfig    domain.ConfigInfo // Global config file info
 	OverrideConfig  domain.ConfigInfo // Override config file info (config.override.toml)
-	RepoConfig      domain.ConfigInfo // Repository config file info (.git/crew/config.toml)
+	RepoConfig      domain.ConfigInfo // Repository config file info (.crew/config.toml)
 	RootRepoConfig  domain.ConfigInfo // Root repository config file info (.crew.toml)
-	RuntimeConfig   domain.ConfigInfo // Runtime config file info (.git/crew/config.runtime.toml)
+	RuntimeConfig   domain.ConfigInfo // Runtime config file info (.crew/config.runtime.toml)
 }
 
 // ShowConfig displays configuration file information.

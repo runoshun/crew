@@ -8,7 +8,7 @@ This guide helps you set up git-crew for your project. Follow the checklist belo
 
 Before starting, ensure:
 - Git repository is initialized
-- `crew init` has been run (`.git/crew/` directory exists)
+- `crew init` has been run (`.crew/` directory exists)
 
 ---
 
@@ -16,14 +16,14 @@ Before starting, ensure:
 
 ### 1. Basic Configuration
 
-Set up the core crew configuration in `.git/crew/config.toml`:
+Set up the core crew configuration in `.crew/config.toml`:
 
 ```bash
 # View current config
 crew config
 
 # Edit config manually
-$EDITOR .git/crew/config.toml
+$EDITOR .crew/config.toml
 ```
 
 **Settings to configure:**
@@ -169,7 +169,7 @@ After completing the checklist:
 
 ```bash
 # Edit config file directly:
-$EDITOR .git/crew/config.toml
+$EDITOR .crew/config.toml
 
 # Add the following line at the end:
 # onboarding_done = true

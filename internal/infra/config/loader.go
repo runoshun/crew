@@ -17,7 +17,7 @@ var _ domain.ConfigLoader = (*Loader)(nil)
 
 // Loader loads configuration from TOML files.
 type Loader struct {
-	crewDir       string // Path to .git/crew directory
+	crewDir       string // Path to .crew directory
 	repoRoot      string // Path to repository root
 	globalConfDir string // Path to global config directory (e.g., ~/.config/crew)
 }
@@ -78,13 +78,13 @@ func (l *Loader) LoadRootRepo() (*domain.Config, error) {
 	return l.loadFile(rootRepoPath)
 }
 
-// LoadRepo returns only the repository configuration (.git/crew/config.toml).
+// LoadRepo returns only the repository configuration (.crew/config.toml).
 func (l *Loader) LoadRepo() (*domain.Config, error) {
 	repoPath := filepath.Join(l.crewDir, domain.ConfigFileName)
 	return l.loadFile(repoPath)
 }
 
-// LoadRuntime returns only the runtime configuration (.git/crew/config.runtime.toml).
+// LoadRuntime returns only the runtime configuration (.crew/config.runtime.toml).
 func (l *Loader) LoadRuntime() (*domain.Config, error) {
 	runtimePath := filepath.Join(l.crewDir, domain.ConfigRuntimeFileName)
 	return l.loadFile(runtimePath)

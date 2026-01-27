@@ -585,7 +585,7 @@ type MockConfigManager struct {
 func NewMockConfigManager() *MockConfigManager {
 	return &MockConfigManager{
 		RepoConfigInfo: domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.toml",
+			Path:   "/test/.crew/config.toml",
 			Exists: false,
 		},
 		GlobalConfigInfo: domain.ConfigInfo{
@@ -601,7 +601,7 @@ func NewMockConfigManager() *MockConfigManager {
 			Exists: false,
 		},
 		RuntimeConfigInfo: domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.runtime.toml",
+			Path:   "/test/.crew/config.runtime.toml",
 			Exists: false,
 		},
 	}

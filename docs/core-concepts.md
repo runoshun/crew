@@ -29,7 +29,7 @@ Each task gets an isolated worktree in `<repo>-worktrees/<task-id>/`. Branch nam
 
 ### 2.2 Concurrent AI Agent Execution
 
-AI agents run in tmux sessions, enabling background execution and attach/detach. git-crew uses a dedicated socket (`.git/crew/tmux.sock`) to isolate from system tmux sessions.
+AI agents run in tmux sessions, enabling background execution and attach/detach. git-crew uses a dedicated socket (`.crew/tmux.sock`) to isolate from system tmux sessions.
 
 ---
 
@@ -104,8 +104,8 @@ Configuration is loaded and merged from multiple sources (later takes precedence
 2. User config: `~/.config/crew/config.toml`
 3. User override: `~/.config/crew/config.override.toml`
 4. Root repo config: `.crew.toml`
-5. Repository config: `.git/crew/config.toml`
-6. Runtime config: `.git/crew/config.runtime.toml` (TUI/system state)
+5. Repository config: `.crew/config.toml`
+6. Runtime config: `.crew/config.runtime.toml` (TUI/system state)
 
 ### Configuration Structure
 
@@ -245,7 +245,7 @@ These exclusions are applied automatically when starting a task with the agent, 
 ### File Layout
 
 ```
-.git/crew/
+.crew/
 ├── tasks.json              # Task store
 ├── config.toml             # Repository config
 ├── config.runtime.toml     # Runtime config (TUI/system state)

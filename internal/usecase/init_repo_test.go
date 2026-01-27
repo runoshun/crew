@@ -103,6 +103,116 @@ func TestInitRepo_Execute_InitializerError(t *testing.T) {
 	assert.Contains(t, err.Error(), "initialize task store")
 }
 
+func TestInitRepo_Execute_GitignoreNeedsAdd(t *testing.T) {
+	// Setup temp directory without .gitignore
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+
+	mock := &mockInitializer{}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.True(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be true when .gitignore doesn't exist")
+}
+
+func TestInitRepo_Execute_GitignoreAlreadyContainsCrew(t *testing.T) {
+	// Setup temp directory with .gitignore containing .crew/
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+	gitignorePath := filepath.Join(tmpDir, ".gitignore")
+
+	require.NoError(t, os.WriteFile(gitignorePath, []byte(".crew/\n"), 0o644))
+
+	mock := &mockInitializer{}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when .crew/ is in .gitignore")
+}
+
+func TestInitRepo_Execute_GitignoreContainsCrewWithoutSlash(t *testing.T) {
+	// Setup temp directory with .gitignore containing .crew (without slash)
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+	gitignorePath := filepath.Join(tmpDir, ".gitignore")
+
+	require.NoError(t, os.WriteFile(gitignorePath, []byte(".crew\n"), 0o644))
+
+	mock := &mockInitializer{}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when .crew is in .gitignore")
+}
+
+func TestSplitLines(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  nil,
+		},
+		{
+			name:  "single line no newline",
+			input: "line1",
+			want:  []string{"line1"},
+		},
+		{
+			name:  "single line with newline",
+			input: "line1\n",
+			want:  []string{"line1"},
+		},
+		{
+			name:  "multiple lines unix",
+			input: "line1\nline2\nline3",
+			want:  []string{"line1", "line2", "line3"},
+		},
+		{
+			name:  "multiple lines windows",
+			input: "line1\r\nline2\r\nline3",
+			want:  []string{"line1", "line2", "line3"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := splitLines(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // Helper functions
 
 func assertDirExists(t *testing.T, path string) {

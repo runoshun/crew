@@ -162,8 +162,8 @@ func TestIntegration_Init(t *testing.T) {
 	out := crewMust(t, dir, "init")
 	assert.Contains(t, out, "Initialized")
 
-	// Verify .git/crew directory exists
-	crewDir := filepath.Join(dir, ".git", "crew")
+	// Verify .crew directory exists
+	crewDir := filepath.Join(dir, ".crew")
 	info, err := os.Stat(crewDir)
 	require.NoError(t, err)
 	assert.True(t, info.IsDir())

@@ -24,7 +24,7 @@ import (
 type Config struct {
 	RepoRoot    string // Root directory of the git repository
 	GitDir      string // Path to .git directory
-	CrewDir     string // Path to .git/crew directory
+	CrewDir     string // Path to .crew directory
 	SocketPath  string // Path to tmux socket
 	StorePath   string // Path to tasks.json
 	WorktreeDir string // Path to worktrees directory

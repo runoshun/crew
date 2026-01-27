@@ -377,7 +377,7 @@ const (
 
 // RepoCrewDir returns the crew directory path for a repository.
 func RepoCrewDir(repoRoot string) string {
-	return filepath.Join(repoRoot, ".git", CrewDirName)
+	return filepath.Join(repoRoot, "."+CrewDirName)
 }
 
 // RepoConfigPath returns the repo config path.

@@ -16,7 +16,7 @@ var _ domain.ConfigManager = (*Manager)(nil)
 
 // Manager manages configuration files.
 type Manager struct {
-	crewDir       string // Path to .git/crew directory
+	crewDir       string // Path to .crew directory
 	repoRoot      string // Path to repository root
 	globalConfDir string // Path to global config directory (e.g., ~/.config/crew)
 }
@@ -82,7 +82,7 @@ func (m *Manager) GetOverrideConfigInfo() domain.ConfigInfo {
 	return m.getConfigInfo(path)
 }
 
-// GetRuntimeConfigInfo returns information about the runtime config file (.git/crew/config.runtime.toml).
+// GetRuntimeConfigInfo returns information about the runtime config file (.crew/config.runtime.toml).
 func (m *Manager) GetRuntimeConfigInfo() domain.ConfigInfo {
 	path := filepath.Join(m.crewDir, domain.ConfigRuntimeFileName)
 	return m.getConfigInfo(path)
