@@ -43,17 +43,12 @@ func (m *Model) newDialogStyles() dialogStyles {
 	bg := Colors.Background
 	width := m.dialogWidth() - 4
 
-	keyColor := Colors.Maroon
-	if m.isReviewMode() {
-		keyColor = Colors.KeyText
-	}
-
 	return dialogStyles{
 		width:      width,
 		bg:         bg,
 		line:       lipgloss.NewStyle().Background(bg).Width(width),
 		text:       lipgloss.NewStyle().Background(bg).Foreground(Colors.TitleNormal),
-		key:        lipgloss.NewStyle().Background(bg).Foreground(keyColor).Bold(true),
+		key:        lipgloss.NewStyle().Background(bg).Foreground(Colors.KeyText).Bold(true),
 		muted:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
 		label:      lipgloss.NewStyle().Background(bg).Foreground(Colors.Primary).Bold(true),
 		labelMuted: lipgloss.NewStyle().Background(bg).Foreground(Colors.Muted),
@@ -254,25 +249,10 @@ func (m *Model) headerFooterContentWidth() int {
 	return width
 }
 
-// isReviewMode returns true if the current mode is related to code review.
-func (m *Model) isReviewMode() bool {
-	switch m.mode { //nolint:exhaustive
-	case ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment:
-		return true
-	default:
-		return false
-	}
-}
-
 // viewHeader renders the header section.
 func (m *Model) viewHeader() string {
-	headerStyle := m.styles.HeaderWarm
-	textStyle := m.styles.HeaderTextWarm
-
-	if m.isReviewMode() {
-		headerStyle = m.styles.Header
-		textStyle = m.styles.HeaderText
-	}
+	headerStyle := m.styles.Header
+	textStyle := m.styles.HeaderText
 
 	title := textStyle.Render("Tasks")
 
@@ -750,10 +730,7 @@ func (m *Model) viewSelectManagerDialog() string {
 }
 
 func (m *Model) viewFooter() string {
-	keyStyle := m.styles.FooterKeyWarm
-	if m.isReviewMode() {
-		keyStyle = m.styles.FooterKey
-	}
+	keyStyle := m.styles.FooterKey
 
 	var content string
 	switch m.mode {
