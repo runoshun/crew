@@ -116,7 +116,6 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 		TaskID:     task.ID,
 		Branch:     branch,
 		BaseBranch: targetBaseBranch,
-		Command:    "merge",
 	})
 	if conflictErr != nil {
 		return &MergeTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr

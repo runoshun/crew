@@ -131,7 +131,6 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		TaskID:     task.ID,
 		Branch:     branch,
 		BaseBranch: baseBranch,
-		Command:    "complete",
 	})
 	if conflictErr != nil {
 		return &CompleteTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr

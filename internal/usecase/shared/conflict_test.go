@@ -173,7 +173,6 @@ func TestConflictHandler_CheckAndHandle_WithConflict(t *testing.T) {
 		TaskID:     1,
 		Branch:     "crew-1",
 		BaseBranch: "main",
-		Command:    "complete",
 	})
 
 	// Assert
@@ -220,14 +219,13 @@ func TestConflictHandler_CheckAndHandle_SessionNotRunning(t *testing.T) {
 		TaskID:     1,
 		Branch:     "crew-1",
 		BaseBranch: "main",
-		Command:    "merge",
 	})
 
 	// Assert
 	require.ErrorIs(t, err, domain.ErrMergeConflict)
 	require.NotNil(t, out)
 	assert.NotEmpty(t, out.Message)
-	assert.Contains(t, out.Message, "crew merge")
+	assert.Contains(t, out.Message, "crew complete")
 
 	// Task status should still change
 	savedTask := tasks.tasks[1]
@@ -254,7 +252,6 @@ func TestConflictHandler_CheckAndHandle_TaskNotFound(t *testing.T) {
 		TaskID:     999,
 		Branch:     "crew-999",
 		BaseBranch: "main",
-		Command:    "complete",
 	})
 
 	// Assert
@@ -264,28 +261,29 @@ func TestConflictHandler_CheckAndHandle_TaskNotFound(t *testing.T) {
 }
 
 func TestBuildConflictMessage(t *testing.T) {
-	t.Run("with complete command", func(t *testing.T) {
+	t.Run("includes task id", func(t *testing.T) {
 		files := []string{"file1.txt", "dir/file2.txt"}
-		msg := buildConflictMessage(files, "main", "complete")
+		msg := buildConflictMessage(files, "main", 42)
 
 		assert.Contains(t, msg, "Merge conflict detected")
 		assert.Contains(t, msg, "file1.txt")
 		assert.Contains(t, msg, "dir/file2.txt")
 		assert.Contains(t, msg, "git merge main")
 		assert.Contains(t, msg, "no fetch needed")
-		assert.Contains(t, msg, "crew complete")
+		assert.Contains(t, msg, "crew complete 42")
+		assert.NotContains(t, msg, "crew merge")
 		assert.NotContains(t, msg, "git fetch")
 	})
 
-	t.Run("with merge command", func(t *testing.T) {
+	t.Run("uses base branch", func(t *testing.T) {
 		files := []string{"conflict.txt"}
-		msg := buildConflictMessage(files, "develop", "merge")
+		msg := buildConflictMessage(files, "develop", 7)
 
 		assert.Contains(t, msg, "git merge develop")
 		assert.Contains(t, msg, "no fetch needed")
-		assert.Contains(t, msg, "crew merge")
-		assert.NotContains(t, msg, "main")
+		assert.Contains(t, msg, "crew complete 7")
+		assert.NotContains(t, msg, "git merge main")
+		assert.NotContains(t, msg, "crew merge")
 		assert.NotContains(t, msg, "git fetch")
-		assert.NotContains(t, msg, "complete")
 	})
 }
