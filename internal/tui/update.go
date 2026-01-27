@@ -468,14 +468,9 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case key.Matches(msg, m.keys.Manager):
-		task := m.SelectedTask()
-		if task != nil {
-			// Check if manager session is already running
-			// If running, attach immediately; otherwise show agent selection
-			return m, m.checkAndAttachOrSelectManager()
-		}
-		// Start or attach to global manager session if no task selected
-		return m, m.startOrAttachManagerSession()
+		// Check if manager session is already running
+		// If running, attach immediately; otherwise show agent selection
+		return m, m.checkAndAttachOrSelectManager()
 	}
 
 	// Check custom keybindings
