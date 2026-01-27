@@ -536,6 +536,9 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 							for envKey, envVal := range envMap {
 								if s, ok := envVal.(string); ok {
 									def.Env[envKey] = s
+								} else {
+									// Non-string env values are treated as unknown keys
+									def.Extra["env."+envKey] = envVal
 								}
 							}
 						}
