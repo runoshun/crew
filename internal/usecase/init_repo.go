@@ -80,8 +80,10 @@ set -g escape-time 0       # No escape delay
 	}
 
 	// Check if .crew/ needs to be added to .gitignore
+	// This check runs regardless of alreadyInitialized to handle migration cases
+	// (e.g., user migrated from .git/crew/ but .gitignore not yet updated)
 	gitignoreNeedsAdd := false
-	if !alreadyInitialized && in.RepoRoot != "" {
+	if in.RepoRoot != "" {
 		gitignoreNeedsAdd = !isCrewInGitignore(in.RepoRoot)
 	}
 
@@ -108,8 +110,8 @@ func isCrewInGitignore(repoRoot string) bool {
 	lines := strings.Split(normalized, "\n")
 
 	for _, line := range lines {
-		// Trim trailing whitespace
-		line = strings.TrimRight(line, " \t")
+		// Trim leading and trailing whitespace
+		line = strings.TrimSpace(line)
 
 		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {

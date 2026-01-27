@@ -25,7 +25,7 @@ This command creates the .crew/ directory with:
 - scripts/: directory for task scripts
 - logs/: directory for log files
 
-After initialization, you will be prompted to add .crew/ to .gitignore.
+If .crew/ is not in .gitignore, you will be prompted to add it.
 
 Migration from older versions:
 If you have an existing .git/crew/ directory from an older version,

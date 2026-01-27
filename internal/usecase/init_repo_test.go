@@ -268,6 +268,55 @@ func TestInitRepo_Execute_GitignoreWithWindowsLineEndings(t *testing.T) {
 	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when .crew/ is in .gitignore with CRLF")
 }
 
+func TestInitRepo_Execute_AlreadyInitializedButGitignoreMissing(t *testing.T) {
+	// Setup temp directory without .gitignore, already initialized (migration case)
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+
+	// Create .crew directory (simulating already initialized)
+	require.NoError(t, os.MkdirAll(crewDir, 0o750))
+
+	mock := &mockInitializer{isInitialized: true}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert - even when already initialized, GitignoreNeedsAdd should be true
+	require.NoError(t, err)
+	assert.True(t, out.AlreadyInitialized)
+	assert.True(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be true even when already initialized")
+}
+
+func TestInitRepo_Execute_GitignoreWithLeadingWhitespace(t *testing.T) {
+	// Setup temp directory with .gitignore containing .crew with leading whitespace
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+	gitignorePath := filepath.Join(tmpDir, ".gitignore")
+
+	require.NoError(t, os.WriteFile(gitignorePath, []byte("  .crew/\n"), 0o644))
+
+	mock := &mockInitializer{}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when .crew/ with leading whitespace is in .gitignore")
+}
+
 // Helper functions
 
 func assertDirExists(t *testing.T, path string) {
