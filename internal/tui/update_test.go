@@ -495,13 +495,16 @@ func TestCheckAndAttachOrSelectManager_Error(t *testing.T) {
 }
 
 func TestManagerKey_WithTaskSelected_SessionRunning_FullFlow(t *testing.T) {
-	// Test full flow: M key -> cmd() -> Update(msg) -> attach
-	// When manager session is running, M key should lead to MsgAttachManagerSession
+	// Test full flow: M key -> cmd() -> Update(msg) -> attachToManagerSession
+	// When manager session is running, M key should lead to MsgAttachManagerSession -> attach command
 	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo}
 	items := []list.Item{taskItem{task: task}}
 
 	mockSessions := &mockSessionManager{isRunningResult: true}
-	container := &app.Container{Sessions: mockSessions}
+	container := &app.Container{
+		Sessions: mockSessions,
+		Config:   app.Config{SocketPath: "/tmp/test.sock"},
+	}
 
 	m := &Model{
 		keys:      DefaultKeyMap(),
@@ -520,8 +523,15 @@ func TestManagerKey_WithTaskSelected_SessionRunning_FullFlow(t *testing.T) {
 
 	// Step 2: Execute the command to get the message
 	msg := cmd()
-	_, isMsgAttach := msg.(MsgAttachManagerSession)
+	attachMsg, isMsgAttach := msg.(MsgAttachManagerSession)
 	assert.True(t, isMsgAttach, "Command should return MsgAttachManagerSession when session is running")
+
+	// Step 3: Pass MsgAttachManagerSession to Update to trigger attachToManagerSession
+	updatedModel2, attachCmd := result.Update(attachMsg)
+	result2, ok := updatedModel2.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result2.mode, "Mode should stay normal during attach")
+	assert.NotNil(t, attachCmd, "Should return attach command (tea.Exec)")
 }
 
 func TestManagerKey_WithTaskSelected_SessionNotRunning_FullFlow(t *testing.T) {
