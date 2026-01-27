@@ -1139,3 +1139,147 @@ func TestLoader_Load_TUIKeybindings(t *testing.T) {
 	assert.True(t, oBinding.Override)
 	assert.False(t, oBinding.Worktree) // Default value
 }
+
+func TestLoader_Load_AgentEnvMerge(t *testing.T) {
+	t.Run("adds env to builtin agent", func(t *testing.T) {
+		// Setup
+		crewDir := t.TempDir()
+		globalDir := t.TempDir()
+
+		// Write config that adds env to builtin opencode agent
+		config := `
+[agents.opencode]
+env = { ANTHROPIC_API_KEY = "sk-test-key" }
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+		require.NoError(t, err)
+
+		// Load config
+		loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+		cfg, err := loader.Load()
+		require.NoError(t, err)
+
+		// Verify env is merged
+		agent := cfg.Agents["opencode"]
+		assert.Equal(t, "sk-test-key", agent.Env["ANTHROPIC_API_KEY"])
+		// Builtin fields should still be present
+		assert.NotEmpty(t, agent.CommandTemplate)
+	})
+
+	t.Run("merges env from global and repo configs", func(t *testing.T) {
+		// Setup
+		crewDir := t.TempDir()
+		globalDir := t.TempDir()
+
+		// Global config sets some env vars
+		globalConfig := `
+[agents.claude]
+env = { GLOBAL_VAR = "global-value", SHARED_VAR = "global-shared" }
+`
+		err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+		require.NoError(t, err)
+
+		// Repo config overrides one and adds another
+		repoConfig := `
+[agents.claude]
+env = { REPO_VAR = "repo-value", SHARED_VAR = "repo-shared" }
+`
+		err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+		require.NoError(t, err)
+
+		// Load config
+		loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+		cfg, err := loader.Load()
+		require.NoError(t, err)
+
+		// Verify env is merged correctly
+		agent := cfg.Agents["claude"]
+		assert.Equal(t, "global-value", agent.Env["GLOBAL_VAR"]) // From global
+		assert.Equal(t, "repo-value", agent.Env["REPO_VAR"])     // From repo
+		assert.Equal(t, "repo-shared", agent.Env["SHARED_VAR"])  // Repo overrides global
+	})
+
+	t.Run("adds env to builtin agent without existing env", func(t *testing.T) {
+		// Setup
+		crewDir := t.TempDir()
+		globalDir := t.TempDir()
+
+		// Write config that adds env to builtin claude agent
+		config := `
+[agents.claude]
+env = { USER_VAR = "user-value" }
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+		require.NoError(t, err)
+
+		// Load config
+		loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+		cfg, err := loader.Load()
+		require.NoError(t, err)
+
+		// Verify user env is added
+		agent := cfg.Agents["claude"]
+		assert.Equal(t, "user-value", agent.Env["USER_VAR"])
+		// Builtin fields should still be present
+		assert.NotEmpty(t, agent.CommandTemplate)
+	})
+
+	t.Run("preserves base env when merging with override", func(t *testing.T) {
+		// Setup
+		crewDir := t.TempDir()
+		globalDir := t.TempDir()
+
+		// Global config sets some env vars for claude
+		globalConfig := `
+[agents.claude]
+env = { BASE_VAR = "base-value", SHARED_VAR = "base-shared" }
+`
+		err := os.WriteFile(filepath.Join(globalDir, domain.ConfigFileName), []byte(globalConfig), 0o644)
+		require.NoError(t, err)
+
+		// Repo config adds new env var and overrides one
+		repoConfig := `
+[agents.claude]
+env = { NEW_VAR = "new-value", SHARED_VAR = "override-shared" }
+`
+		err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(repoConfig), 0o644)
+		require.NoError(t, err)
+
+		// Load config
+		loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+		cfg, err := loader.Load()
+		require.NoError(t, err)
+
+		// Verify env merge: base is preserved, new is added, shared is overridden
+		agent := cfg.Agents["claude"]
+		assert.Equal(t, "base-value", agent.Env["BASE_VAR"])        // Preserved from base
+		assert.Equal(t, "new-value", agent.Env["NEW_VAR"])          // Added from override
+		assert.Equal(t, "override-shared", agent.Env["SHARED_VAR"]) // Overridden
+	})
+
+	t.Run("warns on non-string env values", func(t *testing.T) {
+		// Setup
+		crewDir := t.TempDir()
+		globalDir := t.TempDir()
+
+		// Write config with non-string env value
+		config := `
+[agents.claude]
+env = { VALID_VAR = "valid", INVALID_VAR = 123 }
+`
+		err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+		require.NoError(t, err)
+
+		// Load config
+		loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+		cfg, err := loader.Load()
+		require.NoError(t, err)
+
+		// Verify valid env is set
+		agent := cfg.Agents["claude"]
+		assert.Equal(t, "valid", agent.Env["VALID_VAR"])
+
+		// Verify warning is generated for invalid env value
+		assert.Contains(t, cfg.Warnings, "unknown key in [agents.claude]: env.INVALID_VAR")
+	})
+}
