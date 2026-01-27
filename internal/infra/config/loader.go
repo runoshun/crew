@@ -239,6 +239,7 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						Description:     def.Description,
 						SetupScript:     def.SetupScript,
 						Hidden:          def.Hidden,
+						Env:             def.Env,
 					}
 					for k := range def.Extra {
 						warnings = append(warnings, fmt.Sprintf("unknown key in [agents.%s]: %s", name, k))
@@ -429,6 +430,7 @@ type agentsConfig struct {
 
 type agentDef struct {
 	Extra           map[string]any
+	Env             map[string]string
 	Inherit         string
 	CommandTemplate string
 	Role            string
@@ -527,6 +529,15 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 					case "hidden":
 						if b, ok := v.(bool); ok {
 							def.Hidden = b
+						}
+					case "env":
+						if envMap, ok := v.(map[string]any); ok {
+							def.Env = make(map[string]string)
+							for envKey, envVal := range envMap {
+								if s, ok := envVal.(string); ok {
+									def.Env[envKey] = s
+								}
+							}
 						}
 					default:
 						def.Extra[k] = v
@@ -671,8 +682,27 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		if overrideAgent.Hidden {
 			baseAgent.Hidden = overrideAgent.Hidden
 		}
+		if len(overrideAgent.Env) > 0 {
+			baseAgent.Env = mergeEnv(baseAgent.Env, overrideAgent.Env)
+		}
 		result.Agents[name] = baseAgent
 	}
 
 	return result
+}
+
+// mergeEnv merges two environment maps.
+// Child values override parent values for the same key.
+func mergeEnv(parent, child map[string]string) map[string]string {
+	if parent == nil && child == nil {
+		return nil
+	}
+	merged := make(map[string]string)
+	for key, value := range parent {
+		merged[key] = value
+	}
+	for key, value := range child {
+		merged[key] = value
+	}
+	return merged
 }
