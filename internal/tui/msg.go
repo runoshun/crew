@@ -182,3 +182,8 @@ func (MsgManagerSessionStarted) sealed() {}
 type MsgAttachManagerSession struct{}
 
 func (MsgAttachManagerSession) sealed() {}
+
+// MsgShowManagerSelect is sent to show manager agent selection UI.
+type MsgShowManagerSelect struct{}
+
+func (MsgShowManagerSelect) sealed() {}

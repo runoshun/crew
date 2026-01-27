@@ -1422,14 +1422,23 @@ func (m *Model) loadReviewResult(taskID int) tea.Cmd {
 	}
 }
 
+// isManagerSessionRunning checks if the manager session is currently running.
+// Returns (running, error). This is a shared helper to avoid duplicating
+// session existence checks across multiple methods.
+// Returns an error if container or Sessions is nil (defensive guard for partially initialized models).
+func (m *Model) isManagerSessionRunning() (bool, error) {
+	if m.container == nil || m.container.Sessions == nil {
+		return false, fmt.Errorf("session manager not initialized")
+	}
+	sessionName := domain.ManagerSessionName()
+	return m.container.Sessions.IsRunning(sessionName)
+}
+
 // startOrAttachManagerSession returns a tea.Cmd that starts or attaches to manager session.
 // If the session is already running, it attaches; otherwise, it starts a new session.
 func (m *Model) startOrAttachManagerSession() tea.Cmd {
 	return func() tea.Msg {
-		sessionName := domain.ManagerSessionName()
-
-		// Check if session is already running
-		running, err := m.container.Sessions.IsRunning(sessionName)
+		running, err := m.isManagerSessionRunning()
 		if err != nil {
 			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
 		}
@@ -1467,10 +1476,7 @@ func (m *Model) attachToManagerSession() tea.Cmd {
 // The selected agent is only used when starting a new session.
 func (m *Model) startOrAttachManagerSessionForTask(managerAgent string) tea.Cmd {
 	return func() tea.Msg {
-		sessionName := domain.ManagerSessionName()
-
-		// Check if session is already running
-		running, err := m.container.Sessions.IsRunning(sessionName)
+		running, err := m.isManagerSessionRunning()
 		if err != nil {
 			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
 		}
@@ -1492,6 +1498,26 @@ func (m *Model) startOrAttachManagerSessionForTask(managerAgent string) tea.Cmd 
 		}
 
 		return MsgManagerSessionStarted{SessionName: out.SessionName}
+	}
+}
+
+// checkAndAttachOrSelectManager checks if manager session is running and returns
+// appropriate message. If running, returns MsgAttachManagerSession for immediate attach.
+// If not running, returns MsgShowManagerSelect to show agent selection UI.
+func (m *Model) checkAndAttachOrSelectManager() tea.Cmd {
+	return func() tea.Msg {
+		running, err := m.isManagerSessionRunning()
+		if err != nil {
+			return MsgError{Err: fmt.Errorf("check manager session: %w", err)}
+		}
+
+		if running {
+			// Attach to existing session immediately (skip agent selection)
+			return MsgAttachManagerSession{}
+		}
+
+		// Session not running, show agent selection UI
+		return MsgShowManagerSelect{}
 	}
 }
 

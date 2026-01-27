@@ -199,6 +199,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgAttachManagerSession:
 		// Attach to manager session
 		return m, m.attachToManagerSession()
+
+	case MsgShowManagerSelect:
+		// Show manager agent selection UI
+		m.mode = ModeSelectManager
+		return m, nil
 	}
 
 	return m, nil
@@ -465,8 +470,9 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Manager):
 		task := m.SelectedTask()
 		if task != nil {
-			m.mode = ModeSelectManager
-			return m, nil
+			// Check if manager session is already running
+			// If running, attach immediately; otherwise show agent selection
+			return m, m.checkAndAttachOrSelectManager()
 		}
 		// Start or attach to global manager session if no task selected
 		return m, m.startOrAttachManagerSession()
