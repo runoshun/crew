@@ -25,6 +25,12 @@ This command creates the .crew/ directory with:
 - scripts/: directory for task scripts
 - logs/: directory for log files
 
+After initialization, you will be prompted to add .crew/ to .gitignore.
+
+Migration from older versions:
+If you have an existing .git/crew/ directory from an older version,
+migrate with: mv .git/crew .crew
+
 Preconditions:
 - Current directory must be inside a git repository
 
@@ -83,8 +89,15 @@ func promptAddToGitignore(cmd *cobra.Command) bool {
 }
 
 // addCrewToGitignore adds .crew/ to the .gitignore file.
+// Preserves existing file permissions if the file exists.
 func addCrewToGitignore(repoRoot string) error {
 	gitignorePath := filepath.Join(repoRoot, ".gitignore")
+
+	// Check existing file permissions
+	perm := os.FileMode(0o644) // Default for new files
+	if info, err := os.Stat(gitignorePath); err == nil {
+		perm = info.Mode().Perm()
+	}
 
 	// Read existing content
 	content, err := os.ReadFile(gitignorePath)
@@ -99,5 +112,5 @@ func addCrewToGitignore(repoRoot string) error {
 	}
 	newContent += ".crew/\n"
 
-	return os.WriteFile(gitignorePath, []byte(newContent), 0o600)
+	return os.WriteFile(gitignorePath, []byte(newContent), perm)
 }

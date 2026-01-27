@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
@@ -93,6 +94,8 @@ set -g escape-time 0       # No escape delay
 }
 
 // isCrewInGitignore checks if .crew/ is in .gitignore.
+// Handles various common patterns: .crew, .crew/, /.crew, /.crew/
+// Also handles comments, empty lines, and trailing whitespace.
 func isCrewInGitignore(repoRoot string) bool {
 	gitignorePath := filepath.Join(repoRoot, ".gitignore")
 	content, err := os.ReadFile(gitignorePath)
@@ -100,30 +103,26 @@ func isCrewInGitignore(repoRoot string) bool {
 		return false
 	}
 
-	lines := splitLines(string(content))
+	// Normalize CRLF to LF
+	normalized := strings.ReplaceAll(string(content), "\r\n", "\n")
+	lines := strings.Split(normalized, "\n")
+
 	for _, line := range lines {
-		// Check for exact match or with trailing slash
-		if line == ".crew" || line == ".crew/" {
+		// Trim trailing whitespace
+		line = strings.TrimRight(line, " \t")
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Strip leading slash (anchored pattern)
+		pattern := strings.TrimPrefix(line, "/")
+
+		// Check for .crew with or without trailing slash
+		if pattern == ".crew" || pattern == ".crew/" {
 			return true
 		}
 	}
 	return false
-}
-
-// splitLines splits a string by newlines, handling both Unix and Windows line endings.
-func splitLines(s string) []string {
-	var lines []string
-	var current string
-	for _, c := range s {
-		if c == '\n' {
-			lines = append(lines, current)
-			current = ""
-		} else if c != '\r' {
-			current += string(c)
-		}
-	}
-	if current != "" {
-		lines = append(lines, current)
-	}
-	return lines
 }

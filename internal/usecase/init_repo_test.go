@@ -172,45 +172,100 @@ func TestInitRepo_Execute_GitignoreContainsCrewWithoutSlash(t *testing.T) {
 	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when .crew is in .gitignore")
 }
 
-func TestSplitLines(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  []string
-	}{
-		{
-			name:  "empty string",
-			input: "",
-			want:  nil,
-		},
-		{
-			name:  "single line no newline",
-			input: "line1",
-			want:  []string{"line1"},
-		},
-		{
-			name:  "single line with newline",
-			input: "line1\n",
-			want:  []string{"line1"},
-		},
-		{
-			name:  "multiple lines unix",
-			input: "line1\nline2\nline3",
-			want:  []string{"line1", "line2", "line3"},
-		},
-		{
-			name:  "multiple lines windows",
-			input: "line1\r\nline2\r\nline3",
-			want:  []string{"line1", "line2", "line3"},
-		},
-	}
+func TestInitRepo_Execute_GitignoreWithComment(t *testing.T) {
+	// Setup temp directory with .gitignore containing comment before .crew/
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := splitLines(tt.input)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+	require.NoError(t, os.WriteFile(gitignorePath, []byte("# crew directory\n.crew/\n"), 0o644))
+
+	mock := &mockInitializer{}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when .crew/ is in .gitignore with comment")
+}
+
+func TestInitRepo_Execute_GitignoreWithAnchoredPattern(t *testing.T) {
+	// Setup temp directory with .gitignore containing anchored pattern /.crew/
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+	gitignorePath := filepath.Join(tmpDir, ".gitignore")
+
+	require.NoError(t, os.WriteFile(gitignorePath, []byte("/.crew/\n"), 0o644))
+
+	mock := &mockInitializer{}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when /.crew/ is in .gitignore")
+}
+
+func TestInitRepo_Execute_GitignoreWithTrailingWhitespace(t *testing.T) {
+	// Setup temp directory with .gitignore containing .crew with trailing space
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+	gitignorePath := filepath.Join(tmpDir, ".gitignore")
+
+	require.NoError(t, os.WriteFile(gitignorePath, []byte(".crew  \n"), 0o644))
+
+	mock := &mockInitializer{}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when .crew with trailing whitespace is in .gitignore")
+}
+
+func TestInitRepo_Execute_GitignoreWithWindowsLineEndings(t *testing.T) {
+	// Setup temp directory with .gitignore containing CRLF line endings
+	tmpDir := t.TempDir()
+	crewDir := filepath.Join(tmpDir, ".crew")
+	storePath := filepath.Join(crewDir, "tasks.json")
+	gitignorePath := filepath.Join(tmpDir, ".gitignore")
+
+	require.NoError(t, os.WriteFile(gitignorePath, []byte("node_modules\r\n.crew/\r\n"), 0o644))
+
+	mock := &mockInitializer{}
+	uc := NewInitRepo(mock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), InitRepoInput{
+		CrewDir:   crewDir,
+		RepoRoot:  tmpDir,
+		StorePath: storePath,
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.False(t, out.GitignoreNeedsAdd, "GitignoreNeedsAdd should be false when .crew/ is in .gitignore with CRLF")
 }
 
 // Helper functions
