@@ -405,19 +405,23 @@ func TestHandleSelectManagerMode_UpDown(t *testing.T) {
 }
 
 func TestHandleSelectManagerMode_Enter_NoTask(t *testing.T) {
+	// Even without a selected task, pressing Enter should start the manager
+	mockSessions := &mockSessionManager{isRunningResult: false}
+	container := &app.Container{Sessions: mockSessions}
 	m := &Model{
 		keys:               DefaultKeyMap(),
 		mode:               ModeSelectManager,
 		managerAgents:      []string{"manager-1"},
 		managerAgentCursor: 0,
 		taskList:           list.New([]list.Item{}, newTaskDelegate(DefaultStyles()), 0, 0),
+		container:          container,
 	}
 
 	updatedModel, cmd := m.handleSelectManagerMode(tea.KeyMsg{Type: tea.KeyEnter})
-	assert.Nil(t, cmd)
+	assert.NotNil(t, cmd, "Enter should return a command to start manager session")
 	result, ok := updatedModel.(*Model)
 	assert.True(t, ok)
-	assert.Equal(t, ModeNormal, result.mode, "Enter with no task should return to normal mode")
+	assert.Equal(t, ModeNormal, result.mode, "Enter should return to normal mode")
 }
 
 func TestHandleSelectManagerMode_Enter_NoAgents(t *testing.T) {

@@ -903,11 +903,6 @@ func (m *Model) handleSelectManagerMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
-		task := m.SelectedTask()
-		if task == nil {
-			m.mode = ModeNormal
-			return m, nil
-		}
 		if len(m.managerAgents) == 0 {
 			m.mode = ModeNormal
 			return m, nil
