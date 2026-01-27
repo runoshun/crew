@@ -110,9 +110,9 @@ Use --ignore-* flags to exclude specific sources for debugging.`,
 
 	cmd.Flags().BoolVar(&ignoreGlobal, "ignore-global", false, "Ignore global configuration")
 	cmd.Flags().BoolVar(&ignoreOverride, "ignore-override", false, "Ignore override configuration (config.override.toml)")
-	cmd.Flags().BoolVar(&ignoreRepo, "ignore-repo", false, "Ignore repository configuration (.git/crew/config.toml)")
+	cmd.Flags().BoolVar(&ignoreRepo, "ignore-repo", false, "Ignore repository configuration (.crew/config.toml)")
 	cmd.Flags().BoolVar(&ignoreRootRepo, "ignore-root-repo", false, "Ignore root repository configuration (.crew.toml)")
-	cmd.Flags().BoolVar(&ignoreRuntime, "ignore-runtime", false, "Ignore runtime configuration (.git/crew/config.runtime.toml)")
+	cmd.Flags().BoolVar(&ignoreRuntime, "ignore-runtime", false, "Ignore runtime configuration (.crew/config.runtime.toml)")
 
 	return cmd
 }
@@ -232,7 +232,7 @@ func newConfigInitCommand(c *app.Container) *cobra.Command {
 		Short: "Generate configuration file template",
 		Long: `Generate a configuration file template.
 
-By default, creates the repository configuration file at .git/crew/config.toml.
+By default, creates the repository configuration file at .crew/config.toml.
 With --global, creates the global configuration file at ~/.config/crew/config.toml.
 
 Error conditions:

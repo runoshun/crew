@@ -36,8 +36,8 @@ func newConfigTestContainer(t *testing.T) *app.Container {
 	cmd.Dir = repoRoot
 	require.NoError(t, cmd.Run())
 
-	// Create .git/crew directory (needed for config file creation)
-	crewDir := filepath.Join(repoRoot, ".git", "crew")
+	// Create .crew directory (needed for config file creation)
+	crewDir := filepath.Join(repoRoot, ".crew")
 	require.NoError(t, os.MkdirAll(crewDir, 0755))
 
 	// Set HOME to a temporary directory to isolate global config

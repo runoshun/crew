@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
 // InitRepoInput contains the input parameters for InitRepo.
 type InitRepoInput struct {
-	CrewDir   string // Path to .git/crew directory
+	CrewDir   string // Path to .crew directory
+	RepoRoot  string // Path to repository root
 	StorePath string // Path to tasks.json
 }
 
@@ -21,6 +23,7 @@ type InitRepoOutput struct {
 	CrewDir            string // Path to created crew directory
 	AlreadyInitialized bool   // True if was already initialized (repair only)
 	Repaired           bool   // True if meta was repaired (NextTaskID updated)
+	GitignoreNeedsAdd  bool   // True if .crew/ is not in .gitignore and needs to be added
 }
 
 // InitRepo initializes a repository for git-crew.
@@ -34,7 +37,7 @@ func NewInitRepo(storeInit domain.StoreInitializer) *InitRepo {
 }
 
 // Execute initializes a repository for git-crew.
-// It creates the .git/crew/ directory, tmux.conf, and empty tasks.json.
+// It creates the .crew/ directory, tmux.conf, and empty tasks.json.
 // If already initialized, it still runs Initialize() to repair any inconsistencies.
 func (uc *InitRepo) Execute(_ context.Context, in InitRepoInput) (*InitRepoOutput, error) {
 	alreadyInitialized := uc.storeInit.IsInitialized()
@@ -76,9 +79,52 @@ set -g escape-time 0       # No escape delay
 		return nil, fmt.Errorf("initialize task store: %w", err)
 	}
 
+	// Check if .crew/ needs to be added to .gitignore
+	// This check runs regardless of alreadyInitialized to handle migration cases
+	// (e.g., user migrated from .git/crew/ but .gitignore not yet updated)
+	gitignoreNeedsAdd := false
+	if in.RepoRoot != "" {
+		gitignoreNeedsAdd = !isCrewInGitignore(in.RepoRoot)
+	}
+
 	return &InitRepoOutput{
 		CrewDir:            in.CrewDir,
 		AlreadyInitialized: alreadyInitialized,
 		Repaired:           repaired,
+		GitignoreNeedsAdd:  gitignoreNeedsAdd,
 	}, nil
+}
+
+// isCrewInGitignore checks if .crew/ is in .gitignore.
+// Handles various common patterns: .crew, .crew/, /.crew, /.crew/
+// Also handles comments, empty lines, and trailing whitespace.
+func isCrewInGitignore(repoRoot string) bool {
+	gitignorePath := filepath.Join(repoRoot, ".gitignore")
+	content, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		return false
+	}
+
+	// Normalize CRLF to LF
+	normalized := strings.ReplaceAll(string(content), "\r\n", "\n")
+	lines := strings.Split(normalized, "\n")
+
+	for _, line := range lines {
+		// Trim leading and trailing whitespace
+		line = strings.TrimSpace(line)
+
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Strip leading slash (anchored pattern)
+		pattern := strings.TrimPrefix(line, "/")
+
+		// Check for .crew with or without trailing slash
+		if pattern == ".crew" || pattern == ".crew/" {
+			return true
+		}
+	}
+	return false
 }

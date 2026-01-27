@@ -1,6 +1,6 @@
 // Package logging provides file-based logging for git-crew.
-// It outputs logs to both a global log file (.git/crew/logs/crew.log)
-// and task-specific log files (.git/crew/logs/task-N.log).
+// It outputs logs to both a global log file (.crew/logs/crew.log)
+// and task-specific log files (.crew/logs/task-N.log).
 package logging
 
 import (

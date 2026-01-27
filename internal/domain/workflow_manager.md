@@ -120,7 +120,7 @@ Session is still running. Options:
    - Related files and dependencies
    - Potential impact and constraints
 
-3. **Draft task file** - Create a Markdown file in `.git/crew/drafts/` based on findings:
+3. **Draft task file** - Create a Markdown file in `.crew/drafts/` based on findings:
    ```markdown
    ---
    title: Implement auth
@@ -142,7 +142,7 @@ Session is still running. Options:
 
 5. **Register task**:
    ```bash
-   crew new --from .git/crew/drafts/task.md
+   crew new --from .crew/drafts/task.md
    ```
 
 6. **Start with a worker**:
@@ -154,10 +154,10 @@ Session is still running. Options:
 
 ```bash
 # Edit an existing task from a Markdown file
-crew edit 1 --from .git/crew/drafts/task.md
+crew edit 1 --from .crew/drafts/task.md
 ```
 
-File format (`.git/crew/drafts/task.md`):
+File format (`.crew/drafts/task.md`):
 ```markdown
 ---
 title: Updated Task Title
@@ -281,8 +281,8 @@ See `crew --help-manager-auto` for full specifications.
 ```bash
 crew list                          # List all tasks
 crew show <id>                     # Show task details
-crew new --from .git/crew/drafts/task.md            # Create task from file
-crew edit <id> --from .git/crew/drafts/task.md      # Edit task from file
+crew new --from .crew/drafts/task.md            # Create task from file
+crew edit <id> --from .crew/drafts/task.md      # Edit task from file
 crew comment <id> "<text>"         # Add comment
 crew close <id>                    # Close/abandon task
 ```
@@ -343,7 +343,7 @@ Ensure your project is configured for crew:
 
 ```bash
 # Check configuration
-cat .git/crew/config.toml
+cat .crew/config.toml
 
 # If needed, run onboarding
 crew --help-manager-onboarding
@@ -351,7 +351,7 @@ crew --help-manager-onboarding
 
 ### Key Configuration
 
-Make sure `.git/crew/config.toml` has:
+Make sure `.crew/config.toml` has:
 - `worker_default` - Default worker agent
 - `manager_default` - Default manager agent (optional)
 - Agents configured with models and system prompts
@@ -365,7 +365,7 @@ Make sure `.git/crew/config.toml` has:
 ## Constraints & Scope
 
 Managers are read-only orchestrators:
-- Do not edit files except task drafts (`.git/crew/drafts/`)
+- Do not edit files except task drafts (`.crew/drafts/`)
 - May edit other files only when user explicitly instructs
 - Do not write code
 - Delegate all implementation to workers

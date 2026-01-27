@@ -504,7 +504,7 @@ args = "root"
 	err = os.WriteFile(filepath.Join(repoRootDir, domain.RootConfigFileName), []byte(rootRepoConfig), 0o644)
 	require.NoError(t, err)
 
-	// 3. Repo config (.git/crew/config.toml)
+	// 3. Repo config (.crew/config.toml)
 	repoConfig := `
 [agents.claude]
 args = "repo"

@@ -8,7 +8,7 @@ import (
 
 func TestRepoCrewDir(t *testing.T) {
 	got := RepoCrewDir("/home/user/project")
-	want := "/home/user/project/.git/crew"
+	want := "/home/user/project/.crew"
 	if got != want {
 		t.Errorf("RepoCrewDir() = %q, want %q", got, want)
 	}
@@ -16,7 +16,7 @@ func TestRepoCrewDir(t *testing.T) {
 
 func TestRepoConfigPath(t *testing.T) {
 	got := RepoConfigPath("/home/user/project")
-	want := "/home/user/project/.git/crew/config.toml"
+	want := "/home/user/project/.crew/config.toml"
 	if got != want {
 		t.Errorf("RepoConfigPath() = %q, want %q", got, want)
 	}

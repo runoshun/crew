@@ -264,10 +264,10 @@ type ConfigLoader interface {
 // LoadConfigOptions specifies options for loading configuration.
 type LoadConfigOptions struct {
 	IgnoreGlobal   bool // Skip loading global config
-	IgnoreRepo     bool // Skip loading repo config (.git/crew/config.toml)
+	IgnoreRepo     bool // Skip loading repo config (.crew/config.toml)
 	IgnoreRootRepo bool // Skip loading root repo config (.crew.toml)
 	IgnoreOverride bool // Skip loading override config (config.override.toml)
-	IgnoreRuntime  bool // Skip loading runtime config (.git/crew/config.runtime.toml)
+	IgnoreRuntime  bool // Skip loading runtime config (.crew/config.runtime.toml)
 }
 
 // ConfigInfo holds information about a config file.
@@ -291,7 +291,7 @@ type ConfigManager interface {
 	// GetOverrideConfigInfo returns information about the global override config file (config.override.toml).
 	GetOverrideConfigInfo() ConfigInfo
 
-	// GetRuntimeConfigInfo returns information about the runtime config file (.git/crew/config.runtime.toml).
+	// GetRuntimeConfigInfo returns information about the runtime config file (.crew/config.runtime.toml).
 	GetRuntimeConfigInfo() ConfigInfo
 
 	// InitRepoConfig creates a repository config file with default template.

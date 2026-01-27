@@ -15,7 +15,7 @@ func TestInitConfig_Execute(t *testing.T) {
 	t.Run("creates repo config", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RepoConfigInfo = domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.toml",
+			Path:   "/test/.crew/config.toml",
 			Exists: false,
 		}
 		cfg := domain.NewDefaultConfig()
@@ -27,7 +27,7 @@ func TestInitConfig_Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "/test/.git/crew/config.toml", out.Path)
+		assert.Equal(t, "/test/.crew/config.toml", out.Path)
 		assert.True(t, manager.InitRepoCalled)
 		assert.False(t, manager.InitGlobalCalled)
 	})
@@ -55,7 +55,7 @@ func TestInitConfig_Execute(t *testing.T) {
 	t.Run("returns error when repo config already exists", func(t *testing.T) {
 		manager := testutil.NewMockConfigManager()
 		manager.RepoConfigInfo = domain.ConfigInfo{
-			Path:   "/test/.git/crew/config.toml",
+			Path:   "/test/.crew/config.toml",
 			Exists: true,
 		}
 		manager.InitRepoErr = domain.ErrConfigExists

@@ -86,11 +86,11 @@ func TestSessionName(t *testing.T) {
 }
 
 func TestPathFunctions(t *testing.T) {
-	crewDir := "/repo/.git/crew"
+	crewDir := "/repo/.crew"
 
 	t.Run("ScriptPath", func(t *testing.T) {
 		got := ScriptPath(crewDir, 1)
-		want := "/repo/.git/crew/scripts/task-1.sh"
+		want := "/repo/.crew/scripts/task-1.sh"
 		if got != want {
 			t.Errorf("ScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
 		}
@@ -98,7 +98,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("PromptPath", func(t *testing.T) {
 		got := PromptPath(crewDir, 42)
-		want := "/repo/.git/crew/scripts/task-42-prompt.txt"
+		want := "/repo/.crew/scripts/task-42-prompt.txt"
 		if got != want {
 			t.Errorf("PromptPath(%q, 42) = %q, want %q", crewDir, got, want)
 		}
@@ -106,7 +106,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("ReviewScriptPath", func(t *testing.T) {
 		got := ReviewScriptPath(crewDir, 1)
-		want := "/repo/.git/crew/scripts/review-1.sh"
+		want := "/repo/.crew/scripts/review-1.sh"
 		if got != want {
 			t.Errorf("ReviewScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
 		}
@@ -114,7 +114,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("ReviewPromptPath", func(t *testing.T) {
 		got := ReviewPromptPath(crewDir, 1)
-		want := "/repo/.git/crew/scripts/review-1-prompt.txt"
+		want := "/repo/.crew/scripts/review-1-prompt.txt"
 		if got != want {
 			t.Errorf("ReviewPromptPath(%q, 1) = %q, want %q", crewDir, got, want)
 		}
@@ -122,7 +122,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("TaskLogPath", func(t *testing.T) {
 		got := TaskLogPath(crewDir, 1)
-		want := "/repo/.git/crew/logs/task-1.log"
+		want := "/repo/.crew/logs/task-1.log"
 		if got != want {
 			t.Errorf("TaskLogPath(%q, 1) = %q, want %q", crewDir, got, want)
 		}
@@ -130,7 +130,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("GlobalLogPath", func(t *testing.T) {
 		got := GlobalLogPath(crewDir)
-		want := "/repo/.git/crew/logs/crew.log"
+		want := "/repo/.crew/logs/crew.log"
 		if got != want {
 			t.Errorf("GlobalLogPath(%q) = %q, want %q", crewDir, got, want)
 		}
@@ -138,7 +138,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("SessionLogPath", func(t *testing.T) {
 		got := SessionLogPath(crewDir, "crew-1")
-		want := "/repo/.git/crew/logs/crew-1.log"
+		want := "/repo/.crew/logs/crew-1.log"
 		if got != want {
 			t.Errorf("SessionLogPath(%q, %q) = %q, want %q", crewDir, "crew-1", got, want)
 		}
@@ -146,7 +146,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("SessionLogPath_review", func(t *testing.T) {
 		got := SessionLogPath(crewDir, "crew-1-review")
-		want := "/repo/.git/crew/logs/crew-1-review.log"
+		want := "/repo/.crew/logs/crew-1-review.log"
 		if got != want {
 			t.Errorf("SessionLogPath(%q, %q) = %q, want %q", crewDir, "crew-1-review", got, want)
 		}
@@ -154,7 +154,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("TasksStorePath", func(t *testing.T) {
 		got := TasksStorePath(crewDir)
-		want := "/repo/.git/crew/tasks.json"
+		want := "/repo/.crew/tasks.json"
 		if got != want {
 			t.Errorf("TasksStorePath(%q) = %q, want %q", crewDir, got, want)
 		}
@@ -162,7 +162,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("TmuxSocketPath", func(t *testing.T) {
 		got := TmuxSocketPath(crewDir)
-		want := "/repo/.git/crew/tmux.sock"
+		want := "/repo/.crew/tmux.sock"
 		if got != want {
 			t.Errorf("TmuxSocketPath(%q) = %q, want %q", crewDir, got, want)
 		}
@@ -170,16 +170,16 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("TmuxConfigPath", func(t *testing.T) {
 		got := TmuxConfigPath(crewDir)
-		want := "/repo/.git/crew/tmux.conf"
+		want := "/repo/.crew/tmux.conf"
 		if got != want {
 			t.Errorf("TmuxConfigPath(%q) = %q, want %q", crewDir, got, want)
 		}
 	})
 
 	t.Run("WorktreePath", func(t *testing.T) {
-		worktreeDir := "/repo/.git/crew/worktrees"
+		worktreeDir := "/repo/.crew/worktrees"
 		got := WorktreePath(worktreeDir, 1)
-		want := "/repo/.git/crew/worktrees/1"
+		want := "/repo/.crew/worktrees/1"
 		if got != want {
 			t.Errorf("WorktreePath(%q, 1) = %q, want %q", worktreeDir, got, want)
 		}

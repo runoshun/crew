@@ -169,7 +169,7 @@ func newAttachCommand(c *app.Container) *cobra.Command {
 		Long: `Attach to a running tmux session for a task or manager.
 
 This replaces the current process with the tmux session.
-Use Ctrl+G to detach from the session (configured in .git/crew/tmux.conf).
+Use Ctrl+G to detach from the session (configured in .crew/tmux.conf).
 
 By default, attaches to the work session (crew-<id>).
 Use --review to attach to the review session (crew-<id>-review).

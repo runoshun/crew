@@ -43,7 +43,7 @@ type StartTask struct {
 	clock        domain.Clock
 	logger       domain.Logger
 	runner       domain.ScriptRunner
-	crewDir      string // Path to .git/crew directory
+	crewDir      string // Path to .crew directory
 	repoRoot     string // Repository root path
 }
 

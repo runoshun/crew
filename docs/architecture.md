@@ -302,8 +302,8 @@ git-crew provides file-based logging for debugging and auditing purposes. Logs a
 
 | File | Location | Purpose |
 |------|----------|---------|
-| Global log | `.git/crew/logs/crew.log` | All operations across all tasks |
-| Task log | `.git/crew/logs/task-N.log` | Operations for a specific task |
+| Global log | `.crew/logs/crew.log` | All operations across all tasks |
+| Task log | `.crew/logs/task-N.log` | Operations for a specific task |
 
 ### Log Format
 

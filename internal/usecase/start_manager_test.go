@@ -387,7 +387,7 @@ func TestStartManager_Execute_WithDisabledAgent(t *testing.T) {
 	mockLoader := &testutil.MockConfigLoader{Config: cfg}
 	sessions := testutil.NewMockSessionManager()
 
-	uc := NewStartManager(sessions, mockLoader, "/test", "/test/.git", "/test/.git/crew")
+	uc := NewStartManager(sessions, mockLoader, "/test", "/test/.git", "/test/.crew")
 
 	// Execute with disabled agent
 	_, err := uc.Execute(context.Background(), StartManagerInput{

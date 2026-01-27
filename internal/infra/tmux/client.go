@@ -24,12 +24,12 @@ type Client struct {
 	execFunc   ExecFunc // Function to use for exec (default: syscall.Exec)
 	socketPath string   // Path to the tmux socket
 	configPath string   // Path to tmux configuration
-	crewDir    string   // Path to .git/crew directory
+	crewDir    string   // Path to .crew directory
 }
 
 // NewClient creates a new tmux client.
-// socketPath is the path to the tmux socket (typically .git/crew/tmux.sock).
-// crewDir is the path to .git/crew directory.
+// socketPath is the path to the tmux socket (typically .crew/tmux.sock).
+// crewDir is the path to .crew directory.
 func NewClient(socketPath, crewDir string) *Client {
 	return &Client{
 		socketPath: socketPath,
