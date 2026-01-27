@@ -23,3 +23,5 @@ Thumbs.db
 
 .playwright-mcp/
 .e2e-test/
+
+.crew/
