@@ -694,15 +694,9 @@ func (m *Model) renderAgentRow(agent string, selected bool, ds dialogStyles) str
 }
 
 func (m *Model) viewSelectManagerDialog() string {
-	task := m.SelectedTask()
-	if task == nil {
-		return ""
-	}
-
 	ds := m.newDialogStyles()
 
 	title := ds.renderLine(ds.label.Render("Select Manager"))
-	taskTitle := ds.renderLine(ds.muted.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
 
 	// Build manager rows
 	rows := make([]string, 0, len(m.managerAgents))
@@ -720,8 +714,8 @@ func (m *Model) viewSelectManagerDialog() string {
 			ds.key.Render("esc") + ds.text.Render(" cancel"))
 
 	// Build content
-	lines := make([]string, 0, 4+len(rows)+2)
-	lines = append(lines, title, taskTitle, ds.emptyLine())
+	lines := make([]string, 0, 3+len(rows)+2)
+	lines = append(lines, title, ds.emptyLine())
 	lines = append(lines, rows...)
 	lines = append(lines, ds.emptyLine(), hint)
 
