@@ -14,7 +14,7 @@ import (
 func TestCreateTasksFromFile_Execute_SingleTask(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -49,7 +49,7 @@ Task description here.`
 func TestCreateTasksFromFile_Execute_MultipleTasks(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "develop"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("develop")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -113,7 +113,7 @@ func TestCreateTasksFromFile_Execute_AbsoluteParent(t *testing.T) {
 	}
 	repo.NextIDN = 1
 
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -148,7 +148,7 @@ func TestCreateTasksFromFile_Execute_AbsoluteParentWithHashPrefix(t *testing.T) 
 	}
 	repo.NextIDN = 2
 
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -186,7 +186,7 @@ This should reference existing task 1, not the first task in this file.`
 func TestCreateTasksFromFile_Execute_DryRun(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -223,7 +223,7 @@ Description 2.`
 func TestCreateTasksFromFile_Execute_WithBaseBranch(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -252,7 +252,7 @@ Description.`
 func TestCreateTasksFromFile_Execute_EmptyFile(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -269,7 +269,7 @@ func TestCreateTasksFromFile_Execute_EmptyFile(t *testing.T) {
 func TestCreateTasksFromFile_Execute_MissingTitle(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -291,7 +291,7 @@ No title here.`
 func TestCreateTasksFromFile_Execute_InvalidParentRef(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -314,7 +314,7 @@ Description.`
 func TestCreateTasksFromFile_Execute_ParentNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)
@@ -400,7 +400,7 @@ func TestCreateTasksFromFile_Execute_SaveError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.SaveErr = assert.AnError
-	mockGit := &testutil.MockGit{CurrentBranchName: "main"}
+	mockGit := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 	configLoader := testutil.NewMockConfigLoader()
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
 	uc := NewCreateTasksFromFile(repo, mockGit, configLoader, clock, nil)

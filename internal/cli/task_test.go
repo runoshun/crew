@@ -24,6 +24,7 @@ func newTestContainer(repo *testutil.MockTaskRepository) *app.Container {
 		executor,
 	)
 	container.Git = &testutil.MockGit{}
+	container.Worktrees = testutil.NewMockWorktreeManager()
 	return container
 }
 
@@ -171,7 +172,7 @@ func TestNewNewCommand_DefaultBaseBranch(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	container := newTestContainer(repo)
 	// Mock git to return feature-branch as current branch (now default for new tasks)
-	container.Git = &testutil.MockGit{CurrentBranchName: "feature-branch"}
+	container.Git = &testutil.MockGit{CurrentBranchName: testutil.StringPtr("feature-branch")}
 
 	// Create command
 	cmd := newNewCommand(container)
@@ -948,6 +949,41 @@ func TestNewCpCommand_WithCustomTitle(t *testing.T) {
 	assert.Equal(t, "Custom new title", task.Title)
 }
 
+func TestNewCpCommand_AllCopiesCommentsAndWorktree(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Original task",
+		Status:     domain.StatusTodo,
+		BaseBranch: "main",
+	}
+	repo.Comments[1] = []domain.Comment{
+		{Text: "First", Time: time.Now(), Author: "worker"},
+	}
+	repo.NextIDN = 2
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCpCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1", "--all"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "Copied task #1 to #2")
+	assert.Equal(t, repo.Comments[1], repo.Comments[2])
+	worktrees, ok := container.Worktrees.(*testutil.MockWorktreeManager)
+	if assert.True(t, ok) {
+		assert.True(t, worktrees.CreateCalled)
+		assert.Equal(t, domain.BranchName(2, 0), worktrees.CreateBranch)
+	}
+}
+
 func TestNewCpCommand_SourceNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
@@ -1243,7 +1279,7 @@ func TestResolveTaskID_NoArgsNoGit(t *testing.T) {
 
 func TestResolveTaskID_FromCrewBranch(t *testing.T) {
 	// Auto-detect from crew branch
-	git := &testutil.MockGit{CurrentBranchName: "crew-42"}
+	git := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("crew-42")}
 
 	id, err := resolveTaskID([]string{}, git)
 
@@ -1253,7 +1289,7 @@ func TestResolveTaskID_FromCrewBranch(t *testing.T) {
 
 func TestResolveTaskID_FromCrewBranchWithIssue(t *testing.T) {
 	// Auto-detect from crew branch with issue suffix
-	git := &testutil.MockGit{CurrentBranchName: "crew-7-gh-123"}
+	git := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("crew-7-gh-123")}
 
 	id, err := resolveTaskID([]string{}, git)
 
@@ -1263,7 +1299,7 @@ func TestResolveTaskID_FromCrewBranchWithIssue(t *testing.T) {
 
 func TestResolveTaskID_NonCrewBranch(t *testing.T) {
 	// On a non-crew branch (e.g., main)
-	git := &testutil.MockGit{CurrentBranchName: "main"}
+	git := &testutil.MockGit{CurrentBranchName: testutil.StringPtr("main")}
 
 	_, err := resolveTaskID([]string{}, git)
 

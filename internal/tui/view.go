@@ -834,6 +834,7 @@ func (m *Model) viewHelp() string {
 				{"d", "Delete"},
 				{"c", "Close"},
 				{"y", "Copy"},
+				{"Y", "Copy All"},
 				{"m", "Merge"},
 				{"B", "Block/Unblock"},
 			},
