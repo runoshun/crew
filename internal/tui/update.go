@@ -369,7 +369,14 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if task == nil {
 			return m, nil
 		}
-		return m, m.copyTask(task.ID)
+		return m, m.copyTask(task.ID, false)
+
+	case key.Matches(msg, m.keys.CopyAll):
+		task := m.SelectedTask()
+		if task == nil {
+			return m, nil
+		}
+		return m, m.copyTask(task.ID, true)
 
 	case key.Matches(msg, m.keys.Delete):
 		task := m.SelectedTask()

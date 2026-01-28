@@ -20,6 +20,11 @@ func (m *MockClock) Now() time.Time {
 	return m.NowTime
 }
 
+// StringPtr returns a pointer to the given string value.
+func StringPtr(s string) *string {
+	return &s
+}
+
 // MockTaskRepository is a test double for domain.TaskRepository.
 // Fields are ordered to minimize memory padding.
 type MockTaskRepository struct {
@@ -246,18 +251,21 @@ type MockGit struct {
 	HasUncommittedErr      error
 	MergeErr               error
 	DeleteBranchErr        error
-	GetDefaultBranchErr    error
+	GetDefaultBranchErr    *error
 	MergeConflictErr       error
-	CurrentBranchName      string
-	DefaultBranchName      string
-	MergeBranch            string
-	DeletedBranch          string
-	MergeConflictFiles     []string
+	BranchExistsErr        error
+	CurrentBranchName      *string
+	DefaultBranchName      *string
+	MergeBranch            *string
+	DeletedBranch          *string
+	MergeConflictFiles     *[]string
+	BranchExistsMap        map[string]bool
 	HasUncommittedChangesV bool
 	MergeNoFF              bool
 	MergeCalled            bool
 	DeleteBranchCalled     bool
 	GetDefaultBranchCalled bool
+	BranchExistsCalled     bool
 }
 
 // Ensure MockGit implements domain.Git interface.
@@ -268,12 +276,24 @@ func (m *MockGit) CurrentBranch() (string, error) {
 	if m.CurrentBranchErr != nil {
 		return "", m.CurrentBranchErr
 	}
-	return m.CurrentBranchName, nil
+	if m.CurrentBranchName != nil {
+		return *m.CurrentBranchName, nil
+	}
+	return "", nil
 }
 
 // BranchExists returns the configured value or error.
 func (m *MockGit) BranchExists(branch string) (bool, error) {
-	// Simple mock: assume true unless configured otherwise
+	m.BranchExistsCalled = true
+	if m.BranchExistsErr != nil {
+		return false, m.BranchExistsErr
+	}
+	if m.BranchExistsMap != nil {
+		if exists, ok := m.BranchExistsMap[branch]; ok {
+			return exists, nil
+		}
+		return false, nil
+	}
 	return true, nil
 }
 
@@ -296,7 +316,10 @@ func (m *MockGit) HasMergeConflict(_, _ string) (bool, error) {
 	if m.MergeConflictErr != nil {
 		return false, m.MergeConflictErr
 	}
-	return len(m.MergeConflictFiles) > 0, nil
+	if m.MergeConflictFiles == nil {
+		return false, nil
+	}
+	return len(*m.MergeConflictFiles) > 0, nil
 }
 
 // GetMergeConflictFiles returns the configured conflict files or error.
@@ -304,13 +327,16 @@ func (m *MockGit) GetMergeConflictFiles(_, _ string) ([]string, error) {
 	if m.MergeConflictErr != nil {
 		return nil, m.MergeConflictErr
 	}
-	return m.MergeConflictFiles, nil
+	if m.MergeConflictFiles == nil {
+		return nil, nil
+	}
+	return *m.MergeConflictFiles, nil
 }
 
 // Merge records the call and returns configured error.
 func (m *MockGit) Merge(branch string, noFF bool) error {
 	m.MergeCalled = true
-	m.MergeBranch = branch
+	m.MergeBranch = &branch
 	m.MergeNoFF = noFF
 	return m.MergeErr
 }
@@ -318,7 +344,7 @@ func (m *MockGit) Merge(branch string, noFF bool) error {
 // DeleteBranch records the call and returns configured error.
 func (m *MockGit) DeleteBranch(branch string, force bool) error {
 	m.DeleteBranchCalled = true
-	m.DeletedBranch = branch
+	m.DeletedBranch = &branch
 	// force is ignored in mock for now, or we could add a field to verify it
 	return m.DeleteBranchErr
 }
@@ -327,10 +353,10 @@ func (m *MockGit) DeleteBranch(branch string, force bool) error {
 func (m *MockGit) GetDefaultBranch() (string, error) {
 	m.GetDefaultBranchCalled = true
 	if m.GetDefaultBranchErr != nil {
-		return "", m.GetDefaultBranchErr
+		return "", *m.GetDefaultBranchErr
 	}
-	if m.DefaultBranchName != "" {
-		return m.DefaultBranchName, nil
+	if m.DefaultBranchName != nil {
+		return *m.DefaultBranchName, nil
 	}
 	return "main", nil
 }
@@ -433,6 +459,8 @@ type MockWorktreeManager struct {
 	ExistsErr           error
 	SetupErr            error
 	CreatePath          string
+	CreateBranch        string
+	CreateBaseBranch    string
 	ResolvePath         string
 	SetupWorktreePath   string // Captured path from SetupWorktree call
 	ExistsVal           bool
@@ -452,8 +480,10 @@ func NewMockWorktreeManager() *MockWorktreeManager {
 var _ domain.WorktreeManager = (*MockWorktreeManager)(nil)
 
 // Create records the call and returns configured path or error.
-func (m *MockWorktreeManager) Create(_, _ string) (string, error) {
+func (m *MockWorktreeManager) Create(branch, baseBranch string) (string, error) {
 	m.CreateCalled = true
+	m.CreateBranch = branch
+	m.CreateBaseBranch = baseBranch
 	if m.CreateErr != nil {
 		return "", m.CreateErr
 	}

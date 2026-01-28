@@ -640,8 +640,8 @@ func TestCompleteTask_Execute_MergeConflict(t *testing.T) {
 
 	git := &testutil.MockGit{
 		HasUncommittedChangesV: false,
-		MergeConflictFiles:     []string{"conflict.txt"},
-		DefaultBranchName:      "main",
+		MergeConflictFiles:     &[]string{"conflict.txt"},
+		DefaultBranchName:      testutil.StringPtr("main"),
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
@@ -692,7 +692,7 @@ func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {
 	git := &testutil.MockGit{
 		HasUncommittedChangesV: false,
 		MergeConflictFiles:     nil, // No conflicts
-		DefaultBranchName:      "main",
+		DefaultBranchName:      testutil.StringPtr("main"),
 	}
 
 	configLoader := testutil.NewMockConfigLoader()

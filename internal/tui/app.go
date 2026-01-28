@@ -566,11 +566,15 @@ func (m *Model) mergeTask(taskID int) tea.Cmd {
 }
 
 // copyTask returns a command that copies a task.
-func (m *Model) copyTask(taskID int) tea.Cmd {
+func (m *Model) copyTask(taskID int, copyAll bool) tea.Cmd {
 	return func() tea.Msg {
+		input := usecase.CopyTaskInput{SourceID: taskID}
+		if copyAll {
+			input.CopyAll = true
+		}
 		out, err := m.container.CopyTaskUseCase().Execute(
 			context.Background(),
-			usecase.CopyTaskInput{SourceID: taskID},
+			input,
 		)
 		if err != nil {
 			return MsgError{Err: err}
@@ -778,7 +782,19 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			Desc:     "Duplicate task",
 			Key:      "y",
 			Action: func() (tea.Model, tea.Cmd) {
-				return m, m.copyTask(task.ID)
+				return m, m.copyTask(task.ID, false)
+			},
+			IsAvailable: func() bool {
+				return true
+			},
+		},
+		{
+			ActionID: "copy_all",
+			Label:    "Copy All",
+			Desc:     "Copy task, comments, and code state",
+			Key:      "Y",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, m.copyTask(task.ID, true)
 			},
 			IsAvailable: func() bool {
 				return true

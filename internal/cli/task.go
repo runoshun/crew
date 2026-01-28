@@ -959,6 +959,7 @@ func editTaskFromFile(cmd *cobra.Command, c *app.Container, taskID int, filePath
 func newCpCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		Title string
+		All   bool
 	}
 
 	cmd := &cobra.Command{
@@ -969,15 +970,18 @@ func newCpCommand(c *app.Container) *cobra.Command {
 The new task copies the title (with " (copy)" suffix by default),
 description, labels, and parent reference.
 
-The new task does NOT copy: issue, PR, comments.
-The base branch is set to the source task's branch name.
+The new task does NOT copy: issue, PR, comments (unless --all is used).
+The base branch is inherited from the source task.
 
 Examples:
   # Copy task with default title
   crew cp 1
 
   # Copy task with custom title
-  crew cp 1 --title "New feature based on #1"`,
+  crew cp 1 --title "New feature based on #1"
+
+  # Copy task with comments and code state
+  crew cp 1 --all`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -989,6 +993,9 @@ Examples:
 			// Build input
 			input := usecase.CopyTaskInput{
 				SourceID: taskID,
+			}
+			if opts.All {
+				input.CopyAll = true
 			}
 
 			// Set title if provided
@@ -1010,6 +1017,7 @@ Examples:
 
 	// Optional flags
 	cmd.Flags().StringVar(&opts.Title, "title", "", "Custom title for the new task")
+	cmd.Flags().BoolVar(&opts.All, "all", false, "Copy comments and code state (branch/worktree)")
 
 	return cmd
 }

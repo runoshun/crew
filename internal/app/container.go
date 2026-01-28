@@ -192,7 +192,7 @@ func (c *Container) DeleteTaskUseCase() *usecase.DeleteTask {
 
 // CopyTaskUseCase returns a new CopyTask use case.
 func (c *Container) CopyTaskUseCase() *usecase.CopyTask {
-	return usecase.NewCopyTask(c.Tasks, c.Clock)
+	return usecase.NewCopyTask(c.Tasks, c.Clock, c.Worktrees, c.Git)
 }
 
 // AddCommentUseCase returns a new AddComment use case with session starter.

@@ -22,6 +22,7 @@ type KeyMap struct {
 	// Task management
 	New        key.Binding // Create new task
 	Copy       key.Binding // Copy task
+	CopyAll    key.Binding // Copy task with comments and code state
 	Delete     key.Binding // Delete task
 	Edit       key.Binding // Edit task in editor (with comments)
 	EditStatus key.Binding // Change task status
@@ -102,6 +103,10 @@ func DefaultKeyMap() KeyMap {
 		Copy: key.NewBinding(
 			key.WithKeys("y"),
 			key.WithHelp("y", "copy"),
+		),
+		CopyAll: key.NewBinding(
+			key.WithKeys("Y"),
+			key.WithHelp("Y", "copy all"),
 		),
 		Delete: key.NewBinding(
 			key.WithKeys("d"),
@@ -189,10 +194,10 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.Up, k.Down, k.PrevPage, k.NextPage, k.Enter}, // Navigation
 		{k.Default}, // Default action
 
-		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},   // Session
-		{k.New, k.Copy, k.Delete, k.Edit, k.EditStatus}, // Task management
-		{k.Merge, k.Close, k.Block, k.Manager},          // Workflow
-		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit}, // View & general
+		{k.Start, k.Stop, k.Attach, k.Exec, k.Review},              // Session
+		{k.New, k.Copy, k.CopyAll, k.Delete, k.Edit, k.EditStatus}, // Task management
+		{k.Merge, k.Close, k.Block, k.Manager},                     // Workflow
+		{k.Refresh, k.Filter, k.Detail, k.Help, k.Quit},            // View & general
 	}
 }
 
@@ -221,6 +226,7 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.Review)
 	addKeys(k.New)
 	addKeys(k.Copy)
+	addKeys(k.CopyAll)
 	addKeys(k.Delete)
 	addKeys(k.Edit)
 	addKeys(k.EditStatus)
