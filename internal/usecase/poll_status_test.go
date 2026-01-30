@@ -267,17 +267,14 @@ func TestPollStatus_Execute_MultipleMatchingTasks(t *testing.T) {
 }
 
 func TestPollStatus_Execute_AllStatuses(t *testing.T) {
-	// Test that we can poll for various valid statuses
+	// Test that we can poll for all 6 statuses
 	statuses := []domain.Status{
 		domain.StatusTodo,
 		domain.StatusInProgress,
-		domain.StatusInProgress,
 		domain.StatusDone,
-		domain.StatusInProgress,
-		domain.StatusDone,
-		domain.StatusError,
-		domain.StatusError,
+		domain.StatusMerged,
 		domain.StatusClosed,
+		domain.StatusError,
 	}
 
 	for _, status := range statuses {

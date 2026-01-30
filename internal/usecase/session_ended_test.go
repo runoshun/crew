@@ -158,14 +158,14 @@ func TestSessionEnded_Execute_TaskNotFound(t *testing.T) {
 	assert.True(t, out.Ignored)
 }
 
-func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
+func TestSessionEnded_Execute_MaintainDoneStatus(t *testing.T) {
 	crewDir := t.TempDir()
 
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Test task",
-		Status:  domain.StatusDone, // Already for_review
+		Status:  domain.StatusDone, // Already done
 		Agent:   "claude",
 		Session: "crew-1",
 	}
@@ -182,14 +182,14 @@ func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, out.Ignored)
 
-	// Status should remain for_review and session info should be kept
+	// Status should remain done, but session info should be cleared
 	task := repo.Tasks[1]
 	assert.Equal(t, domain.StatusDone, task.Status)
-	assert.Equal(t, "claude", task.Agent)
-	assert.Equal(t, "crew-1", task.Session)
+	assert.Empty(t, task.Agent, "agent should be cleared on session end")
+	assert.Empty(t, task.Session, "session should be cleared on session end")
 }
 
-func TestSessionEnded_Execute_DoneStatusUnchanged(t *testing.T) {
+func TestSessionEnded_Execute_ClosedStatusUnchanged(t *testing.T) {
 	crewDir := t.TempDir()
 
 	repo := testutil.NewMockTaskRepository()
@@ -213,9 +213,11 @@ func TestSessionEnded_Execute_DoneStatusUnchanged(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, out.Ignored)
 
-	// Status should remain done
+	// Status should remain closed, but session info should be cleared
 	task := repo.Tasks[1]
 	assert.Equal(t, domain.StatusClosed, task.Status)
+	assert.Empty(t, task.Agent, "agent should be cleared on session end")
+	assert.Empty(t, task.Session, "session should be cleared on session end")
 }
 
 // Helper function to create script file for testing cleanup

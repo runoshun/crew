@@ -82,6 +82,11 @@ func (uc *StartTask) Execute(ctx context.Context, in StartTaskInput) (*StartTask
 		return nil, err
 	}
 
+	// Check if task status allows starting
+	if !task.Status.CanStart() {
+		return nil, fmt.Errorf("cannot start task with status %q: %w", task.Status, domain.ErrInvalidTransition)
+	}
+
 	// Check if task is blocked
 	if task.IsBlocked() {
 		return nil, fmt.Errorf("%w: %q", domain.ErrTaskBlocked, task.BlockReason)

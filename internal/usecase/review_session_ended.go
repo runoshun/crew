@@ -54,9 +54,10 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 		return &ReviewSessionEndedOutput{Ignored: true}, nil
 	}
 
-	// Check if task is in in_progress status (expected state during review)
-	if task.Status != domain.StatusInProgress {
-		// Already processed or unexpected state
+	// Check if task is in a reviewable status (in_progress or done)
+	// Review can happen from both in_progress (during work) and done (re-review)
+	if task.Status != domain.StatusInProgress && task.Status != domain.StatusDone {
+		// Already processed or unexpected state (e.g., merged, closed)
 		return &ReviewSessionEndedOutput{Ignored: true}, nil
 	}
 

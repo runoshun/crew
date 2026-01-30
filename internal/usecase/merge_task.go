@@ -153,9 +153,9 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 		return nil, fmt.Errorf("delete branch: %w", err)
 	}
 
-	// Update status to closed with merged reason
-	task.Status = domain.StatusClosed
-	task.CloseReason = domain.CloseReasonMerged
+	// Update status to merged
+	task.Status = domain.StatusMerged
+	task.CloseReason = domain.CloseReasonNone // CloseReason not needed for StatusMerged
 	task.Agent = ""
 	task.Session = ""
 

@@ -38,7 +38,7 @@ func TestMergeTask_Execute_Success(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.Empty(t, out.Task.Agent)
 	assert.Empty(t, out.Task.Session)
 
@@ -121,7 +121,7 @@ func TestMergeTask_Execute_StopsRunningSession(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.True(t, sessions.StopCalled)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 }
 
 func TestMergeTask_Execute_NoWorktree(t *testing.T) {
@@ -426,7 +426,7 @@ func TestMergeTask_Execute_WithCustomBaseBranch(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 	if assert.NotNil(t, git.MergeBranch) {
 		assert.Equal(t, "crew-1", *git.MergeBranch)
@@ -462,7 +462,7 @@ func TestMergeTask_Execute_PrioritizesInputBaseBranch(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 	assert.False(t, git.GetDefaultBranchCalled)
 }
@@ -495,7 +495,7 @@ func TestMergeTask_Execute_BaseBranchMismatch(t *testing.T) {
 	// Assert - should succeed (override is allowed)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 }
 
@@ -554,7 +554,7 @@ func TestMergeTask_Execute_UseTaskBaseBranch(t *testing.T) {
 	// Assert - should merge to feature/workspace (task's base branch)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 	assert.False(t, git.GetDefaultBranchCalled)
 }
@@ -587,7 +587,7 @@ func TestMergeTask_Execute_EmptyTaskBaseBranch(t *testing.T) {
 	// Assert - should merge to develop (default branch)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 	assert.True(t, git.GetDefaultBranchCalled)
 }
@@ -696,7 +696,7 @@ func TestMergeTask_Execute_NoMergeConflict(t *testing.T) {
 	// Assert - should succeed
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 
 	// Merge should have been called
 	assert.True(t, git.MergeCalled)

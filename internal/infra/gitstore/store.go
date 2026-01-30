@@ -227,8 +227,9 @@ func (s *Store) Save(task *domain.Task) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Ensure StatusVersion is set to current version
-	task.StatusVersion = domain.StatusVersionCurrent
+	// Normalize status before saving to ensure legacy statuses are converted
+	// This handles edge cases where legacy status might be passed to Save
+	domain.NormalizeStatus(task)
 
 	// Serialize task to YAML
 	data, err := yaml.Marshal(task)
@@ -379,8 +380,8 @@ func (s *Store) SaveTaskWithComments(task *domain.Task, comments []domain.Commen
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Ensure StatusVersion is set to current version
-	task.StatusVersion = domain.StatusVersionCurrent
+	// Normalize status before saving to ensure legacy statuses are converted
+	domain.NormalizeStatus(task)
 
 	// Get original task ref for rollback (may not exist for new tasks)
 	taskRefName := s.taskRef(task.ID)

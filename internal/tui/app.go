@@ -680,7 +680,10 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				}
 			},
 			IsAvailable: func() bool {
-				return task.Status == domain.StatusInProgress && task.Session != ""
+				// Review session uses a separate session name (crew-{id}-review)
+				// not stored in task.Session, so we can't check if it's running here.
+				// Allow when task is in reviewable status; actual session check happens on attach.
+				return task.Status == domain.StatusInProgress || task.Status == domain.StatusDone
 			},
 		},
 		{
