@@ -28,9 +28,19 @@ func TestWorkspaceRepo_DisplayName(t *testing.T) {
 			expected: "single-dir",
 		},
 		{
-			name:     "handles trailing slash (should not happen in practice)",
+			name:     "handles trailing slash",
 			repo:     WorkspaceRepo{Path: "/path/to/repo/"},
-			expected: "",
+			expected: "repo",
+		},
+		{
+			name:     "handles multiple trailing slashes",
+			repo:     WorkspaceRepo{Path: "/path/to/repo///"},
+			expected: "repo",
+		},
+		{
+			name:     "handles root path with trailing slash",
+			repo:     WorkspaceRepo{Path: "/"},
+			expected: "/", // Return original for edge case
 		},
 	}
 

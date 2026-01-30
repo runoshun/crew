@@ -31,6 +31,10 @@ func NewStore(globalCrewDir string) *Store {
 // Load reads the workspace file and returns the repos list.
 // Returns empty file with version 1 if file doesn't exist.
 func (s *Store) Load() (*domain.WorkspaceFile, error) {
+	if s.filePath == "" {
+		return nil, errors.New("workspace file path is not configured (home directory could not be determined)")
+	}
+
 	data, err := os.ReadFile(s.filePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -56,6 +60,10 @@ func (s *Store) Load() (*domain.WorkspaceFile, error) {
 
 // Save writes the workspace file.
 func (s *Store) Save(file *domain.WorkspaceFile) error {
+	if s.filePath == "" {
+		return errors.New("workspace file path is not configured (home directory could not be determined)")
+	}
+
 	// Ensure directory exists with proper permissions (0700)
 	dir := filepath.Dir(s.filePath)
 	if err := os.MkdirAll(dir, 0700); err != nil {
@@ -116,12 +124,23 @@ func (s *Store) AddRepo(path string) error {
 }
 
 // RemoveRepo removes a repository from the workspace by path.
+// Like AddRepo, this resolves the path to the git repository root,
+// so removing via a subdirectory path works correctly.
 func (s *Store) RemoveRepo(path string) error {
-	// Normalize path for comparison
+	// Normalize path
 	absPath, err := normalizePath(path)
 	if err != nil {
 		absPath = path // Use as-is if normalization fails
 	}
+
+	// Try to resolve to git root (like AddRepo does)
+	// This allows removing by subdir path
+	gitRoot, err := resolveGitRoot(absPath)
+	if err == nil {
+		absPath = gitRoot
+	}
+	// If resolveGitRoot fails (path doesn't exist or isn't a git repo),
+	// we still try to match against the normalized path
 
 	file, err := s.Load()
 	if err != nil {

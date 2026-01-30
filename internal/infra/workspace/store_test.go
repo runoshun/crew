@@ -142,6 +142,37 @@ func TestStore_RemoveRepo(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrWorkspaceRepoNotFound)
 }
 
+func TestStore_RemoveRepoBySubdirectory(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStore(dir)
+
+	// Create a git repo with subdirectory
+	repoDir := t.TempDir()
+	gitDir := filepath.Join(repoDir, ".git")
+	require.NoError(t, os.MkdirAll(gitDir, 0755))
+
+	subDir := filepath.Join(repoDir, "src", "pkg")
+	require.NoError(t, os.MkdirAll(subDir, 0755))
+
+	// Add repo (will be stored as repoDir)
+	err := store.AddRepo(repoDir)
+	require.NoError(t, err)
+
+	// Verify it was added
+	file, err := store.Load()
+	require.NoError(t, err)
+	require.Len(t, file.Repos, 1)
+
+	// Remove via subdirectory - should resolve to repo root and match
+	err = store.RemoveRepo(subDir)
+	require.NoError(t, err)
+
+	// Verify it was removed
+	file, err = store.Load()
+	require.NoError(t, err)
+	assert.Empty(t, file.Repos)
+}
+
 func TestStore_UpdateLastOpened(t *testing.T) {
 	dir := t.TempDir()
 	store := NewStore(dir)

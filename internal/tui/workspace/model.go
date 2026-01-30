@@ -204,6 +204,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.Err
 		return m, nil
 
+	case MsgRepoExited:
+		// Returned from repo TUI, reload repos and summaries
+		m.loading = true
+		return m, m.loadRepos()
+
 	case MsgTick:
 		// Periodic refresh (could add auto-refresh here)
 		return m, nil
@@ -369,8 +374,8 @@ func (m *Model) openRepo(path string) tea.Cmd {
 	cmd := exec.Command(crewPath, "tui")
 	cmd.Dir = path
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		// After the repo TUI exits, reload repos and summaries
-		return MsgReposLoaded{Repos: nil, Err: nil}
+		// After the repo TUI exits, signal to reload
+		return MsgRepoExited{}
 	})
 }
 

@@ -117,17 +117,29 @@ type WorkspaceRepoInfo struct {
 
 // DisplayName returns the name to display for this repo.
 // Returns Name if set, otherwise the basename of the path.
+// Handles trailing slashes by trimming them first.
 func (r *WorkspaceRepo) DisplayName() string {
 	if r.Name != "" {
 		return r.Name
 	}
+
+	// Trim trailing slashes
+	path := r.Path
+	for len(path) > 0 && path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
+	if path == "" {
+		return r.Path // Return original if path was only slashes
+	}
+
 	// Return the last path component
-	for i := len(r.Path) - 1; i >= 0; i-- {
-		if r.Path[i] == '/' {
-			return r.Path[i+1:]
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '/' {
+			return path[i+1:]
 		}
 	}
-	return r.Path
+	return path
 }
 
 // WorkspaceRepository defines the interface for workspace persistence.
