@@ -118,7 +118,7 @@ func TestSessionEnded_Execute_AlreadyCleared(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Test task",
-		Status:  domain.StatusForReview,
+		Status:  domain.StatusDone,
 		Agent:   "", // Already cleared
 		Session: "", // Already cleared
 	}
@@ -137,7 +137,7 @@ func TestSessionEnded_Execute_AlreadyCleared(t *testing.T) {
 
 	// Status should not change
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusForReview, task.Status)
+	assert.Equal(t, domain.StatusDone, task.Status)
 }
 
 func TestSessionEnded_Execute_TaskNotFound(t *testing.T) {
@@ -165,7 +165,7 @@ func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Test task",
-		Status:  domain.StatusForReview, // Already for_review
+		Status:  domain.StatusDone, // Already for_review
 		Agent:   "claude",
 		Session: "crew-1",
 	}
@@ -184,7 +184,7 @@ func TestSessionEnded_Execute_MaintainInReviewStatus(t *testing.T) {
 
 	// Status should remain for_review and session info should be kept
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusForReview, task.Status)
+	assert.Equal(t, domain.StatusDone, task.Status)
 	assert.Equal(t, "claude", task.Agent)
 	assert.Equal(t, "crew-1", task.Session)
 }

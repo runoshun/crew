@@ -160,7 +160,7 @@ func TestConflictHandler_CheckAndHandle_WithConflict(t *testing.T) {
 	tasks.tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusReviewing,
+		Status: domain.StatusInProgress,
 	}
 	sessions := &mockSessionManager{isRunning: true}
 	git := &mockGit{conflictFiles: []string{"file1.txt", "file2.txt"}}
@@ -206,7 +206,7 @@ func TestConflictHandler_CheckAndHandle_SessionNotRunning(t *testing.T) {
 	tasks.tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusReviewing,
+		Status: domain.StatusInProgress,
 	}
 	sessions := &mockSessionManager{isRunning: false}
 	git := &mockGit{conflictFiles: []string{"conflict.txt"}}

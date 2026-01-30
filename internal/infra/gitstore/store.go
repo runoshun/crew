@@ -143,6 +143,9 @@ func (s *Store) Get(id int) (*domain.Task, error) {
 	}
 	task.ID = id
 
+	// Normalize legacy status values
+	domain.NormalizeStatus(&task)
+
 	return &task, nil
 }
 
@@ -182,6 +185,9 @@ func (s *Store) List(filter domain.TaskFilter) ([]*domain.Task, error) {
 		}
 		task.ID = taskID
 
+		// Normalize legacy status values
+		domain.NormalizeStatus(&task)
+
 		// Apply ParentID filter
 		if filter.ParentID != nil {
 			if task.ParentID == nil || *task.ParentID != *filter.ParentID {
@@ -220,6 +226,9 @@ func (s *Store) GetChildren(parentID int) ([]*domain.Task, error) {
 func (s *Store) Save(task *domain.Task) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Ensure StatusVersion is set to current version
+	task.StatusVersion = domain.StatusVersionCurrent
 
 	// Serialize task to YAML
 	data, err := yaml.Marshal(task)
@@ -369,6 +378,9 @@ func (s *Store) UpdateComment(taskID, index int, comment domain.Comment) error {
 func (s *Store) SaveTaskWithComments(task *domain.Task, comments []domain.Comment) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Ensure StatusVersion is set to current version
+	task.StatusVersion = domain.StatusVersionCurrent
 
 	// Get original task ref for rollback (may not exist for new tasks)
 	taskRefName := s.taskRef(task.ID)

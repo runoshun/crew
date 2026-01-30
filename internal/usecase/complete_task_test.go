@@ -38,7 +38,7 @@ func TestCompleteTask_Execute_Success(t *testing.T) {
 		status domain.Status
 	}{
 		{"from in_progress", domain.StatusInProgress},
-		{"from needs_input", domain.StatusNeedsInput},
+		{"from needs_input", domain.StatusInProgress},
 	}
 
 	for _, tt := range tests {
@@ -73,12 +73,12 @@ func TestCompleteTask_Execute_Success(t *testing.T) {
 			// Assert
 			require.NoError(t, err)
 			require.NotNil(t, out)
-			assert.Equal(t, domain.StatusReviewed, out.Task.Status) // skip_review=true goes to reviewed
+			assert.Equal(t, domain.StatusDone, out.Task.Status) // skip_review=true goes to reviewed
 			assert.False(t, out.ShouldStartReview)
 
 			// Verify task is updated in repository
 			savedTask := repo.Tasks[1]
-			assert.Equal(t, domain.StatusReviewed, savedTask.Status)
+			assert.Equal(t, domain.StatusDone, savedTask.Status)
 		})
 	}
 }
@@ -126,7 +126,7 @@ func TestCompleteTask_Execute_WithCompleteCommand(t *testing.T) {
 	assert.Equal(t, "sh", executor.ExecutedCmd.Program)
 	assert.Equal(t, []string{"-c", "echo 'Running CI'"}, executor.ExecutedCmd.Args)
 	assert.Equal(t, testDir, executor.ExecutedCmd.Dir)
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status) // skip_review=true
+	assert.Equal(t, domain.StatusDone, out.Task.Status) // skip_review=true
 }
 
 func TestCompleteTask_Execute_CompleteCommandFails(t *testing.T) {
@@ -216,7 +216,7 @@ func TestCompleteTask_Execute_NotInProgress(t *testing.T) {
 		status domain.Status
 	}{
 		{"from todo", domain.StatusTodo},
-		{"from in_review", domain.StatusForReview},
+		{"from in_review", domain.StatusDone},
 		{"from error", domain.StatusError},
 		{"from done", domain.StatusClosed},
 		{"from closed", domain.StatusClosed},
@@ -454,7 +454,7 @@ func TestCompleteTask_Execute_WithComment(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 
 	// Verify comment is added
 	comments, err := repo.GetComments(1)
@@ -494,7 +494,7 @@ func TestCompleteTask_Execute_SkipReview_TaskLevel(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.False(t, out.ShouldStartReview)
 }
 
@@ -534,7 +534,7 @@ func TestCompleteTask_Execute_SkipReview_ConfigLevel(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.False(t, out.ShouldStartReview)
 }
 
@@ -574,7 +574,7 @@ func TestCompleteTask_Execute_SkipReview_TaskTrueOverridesConfigFalse(t *testing
 	// Assert - task.SkipReview=true should take precedence
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.False(t, out.ShouldStartReview)
 }
 
@@ -613,11 +613,11 @@ func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing
 	})
 
 	// Assert - task.SkipReview=false should take precedence over config
-	// Task goes to reviewing
+	// Task goes to done (ready for review in new model)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// Status should be reviewing
-	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	// Status should be done (review should start)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.True(t, out.ShouldStartReview)
 }
 
@@ -709,7 +709,7 @@ func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {
 	// Assert - should succeed
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 }
 
 func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
@@ -748,7 +748,7 @@ func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.Equal(t, domain.ReviewModeAutoFix, out.ReviewMode)
 	assert.Equal(t, 5, out.AutoFixMaxRetries)
 	assert.True(t, out.AutoFixIsLGTM)
@@ -789,7 +789,7 @@ func TestCompleteTask_Execute_AutoMode(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.Equal(t, domain.ReviewModeAuto, out.ReviewMode)
 	assert.True(t, out.ShouldStartReview) // Background review should start
 }
@@ -829,7 +829,7 @@ func TestCompleteTask_Execute_InvalidReviewModeFallsBackToAuto(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.Equal(t, domain.ReviewModeAuto, out.ReviewMode)
 	assert.True(t, out.ShouldStartReview)
 
@@ -958,7 +958,7 @@ func TestCompleteTask_Execute_ManualMode(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusForReview, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 	assert.Equal(t, domain.ReviewModeManual, out.ReviewMode)
 	assert.False(t, out.ShouldStartReview) // No automatic review in manual mode
 }

@@ -576,8 +576,8 @@ func TestEditTask_Execute_StatusTransitions(t *testing.T) {
 	}{
 		// Valid transitions
 		{"todo to in_progress", domain.StatusTodo, domain.StatusInProgress, false},
-		{"in_progress to for_review", domain.StatusInProgress, domain.StatusForReview, false},
-		{"for_review to closed", domain.StatusForReview, domain.StatusClosed, false},
+		{"in_progress to for_review", domain.StatusInProgress, domain.StatusDone, false},
+		{"done to closed", domain.StatusDone, domain.StatusClosed, false},
 		{"any to closed", domain.StatusTodo, domain.StatusClosed, false},
 		// Same status (no change)
 		{"todo to todo", domain.StatusTodo, domain.StatusTodo, false},
@@ -756,7 +756,7 @@ func TestEditTask_Execute_ConditionalStatusUpdate_MatchingStatus(t *testing.T) {
 	uc := NewEditTask(repo)
 
 	// Execute - update status with matching condition
-	newStatus := domain.StatusNeedsInput
+	newStatus := domain.StatusInProgress
 	out, err := uc.Execute(context.Background(), EditTaskInput{
 		TaskID:   1,
 		Status:   &newStatus,
@@ -765,7 +765,7 @@ func TestEditTask_Execute_ConditionalStatusUpdate_MatchingStatus(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	assert.Equal(t, domain.StatusNeedsInput, out.Task.Status)
+	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
 }
 
 func TestEditTask_Execute_ConditionalStatusUpdate_NonMatchingStatus(t *testing.T) {
@@ -779,7 +779,7 @@ func TestEditTask_Execute_ConditionalStatusUpdate_NonMatchingStatus(t *testing.T
 	uc := NewEditTask(repo)
 
 	// Execute - update status with non-matching condition
-	newStatus := domain.StatusNeedsInput
+	newStatus := domain.StatusInProgress
 	out, err := uc.Execute(context.Background(), EditTaskInput{
 		TaskID:   1,
 		Status:   &newStatus,
@@ -797,7 +797,7 @@ func TestEditTask_Execute_ConditionalStatusUpdate_MultipleConditions(t *testing.
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusNeedsInput,
+		Status: domain.StatusInProgress,
 	}
 	uc := NewEditTask(repo)
 
@@ -806,7 +806,7 @@ func TestEditTask_Execute_ConditionalStatusUpdate_MultipleConditions(t *testing.
 	out, err := uc.Execute(context.Background(), EditTaskInput{
 		TaskID:   1,
 		Status:   &newStatus,
-		IfStatus: []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
+		IfStatus: []domain.Status{domain.StatusInProgress, domain.StatusInProgress},
 	})
 
 	// Assert
@@ -826,7 +826,7 @@ func TestEditTask_Execute_ConditionalStatusUpdate_WithOtherFields(t *testing.T) 
 
 	// Execute - conditional status update with title change
 	// Status condition not met, but title should still be updated
-	newStatus := domain.StatusNeedsInput
+	newStatus := domain.StatusInProgress
 	newTitle := "Updated title"
 	out, err := uc.Execute(context.Background(), EditTaskInput{
 		TaskID:   1,

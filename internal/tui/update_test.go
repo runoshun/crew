@@ -139,7 +139,7 @@ func TestUpdate_StopKey_NoSession(t *testing.T) {
 }
 
 func TestUpdate_StopKey_WithSession(t *testing.T) {
-	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusForReview, Session: "crew-1"}
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusDone, Session: "crew-1"}
 	items := []list.Item{taskItem{task: task}}
 
 	m := &Model{

@@ -38,11 +38,8 @@ var Colors = struct {
 	// Status colors
 	Todo        lipgloss.Color
 	InProgress  lipgloss.Color
-	NeedsInput  lipgloss.Color
-	ForReview   lipgloss.Color
-	Reviewing   lipgloss.Color
-	Reviewed    lipgloss.Color
-	Stopped     lipgloss.Color
+	Done        lipgloss.Color
+	Merged      lipgloss.Color
 	StatusError lipgloss.Color
 	Closed      lipgloss.Color
 
@@ -77,11 +74,8 @@ var Colors = struct {
 	// Status colors
 	Todo:        lipgloss.Color("#89B4FA"), // Blue (pending)
 	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow (active work)
-	NeedsInput:  lipgloss.Color("#94E2D5"), // Teal (waiting for input)
-	ForReview:   lipgloss.Color("#CBA6F7"), // Mauve (awaiting review)
-	Reviewing:   lipgloss.Color("#F9E2AF"), // Yellow (review in progress)
-	Reviewed:    lipgloss.Color("#A6E3A1"), // Green (review complete)
-	Stopped:     lipgloss.Color("#FAB387"), // Peach/Orange
+	Done:        lipgloss.Color("#A6E3A1"), // Green (complete, awaiting merge)
+	Merged:      lipgloss.Color("#CBA6F7"), // Mauve (merged)
 	StatusError: lipgloss.Color("#F38BA8"), // Red
 	Closed:      lipgloss.Color("#6C7086"), // Overlay0
 
@@ -127,22 +121,16 @@ type Styles struct {
 	// Status badges (normal)
 	StatusTodo       lipgloss.Style
 	StatusInProgress lipgloss.Style
-	StatusNeedsInput lipgloss.Style
-	StatusForReview  lipgloss.Style
-	StatusReviewing  lipgloss.Style
-	StatusReviewed   lipgloss.Style
-	StatusStopped    lipgloss.Style
+	StatusDone       lipgloss.Style
+	StatusMerged     lipgloss.Style
 	StatusError      lipgloss.Style
 	StatusClosed     lipgloss.Style
 
 	// Status badges (selected - brighter)
 	StatusTodoSelected       lipgloss.Style
 	StatusInProgressSelected lipgloss.Style
-	StatusNeedsInputSelected lipgloss.Style
-	StatusForReviewSelected  lipgloss.Style
-	StatusReviewingSelected  lipgloss.Style
-	StatusReviewedSelected   lipgloss.Style
-	StatusStoppedSelected    lipgloss.Style
+	StatusDoneSelected       lipgloss.Style
+	StatusMergedSelected     lipgloss.Style
 	StatusErrorSelected      lipgloss.Style
 	StatusClosedSelected     lipgloss.Style
 
@@ -278,20 +266,11 @@ func DefaultStyles() Styles {
 		StatusInProgress: lipgloss.NewStyle().
 			Foreground(Colors.InProgress),
 
-		StatusNeedsInput: lipgloss.NewStyle().
-			Foreground(Colors.NeedsInput),
+		StatusDone: lipgloss.NewStyle().
+			Foreground(Colors.Done),
 
-		StatusForReview: lipgloss.NewStyle().
-			Foreground(Colors.ForReview),
-
-		StatusReviewing: lipgloss.NewStyle().
-			Foreground(Colors.Reviewing),
-
-		StatusReviewed: lipgloss.NewStyle().
-			Foreground(Colors.Reviewed),
-
-		StatusStopped: lipgloss.NewStyle().
-			Foreground(Colors.Stopped),
+		StatusMerged: lipgloss.NewStyle().
+			Foreground(Colors.Merged),
 
 		StatusError: lipgloss.NewStyle().
 			Foreground(Colors.StatusError),
@@ -308,24 +287,12 @@ func DefaultStyles() Styles {
 			Foreground(Colors.InProgress).
 			Bold(true),
 
-		StatusNeedsInputSelected: lipgloss.NewStyle().
-			Foreground(Colors.NeedsInput).
+		StatusDoneSelected: lipgloss.NewStyle().
+			Foreground(Colors.Done).
 			Bold(true),
 
-		StatusForReviewSelected: lipgloss.NewStyle().
-			Foreground(Colors.ForReview).
-			Bold(true),
-
-		StatusReviewingSelected: lipgloss.NewStyle().
-			Foreground(Colors.Reviewing).
-			Bold(true),
-
-		StatusReviewedSelected: lipgloss.NewStyle().
-			Foreground(Colors.Reviewed).
-			Bold(true),
-
-		StatusStoppedSelected: lipgloss.NewStyle().
-			Foreground(Colors.Stopped).
+		StatusMergedSelected: lipgloss.NewStyle().
+			Foreground(Colors.Merged).
 			Bold(true),
 
 		StatusErrorSelected: lipgloss.NewStyle().
@@ -417,25 +384,15 @@ func (s Styles) StatusStyle(status domain.Status) lipgloss.Style {
 		return s.StatusTodo
 	case domain.StatusInProgress:
 		return s.StatusInProgress
-	case domain.StatusNeedsInput:
-		return s.StatusNeedsInput
-	case domain.StatusForReview:
-		return s.StatusForReview
-	case domain.StatusReviewing:
-		return s.StatusReviewing
-	case domain.StatusReviewed:
-		return s.StatusReviewed
-	case domain.StatusStopped:
-		return s.StatusStopped
+	case domain.StatusDone:
+		return s.StatusDone
+	case domain.StatusMerged:
+		return s.StatusMerged
 	case domain.StatusError:
 		return s.StatusError
 	case domain.StatusClosed:
 		return s.StatusClosed
 	default:
-		// Handle legacy "done" status as closed
-		if status.IsLegacyDone() {
-			return s.StatusClosed
-		}
 		return s.StatusTodo
 	}
 }
@@ -447,25 +404,15 @@ func (s Styles) StatusStyleSelected(status domain.Status) lipgloss.Style {
 		return s.StatusTodoSelected
 	case domain.StatusInProgress:
 		return s.StatusInProgressSelected
-	case domain.StatusNeedsInput:
-		return s.StatusNeedsInputSelected
-	case domain.StatusForReview:
-		return s.StatusForReviewSelected
-	case domain.StatusReviewing:
-		return s.StatusReviewingSelected
-	case domain.StatusReviewed:
-		return s.StatusReviewedSelected
-	case domain.StatusStopped:
-		return s.StatusStoppedSelected
+	case domain.StatusDone:
+		return s.StatusDoneSelected
+	case domain.StatusMerged:
+		return s.StatusMergedSelected
 	case domain.StatusError:
 		return s.StatusErrorSelected
 	case domain.StatusClosed:
 		return s.StatusClosedSelected
 	default:
-		// Handle legacy "done" status as closed
-		if status.IsLegacyDone() {
-			return s.StatusClosedSelected
-		}
 		return s.StatusTodoSelected
 	}
 }
@@ -477,25 +424,15 @@ func StatusText(status domain.Status) string {
 		return "Todo"
 	case domain.StatusInProgress:
 		return "InPrg"
-	case domain.StatusNeedsInput:
-		return "Input"
-	case domain.StatusForReview:
-		return "ForRev"
-	case domain.StatusReviewing:
-		return "Revwg"
-	case domain.StatusReviewed:
-		return "Revwd"
-	case domain.StatusStopped:
-		return "Stop"
+	case domain.StatusDone:
+		return "Done"
+	case domain.StatusMerged:
+		return "Mrgd"
 	case domain.StatusError:
 		return "Err"
 	case domain.StatusClosed:
 		return "Clsd"
 	default:
-		// Handle legacy "done" status as closed
-		if status.IsLegacyDone() {
-			return "Clsd"
-		}
 		return "?"
 	}
 }
@@ -507,25 +444,15 @@ func StatusIcon(status domain.Status) string {
 		return "●"
 	case domain.StatusInProgress:
 		return "➜"
-	case domain.StatusNeedsInput:
-		return "?"
-	case domain.StatusForReview:
-		return "◎"
-	case domain.StatusReviewing:
-		return "⟳"
-	case domain.StatusReviewed:
+	case domain.StatusDone:
 		return "✔"
-	case domain.StatusStopped:
-		return "⏸"
+	case domain.StatusMerged:
+		return "◆"
 	case domain.StatusError:
 		return "✕"
 	case domain.StatusClosed:
 		return "−"
 	default:
-		// Handle legacy "done" status as closed
-		if status.IsLegacyDone() {
-			return "−"
-		}
 		return "?"
 	}
 }

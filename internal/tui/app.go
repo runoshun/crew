@@ -41,22 +41,14 @@ func (m *Model) defaultActionID(task *domain.Task) string {
 		return ""
 	}
 	switch task.Status {
-	case domain.StatusTodo, domain.StatusError, domain.StatusStopped:
+	case domain.StatusTodo, domain.StatusError:
 		return "start"
-	case domain.StatusInProgress, domain.StatusNeedsInput:
+	case domain.StatusInProgress:
 		return "attach"
-	case domain.StatusReviewing:
-		return "attach_review"
-	case domain.StatusForReview:
-		return "show_diff"
-	case domain.StatusReviewed:
+	case domain.StatusDone:
 		return "review_result"
-	case domain.StatusClosed:
+	case domain.StatusMerged, domain.StatusClosed:
 		return "detail"
-	default:
-		if task.Status.IsLegacyDone() {
-			return "detail"
-		}
 	}
 	return ""
 }
@@ -292,7 +284,7 @@ func (m *Model) canStopSelectedTask(task *domain.Task) bool {
 	if task == nil {
 		return false
 	}
-	if task.Status == domain.StatusInProgress || task.Status == domain.StatusNeedsInput || task.Status == domain.StatusReviewing {
+	if task.Status == domain.StatusInProgress {
 		return true
 	}
 	return task.Session != ""
@@ -396,26 +388,18 @@ func (m *Model) dialogWidth() int {
 }
 
 var statusPriority = map[domain.Status]int{
-	domain.StatusReviewing:  0, // Review in progress
-	domain.StatusInProgress: 1, // Work in progress
-	domain.StatusNeedsInput: 1, // Waiting for input
-	domain.StatusForReview:  2, // Awaiting review
-	domain.StatusReviewed:   2, // Review complete
-	domain.StatusError:      3,
-	domain.StatusStopped:    3,
-	domain.StatusTodo:       4,
+	domain.StatusInProgress: 0, // Work in progress
+	domain.StatusDone:       1, // Complete, awaiting merge
+	domain.StatusError:      2,
+	domain.StatusTodo:       3,
+	domain.StatusMerged:     4,
 	domain.StatusClosed:     5,
 }
 
 // getStatusPriority returns the sort priority for a status.
-// Handles legacy "done" status by treating it as closed.
 func getStatusPriority(status domain.Status) int {
 	if p, ok := statusPriority[status]; ok {
 		return p
-	}
-	// Handle legacy "done" status as closed (priority 5)
-	if status.IsLegacyDone() {
-		return statusPriority[domain.StatusClosed]
 	}
 	// Unknown status goes to the end
 	return 99
@@ -696,7 +680,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				}
 			},
 			IsAvailable: func() bool {
-				return task.Status == domain.StatusReviewing
+				return task.Status == domain.StatusInProgress && task.Session != ""
 			},
 		},
 		{
@@ -710,7 +694,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				}
 			},
 			IsAvailable: func() bool {
-				return task.Status == domain.StatusForReview
+				return task.Status == domain.StatusDone
 			},
 		},
 		{
@@ -722,7 +706,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, m.loadReviewResult(task.ID)
 			},
 			IsAvailable: func() bool {
-				return task.Status == domain.StatusReviewed
+				return task.Status == domain.StatusDone
 			},
 		},
 		{
@@ -854,7 +838,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return task.Status == domain.StatusForReview || task.Status == domain.StatusReviewed
+				return task.Status == domain.StatusDone
 			},
 		},
 		{

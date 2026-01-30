@@ -127,8 +127,9 @@ type ReviewOutput struct {
 // ExecuteReview runs the review command and records its result.
 func ExecuteReview(ctx context.Context, deps ReviewDeps, in ReviewInput) (*ReviewOutput, error) {
 	if !in.SkipStatusCheck {
-		if in.Task.Status != domain.StatusForReview && in.Task.Status != domain.StatusReviewing {
-			return nil, fmt.Errorf("cannot review task in %s status (must be for_review or reviewing): %w", in.Task.Status, domain.ErrInvalidTransition)
+		// Review can only be executed on in_progress or done tasks
+		if in.Task.Status != domain.StatusInProgress && in.Task.Status != domain.StatusDone {
+			return nil, fmt.Errorf("cannot review task in %s status (must be in_progress or done): %w", in.Task.Status, domain.ErrInvalidTransition)
 		}
 	}
 

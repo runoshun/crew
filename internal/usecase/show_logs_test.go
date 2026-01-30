@@ -48,7 +48,7 @@ func TestShowLogs_Execute_ReviewSession(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusReviewing,
+		Status: domain.StatusInProgress,
 	}
 
 	crewDir := t.TempDir()

@@ -32,14 +32,14 @@ func TestStopTask_Execute_Success_InProgress(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusStopped, out.Task.Status)
+	assert.Equal(t, domain.StatusError, out.Task.Status)
 	assert.Empty(t, out.Task.Agent, "agent should be cleared")
 	assert.Empty(t, out.Task.Session, "session should be cleared")
 	assert.True(t, sessions.StopCalled, "session should be stopped")
 
 	// Verify task is updated in repository
 	savedTask := repo.Tasks[1]
-	assert.Equal(t, domain.StatusStopped, savedTask.Status)
+	assert.Equal(t, domain.StatusError, savedTask.Status)
 }
 
 func TestStopTask_Execute_NoRunningSession(t *testing.T) {
@@ -64,7 +64,7 @@ func TestStopTask_Execute_NoRunningSession(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusStopped, out.Task.Status)
+	assert.Equal(t, domain.StatusError, out.Task.Status)
 	assert.Empty(t, out.Task.Agent, "agent should be cleared")
 	assert.Empty(t, out.Task.Session, "session should be cleared")
 	assert.False(t, sessions.StopCalled, "stop should not be called when no session running")
@@ -75,7 +75,7 @@ func TestStopTask_Execute_StopReviewSession(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task in review",
-		Status: domain.StatusReviewing,
+		Status: domain.StatusInProgress,
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true
@@ -88,24 +88,26 @@ func TestStopTask_Execute_StopReviewSession(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewing, out.Task.Status)
+	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
 	assert.Equal(t, domain.ReviewSessionName(1), out.SessionName)
 	assert.True(t, sessions.StopCalled)
 }
 
 func TestStopTask_Execute_StopReviewSessionFallback(t *testing.T) {
+	// Test: when work session is not running and task.Session is empty,
+	// but review session is running, stop the review session
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Task in review",
-		Status:  domain.StatusReviewing,
-		Agent:   "claude",
-		Session: "crew-1",
+		Status:  domain.StatusInProgress,
+		Agent:   "", // No agent
+		Session: "", // No work session
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = false
 	sessionsByName := map[string]bool{
-		domain.ReviewSessionName(1): true,
+		domain.ReviewSessionName(1): true, // Review session is running
 		"crew-1":                    false,
 	}
 	sessions.IsRunningFunc = func(name string) (bool, error) {
@@ -153,7 +155,7 @@ func TestStopTask_Execute_AlreadyInReview(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Task in review",
-		Status:  domain.StatusForReview,
+		Status:  domain.StatusDone,
 		Agent:   "",
 		Session: "crew-1",
 	}
@@ -169,7 +171,7 @@ func TestStopTask_Execute_AlreadyInReview(t *testing.T) {
 	// Assert - should succeed and move to stopped
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusStopped, out.Task.Status, "status should change to stopped when session exists")
+	assert.Equal(t, domain.StatusError, out.Task.Status, "status should change to stopped when session exists")
 }
 
 func TestStopTask_Execute_ErrorStatus(t *testing.T) {
@@ -194,7 +196,7 @@ func TestStopTask_Execute_ErrorStatus(t *testing.T) {
 	// Assert - should succeed and move to stopped
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusStopped, out.Task.Status, "status should change to stopped when session exists")
+	assert.Equal(t, domain.StatusError, out.Task.Status, "status should change to stopped when session exists")
 }
 
 func TestStopTask_Execute_TaskNotFound(t *testing.T) {
@@ -308,7 +310,7 @@ func TestStopTask_Execute_ClearsAgentInfo(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:      1,
 		Title:   "Task with agent info",
-		Status:  domain.StatusForReview, // Not in_progress
+		Status:  domain.StatusDone, // Not in_progress
 		Agent:   "claude",
 		Session: "crew-1",
 	}
@@ -324,7 +326,7 @@ func TestStopTask_Execute_ClearsAgentInfo(t *testing.T) {
 	// Assert - agent info should be cleared even though status changes
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusStopped, out.Task.Status)
+	assert.Equal(t, domain.StatusError, out.Task.Status)
 	assert.Empty(t, out.Task.Agent, "agent should be cleared")
 	assert.Empty(t, out.Task.Session, "session should be cleared")
 	assert.True(t, sessions.StopCalled, "session should be stopped")

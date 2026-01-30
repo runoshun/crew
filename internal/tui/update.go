@@ -317,7 +317,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeConfirm
 		m.confirmAction = ConfirmStop
 		m.confirmTaskID = task.ID
-		m.confirmReviewSession = task.Status == domain.StatusReviewing
+		m.confirmReviewSession = false // Review is handled by session status, not task status
 		return m, nil
 
 	case key.Matches(msg, m.keys.Attach):
@@ -406,7 +406,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Merge):
 		task := m.SelectedTask()
-		if task == nil || (task.Status != domain.StatusForReview && task.Status != domain.StatusReviewed) {
+		if task == nil || task.Status != domain.StatusDone {
 			return m, nil
 		}
 		m.mode = ModeConfirm
@@ -573,46 +573,26 @@ func (m *Model) performDefaultAction(task *domain.Task) (tea.Model, tea.Cmd) {
 	}
 
 	switch task.Status {
-	case domain.StatusTodo, domain.StatusError, domain.StatusStopped:
+	case domain.StatusTodo, domain.StatusError:
 		// Start the task
 		m.mode = ModeStart
 		return m, nil
 
-	case domain.StatusInProgress, domain.StatusNeedsInput:
-		// Attach to session (needs_input - task is running but waiting)
+	case domain.StatusInProgress:
+		// Attach to session
 		return m, func() tea.Msg {
 			return MsgAttachSession{TaskID: task.ID}
 		}
 
-	case domain.StatusReviewing:
-		// Attach to review session
-		return m, func() tea.Msg {
-			return MsgAttachSession{TaskID: task.ID, Review: true}
-		}
-
-	case domain.StatusForReview:
-		// Show diff for review (attach is available via 'a' key)
-		return m, func() tea.Msg {
-			return MsgShowDiff{TaskID: task.ID}
-		}
-
-	case domain.StatusReviewed:
+	case domain.StatusDone:
 		// Load and show review result, then allow actions (merge, request changes, etc.)
 		return m, m.loadReviewResult(task.ID)
 
-	case domain.StatusClosed:
+	case domain.StatusMerged, domain.StatusClosed:
 		// Show detail view for terminal states
 		m.detailFocused = true
 		m.updateLayoutSizes()
 		return m, m.loadComments(task.ID)
-
-	default:
-		// Handle legacy "done" status as closed
-		if task.Status.IsLegacyDone() {
-			m.detailFocused = true
-			m.updateLayoutSizes()
-			return m, m.loadComments(task.ID)
-		}
 	}
 
 	return m, nil

@@ -185,7 +185,7 @@ func (uc *PollTask) Execute(ctx context.Context, in PollTaskInput) (*PollTaskOut
 
 // isTerminalStatus returns true if the status is a terminal state.
 func (uc *PollTask) isTerminalStatus(status domain.Status) bool {
-	return status.IsTerminal() || status == domain.StatusError
+	return status.IsTerminal()
 }
 
 // containsStatus returns true if the slice contains the specified status.

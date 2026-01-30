@@ -85,10 +85,10 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, err
 	}
 
-	// Validate status - must be for_review or reviewing
-	// reviewing is allowed because CompleteTask transitions to it before starting review
-	if task.Status != domain.StatusForReview && task.Status != domain.StatusReviewing {
-		return nil, fmt.Errorf("cannot review task in %s status (must be for_review or reviewing): %w", task.Status, domain.ErrInvalidTransition)
+	// Validate status - must be in_progress or done
+	// done is allowed because CompleteTask transitions to it before starting review
+	if task.Status != domain.StatusInProgress && task.Status != domain.StatusDone {
+		return nil, fmt.Errorf("cannot review task in %s status (must be in_progress or done): %w", task.Status, domain.ErrInvalidTransition)
 	}
 
 	// Check if review session is already running
@@ -122,8 +122,9 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 
 // executeSync runs the review synchronously and returns the result.
 func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput) (*ReviewTaskOutput, error) {
-	// Update status to reviewing
-	task.Status = domain.StatusReviewing
+	// Keep status as in_progress during review
+	originalStatus := task.Status
+	task.Status = domain.StatusInProgress
 	if err := uc.tasks.Save(task); err != nil {
 		return nil, fmt.Errorf("save task: %w", err)
 	}
@@ -137,17 +138,17 @@ func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, review
 		Task:            task,
 		WorktreePath:    reviewCmd.WorktreePath,
 		Result:          reviewCmd.Result,
-		SkipStatusCheck: false,
+		SkipStatusCheck: true,
 	})
 	if err != nil {
-		// Revert status to for_review on error
-		task.Status = domain.StatusForReview
+		// Revert status to original on error
+		task.Status = originalStatus
 		_ = uc.tasks.Save(task)
 		return nil, err
 	}
 
-	// Update task status to reviewed
-	task.Status = domain.StatusReviewed
+	// Update task status to done (review complete)
+	task.Status = domain.StatusDone
 	if err := uc.tasks.Save(task); err != nil {
 		// Log but don't fail - the review was successful
 		_, _ = fmt.Fprintf(uc.stderr, "warning: failed to update task status: %v\n", err)
@@ -167,8 +168,9 @@ func (uc *ReviewTask) executeBackground(ctx context.Context, task *domain.Task, 
 		return nil, fmt.Errorf("generate review script: %w", err)
 	}
 
-	// Update status to reviewing
-	task.Status = domain.StatusReviewing
+	// Keep status as in_progress during background review
+	originalStatus := task.Status
+	task.Status = domain.StatusInProgress
 	if err := uc.tasks.Save(task); err != nil {
 		uc.cleanupScript(task.ID)
 		return nil, fmt.Errorf("save task: %w", err)
@@ -185,7 +187,7 @@ func (uc *ReviewTask) executeBackground(ctx context.Context, task *domain.Task, 
 		Type:      domain.SessionTypeReviewer,
 	}); err != nil {
 		// Rollback status
-		task.Status = domain.StatusForReview
+		task.Status = originalStatus
 		_ = uc.tasks.Save(task)
 		uc.cleanupScript(task.ID)
 		return nil, fmt.Errorf("start session: %w", err)

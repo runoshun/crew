@@ -144,7 +144,7 @@ func TestStartTask_Execute_FromInReview(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Test task",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
