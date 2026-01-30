@@ -363,8 +363,8 @@ func TestAddComment_Execute_RequestChanges_ResetsAutoFixRetryCount(t *testing.T)
 	repo.Tasks[1] = &domain.Task{
 		ID:                1,
 		Title:             "Test task",
-		Status:            domain.StatusReviewing, // Start from non-in_progress status
-		AutoFixRetryCount: 2,                      // Simulates 2 previous failed review attempts
+		Status:            domain.StatusInProgress, // Start from non-in_progress status
+		AutoFixRetryCount: 2,                       // Simulates 2 previous failed review attempts
 	}
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true

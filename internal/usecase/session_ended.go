@@ -52,21 +52,17 @@ func (uc *SessionEnded) Execute(_ context.Context, in SessionEndedInput) (*Sessi
 		return &SessionEndedOutput{Ignored: true}, nil
 	}
 
-	// Update status based on task status and determine whether to clear session info
-	// - in_progress: transition to error and clear session (session end = abnormal if in_progress)
-	// - Other states: maintain current status and keep session
-	shouldClearSession := false
+	// Update status based on task status
+	// - in_progress: transition to error (session end while in_progress = abnormal)
+	// - Other states: maintain current status
 	if task.Status == domain.StatusInProgress {
 		task.Status = domain.StatusError
-		shouldClearSession = true
 	}
-	// If already for_review, reviewed, or closed, don't change status or session
 
-	// Clear agent info only if abnormal exit
-	if shouldClearSession {
-		task.Agent = ""
-		task.Session = ""
-	}
+	// Always clear agent info on session end
+	// This prevents TUI from showing "running" state when session is gone
+	task.Agent = ""
+	task.Session = ""
 
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {

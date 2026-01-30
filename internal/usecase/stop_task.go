@@ -67,19 +67,17 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		return nil, err
 	}
 	if sessionStopped != "" {
-		if task.Status != domain.StatusReviewing {
-			task.Status = domain.StatusStopped
-		}
+		// Set status to error when stopping (indicates manual stop or abnormal termination)
+		task.Status = domain.StatusError
 		uc.cleanupScriptFiles(task.ID)
 		return uc.saveStoppedTask(task, sessionStopped)
 	}
 
 	if task.Session != "" {
-		if task.Status != domain.StatusReviewing {
-			task.Status = domain.StatusStopped
-			uc.cleanupScriptFiles(task.ID)
-			return uc.saveStoppedTask(task, "")
-		}
+		// Set status to error when stopping
+		task.Status = domain.StatusError
+		uc.cleanupScriptFiles(task.ID)
+		return uc.saveStoppedTask(task, "")
 	}
 
 	reviewStopped, err := shared.StopReviewSession(uc.sessions, task.ID)

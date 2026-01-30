@@ -16,6 +16,11 @@ const (
 	CloseReasonAbandoned CloseReason = "abandoned" // Task was abandoned without merge
 )
 
+// StatusVersion indicates the status model version.
+// Version 0 (or missing): Legacy status model where "done" meant "closed"
+// Version 2: New status model where "done" is a distinct state
+const StatusVersionCurrent = 2
+
 // Task represents a work unit managed by git-crew.
 // Fields are ordered to minimize memory padding.
 type Task struct {
@@ -36,6 +41,7 @@ type Task struct {
 	Issue             int         `json:"issue,omitempty"`             // GitHub issue number (0 = not linked)
 	PR                int         `json:"pr,omitempty"`                // GitHub PR number (0 = not created)
 	AutoFixRetryCount int         `json:"autoFixRetryCount,omitempty"` // Current retry count for auto_fix mode
+	StatusVersion     int         `json:"statusVersion,omitempty"`     // Status model version (0=legacy, 2=current)
 }
 
 // IsRoot returns true if this is a root task (no parent).

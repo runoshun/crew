@@ -24,7 +24,7 @@ func TestPollStatus_Execute_ImmediateMatch(t *testing.T) {
 	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Task 2",
-		Status: domain.StatusForReview, // Target status
+		Status: domain.StatusDone, // Target status
 	}
 
 	var stdout bytes.Buffer
@@ -33,7 +33,7 @@ func TestPollStatus_Execute_ImmediateMatch(t *testing.T) {
 	// Execute
 	ctx := context.Background()
 	out, err := uc.Execute(ctx, PollStatusInput{
-		Status:   domain.StatusForReview,
+		Status:   domain.StatusDone,
 		Interval: 10,
 		Timeout:  0,
 	})
@@ -42,10 +42,10 @@ func TestPollStatus_Execute_ImmediateMatch(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, 2, out.TaskID)
-	assert.Equal(t, domain.StatusForReview, out.Status)
+	assert.Equal(t, domain.StatusDone, out.Status)
 
 	// Check output format
-	assert.Equal(t, "for_review 2\n", stdout.String())
+	assert.Equal(t, "done 2\n", stdout.String())
 }
 
 func TestPollStatus_Execute_WaitForStatus(t *testing.T) {
@@ -63,7 +63,7 @@ func TestPollStatus_Execute_WaitForStatus(t *testing.T) {
 	// Change task status after short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(1, domain.StatusForReview)
+		repo.UpdateStatus(1, domain.StatusDone)
 	}()
 
 	// Execute with short interval
@@ -71,7 +71,7 @@ func TestPollStatus_Execute_WaitForStatus(t *testing.T) {
 	defer cancel()
 
 	out, err := uc.Execute(ctx, PollStatusInput{
-		Status:   domain.StatusForReview,
+		Status:   domain.StatusDone,
 		Interval: 1,
 		Timeout:  0,
 	})
@@ -80,8 +80,8 @@ func TestPollStatus_Execute_WaitForStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, 1, out.TaskID)
-	assert.Equal(t, domain.StatusForReview, out.Status)
-	assert.Equal(t, "for_review 1\n", stdout.String())
+	assert.Equal(t, domain.StatusDone, out.Status)
+	assert.Equal(t, "done 1\n", stdout.String())
 }
 
 func TestPollStatus_Execute_Timeout(t *testing.T) {
@@ -101,7 +101,7 @@ func TestPollStatus_Execute_Timeout(t *testing.T) {
 	defer cancel()
 
 	out, err := uc.Execute(ctx, PollStatusInput{
-		Status:   domain.StatusForReview,
+		Status:   domain.StatusDone,
 		Interval: 10, // Long interval, but context will timeout first
 		Timeout:  0,  // No usecase timeout, rely on context
 	})
@@ -156,7 +156,7 @@ func TestPollStatus_Execute_ContextCanceled(t *testing.T) {
 
 	// Execute
 	out, err := uc.Execute(ctx, PollStatusInput{
-		Status:   domain.StatusForReview,
+		Status:   domain.StatusDone,
 		Interval: 1,
 		Timeout:  0,
 	})
@@ -173,7 +173,7 @@ func TestPollStatus_Execute_DefaultInterval(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
-		Status: domain.StatusForReview, // Already matches target
+		Status: domain.StatusDone, // Already matches target
 	}
 
 	var stdout bytes.Buffer
@@ -181,7 +181,7 @@ func TestPollStatus_Execute_DefaultInterval(t *testing.T) {
 
 	// Execute with interval <= 0 (should use default, but exits immediately due to match)
 	out, err := uc.Execute(context.Background(), PollStatusInput{
-		Status:   domain.StatusForReview,
+		Status:   domain.StatusDone,
 		Interval: 0, // Should use default (10), but won't matter since immediate match
 		Timeout:  0,
 	})
@@ -204,7 +204,7 @@ func TestPollStatus_Execute_ListError(t *testing.T) {
 
 	// Execute
 	_, err := uc.Execute(context.Background(), PollStatusInput{
-		Status:   domain.StatusForReview,
+		Status:   domain.StatusDone,
 		Interval: 1,
 		Timeout:  0,
 	})
@@ -223,7 +223,7 @@ func TestPollStatus_Execute_EmptyTaskList(t *testing.T) {
 
 	// Execute with timeout
 	out, err := uc.Execute(context.Background(), PollStatusInput{
-		Status:   domain.StatusForReview,
+		Status:   domain.StatusDone,
 		Interval: 1,
 		Timeout:  1,
 	})
@@ -239,12 +239,12 @@ func TestPollStatus_Execute_MultipleMatchingTasks(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task 1",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Task 2",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 
 	var stdout bytes.Buffer
@@ -253,7 +253,7 @@ func TestPollStatus_Execute_MultipleMatchingTasks(t *testing.T) {
 	// Execute
 	ctx := context.Background()
 	out, err := uc.Execute(ctx, PollStatusInput{
-		Status:   domain.StatusForReview,
+		Status:   domain.StatusDone,
 		Interval: 10,
 		Timeout:  0,
 	})
@@ -261,23 +261,20 @@ func TestPollStatus_Execute_MultipleMatchingTasks(t *testing.T) {
 	// Assert - should return one of the matching tasks
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusForReview, out.Status)
+	assert.Equal(t, domain.StatusDone, out.Status)
 	// TaskID should be either 1 or 2
 	assert.True(t, out.TaskID == 1 || out.TaskID == 2)
 }
 
 func TestPollStatus_Execute_AllStatuses(t *testing.T) {
-	// Test that we can poll for various valid statuses
+	// Test that we can poll for all 6 statuses
 	statuses := []domain.Status{
 		domain.StatusTodo,
 		domain.StatusInProgress,
-		domain.StatusNeedsInput,
-		domain.StatusForReview,
-		domain.StatusReviewing,
-		domain.StatusReviewed,
-		domain.StatusStopped,
-		domain.StatusError,
+		domain.StatusDone,
+		domain.StatusMerged,
 		domain.StatusClosed,
+		domain.StatusError,
 	}
 
 	for _, status := range statuses {

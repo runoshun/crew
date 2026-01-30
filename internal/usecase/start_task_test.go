@@ -144,7 +144,7 @@ func TestStartTask_Execute_FromInReview(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Test task",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -225,14 +225,16 @@ func TestStartTask_Execute_TaskNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrTaskNotFound)
 }
 
-func TestStartTask_Execute_AllowAllStatuses(t *testing.T) {
+func TestStartTask_Execute_AllowStartableStatuses(t *testing.T) {
+	// Startable statuses: todo, in_progress, done, error
 	tests := []struct {
 		name   string
 		status domain.Status
 	}{
-		{"done", domain.StatusClosed},
-		{"closed", domain.StatusClosed},
+		{"todo", domain.StatusTodo},
 		{"in_progress", domain.StatusInProgress},
+		{"done", domain.StatusDone},
+		{"error", domain.StatusError},
 	}
 
 	for _, tt := range tests {
@@ -264,6 +266,46 @@ func TestStartTask_Execute_AllowAllStatuses(t *testing.T) {
 			// Assert
 			assert.NoError(t, err)
 			assert.Equal(t, domain.StatusInProgress, repo.Tasks[1].Status)
+		})
+	}
+}
+
+func TestStartTask_Execute_RejectTerminalStatuses(t *testing.T) {
+	// Terminal statuses: merged, closed - cannot be started
+	tests := []struct {
+		name   string
+		status domain.Status
+	}{
+		{"merged", domain.StatusMerged},
+		{"closed", domain.StatusClosed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crewDir := t.TempDir()
+			repoRoot := t.TempDir()
+
+			repo := testutil.NewMockTaskRepository()
+			repo.Tasks[1] = &domain.Task{
+				ID:     1,
+				Title:  "Test task",
+				Status: tt.status,
+			}
+			sessions := testutil.NewMockSessionManager()
+			worktrees := testutil.NewMockWorktreeManager()
+			configLoader := testutil.NewMockConfigLoader()
+			clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+			uc := NewStartTask(repo, sessions, worktrees, configLoader, &testutil.MockGit{}, clock, nil, testutil.NewMockScriptRunner(), crewDir, repoRoot)
+
+			// Execute
+			_, err := uc.Execute(context.Background(), StartTaskInput{
+				TaskID: 1,
+				Agent:  "claude",
+			})
+
+			// Assert - should fail with ErrInvalidTransition
+			assert.ErrorIs(t, err, domain.ErrInvalidTransition)
 		})
 	}
 }

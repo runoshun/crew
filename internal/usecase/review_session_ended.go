@@ -54,9 +54,10 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 		return &ReviewSessionEndedOutput{Ignored: true}, nil
 	}
 
-	// Check if task is in reviewing status (expected state)
-	if task.Status != domain.StatusReviewing {
-		// Already processed or unexpected state
+	// Check if task is in a reviewable status (in_progress or done)
+	// Review can happen from both in_progress (during work) and done (re-review)
+	if task.Status != domain.StatusInProgress && task.Status != domain.StatusDone {
+		// Already processed or unexpected state (e.g., merged, closed)
 		return &ReviewSessionEndedOutput{Ignored: true}, nil
 	}
 
@@ -82,11 +83,9 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 
 	// Update status based on exit code
 	if in.ExitCode == 0 {
-		task.Status = domain.StatusReviewed
-	} else {
-		// Revert to for_review to allow retry
-		task.Status = domain.StatusForReview
+		task.Status = domain.StatusDone
 	}
+	// On error (non-zero exit code), keep as in_progress to allow retry
 
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {

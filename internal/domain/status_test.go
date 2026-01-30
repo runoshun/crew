@@ -12,64 +12,44 @@ func TestStatus_CanTransitionTo(t *testing.T) {
 		// From todo
 		{"todo -> in_progress", StatusTodo, StatusInProgress, true},
 		{"todo -> closed", StatusTodo, StatusClosed, true},
-		{"todo -> for_review", StatusTodo, StatusForReview, false},
+		{"todo -> done", StatusTodo, StatusDone, false},
 		{"todo -> error", StatusTodo, StatusError, false},
+		{"todo -> merged", StatusTodo, StatusMerged, false},
 
 		// From in_progress
-		{"in_progress -> for_review", StatusInProgress, StatusForReview, true},
-		{"in_progress -> needs_input", StatusInProgress, StatusNeedsInput, true},
-		{"in_progress -> stopped", StatusInProgress, StatusStopped, true},
+		{"in_progress -> done", StatusInProgress, StatusDone, true},
 		{"in_progress -> error", StatusInProgress, StatusError, true},
 		{"in_progress -> closed", StatusInProgress, StatusClosed, true},
-		{"in_progress -> reviewed", StatusInProgress, StatusReviewed, false},
+		{"in_progress -> merged", StatusInProgress, StatusMerged, false},
 		{"in_progress -> todo", StatusInProgress, StatusTodo, false},
 
-		// From needs_input
-		{"needs_input -> in_progress", StatusNeedsInput, StatusInProgress, true},
-		{"needs_input -> for_review", StatusNeedsInput, StatusForReview, true},
-		{"needs_input -> closed", StatusNeedsInput, StatusClosed, true},
-		{"needs_input -> todo", StatusNeedsInput, StatusTodo, false},
-		{"needs_input -> reviewed", StatusNeedsInput, StatusReviewed, false},
-
-		// From for_review
-		{"for_review -> reviewing", StatusForReview, StatusReviewing, true},
-		{"for_review -> in_progress", StatusForReview, StatusInProgress, true},
-		{"for_review -> closed", StatusForReview, StatusClosed, true},
-		{"for_review -> todo", StatusForReview, StatusTodo, false},
-		{"for_review -> reviewed", StatusForReview, StatusReviewed, false},
-
-		// From reviewing
-		{"reviewing -> reviewed", StatusReviewing, StatusReviewed, true},
-		{"reviewing -> in_progress", StatusReviewing, StatusInProgress, true},
-		{"reviewing -> closed", StatusReviewing, StatusClosed, true},
-		{"reviewing -> for_review", StatusReviewing, StatusForReview, false},
-		{"reviewing -> todo", StatusReviewing, StatusTodo, false},
-
-		// From reviewed
-		{"reviewed -> in_progress", StatusReviewed, StatusInProgress, true},
-		{"reviewed -> closed", StatusReviewed, StatusClosed, true},
-		{"reviewed -> for_review", StatusReviewed, StatusForReview, false},
-		{"reviewed -> todo", StatusReviewed, StatusTodo, false},
-
-		// From stopped
-		{"stopped -> in_progress", StatusStopped, StatusInProgress, true},
-		{"stopped -> closed", StatusStopped, StatusClosed, true},
-		{"stopped -> todo", StatusStopped, StatusTodo, false},
-		{"stopped -> reviewed", StatusStopped, StatusReviewed, false},
+		// From done
+		{"done -> merged", StatusDone, StatusMerged, true},
+		{"done -> closed", StatusDone, StatusClosed, true},
+		{"done -> in_progress", StatusDone, StatusInProgress, true},
+		{"done -> todo", StatusDone, StatusTodo, false},
+		{"done -> error", StatusDone, StatusError, false},
 
 		// From error
 		{"error -> in_progress", StatusError, StatusInProgress, true},
 		{"error -> closed", StatusError, StatusClosed, true},
 		{"error -> todo", StatusError, StatusTodo, false},
-		{"error -> for_review", StatusError, StatusForReview, false},
-		{"error -> reviewed", StatusError, StatusReviewed, false},
+		{"error -> done", StatusError, StatusDone, false},
+		{"error -> merged", StatusError, StatusMerged, false},
+
+		// From merged (terminal)
+		{"merged -> todo", StatusMerged, StatusTodo, false},
+		{"merged -> in_progress", StatusMerged, StatusInProgress, false},
+		{"merged -> done", StatusMerged, StatusDone, false},
+		{"merged -> error", StatusMerged, StatusError, false},
+		{"merged -> closed", StatusMerged, StatusClosed, false},
 
 		// From closed (terminal)
 		{"closed -> todo", StatusClosed, StatusTodo, false},
 		{"closed -> in_progress", StatusClosed, StatusInProgress, false},
-		{"closed -> for_review", StatusClosed, StatusForReview, false},
+		{"closed -> done", StatusClosed, StatusDone, false},
 		{"closed -> error", StatusClosed, StatusError, false},
-		{"closed -> closed", StatusClosed, StatusClosed, false},
+		{"closed -> merged", StatusClosed, StatusMerged, false},
 	}
 
 	for _, tt := range tests {
@@ -96,12 +76,9 @@ func TestStatus_IsTerminal(t *testing.T) {
 	}{
 		{StatusTodo, false},
 		{StatusInProgress, false},
-		{StatusNeedsInput, false},
-		{StatusForReview, false},
-		{StatusReviewing, false},
-		{StatusReviewed, false},
-		{StatusStopped, false},
+		{StatusDone, false},
 		{StatusError, false},
+		{StatusMerged, true},
 		{StatusClosed, true},
 	}
 
@@ -120,13 +97,10 @@ func TestStatus_CanStart(t *testing.T) {
 		canStart bool
 	}{
 		{StatusTodo, true},
-		{StatusInProgress, false},
-		{StatusNeedsInput, false},
-		{StatusForReview, true},
-		{StatusReviewing, false},
-		{StatusReviewed, true},
-		{StatusStopped, true},
+		{StatusInProgress, true},
+		{StatusDone, true},
 		{StatusError, true},
+		{StatusMerged, false},
 		{StatusClosed, false},
 	}
 
@@ -146,13 +120,10 @@ func TestStatus_Display(t *testing.T) {
 	}{
 		{StatusTodo, "To Do"},
 		{StatusInProgress, "In Progress"},
-		{StatusNeedsInput, "Needs Input"},
-		{StatusForReview, "For Review"},
-		{StatusReviewing, "Reviewing"},
-		{StatusReviewed, "Reviewed"},
-		{StatusStopped, "Stopped"},
-		{StatusError, "Error"},
+		{StatusDone, "Done"},
+		{StatusMerged, "Merged"},
 		{StatusClosed, "Closed"},
+		{StatusError, "Error"},
 		{Status("unknown"), "unknown"},
 	}
 
@@ -172,15 +143,18 @@ func TestStatus_IsValid(t *testing.T) {
 	}{
 		{StatusTodo, true},
 		{StatusInProgress, true},
-		{StatusNeedsInput, true},
-		{StatusForReview, true},
-		{StatusReviewing, true},
-		{StatusReviewed, true},
-		{StatusStopped, true},
-		{StatusError, true},
+		{StatusDone, true},
+		{StatusMerged, true},
 		{StatusClosed, true},
+		{StatusError, true},
 		{Status("unknown"), false},
 		{Status(""), false},
+		// Legacy statuses are not valid for new tasks
+		{Status("needs_input"), false},
+		{Status("for_review"), false},
+		{Status("reviewing"), false},
+		{Status("reviewed"), false},
+		{Status("stopped"), false},
 	}
 
 	for _, tt := range tests {
@@ -192,18 +166,43 @@ func TestStatus_IsValid(t *testing.T) {
 	}
 }
 
+func TestStatus_IsLegacy(t *testing.T) {
+	tests := []struct {
+		status   Status
+		isLegacy bool
+	}{
+		{StatusTodo, false},
+		{StatusInProgress, false},
+		{StatusDone, false},
+		{StatusMerged, false},
+		{StatusClosed, false},
+		{StatusError, false},
+		{Status("needs_input"), true},
+		{Status("for_review"), true},
+		{Status("reviewing"), true},
+		{Status("reviewed"), true},
+		{Status("stopped"), true},
+		{Status("unknown"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.status), func(t *testing.T) {
+			if got := tt.status.IsLegacy(); got != tt.isLegacy {
+				t.Errorf("IsLegacy() = %v, want %v", got, tt.isLegacy)
+			}
+		})
+	}
+}
+
 func TestAllStatuses(t *testing.T) {
 	statuses := AllStatuses()
 	expected := []Status{
 		StatusTodo,
 		StatusInProgress,
-		StatusNeedsInput,
-		StatusForReview,
-		StatusReviewing,
-		StatusReviewed,
-		StatusStopped,
-		StatusError,
+		StatusDone,
+		StatusMerged,
 		StatusClosed,
+		StatusError,
 	}
 
 	if len(statuses) != len(expected) {
@@ -214,5 +213,185 @@ func TestAllStatuses(t *testing.T) {
 		if statuses[i] != s {
 			t.Errorf("AllStatuses()[%d] = %v, want %v", i, statuses[i], s)
 		}
+	}
+}
+
+func TestNormalizeStatus(t *testing.T) {
+	tests := []struct {
+		name          string
+		inputStatus   Status
+		inputVersion  int
+		inputReason   CloseReason
+		expectStatus  Status
+		expectReason  CloseReason
+		expectVersion int
+	}{
+		// Already normalized (StatusVersion >= 2) - no change
+		{
+			name:          "already normalized todo",
+			inputStatus:   StatusTodo,
+			inputVersion:  2,
+			expectStatus:  StatusTodo,
+			expectVersion: 2,
+		},
+		{
+			name:          "already normalized done",
+			inputStatus:   StatusDone,
+			inputVersion:  2,
+			expectStatus:  StatusDone,
+			expectVersion: 2,
+		},
+
+		// Legacy statuses (StatusVersion = 0) - normalize
+		{
+			name:          "legacy needs_input -> in_progress",
+			inputStatus:   Status("needs_input"),
+			inputVersion:  0,
+			expectStatus:  StatusInProgress,
+			expectVersion: StatusVersionCurrent,
+		},
+		{
+			name:          "legacy stopped -> in_progress",
+			inputStatus:   Status("stopped"),
+			inputVersion:  0,
+			expectStatus:  StatusInProgress,
+			expectVersion: StatusVersionCurrent,
+		},
+		{
+			name:          "legacy for_review -> in_progress",
+			inputStatus:   Status("for_review"),
+			inputVersion:  0,
+			expectStatus:  StatusInProgress,
+			expectVersion: StatusVersionCurrent,
+		},
+		{
+			name:          "legacy reviewing -> in_progress",
+			inputStatus:   Status("reviewing"),
+			inputVersion:  0,
+			expectStatus:  StatusInProgress,
+			expectVersion: StatusVersionCurrent,
+		},
+		{
+			name:          "legacy reviewed -> done",
+			inputStatus:   Status("reviewed"),
+			inputVersion:  0,
+			expectStatus:  StatusDone,
+			expectVersion: StatusVersionCurrent,
+		},
+
+		// Legacy done (StatusVersion = 0) -> closed
+		{
+			name:          "legacy done -> closed",
+			inputStatus:   Status("done"),
+			inputVersion:  0,
+			expectStatus:  StatusClosed,
+			expectReason:  CloseReasonAbandoned,
+			expectVersion: StatusVersionCurrent,
+		},
+		{
+			name:          "legacy done with existing reason -> closed",
+			inputStatus:   Status("done"),
+			inputVersion:  0,
+			inputReason:   CloseReasonMerged,
+			expectStatus:  StatusClosed,
+			expectReason:  CloseReasonMerged, // Preserve existing reason
+			expectVersion: StatusVersionCurrent,
+		},
+
+		// closed + CloseReasonMerged -> merged
+		{
+			name:          "closed with merged reason -> merged",
+			inputStatus:   StatusClosed,
+			inputVersion:  0,
+			inputReason:   CloseReasonMerged,
+			expectStatus:  StatusMerged,
+			expectReason:  CloseReasonNone, // Reason is cleared after split
+			expectVersion: StatusVersionCurrent,
+		},
+
+		// closed without merged reason -> closed
+		{
+			name:          "closed with abandoned reason -> closed",
+			inputStatus:   StatusClosed,
+			inputVersion:  0,
+			inputReason:   CloseReasonAbandoned,
+			expectStatus:  StatusClosed,
+			expectReason:  CloseReasonAbandoned,
+			expectVersion: StatusVersionCurrent,
+		},
+		{
+			name:          "closed with no reason -> closed",
+			inputStatus:   StatusClosed,
+			inputVersion:  0,
+			inputReason:   CloseReasonNone,
+			expectStatus:  StatusClosed,
+			expectReason:  CloseReasonNone,
+			expectVersion: StatusVersionCurrent,
+		},
+
+		// Non-legacy statuses remain unchanged
+		{
+			name:          "todo unchanged",
+			inputStatus:   StatusTodo,
+			inputVersion:  0,
+			expectStatus:  StatusTodo,
+			expectVersion: StatusVersionCurrent,
+		},
+		{
+			name:          "in_progress unchanged",
+			inputStatus:   StatusInProgress,
+			inputVersion:  0,
+			expectStatus:  StatusInProgress,
+			expectVersion: StatusVersionCurrent,
+		},
+		{
+			name:          "error unchanged",
+			inputStatus:   StatusError,
+			inputVersion:  0,
+			expectStatus:  StatusError,
+			expectVersion: StatusVersionCurrent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &Task{
+				Status:        tt.inputStatus,
+				StatusVersion: tt.inputVersion,
+				CloseReason:   tt.inputReason,
+			}
+
+			NormalizeStatus(task)
+
+			if task.Status != tt.expectStatus {
+				t.Errorf("Status = %v, want %v", task.Status, tt.expectStatus)
+			}
+			if task.StatusVersion != tt.expectVersion {
+				t.Errorf("StatusVersion = %v, want %v", task.StatusVersion, tt.expectVersion)
+			}
+			if task.CloseReason != tt.expectReason {
+				t.Errorf("CloseReason = %v, want %v", task.CloseReason, tt.expectReason)
+			}
+		})
+	}
+}
+
+func TestNormalizeStatus_Idempotent(t *testing.T) {
+	// Ensure normalizing twice produces the same result
+	task := &Task{
+		Status:        Status("needs_input"),
+		StatusVersion: 0,
+	}
+
+	NormalizeStatus(task)
+	firstStatus := task.Status
+	firstVersion := task.StatusVersion
+
+	NormalizeStatus(task)
+	if task.Status != firstStatus {
+		t.Errorf("Second normalization changed status: %v -> %v", firstStatus, task.Status)
+	}
+	if task.StatusVersion != firstVersion {
+		t.Errorf("Second normalization changed version: %v -> %v", firstVersion, task.StatusVersion)
 	}
 }

@@ -23,7 +23,7 @@ func TestReviewSessionEnded_Execute_Success(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task being reviewed",
-		Status: domain.StatusReviewing,
+		Status: domain.StatusInProgress,
 	}
 
 	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
@@ -42,7 +42,7 @@ func TestReviewSessionEnded_Execute_Success(t *testing.T) {
 
 	// Verify task was updated
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusReviewed, task.Status)
+	assert.Equal(t, domain.StatusDone, task.Status)
 
 	// Verify comment was added via repository
 	comments, err := repo.GetComments(1)
@@ -73,16 +73,16 @@ func TestReviewSessionEnded_Execute_TaskNotFound(t *testing.T) {
 	assert.True(t, out.Ignored)
 }
 
-func TestReviewSessionEnded_Execute_NotReviewing(t *testing.T) {
-	// Setup
+func TestReviewSessionEnded_Execute_FromDoneStatus(t *testing.T) {
+	// Setup - review can happen from done status (re-review)
 	repo := testutil.NewMockTaskRepository()
 	clock := &testutil.MockClock{NowTime: time.Now()}
 	crewDir := t.TempDir()
 
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
-		Title:  "Task not in reviewing status",
-		Status: domain.StatusInProgress,
+		Title:  "Task already done",
+		Status: domain.StatusDone, // done status is allowed for review
 	}
 
 	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
@@ -94,14 +94,50 @@ func TestReviewSessionEnded_Execute_NotReviewing(t *testing.T) {
 		Output:   "Review output",
 	})
 
-	// Assert - should be ignored
+	// Assert - should succeed (done status is allowed)
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.False(t, out.Ignored)
+
+	// Verify task remains in done status
+	task := repo.Tasks[1]
+	assert.Equal(t, domain.StatusDone, task.Status)
+
+	// Verify comment was added
+	comments, err := repo.GetComments(1)
+	require.NoError(t, err)
+	require.Len(t, comments, 1)
+}
+
+func TestReviewSessionEnded_Execute_TerminalStatus(t *testing.T) {
+	// Setup - terminal statuses should be ignored
+	repo := testutil.NewMockTaskRepository()
+	clock := &testutil.MockClock{NowTime: time.Now()}
+	crewDir := t.TempDir()
+
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Task already merged",
+		Status: domain.StatusMerged, // Terminal status should be ignored
+	}
+
+	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), ReviewSessionEndedInput{
+		TaskID:   1,
+		ExitCode: 0,
+		Output:   "Review output",
+	})
+
+	// Assert - should be ignored because status is terminal
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.True(t, out.Ignored)
 
 	// Verify task status was not changed
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusInProgress, task.Status)
+	assert.Equal(t, domain.StatusMerged, task.Status)
 }
 
 func TestReviewSessionEnded_Execute_NonZeroExitCode(t *testing.T) {
@@ -113,7 +149,7 @@ func TestReviewSessionEnded_Execute_NonZeroExitCode(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task being reviewed",
-		Status: domain.StatusReviewing,
+		Status: domain.StatusInProgress,
 	}
 
 	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
@@ -130,9 +166,9 @@ func TestReviewSessionEnded_Execute_NonZeroExitCode(t *testing.T) {
 	require.NotNil(t, out)
 	assert.False(t, out.Ignored)
 
-	// Verify task was reverted to for_review for retry (not reviewed)
+	// Verify task stays in_progress for retry on failure
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusForReview, task.Status)
+	assert.Equal(t, domain.StatusInProgress, task.Status)
 
 	// Verify comment was added (even with non-zero exit)
 	comments, err := repo.GetComments(1)
@@ -158,7 +194,7 @@ func TestReviewSessionEnded_Execute_CleanupsScriptFiles(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Task being reviewed",
-		Status: domain.StatusReviewing,
+		Status: domain.StatusInProgress,
 	}
 
 	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)

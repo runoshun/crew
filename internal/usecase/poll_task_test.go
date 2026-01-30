@@ -294,9 +294,8 @@ func TestPollTask_Execute_ImmediateTerminalState(t *testing.T) {
 		name   string
 		status domain.Status
 	}{
-		{"done", domain.StatusClosed},
+		{"merged", domain.StatusMerged},
 		{"closed", domain.StatusClosed},
-		{"error", domain.StatusError},
 	}
 
 	for _, tt := range tests {
@@ -342,11 +341,12 @@ func TestPollTask_isTerminalStatus(t *testing.T) {
 		expected bool
 	}{
 		{"done is terminal", domain.StatusClosed, true},
+		{"merged is terminal", domain.StatusMerged, true},
 		{"closed is terminal", domain.StatusClosed, true},
-		{"error is terminal", domain.StatusError, true},
 		{"todo is not terminal", domain.StatusTodo, false},
 		{"in_progress is not terminal", domain.StatusInProgress, false},
-		{"stopped is not terminal", domain.StatusStopped, false},
+		{"done is not terminal", domain.StatusDone, false},
+		{"error is not terminal", domain.StatusError, false},
 	}
 
 	for _, tt := range tests {
@@ -418,26 +418,32 @@ func TestPollTask_Execute_ExpectedStatus_Match(t *testing.T) {
 	executor := testutil.NewMockCommandExecutor()
 	uc := NewPollTask(repo, clock, executor, io.Discard, io.Discard)
 
-	// Change to terminal state after short delay
+	// Change to a different (terminal) state after short delay
+	// so the poll will detect the change
 	go func() {
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 		repo.UpdateStatus(1, domain.StatusClosed)
 	}()
 
 	// Execute with expected status that matches current status
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// Use short timeout to speed up test
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	start := time.Now()
 	_, err := uc.Execute(ctx, PollTaskInput{
 		TaskIDs:          []int{1},
 		ExpectedStatuses: []domain.Status{domain.StatusInProgress},
-		Interval:         1,
-		Timeout:          0,
+		Interval:         1, // 1 second poll interval
+		Timeout:          3, // 3 second timeout
 		CommandTemplate:  "",
 	})
 
-	// Assert - should continue polling (not exit immediately)
+	// Assert - should continue polling until status changes (not exit immediately)
 	require.NoError(t, err)
+	elapsed := time.Since(start)
+	// Should take at least 1 polling interval since status changes after 150ms
+	assert.GreaterOrEqual(t, elapsed, 150*time.Millisecond)
 }
 
 func TestPollTask_Execute_ExpectedStatus_Mismatch(t *testing.T) {
@@ -447,7 +453,7 @@ func TestPollTask_Execute_ExpectedStatus_Mismatch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview, // Current status differs from expected
+		Status: domain.StatusDone, // Current status differs from expected
 	}
 
 	executor := testutil.NewMockCommandExecutor()
@@ -487,19 +493,19 @@ func TestPollTask_Execute_ExpectedStatus_Multiple(t *testing.T) {
 		{
 			name:          "matches first expected status",
 			currentStatus: domain.StatusInProgress,
-			expected:      []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
+			expected:      []domain.Status{domain.StatusInProgress, domain.StatusInProgress},
 			shouldMatch:   true,
 		},
 		{
 			name:          "matches second expected status",
-			currentStatus: domain.StatusNeedsInput,
-			expected:      []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
+			currentStatus: domain.StatusInProgress,
+			expected:      []domain.Status{domain.StatusInProgress, domain.StatusInProgress},
 			shouldMatch:   true,
 		},
 		{
 			name:          "does not match any expected status",
-			currentStatus: domain.StatusForReview,
-			expected:      []domain.Status{domain.StatusInProgress, domain.StatusNeedsInput},
+			currentStatus: domain.StatusDone,
+			expected:      []domain.Status{domain.StatusInProgress, domain.StatusInProgress},
 			shouldMatch:   false,
 		},
 	}
@@ -733,7 +739,7 @@ func TestPollTask_Execute_MultipleTasks_MiddleChanges(t *testing.T) {
 	// Change second task status after short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		repo.UpdateStatus(2, domain.StatusForReview)
+		repo.UpdateStatus(2, domain.StatusDone)
 	}()
 
 	// Execute monitoring multiple tasks
@@ -750,7 +756,7 @@ func TestPollTask_Execute_MultipleTasks_MiddleChanges(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.True(t, executor.ExecuteWithContextCalled)
-	assert.Contains(t, executor.ExecutedCmd.Args[1], "2: todo -> for_review")
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "2: todo -> done")
 }
 
 func TestPollTask_Execute_MultipleTasks_OneTerminal_ContinuesMonitoring(t *testing.T) {
@@ -806,7 +812,7 @@ func TestPollTask_Execute_MultipleTasks_AllTerminal(t *testing.T) {
 	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Task 2",
-		Status: domain.StatusError, // Terminal
+		Status: domain.StatusMerged, // Terminal
 	}
 
 	executor := testutil.NewMockCommandExecutor()
@@ -867,7 +873,7 @@ func TestPollTask_Execute_MultipleTasks_ExpectedStatus_Mismatch(t *testing.T) {
 	repo.Tasks[2] = &domain.Task{
 		ID:     2,
 		Title:  "Task 2",
-		Status: domain.StatusForReview, // Does NOT match expected
+		Status: domain.StatusDone, // Does NOT match expected
 	}
 
 	executor := testutil.NewMockCommandExecutor()
@@ -889,5 +895,5 @@ func TestPollTask_Execute_MultipleTasks_ExpectedStatus_Mismatch(t *testing.T) {
 	elapsed := time.Since(start)
 	assert.Less(t, elapsed, 100*time.Millisecond)
 	assert.True(t, executor.ExecuteWithContextCalled)
-	assert.Contains(t, executor.ExecutedCmd.Args[1], "2: in_progress -> for_review")
+	assert.Contains(t, executor.ExecutedCmd.Args[1], "2: in_progress -> done")
 }

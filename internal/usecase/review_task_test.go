@@ -82,7 +82,7 @@ func TestReviewTask_Execute_InvalidStatus(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress, // Not for_review
+		Status: domain.StatusTodo, // Not in_progress or done
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -111,7 +111,7 @@ func TestReviewTask_Execute_ConfigLoadError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -141,7 +141,7 @@ func TestReviewTask_Execute_AgentNotFound(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -171,7 +171,7 @@ func TestReviewTask_Execute_WorktreeResolveError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -201,7 +201,7 @@ func TestReviewTask_Execute_UsesDefaultReviewer(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -231,7 +231,7 @@ func TestReviewTask_Execute_UsesDefaultReviewer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, executor.ExecuteWithContextCalled, "ExecuteWithContext should have been called")
 	assert.NotNil(t, executor.ExecutedCmd, "Command should have been executed")
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 }
 
 func TestReviewTask_Execute_EmptyDefaultReviewer(t *testing.T) {
@@ -240,7 +240,7 @@ func TestReviewTask_Execute_EmptyDefaultReviewer(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -284,7 +284,7 @@ func TestReviewTask_Execute_TaskWithIssue(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 		Issue:  123,
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -307,7 +307,7 @@ func TestReviewTask_Execute_WithReviewerPrompt(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -351,7 +351,7 @@ func TestReviewTask_Execute_AgentPromptOverridesReviewerPrompt(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -395,7 +395,7 @@ func TestReviewTask_Execute_MessageOverridesReviewerPrompt(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -440,7 +440,7 @@ func TestReviewTask_Execute_AgentPromptOverridesMessage(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusForReview,
+		Status: domain.StatusDone,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -483,7 +483,7 @@ func TestReviewTask_Execute_WithDisabledAgent(t *testing.T) {
 	task := &domain.Task{
 		ID:         1,
 		Title:      "Test",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	repo := testutil.NewMockTaskRepository()
@@ -530,7 +530,7 @@ func TestReviewTask_Execute_StatusReviewing(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusReviewing, // Already reviewing
+		Status: domain.StatusInProgress, // Already reviewing
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
@@ -552,5 +552,5 @@ func TestReviewTask_Execute_StatusReviewing(t *testing.T) {
 	// Assert - should succeed
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusReviewed, out.Task.Status)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
 }

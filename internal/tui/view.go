@@ -441,11 +441,11 @@ func (m *Model) viewConfirmDialog() string {
 		} else {
 			target = fmt.Sprintf("work session for task #%d", m.confirmTaskID)
 		}
-		color = Colors.Stopped
+		color = Colors.StatusError
 	case ConfirmMerge:
 		action = "Merge"
 		target = fmt.Sprintf("task #%d", m.confirmTaskID)
-		color = Colors.Reviewed
+		color = Colors.Done
 	}
 
 	// Find task title

@@ -98,9 +98,9 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		return nil, err
 	}
 
-	// Validate status - must be in_progress or needs_input
-	if task.Status != domain.StatusInProgress && task.Status != domain.StatusNeedsInput {
-		return nil, fmt.Errorf("cannot complete task in %s status (must be in_progress or needs_input): %w", task.Status, domain.ErrInvalidTransition)
+	// Validate status - must be in_progress
+	if task.Status != domain.StatusInProgress {
+		return nil, fmt.Errorf("cannot complete task in %s status (must be in_progress): %w", task.Status, domain.ErrInvalidTransition)
 	}
 
 	// Resolve worktree path
@@ -175,8 +175,8 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	}
 
 	if skipReview {
-		// Skip review: go directly to reviewed status
-		task.Status = domain.StatusReviewed
+		// Skip review: go directly to done status
+		task.Status = domain.StatusDone
 
 		// Save task
 		if saveErr := uc.tasks.Save(task); saveErr != nil {
@@ -185,7 +185,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 
 		// Log task completion
 		if uc.logger != nil {
-			uc.logger.Info(task.ID, "task", "completed (status: reviewed, skip_review: true)")
+			uc.logger.Info(task.ID, "task", "completed (status: done, skip_review: true)")
 		}
 
 		return &CompleteTaskOutput{
@@ -253,7 +253,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}
 
 		if reviewOut.IsLGTM {
-			task.Status = domain.StatusReviewed
+			task.Status = domain.StatusDone
 			task.AutoFixRetryCount = 0
 		} else {
 			task.AutoFixRetryCount = retryCount + 1
@@ -265,7 +265,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 
 		if uc.logger != nil {
 			if reviewOut.IsLGTM {
-				uc.logger.Info(task.ID, "task", "completed (auto_fix LGTM, status: reviewed)")
+				uc.logger.Info(task.ID, "task", "completed (auto_fix LGTM, status: done)")
 			} else {
 				uc.logger.Info(task.ID, "task", "completed (auto_fix review feedback, status: in_progress)")
 			}
@@ -282,15 +282,15 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}, nil
 
 	case domain.ReviewModeManual:
-		// manual mode: set status to for_review, do not start review
-		task.Status = domain.StatusForReview
+		// manual mode: set status to done, do not start review
+		task.Status = domain.StatusDone
 
 		if saveErr := uc.tasks.Save(task); saveErr != nil {
 			return nil, fmt.Errorf("save task: %w", saveErr)
 		}
 
 		if uc.logger != nil {
-			uc.logger.Info(task.ID, "task", "completed (status: for_review, manual review mode)")
+			uc.logger.Info(task.ID, "task", "completed (status: done, manual review mode)")
 		}
 
 		return &CompleteTaskOutput{
@@ -301,15 +301,15 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}, nil
 
 	case domain.ReviewModeAuto:
-		// auto mode (default): transition to reviewing to signal that review should start
-		task.Status = domain.StatusReviewing
+		// auto mode (default): transition to done to signal that review should start
+		task.Status = domain.StatusDone
 
 		if saveErr := uc.tasks.Save(task); saveErr != nil {
 			return nil, fmt.Errorf("save task: %w", saveErr)
 		}
 
 		if uc.logger != nil {
-			uc.logger.Info(task.ID, "task", "completed (status: reviewing, review should start)")
+			uc.logger.Info(task.ID, "task", "completed (status: done, review should start)")
 		}
 
 		return &CompleteTaskOutput{

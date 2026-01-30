@@ -16,7 +16,7 @@ func TestMergeTask_Execute_Success(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		Issue:      0,
 		BaseBranch: "main",
 	}
@@ -38,7 +38,7 @@ func TestMergeTask_Execute_Success(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.Empty(t, out.Task.Agent)
 	assert.Empty(t, out.Task.Session)
 
@@ -61,7 +61,7 @@ func TestMergeTask_Execute_SuccessWithIssue(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task with issue",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		Issue:      123,
 		BaseBranch: "main",
 	}
@@ -121,7 +121,7 @@ func TestMergeTask_Execute_StopsRunningSession(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.True(t, sessions.StopCalled)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 }
 
 func TestMergeTask_Execute_NoWorktree(t *testing.T) {
@@ -130,7 +130,7 @@ func TestMergeTask_Execute_NoWorktree(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task without worktree",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -179,7 +179,7 @@ func TestMergeTask_Execute_NotOnMain(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -205,7 +205,7 @@ func TestMergeTask_Execute_UncommittedChanges(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -252,7 +252,7 @@ func TestMergeTask_Execute_MergeError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -283,7 +283,7 @@ func TestMergeTask_Execute_DeleteBranchError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -313,7 +313,7 @@ func TestMergeTask_Execute_SaveError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	repo.SaveErr = assert.AnError
@@ -374,7 +374,7 @@ func TestMergeTask_Execute_RemoveWorktreeError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -404,7 +404,7 @@ func TestMergeTask_Execute_WithCustomBaseBranch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge to feature branch",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "feature/workspace",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -426,7 +426,7 @@ func TestMergeTask_Execute_WithCustomBaseBranch(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 	if assert.NotNil(t, git.MergeBranch) {
 		assert.Equal(t, "crew-1", *git.MergeBranch)
@@ -439,7 +439,7 @@ func TestMergeTask_Execute_PrioritizesInputBaseBranch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task with different base branch",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "feature/workspace",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -462,7 +462,7 @@ func TestMergeTask_Execute_PrioritizesInputBaseBranch(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 	assert.False(t, git.GetDefaultBranchCalled)
 }
@@ -473,7 +473,7 @@ func TestMergeTask_Execute_BaseBranchMismatch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task with feature base branch",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "feature/workspace",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -495,7 +495,7 @@ func TestMergeTask_Execute_BaseBranchMismatch(t *testing.T) {
 	// Assert - should succeed (override is allowed)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 }
 
@@ -505,7 +505,7 @@ func TestMergeTask_Execute_NotOnBaseBranch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task to merge",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "feature/workspace",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -532,7 +532,7 @@ func TestMergeTask_Execute_UseTaskBaseBranch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task with custom base",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "feature/workspace",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -554,7 +554,7 @@ func TestMergeTask_Execute_UseTaskBaseBranch(t *testing.T) {
 	// Assert - should merge to feature/workspace (task's base branch)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 	assert.False(t, git.GetDefaultBranchCalled)
 }
@@ -565,7 +565,7 @@ func TestMergeTask_Execute_EmptyTaskBaseBranch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task without base branch",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "", // empty
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -587,7 +587,7 @@ func TestMergeTask_Execute_EmptyTaskBaseBranch(t *testing.T) {
 	// Assert - should merge to develop (default branch)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 	assert.True(t, git.MergeCalled)
 	assert.True(t, git.GetDefaultBranchCalled)
 }
@@ -598,7 +598,7 @@ func TestMergeTask_Execute_DefaultBranchMismatch(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task without base branch",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -626,7 +626,7 @@ func TestMergeTask_Execute_MergeConflict(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task with conflict",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -674,7 +674,7 @@ func TestMergeTask_Execute_NoMergeConflict(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task without conflict",
-		Status:     domain.StatusForReview,
+		Status:     domain.StatusDone,
 		BaseBranch: "main",
 	}
 	sessions := testutil.NewMockSessionManager()
@@ -696,7 +696,7 @@ func TestMergeTask_Execute_NoMergeConflict(t *testing.T) {
 	// Assert - should succeed
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusClosed, out.Task.Status)
+	assert.Equal(t, domain.StatusMerged, out.Task.Status)
 
 	// Merge should have been called
 	assert.True(t, git.MergeCalled)
