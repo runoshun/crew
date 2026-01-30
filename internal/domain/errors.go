@@ -43,4 +43,10 @@ var (
 	ErrInvalidEnvVarName       = errors.New("invalid environment variable name")
 	ErrTaskBlocked             = errors.New("task is blocked")
 	ErrCopyAllRequiresManagers = errors.New("copy --all requires git and worktree managers (container wiring missing)")
+
+	// Workspace errors
+	ErrWorkspaceRepoNotFound  = errors.New("repository not found in workspace")
+	ErrWorkspaceRepoExists    = errors.New("repository already registered in workspace")
+	ErrWorkspaceInvalidPath   = errors.New("invalid repository path")
+	ErrWorkspaceFileCorrupted = errors.New("workspace file is corrupted")
 )

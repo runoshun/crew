@@ -44,15 +44,16 @@ func run() error {
 }
 
 // runWithoutContainer handles cases where git repo is not found.
-// This allows --version and --help to work without a git repository.
+// This allows --version, --help, and workspace commands to work without a git repository.
 func runWithoutContainer(gitErr error) error {
 	rootCmd := cli.NewRootCommand(nil, version)
 
-	// If the command is --version or --help, execute it
+	// Commands that can run without a git repository
 	if len(os.Args) > 1 {
 		arg := os.Args[1]
 		if arg == "--version" || arg == "-v" || arg == "version" ||
-			arg == "--help" || arg == "-h" || arg == "help" {
+			arg == "--help" || arg == "-h" || arg == "help" ||
+			arg == "workspace" || arg == "ws" {
 			return rootCmd.Execute()
 		}
 	}

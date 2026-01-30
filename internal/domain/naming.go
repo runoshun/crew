@@ -96,6 +96,15 @@ func ManagerScriptPath(crewDir string) string {
 	return filepath.Join(crewDir, "scripts", "manager.sh")
 }
 
+// WorkspacesFileName is the name of the workspaces file.
+const WorkspacesFileName = "workspaces.toml"
+
+// WorkspacesFilePath returns the path to the workspaces.toml file.
+// globalCrewDir is typically ~/.config/crew (resolved by caller).
+func WorkspacesFilePath(globalCrewDir string) string {
+	return filepath.Join(globalCrewDir, WorkspacesFileName)
+}
+
 // branchPattern matches crew branch names: crew-<id> or crew-<id>-gh-<issue>
 var branchPattern = regexp.MustCompile(`^crew-(\d+)(?:-gh-\d+)?$`)
 
