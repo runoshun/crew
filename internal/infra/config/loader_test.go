@@ -427,6 +427,51 @@ review_mode = "invalid"
 	assert.Contains(t, cfg.Warnings, "invalid value for complete.review_mode: \"invalid\" (expected \"auto\", \"manual\", or \"auto_fix\")")
 }
 
+func TestLoader_Load_HelpFilePathResolution(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	helpDir := filepath.Join(crewDir, "help")
+	err := os.MkdirAll(helpDir, 0o755)
+	require.NoError(t, err)
+
+	helpPath := filepath.Join(helpDir, "worker.md")
+	err = os.WriteFile(helpPath, []byte("# Worker Help"), 0o644)
+	require.NoError(t, err)
+
+	config := `
+[help]
+worker_file = "help/worker.md"
+`
+	err = os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, helpPath, cfg.Help.WorkerFile)
+}
+
+func TestLoader_Load_HelpWarningBothInlineAndFile(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	config := `
+[help]
+worker = "inline"
+worker_file = "worker.md"
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	assert.Contains(t, cfg.Warnings, "both help.worker and help.worker_file are set; using help.worker_file")
+}
+
 func TestLoader_Load_WorktreeConfig(t *testing.T) {
 	// Setup
 	crewDir := t.TempDir()
