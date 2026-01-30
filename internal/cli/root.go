@@ -209,6 +209,10 @@ Use --help-manager-auto to see the auto mode guide.`,
 	listAgentsCmd := newListAgentsCommand(c)
 	listAgentsCmd.GroupID = groupSetup
 
+	// Workspace command (can run without git repo)
+	workspaceCmd := newWorkspaceCommand(c)
+	workspaceCmd.GroupID = groupSession
+
 	// Internal commands (hidden)
 	sessionEndedCmd := newSessionEndedCommand(c)
 	reviewSessionEndedCmd := newReviewSessionEndedCommand(c)
@@ -242,6 +246,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 		tuiCmd,
 		managerCmd,
 		snapshotCmd,
+		workspaceCmd,
 		newSyncCmd(c),
 		sessionEndedCmd,
 		reviewSessionEndedCmd,
