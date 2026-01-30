@@ -78,28 +78,22 @@ func TestNewTaskSummary(t *testing.T) {
 		{ID: 1, Status: StatusTodo},
 		{ID: 2, Status: StatusTodo},
 		{ID: 3, Status: StatusInProgress},
-		{ID: 4, Status: StatusNeedsInput},
-		{ID: 5, Status: StatusForReview},
-		{ID: 6, Status: StatusReviewing},
-		{ID: 7, Status: StatusReviewed},
-		{ID: 8, Status: StatusStopped},
-		{ID: 9, Status: StatusError},
-		{ID: 10, Status: StatusClosed},
-		{ID: 11, Status: StatusClosed},
+		{ID: 4, Status: StatusDone},
+		{ID: 5, Status: StatusMerged},
+		{ID: 6, Status: StatusError},
+		{ID: 7, Status: StatusClosed},
+		{ID: 8, Status: StatusClosed},
 	}
 
 	summary := NewTaskSummary(tasks)
 
 	assert.Equal(t, 2, summary.Todo)
 	assert.Equal(t, 1, summary.InProgress)
-	assert.Equal(t, 1, summary.NeedsInput)
-	assert.Equal(t, 1, summary.ForReview)
-	assert.Equal(t, 1, summary.Reviewing)
-	assert.Equal(t, 1, summary.Reviewed)
-	assert.Equal(t, 1, summary.Stopped)
+	assert.Equal(t, 1, summary.Done)
+	assert.Equal(t, 1, summary.Merged)
 	assert.Equal(t, 1, summary.Error)
 	assert.Equal(t, 2, summary.Closed)
-	assert.Equal(t, 9, summary.TotalActive) // All except Closed
+	assert.Equal(t, 5, summary.TotalActive) // Todo + InProgress + Done + Error
 }
 
 func TestNewTaskSummary_EmptyList(t *testing.T) {

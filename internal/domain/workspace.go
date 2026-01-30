@@ -62,13 +62,10 @@ func (s RepoState) String() string {
 type TaskSummary struct {
 	Todo        int
 	InProgress  int
-	NeedsInput  int
-	ForReview   int
-	Reviewing   int
-	Reviewed    int
-	Stopped     int
-	Error       int
+	Done        int
+	Merged      int
 	Closed      int
+	Error       int
 	TotalActive int // Sum of all non-terminal statuses
 }
 
@@ -76,33 +73,25 @@ type TaskSummary struct {
 func NewTaskSummary(tasks []*Task) TaskSummary {
 	var s TaskSummary
 	for _, t := range tasks {
-		switch t.Status { //nolint:exhaustive // statusDoneLegacy handled in default
+		switch t.Status {
 		case StatusTodo:
 			s.Todo++
 		case StatusInProgress:
 			s.InProgress++
-		case StatusNeedsInput:
-			s.NeedsInput++
-		case StatusForReview:
-			s.ForReview++
-		case StatusReviewing:
-			s.Reviewing++
-		case StatusReviewed:
-			s.Reviewed++
-		case StatusStopped:
-			s.Stopped++
-		case StatusError:
-			s.Error++
+		case StatusDone:
+			s.Done++
+		case StatusMerged:
+			s.Merged++
 		case StatusClosed:
 			s.Closed++
-		default:
-			// Handle legacy "done" status as closed
-			if t.Status.IsLegacyDone() {
-				s.Closed++
-			}
+		case StatusError:
+			s.Error++
+		case statusNeedsInputLegacy, statusForReviewLegacy, statusReviewingLegacy, statusReviewedLegacy, statusStoppedLegacy:
+			// Legacy statuses are counted as in_progress
+			s.InProgress++
 		}
 	}
-	s.TotalActive = s.Todo + s.InProgress + s.NeedsInput + s.ForReview + s.Reviewing + s.Reviewed + s.Stopped + s.Error
+	s.TotalActive = s.Todo + s.InProgress + s.Done + s.Error
 	return s
 }
 

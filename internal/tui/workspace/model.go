@@ -544,17 +544,14 @@ func formatSummary(s domain.TaskSummary) string {
 	if s.InProgress > 0 {
 		parts = append(parts, fmt.Sprintf("prog:%d", s.InProgress))
 	}
-	if s.NeedsInput > 0 {
-		parts = append(parts, fmt.Sprintf("input:%d", s.NeedsInput))
-	}
 	if s.Todo > 0 {
 		parts = append(parts, fmt.Sprintf("todo:%d", s.Todo))
 	}
-	if s.ForReview > 0 || s.Reviewing > 0 || s.Reviewed > 0 {
-		parts = append(parts, fmt.Sprintf("review:%d", s.ForReview+s.Reviewing+s.Reviewed))
+	if s.Done > 0 {
+		parts = append(parts, fmt.Sprintf("done:%d", s.Done))
 	}
-	if s.Error > 0 || s.Stopped > 0 {
-		parts = append(parts, fmt.Sprintf("err:%d", s.Error+s.Stopped))
+	if s.Error > 0 {
+		parts = append(parts, fmt.Sprintf("err:%d", s.Error))
 	}
 
 	return strings.Join(parts, " ")
