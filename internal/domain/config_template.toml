@@ -86,6 +86,19 @@
 ## Log settings
 # level = "<<.LogLevel>>"  # debug, info, warn, error
 
+[help]
+## Role-specific help overrides (Go templates)
+## Use *_file for large content. If both are set, *_file wins.
+## Relative *_file paths are resolved from this config file's directory.
+# worker = ""
+# worker_file = ""
+# manager = ""
+# manager_file = ""
+# manager_onboarding = ""
+# manager_onboarding_file = ""
+# manager_auto = ""
+# manager_auto_file = ""
+
 ## Onboarding completion flag
 ## Set to true after completing the onboarding process
 # onboarding_done = false

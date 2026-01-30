@@ -24,6 +24,7 @@ type Config struct {
 	Tasks        TasksConfig      `toml:"tasks"`
 	Diff         DiffConfig       `toml:"diff"`
 	Log          LogConfig        `toml:"log"`
+	Help         HelpConfig       `toml:"help"`
 	Complete     CompleteConfig   `toml:"complete"`
 
 	OnboardingDone bool `toml:"onboarding_done,omitempty"` // Whether onboarding has been completed
@@ -312,6 +313,18 @@ type TUIKeybinding struct {
 // TUIConfig holds TUI customization settings from [tui] section.
 type TUIConfig struct {
 	Keybindings map[string]TUIKeybinding `toml:"keybindings"` // Custom keybindings
+}
+
+// HelpConfig holds settings for role-specific help overrides from [help] section.
+type HelpConfig struct {
+	Worker                string `toml:"worker,omitempty"`
+	WorkerFile            string `toml:"worker_file,omitempty"`
+	Manager               string `toml:"manager,omitempty"`
+	ManagerFile           string `toml:"manager_file,omitempty"`
+	ManagerOnboarding     string `toml:"manager_onboarding,omitempty"`
+	ManagerOnboardingFile string `toml:"manager_onboarding_file,omitempty"`
+	ManagerAuto           string `toml:"manager_auto,omitempty"`
+	ManagerAutoFile       string `toml:"manager_auto_file,omitempty"`
 }
 
 // Default configuration values.

@@ -175,6 +175,11 @@ func (l *Loader) LoadWithOptions(opts domain.LoadConfigOptions) (*domain.Config,
 		return nil, err
 	}
 
+	appendHelpWarnings(base)
+	if len(base.Warnings) > 1 {
+		sort.Strings(base.Warnings)
+	}
+
 	return base, nil
 }
 
@@ -190,15 +195,19 @@ func (l *Loader) loadFile(path string) (*domain.Config, error) {
 		return nil, err
 	}
 
-	return convertRawToDomainConfig(raw), nil
+	return convertRawToDomainConfig(raw, path), nil
 }
 
 // convertRawToDomainConfig converts the raw map to domain config and collects warnings.
-func convertRawToDomainConfig(raw map[string]any) *domain.Config {
+func convertRawToDomainConfig(raw map[string]any, sourcePath string) *domain.Config {
 	res := &domain.Config{
 		Agents: make(map[string]domain.Agent),
 	}
 	var warnings []string
+	sourceDir := ""
+	if sourcePath != "" {
+		sourceDir = filepath.Dir(sourcePath)
+	}
 
 	for section, value := range raw {
 		switch section {
@@ -305,6 +314,47 @@ func convertRawToDomainConfig(raw map[string]any) *domain.Config {
 						}
 					default:
 						warnings = append(warnings, fmt.Sprintf("unknown key in [log]: %s", k))
+					}
+				}
+			}
+		case "help":
+			if m, ok := value.(map[string]any); ok {
+				for k, v := range m {
+					switch k {
+					case "worker":
+						if s, ok := v.(string); ok {
+							res.Help.Worker = s
+						}
+					case "worker_file":
+						if s, ok := v.(string); ok {
+							res.Help.WorkerFile = resolveHelpFilePath(s, sourceDir)
+						}
+					case "manager":
+						if s, ok := v.(string); ok {
+							res.Help.Manager = s
+						}
+					case "manager_file":
+						if s, ok := v.(string); ok {
+							res.Help.ManagerFile = resolveHelpFilePath(s, sourceDir)
+						}
+					case "manager_onboarding":
+						if s, ok := v.(string); ok {
+							res.Help.ManagerOnboarding = s
+						}
+					case "manager_onboarding_file":
+						if s, ok := v.(string); ok {
+							res.Help.ManagerOnboardingFile = resolveHelpFilePath(s, sourceDir)
+						}
+					case "manager_auto":
+						if s, ok := v.(string); ok {
+							res.Help.ManagerAuto = s
+						}
+					case "manager_auto_file":
+						if s, ok := v.(string); ok {
+							res.Help.ManagerAutoFile = resolveHelpFilePath(s, sourceDir)
+						}
+					default:
+						warnings = append(warnings, fmt.Sprintf("unknown key in [help]: %s", k))
 					}
 				}
 			}
@@ -556,6 +606,35 @@ func parseAgentsSection(raw map[string]any) agentsConfig {
 	return result
 }
 
+func resolveHelpFilePath(value, sourceDir string) string {
+	if value == "" {
+		return ""
+	}
+	if sourceDir == "" || filepath.IsAbs(value) {
+		return value
+	}
+	joined := filepath.Join(sourceDir, value)
+	resolved, err := filepath.Abs(joined)
+	if err != nil {
+		return filepath.Clean(joined)
+	}
+	return resolved
+}
+
+func appendHelpWarnings(cfg *domain.Config) {
+	warnBoth := func(inline, file, key string) {
+		if inline == "" || file == "" {
+			return
+		}
+		cfg.Warnings = append(cfg.Warnings, fmt.Sprintf("both help.%s and help.%s_file are set; using help.%s_file", key, key, key))
+	}
+
+	warnBoth(cfg.Help.Worker, cfg.Help.WorkerFile, "worker")
+	warnBoth(cfg.Help.Manager, cfg.Help.ManagerFile, "manager")
+	warnBoth(cfg.Help.ManagerOnboarding, cfg.Help.ManagerOnboardingFile, "manager_onboarding")
+	warnBoth(cfg.Help.ManagerAuto, cfg.Help.ManagerAutoFile, "manager_auto")
+}
+
 // mergeConfigs merges two configs, with override taking precedence.
 func mergeConfigs(base, override *domain.Config) *domain.Config {
 	result := &domain.Config{
@@ -564,6 +643,7 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		Complete:     base.Complete,
 		Diff:         base.Diff,
 		Log:          base.Log,
+		Help:         base.Help,
 		Tasks:        base.Tasks,
 		TUI:          base.TUI,
 		Worktree:     base.Worktree,
@@ -633,6 +713,30 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.Tasks.Encrypt {
 		result.Tasks.Encrypt = override.Tasks.Encrypt
+	}
+	if override.Help.Worker != "" {
+		result.Help.Worker = override.Help.Worker
+	}
+	if override.Help.WorkerFile != "" {
+		result.Help.WorkerFile = override.Help.WorkerFile
+	}
+	if override.Help.Manager != "" {
+		result.Help.Manager = override.Help.Manager
+	}
+	if override.Help.ManagerFile != "" {
+		result.Help.ManagerFile = override.Help.ManagerFile
+	}
+	if override.Help.ManagerOnboarding != "" {
+		result.Help.ManagerOnboarding = override.Help.ManagerOnboarding
+	}
+	if override.Help.ManagerOnboardingFile != "" {
+		result.Help.ManagerOnboardingFile = override.Help.ManagerOnboardingFile
+	}
+	if override.Help.ManagerAuto != "" {
+		result.Help.ManagerAuto = override.Help.ManagerAuto
+	}
+	if override.Help.ManagerAutoFile != "" {
+		result.Help.ManagerAutoFile = override.Help.ManagerAutoFile
 	}
 	if override.Worktree.SetupCommand != "" {
 		result.Worktree.SetupCommand = override.Worktree.SetupCommand

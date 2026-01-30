@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/app"
+	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -86,18 +87,22 @@ Use --help-manager-auto to see the auto mode guide.`,
 				return errors.New("cannot use multiple help flags together")
 			}
 
+			var cfg *domain.Config
+			if c != nil {
+				cfg, _ = c.ConfigLoader.Load()
+			}
+
 			if fullWorker {
-				return showWorkerHelp(cmd.OutOrStdout())
+				return showWorkerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
 			}
 			if fullManager {
-				cfg, _ := c.ConfigLoader.Load()
-				return showManagerHelp(cmd.OutOrStdout(), cfg)
+				return showManagerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
 			}
 			if managerOnboarding {
-				return showManagerOnboardingHelp(cmd.OutOrStdout())
+				return showManagerOnboardingHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
 			}
 			if managerAuto {
-				return showManagerAutoHelp(cmd.OutOrStdout())
+				return showManagerAutoHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
 			}
 			// Default: launch TUI
 			return launchTUIFunc(c)

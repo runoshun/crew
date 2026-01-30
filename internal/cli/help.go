@@ -9,6 +9,9 @@ import (
 )
 
 func buildHelpData(cfg *domain.Config) domain.HelpData {
+	if cfg == nil {
+		cfg = &domain.Config{}
+	}
 	enabledAgents := cfg.EnabledAgents()
 	workers := make([]domain.WorkerInfo, 0, len(enabledAgents))
 	for name, agent := range enabledAgents {
@@ -30,38 +33,48 @@ func buildHelpData(cfg *domain.Config) domain.HelpData {
 	}
 }
 
-func showManagerHelp(w io.Writer, cfg *domain.Config) error {
-	help, err := domain.RenderManagerHelp(buildHelpData(cfg))
+func showManagerHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
+	help, warnings, err := domain.RenderManagerHelp(cfg, buildHelpData(cfg))
 	if err != nil {
 		return err
 	}
+	writeWarnings(errW, warnings)
 	_, err = fmt.Fprint(w, help)
 	return err
 }
 
-func showWorkerHelp(w io.Writer) error {
-	help, err := domain.RenderWorkerHelp()
+func showWorkerHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
+	help, warnings, err := domain.RenderWorkerHelp(cfg)
 	if err != nil {
 		return err
 	}
+	writeWarnings(errW, warnings)
 	_, err = fmt.Fprint(w, help)
 	return err
 }
 
-func showManagerOnboardingHelp(w io.Writer) error {
-	help, err := domain.RenderManagerOnboardingHelp()
+func showManagerOnboardingHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
+	help, warnings, err := domain.RenderManagerOnboardingHelp(cfg)
 	if err != nil {
 		return err
 	}
+	writeWarnings(errW, warnings)
 	_, err = fmt.Fprint(w, help)
 	return err
 }
 
-func showManagerAutoHelp(w io.Writer) error {
-	help, err := domain.RenderManagerAutoHelp()
+func showManagerAutoHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
+	help, warnings, err := domain.RenderManagerAutoHelp(cfg)
 	if err != nil {
 		return err
 	}
+	writeWarnings(errW, warnings)
 	_, err = fmt.Fprint(w, help)
 	return err
+}
+
+func writeWarnings(w io.Writer, warnings []string) {
+	for _, warning := range warnings {
+		_, _ = fmt.Fprintf(w, "Warning: %s\n", warning)
+	}
 }
