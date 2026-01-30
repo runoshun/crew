@@ -11,9 +11,21 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 )
 
+func TestNewStore_EmptyDir(t *testing.T) {
+	_, err := NewStore("")
+	assert.ErrorIs(t, err, ErrNoHomeDir)
+}
+
+func TestNewStore_RelativePath(t *testing.T) {
+	// Relative path should fail
+	_, err := NewStore("relative/path")
+	assert.ErrorIs(t, err, ErrNoHomeDir)
+}
+
 func TestStore_LoadEmpty(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	file, err := store.Load()
 	require.NoError(t, err)
@@ -23,7 +35,8 @@ func TestStore_LoadEmpty(t *testing.T) {
 
 func TestStore_SaveAndLoad(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Create a test file
 	file := &domain.WorkspaceFile{
@@ -35,7 +48,7 @@ func TestStore_SaveAndLoad(t *testing.T) {
 	}
 
 	// Save
-	err := store.Save(file)
+	err = store.Save(file)
 	require.NoError(t, err)
 
 	// Verify file was created with correct permissions
@@ -52,7 +65,8 @@ func TestStore_SaveAndLoad(t *testing.T) {
 
 func TestStore_AddRepo(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Create a git repo to add
 	repoDir := t.TempDir()
@@ -60,7 +74,7 @@ func TestStore_AddRepo(t *testing.T) {
 	require.NoError(t, os.MkdirAll(gitDir, 0755))
 
 	// Add repo
-	err := store.AddRepo(repoDir)
+	err = store.AddRepo(repoDir)
 	require.NoError(t, err)
 
 	// Verify it was added
@@ -76,7 +90,8 @@ func TestStore_AddRepo(t *testing.T) {
 
 func TestStore_AddRepoSubdirectory(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Create a git repo with subdirectory
 	repoDir := t.TempDir()
@@ -87,7 +102,7 @@ func TestStore_AddRepoSubdirectory(t *testing.T) {
 	require.NoError(t, os.MkdirAll(subDir, 0755))
 
 	// Add via subdirectory - should resolve to repo root
-	err := store.AddRepo(subDir)
+	err = store.AddRepo(subDir)
 	require.NoError(t, err)
 
 	// Verify it was added with the repo root path
@@ -99,10 +114,11 @@ func TestStore_AddRepoSubdirectory(t *testing.T) {
 
 func TestStore_AddRepoInvalidPath(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Try to add non-existent path
-	err := store.AddRepo("/non/existent/path")
+	err = store.AddRepo("/non/existent/path")
 	assert.ErrorIs(t, err, domain.ErrWorkspaceInvalidPath)
 
 	// Try to add non-git directory
@@ -111,9 +127,35 @@ func TestStore_AddRepoInvalidPath(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrWorkspaceInvalidPath)
 }
 
+func TestStore_AddRepoCorruptedFile(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write a corrupted file
+	filePath := domain.WorkspacesFilePath(dir)
+	require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0755))
+	require.NoError(t, os.WriteFile(filePath, []byte("this is not valid toml [[["), 0600))
+
+	store, err := NewStore(dir)
+	require.NoError(t, err)
+
+	// Create a git repo to add
+	repoDir := t.TempDir()
+	gitDir := filepath.Join(repoDir, ".git")
+	require.NoError(t, os.MkdirAll(gitDir, 0755))
+
+	// AddRepo should fail with corruption error, not overwrite
+	err = store.AddRepo(repoDir)
+	assert.ErrorIs(t, err, domain.ErrWorkspaceFileCorrupted)
+
+	// Verify file was not overwritten
+	content, _ := os.ReadFile(filePath)
+	assert.Contains(t, string(content), "this is not valid toml")
+}
+
 func TestStore_RemoveRepo(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Create initial file with repos
 	file := &domain.WorkspaceFile{
@@ -127,7 +169,7 @@ func TestStore_RemoveRepo(t *testing.T) {
 	require.NoError(t, store.Save(file))
 
 	// Remove middle repo
-	err := store.RemoveRepo("/path/to/repo2")
+	err = store.RemoveRepo("/path/to/repo2")
 	require.NoError(t, err)
 
 	// Verify it was removed
@@ -144,7 +186,8 @@ func TestStore_RemoveRepo(t *testing.T) {
 
 func TestStore_RemoveRepoBySubdirectory(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Create a git repo with subdirectory
 	repoDir := t.TempDir()
@@ -155,7 +198,7 @@ func TestStore_RemoveRepoBySubdirectory(t *testing.T) {
 	require.NoError(t, os.MkdirAll(subDir, 0755))
 
 	// Add repo (will be stored as repoDir)
-	err := store.AddRepo(repoDir)
+	err = store.AddRepo(repoDir)
 	require.NoError(t, err)
 
 	// Verify it was added
@@ -175,7 +218,8 @@ func TestStore_RemoveRepoBySubdirectory(t *testing.T) {
 
 func TestStore_UpdateLastOpened(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Create a real path that exists for normalization to work
 	repoPath := t.TempDir()
@@ -190,7 +234,7 @@ func TestStore_UpdateLastOpened(t *testing.T) {
 	require.NoError(t, store.Save(file))
 
 	// Update last opened
-	err := store.UpdateLastOpened(repoPath)
+	err = store.UpdateLastOpened(repoPath)
 	require.NoError(t, err)
 
 	// Verify it was updated
@@ -222,7 +266,8 @@ name = "second"
 	require.NoError(t, os.MkdirAll(filepath.Dir(filePath), 0755))
 	require.NoError(t, os.WriteFile(filePath, []byte(content), 0600))
 
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Load should deduplicate (keep first)
 	file, err := store.Load()
@@ -233,7 +278,8 @@ name = "second"
 
 func TestStore_SortOrder(t *testing.T) {
 	dir := t.TempDir()
-	store := NewStore(dir)
+	store, err := NewStore(dir)
+	require.NoError(t, err)
 
 	// Create file with unsorted repos
 	file := &domain.WorkspaceFile{

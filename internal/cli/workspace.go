@@ -45,7 +45,10 @@ func newWorkspaceAddCommand() *cobra.Command {
 		Short: "Add a repository to the workspace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			store := workspace.NewStoreFromDefault()
+			store, err := workspace.NewStoreFromDefault()
+			if err != nil {
+				return err
+			}
 			return store.AddRepo(args[0])
 		},
 	}
@@ -59,7 +62,10 @@ func newWorkspaceRemoveCommand() *cobra.Command {
 		Short:   "Remove a repository from the workspace",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			store := workspace.NewStoreFromDefault()
+			store, err := workspace.NewStoreFromDefault()
+			if err != nil {
+				return err
+			}
 			return store.RemoveRepo(args[0])
 		},
 	}
@@ -72,7 +78,10 @@ func newWorkspaceListCommand() *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List repositories in the workspace",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			store := workspace.NewStoreFromDefault()
+			store, err := workspace.NewStoreFromDefault()
+			if err != nil {
+				return err
+			}
 			file, err := store.Load()
 			if err != nil {
 				return err

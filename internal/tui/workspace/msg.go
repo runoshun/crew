@@ -62,7 +62,9 @@ type MsgOpenRepo struct {
 func (MsgOpenRepo) sealed() {}
 
 // MsgRepoExited is sent when returning from a repo TUI.
-type MsgRepoExited struct{}
+type MsgRepoExited struct {
+	Err error // Error from crew tui if it failed to start
+}
 
 func (MsgRepoExited) sealed() {}
 

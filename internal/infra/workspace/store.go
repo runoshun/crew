@@ -15,6 +15,9 @@ import (
 // Ensure Store implements domain.WorkspaceRepository.
 var _ domain.WorkspaceRepository = (*Store)(nil)
 
+// ErrNoHomeDir is returned when the home directory cannot be determined.
+var ErrNoHomeDir = errors.New("home directory could not be determined")
+
 // Store implements WorkspaceRepository for file-based persistence.
 type Store struct {
 	filePath string
@@ -22,17 +25,26 @@ type Store struct {
 
 // NewStore creates a new workspace store.
 // globalCrewDir is typically ~/.config/crew.
-func NewStore(globalCrewDir string) *Store {
-	return &Store{
-		filePath: domain.WorkspacesFilePath(globalCrewDir),
+// Returns error if globalCrewDir is empty (cannot determine where to store workspaces).
+func NewStore(globalCrewDir string) (*Store, error) {
+	if globalCrewDir == "" {
+		return nil, ErrNoHomeDir
 	}
+	filePath := domain.WorkspacesFilePath(globalCrewDir)
+	// Ensure the path is absolute to prevent writing to CWD
+	if !filepath.IsAbs(filePath) {
+		return nil, ErrNoHomeDir
+	}
+	return &Store{
+		filePath: filePath,
+	}, nil
 }
 
 // Load reads the workspace file and returns the repos list.
 // Returns empty file with version 1 if file doesn't exist.
 func (s *Store) Load() (*domain.WorkspaceFile, error) {
 	if s.filePath == "" {
-		return nil, errors.New("workspace file path is not configured (home directory could not be determined)")
+		return nil, ErrNoHomeDir
 	}
 
 	data, err := os.ReadFile(s.filePath)
@@ -61,7 +73,7 @@ func (s *Store) Load() (*domain.WorkspaceFile, error) {
 // Save writes the workspace file.
 func (s *Store) Save(file *domain.WorkspaceFile) error {
 	if s.filePath == "" {
-		return errors.New("workspace file path is not configured (home directory could not be determined)")
+		return ErrNoHomeDir
 	}
 
 	// Ensure directory exists with proper permissions (0700)
@@ -100,12 +112,9 @@ func (s *Store) AddRepo(path string) error {
 	// Load current file
 	file, err := s.Load()
 	if err != nil {
-		// If file is corrupted, start fresh
-		if errors.Is(err, domain.ErrWorkspaceFileCorrupted) {
-			file = &domain.WorkspaceFile{Version: 1}
-		} else {
-			return err
-		}
+		// If file is corrupted, don't overwrite - return error
+		// This prevents data loss per spec: "壊れている場合は warning + 空リストで起動（ファイルは上書きしない）"
+		return err
 	}
 
 	// Check for duplicates

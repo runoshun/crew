@@ -61,22 +61,29 @@ func New() *Model {
 	ai.Placeholder = "Enter repository path..."
 	ai.CharLimit = 500
 
+	store, storeErr := NewStoreFromDefault()
+
 	return &Model{
-		store:     NewStoreFromDefault(),
+		store:     store,
 		repos:     nil,
 		repoInfos: make(map[string]domain.WorkspaceRepoInfo),
+		err:       storeErr, // Will be displayed on first render if store creation failed
 		cursor:    0,
 		mode:      ModeNormal,
 		keys:      DefaultKeyMap(),
 		styles:    DefaultStyles(),
 		help:      help.New(),
 		addInput:  ai,
-		loading:   true,
+		loading:   storeErr == nil, // Don't show loading if we already have an error
 	}
 }
 
 // Init initializes the model.
 func (m *Model) Init() tea.Cmd {
+	// Don't try to load if store creation failed
+	if m.store == nil {
+		return nil
+	}
 	return tea.Batch(
 		m.loadRepos(),
 	)
@@ -141,9 +148,9 @@ func loadRepoInfo(repo domain.WorkspaceRepo) domain.WorkspaceRepoInfo {
 		return info
 	}
 
-	// List tasks
+	// List tasks (exclude terminal statuses for faster loading per spec)
 	out, err := container.ListTasksUseCase().Execute(context.Background(), usecase.ListTasksInput{
-		IncludeTerminal: true, // Include all tasks for summary
+		IncludeTerminal: false,
 	})
 	if err != nil {
 		info.State = domain.RepoStateLoadError
@@ -205,7 +212,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case MsgRepoExited:
-		// Returned from repo TUI, reload repos and summaries
+		// Returned from repo TUI, show error if any and reload repos
+		if msg.Err != nil {
+			m.err = fmt.Errorf("crew tui failed: %w", msg.Err)
+		}
 		m.loading = true
 		return m, m.loadRepos()
 
@@ -374,8 +384,8 @@ func (m *Model) openRepo(path string) tea.Cmd {
 	cmd := exec.Command(crewPath, "tui")
 	cmd.Dir = path
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		// After the repo TUI exits, signal to reload
-		return MsgRepoExited{}
+		// After the repo TUI exits, signal to reload (pass error if any)
+		return MsgRepoExited{Err: err}
 	})
 }
 

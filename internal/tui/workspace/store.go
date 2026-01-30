@@ -9,11 +9,17 @@ import (
 )
 
 // NewStoreFromDefault creates a workspace store using the default global config directory.
-func NewStoreFromDefault() *infraWorkspace.Store {
-	return infraWorkspace.NewStore(defaultGlobalConfigDir())
+// Returns the store and any error that occurred during creation.
+func NewStoreFromDefault() (*infraWorkspace.Store, error) {
+	globalDir := defaultGlobalConfigDir()
+	if globalDir == "" {
+		return nil, infraWorkspace.ErrNoHomeDir
+	}
+	return infraWorkspace.NewStore(globalDir)
 }
 
 // defaultGlobalConfigDir returns the default global config directory.
+// Returns empty string if home directory cannot be determined.
 func defaultGlobalConfigDir() string {
 	configHome := os.Getenv("XDG_CONFIG_HOME")
 	if configHome == "" {
