@@ -43,6 +43,7 @@ crew complete          # Mark task as complete
 - Default: 1
 - `skip_review = true` bypasses the review requirement
 - Review count increments only when `crew review` exits with code 0
+- `crew review` runs an external tool synchronously and does not change task status
 
 ### Configuration
 
@@ -55,6 +56,29 @@ min_reviews = 1
 ### Deprecated Settings
 
 `[complete].review_mode` and `auto_fix` are deprecated and ignored.
+
+---
+
+## Task Status Reference
+
+| Status | Meaning |
+|--------|---------|
+| `todo` | Created, awaiting start |
+| `in_progress` | Work in progress (includes input waiting and paused states) |
+| `done` | Implementation complete, awaiting merge or close |
+| `merged` | Merged to base branch (terminal) |
+| `closed` | Closed without merge (terminal) |
+| `error` | Session terminated unexpectedly or manually stopped (restartable) |
+
+Main flow:
+
+```
+todo -> in_progress -> done -> merged
+                 \-> closed
+error -> in_progress
+```
+
+`crew complete` transitions tasks to `done` after review requirements are met.
 
 ---
 
