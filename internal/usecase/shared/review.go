@@ -3,6 +3,7 @@ package shared
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -124,6 +125,40 @@ type ReviewOutput struct {
 	IsLGTM bool
 }
 
+// RecordReviewResult updates review metadata and stores the review comment.
+func RecordReviewResult(deps ReviewDeps, task *domain.Task, output string) (*ReviewOutput, error) {
+	if task == nil {
+		return nil, errors.New("task is nil")
+	}
+
+	review := strings.TrimSpace(extractReviewResult(output))
+	isLGTM := strings.HasPrefix(review, domain.ReviewLGTMPrefix)
+
+	now := deps.Clock.Now()
+	if review != "" {
+		comment := domain.Comment{
+			Text:   review,
+			Time:   now,
+			Author: "reviewer",
+		}
+		if err := deps.Tasks.AddComment(task.ID, comment); err != nil {
+			if deps.Stderr != nil {
+				_, _ = fmt.Fprintf(deps.Stderr, "warning: failed to add review comment: %v\n", err)
+			}
+		}
+	}
+
+	task.ReviewCount++
+	task.LastReviewAt = now
+	lastReviewIsLGTM := isLGTM
+	task.LastReviewIsLGTM = &lastReviewIsLGTM
+
+	return &ReviewOutput{
+		Review: review,
+		IsLGTM: isLGTM,
+	}, nil
+}
+
 // ExecuteReview runs the review command and records its result.
 func ExecuteReview(ctx context.Context, deps ReviewDeps, in ReviewInput) (*ReviewOutput, error) {
 	if !in.SkipStatusCheck {
@@ -154,25 +189,7 @@ END_OF_PROMPT
 		return nil, fmt.Errorf("run reviewer: %w", err)
 	}
 
-	review := strings.TrimSpace(extractReviewResult(stdoutBuf.String()))
-
-	if review != "" {
-		comment := domain.Comment{
-			Text:   review,
-			Time:   deps.Clock.Now(),
-			Author: "reviewer",
-		}
-		if err := deps.Tasks.AddComment(in.Task.ID, comment); err != nil {
-			if deps.Stderr != nil {
-				_, _ = fmt.Fprintf(deps.Stderr, "warning: failed to add review comment: %v\n", err)
-			}
-		}
-	}
-
-	return &ReviewOutput{
-		Review: review,
-		IsLGTM: strings.HasPrefix(review, domain.ReviewLGTMPrefix),
-	}, nil
+	return RecordReviewResult(deps, in.Task, stdoutBuf.String())
 }
 
 // extractReviewResult extracts the final review result from the full output.

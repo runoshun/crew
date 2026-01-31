@@ -368,12 +368,14 @@ type namespaceMeta struct {
 }
 
 type taskMetaPayload struct {
-	Schema        *int    `json:"schema"`
-	Status        *string `json:"status"`
-	Created       *string `json:"created"`
-	Started       *string `json:"started,omitempty"`
-	BaseBranch    *string `json:"base_branch"`
-	StatusVersion *int    `json:"status_version"`
+	Schema           *int    `json:"schema"`
+	Status           *string `json:"status"`
+	Created          *string `json:"created"`
+	Started          *string `json:"started,omitempty"`
+	BaseBranch       *string `json:"base_branch"`
+	StatusVersion    *int    `json:"status_version"`
+	LastReviewAt     *string `json:"last_review_at,omitempty"`
+	LastReviewIsLGTM *bool   `json:"last_review_is_lgtm,omitempty"`
 
 	Agent       string `json:"agent,omitempty"`
 	Session     string `json:"session,omitempty"`
@@ -382,12 +384,14 @@ type taskMetaPayload struct {
 
 	Issue             int `json:"issue,omitempty"`
 	PR                int `json:"pr,omitempty"`
+	ReviewCount       int `json:"review_count,omitempty"`
 	AutoFixRetryCount int `json:"auto_fix_retry_count,omitempty"`
 }
 
 type taskMeta struct {
-	Created time.Time
-	Started time.Time
+	Created      time.Time
+	Started      time.Time
+	LastReviewAt time.Time
 
 	Status      domain.Status
 	CloseReason domain.CloseReason
@@ -396,11 +400,14 @@ type taskMeta struct {
 	BaseBranch  string
 	BlockReason string
 
-	Schema            int
-	Issue             int
-	PR                int
-	AutoFixRetryCount int
-	StatusVersion     int
+	Schema              int
+	Issue               int
+	PR                  int
+	ReviewCount         int
+	AutoFixRetryCount   int
+	StatusVersion       int
+	LastReviewIsLGTM    bool
+	LastReviewIsLGTMSet bool
 }
 
 type taskFrontmatter struct {
@@ -594,6 +601,12 @@ func (s *Store) readTask(id int) (*domain.Task, []domain.Comment, error) {
 		return nil, nil, fmt.Errorf("parse task meta: %w", err)
 	}
 
+	var lastReviewIsLGTM *bool
+	if meta.LastReviewIsLGTMSet {
+		value := meta.LastReviewIsLGTM
+		lastReviewIsLGTM = &value
+	}
+
 	task := &domain.Task{
 		ID:                id,
 		Namespace:         s.namespace,
@@ -604,6 +617,7 @@ func (s *Store) readTask(id int) (*domain.Task, []domain.Comment, error) {
 		SkipReview:        frontmatter.SkipReview,
 		Created:           meta.Created,
 		Started:           meta.Started,
+		LastReviewAt:      meta.LastReviewAt,
 		Agent:             meta.Agent,
 		Session:           meta.Session,
 		BaseBranch:        meta.BaseBranch,
@@ -612,6 +626,8 @@ func (s *Store) readTask(id int) (*domain.Task, []domain.Comment, error) {
 		BlockReason:       meta.BlockReason,
 		Issue:             meta.Issue,
 		PR:                meta.PR,
+		ReviewCount:       meta.ReviewCount,
+		LastReviewIsLGTM:  lastReviewIsLGTM,
 		AutoFixRetryCount: meta.AutoFixRetryCount,
 		StatusVersion:     meta.StatusVersion,
 	}
@@ -653,6 +669,13 @@ func parseTaskMeta(content []byte) (taskMeta, error) {
 			return taskMeta{}, fmt.Errorf("invalid started time: %w", err)
 		}
 	}
+	var lastReviewAt time.Time
+	if payload.LastReviewAt != nil && *payload.LastReviewAt != "" {
+		lastReviewAt, err = time.Parse(time.RFC3339, *payload.LastReviewAt)
+		if err != nil {
+			return taskMeta{}, fmt.Errorf("invalid last_review_at time: %w", err)
+		}
+	}
 	closeReason := domain.CloseReason(payload.CloseReason)
 	if closeReason != domain.CloseReasonNone && closeReason != domain.CloseReasonMerged && closeReason != domain.CloseReasonAbandoned {
 		return taskMeta{}, fmt.Errorf("invalid close_reason: %s", payload.CloseReason)
@@ -660,21 +683,31 @@ func parseTaskMeta(content []byte) (taskMeta, error) {
 	if *payload.StatusVersion < 0 {
 		return taskMeta{}, errors.New("status_version must be non-negative")
 	}
+	lastReviewIsLGTM := false
+	lastReviewIsLGTMSet := false
+	if payload.LastReviewIsLGTM != nil {
+		lastReviewIsLGTM = *payload.LastReviewIsLGTM
+		lastReviewIsLGTMSet = true
+	}
 
 	return taskMeta{
-		Schema:            *payload.Schema,
-		Status:            status,
-		Created:           created,
-		Started:           started,
-		Agent:             payload.Agent,
-		Session:           payload.Session,
-		BaseBranch:        *payload.BaseBranch,
-		CloseReason:       closeReason,
-		BlockReason:       payload.BlockReason,
-		Issue:             payload.Issue,
-		PR:                payload.PR,
-		AutoFixRetryCount: payload.AutoFixRetryCount,
-		StatusVersion:     *payload.StatusVersion,
+		Schema:              *payload.Schema,
+		Status:              status,
+		Created:             created,
+		Started:             started,
+		LastReviewAt:        lastReviewAt,
+		Agent:               payload.Agent,
+		Session:             payload.Session,
+		BaseBranch:          *payload.BaseBranch,
+		CloseReason:         closeReason,
+		BlockReason:         payload.BlockReason,
+		Issue:               payload.Issue,
+		PR:                  payload.PR,
+		ReviewCount:         payload.ReviewCount,
+		AutoFixRetryCount:   payload.AutoFixRetryCount,
+		StatusVersion:       *payload.StatusVersion,
+		LastReviewIsLGTM:    lastReviewIsLGTM,
+		LastReviewIsLGTMSet: lastReviewIsLGTMSet,
 	}, nil
 }
 
@@ -706,6 +739,15 @@ func (s *Store) writeTask(task *domain.Task, comments []domain.Comment) error {
 	}
 	if !task.Started.IsZero() {
 		metaPayload.Started = strPtr(task.Started.Format(time.RFC3339))
+	}
+	if !task.LastReviewAt.IsZero() {
+		metaPayload.LastReviewAt = strPtr(task.LastReviewAt.Format(time.RFC3339))
+	}
+	if task.ReviewCount != 0 {
+		metaPayload.ReviewCount = task.ReviewCount
+	}
+	if task.LastReviewIsLGTM != nil {
+		metaPayload.LastReviewIsLGTM = task.LastReviewIsLGTM
 	}
 	if task.AutoFixRetryCount != 0 {
 		metaPayload.AutoFixRetryCount = task.AutoFixRetryCount

@@ -277,6 +277,7 @@ func (m ReviewMode) NextMode() ReviewMode {
 type CompleteConfig struct {
 	Command           string     `toml:"command,omitempty"`              // Command to run as CI gate on complete
 	ReviewMode        ReviewMode `toml:"review_mode,omitempty"`          // Review mode: auto (default), manual, auto_fix
+	MinReviews        int        `toml:"min_reviews,omitempty"`          // Minimum successful reviews required to complete
 	AutoFixMaxRetries int        `toml:"auto_fix_max_retries,omitempty"` // Maximum retry count for auto-fix mode (default: 3)
 	ReviewModeSet     bool       `toml:"-"`                              // True if ReviewMode was explicitly set in config (not exported to TOML)
 
@@ -423,6 +424,7 @@ func GlobalOverrideConfigPath(configHome string) string {
 // Default configuration values for CompleteConfig.
 const (
 	DefaultAutoFixMaxRetries = 3
+	DefaultMinReviews        = 1
 )
 
 // NewDefaultConfig returns a Config with default values.
@@ -435,6 +437,7 @@ func NewDefaultConfig() *Config {
 		AgentsConfig: AgentsConfig{},
 		Complete: CompleteConfig{
 			AutoFixMaxRetries: DefaultAutoFixMaxRetries,
+			MinReviews:        DefaultMinReviews,
 		},
 		Log: LogConfig{
 			Level: DefaultLogLevel,

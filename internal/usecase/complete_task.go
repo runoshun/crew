@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
@@ -21,19 +20,18 @@ type CompleteTaskInput struct {
 type CompleteTaskOutput struct {
 	Task              *domain.Task      // The completed task
 	ConflictMessage   string            // Conflict message to display (only set when ErrMergeConflict is returned)
-	AutoFixReview     string            // Review output when auto_fix runs synchronously
-	ReviewMode        domain.ReviewMode // The review mode that was used
-	AutoFixMaxRetries int               // Maximum retry count for auto_fix
-	AutoFixRetryCount int               // Current retry count after auto_fix review
-	ShouldStartReview bool              // True if review should be started by CLI (for background review)
-	AutoFixIsLGTM     bool              // True if auto_fix review passed
+	AutoFixReview     string            // Deprecated: auto_fix output (ignored)
+	ReviewMode        domain.ReviewMode // Deprecated: review_mode (ignored)
+	AutoFixMaxRetries int               // Deprecated: auto_fix setting (ignored)
+	AutoFixRetryCount int               // Deprecated: auto_fix state (ignored)
+	ShouldStartReview bool              // Deprecated: review auto-start (always false)
+	AutoFixIsLGTM     bool              // Deprecated: auto_fix result (ignored)
 }
 
 // CompleteTask is the use case for marking a task as complete.
 // Status transitions depend on configuration:
-//   - skip_review: directly to reviewed
-//   - auto_fix: runs synchronous review and sets status to reviewed on LGTM
-//   - normal: transitions to reviewing, signals CLI to start background review
+//   - skip_review: directly to done
+//   - otherwise: require review count to meet min_reviews, then set done
 //
 // Fields are ordered to minimize memory padding.
 type CompleteTask struct {
@@ -79,18 +77,16 @@ func NewCompleteTask(
 	}
 }
 
-// ErrAutoFixMaxRetries is returned when auto_fix reaches the maximum retry limit.
-var ErrAutoFixMaxRetries = errors.New("auto_fix reached maximum retries")
-
 // Execute marks a task as complete.
 // Preconditions:
-//   - Status is in_progress or needs_input
+//   - Status is in_progress
 //   - No uncommitted changes in worktree
 //
 // Processing:
-//   - If [complete].command is configured, execute it (abort on failure)
-//   - If skip_review: set status to reviewed
-//   - If not skip_review: set status to reviewing (indicating review start)
+//   - Validate review requirement (skip_review/min_reviews)
+//   - Check for merge conflicts with base branch
+//   - Run [complete].command if configured (abort on failure)
+//   - Set status to done and save
 func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*CompleteTaskOutput, error) {
 	// Get the task
 	task, err := shared.GetTask(uc.tasks, in.TaskID)
@@ -119,6 +115,43 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		return nil, domain.ErrUncommittedChanges
 	}
 
+	// Load config for completion checks
+	cfg, err := uc.config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+
+	// Determine if we should skip review
+	// Priority: task.SkipReview (if explicitly set) > config.Tasks.SkipReview > false
+	var skipReview bool
+	if task.SkipReview != nil {
+		// Task has explicit setting, use it (respects --no-skip-review)
+		skipReview = *task.SkipReview
+	} else if cfg != nil {
+		// Fall back to config setting
+		skipReview = cfg.Tasks.SkipReview
+	}
+	// else: default false
+
+	minReviews := domain.DefaultMinReviews
+	if cfg != nil && cfg.Complete.MinReviews > 0 {
+		minReviews = cfg.Complete.MinReviews
+	}
+	if cfg != nil && uc.logger != nil {
+		if cfg.Complete.ReviewModeSet {
+			uc.logger.Warn(task.ID, "task", "complete.review_mode is deprecated and ignored")
+		}
+		if cfg.Complete.AutoFixSet {
+			uc.logger.Warn(task.ID, "task", "complete.auto_fix is deprecated and ignored")
+		}
+	}
+
+	if !skipReview {
+		if task.ReviewCount < minReviews {
+			return nil, fmt.Errorf("review required: have %d, need %d (run \"crew review %d\")", task.ReviewCount, minReviews, task.ID)
+		}
+	}
+
 	// Resolve base branch for conflict check
 	baseBranch, err := resolveBaseBranch(task, uc.git)
 	if err != nil {
@@ -136,12 +169,6 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		return &CompleteTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr
 	}
 
-	// Load config and execute complete.command if configured
-	cfg, err := uc.config.Load()
-	if err != nil {
-		return nil, fmt.Errorf("load config: %w", err)
-	}
-
 	if cfg != nil && cfg.Complete.Command != "" {
 		// Execute the complete command using CommandExecutor
 		cmd := domain.NewShellCommand(cfg.Complete.Command, worktreePath)
@@ -151,19 +178,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}
 	}
 
-	// Determine if we should skip review
-	// Priority: task.SkipReview (if explicitly set) > config.Tasks.SkipReview > false
-	var skipReview bool
-	if task.SkipReview != nil {
-		// Task has explicit setting, use it (respects --no-skip-review)
-		skipReview = *task.SkipReview
-	} else if cfg != nil {
-		// Fall back to config setting
-		skipReview = cfg.Tasks.SkipReview
-	}
-	// else: default false
-
-	// Add comment if provided
+	// Add comment if provided (only after completion conditions are met)
 	if in.Comment != "" {
 		comment := domain.Comment{
 			Text: in.Comment,
@@ -174,151 +189,23 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}
 	}
 
-	if skipReview {
-		// Skip review: go directly to done status
-		task.Status = domain.StatusDone
+	task.Status = domain.StatusDone
 
-		// Save task
-		if saveErr := uc.tasks.Save(task); saveErr != nil {
-			return nil, fmt.Errorf("save task: %w", saveErr)
-		}
+	if saveErr := uc.tasks.Save(task); saveErr != nil {
+		return nil, fmt.Errorf("save task: %w", saveErr)
+	}
 
-		// Log task completion
-		if uc.logger != nil {
+	if uc.logger != nil {
+		if skipReview {
 			uc.logger.Info(task.ID, "task", "completed (status: done, skip_review: true)")
-		}
-
-		return &CompleteTaskOutput{
-			Task:              task,
-			ShouldStartReview: false,
-			ReviewMode:        domain.ReviewModeAuto,
-		}, nil
-	}
-
-	// Determine review mode
-	// Priority: ReviewMode (if set) > legacy AutoFix (if set) > default (auto)
-	reviewMode := domain.ReviewModeAuto // default
-	if cfg != nil {
-		if cfg.Complete.ReviewModeSet {
-			reviewMode = cfg.Complete.ReviewMode
-		} else if cfg.Complete.AutoFixSet && cfg.Complete.AutoFix { //nolint:staticcheck // Legacy compatibility
-			// Legacy: auto_fix=true maps to auto_fix mode
-			reviewMode = domain.ReviewModeAutoFix
-		}
-	}
-	if !reviewMode.IsValid() {
-		if uc.logger != nil {
-			uc.logger.Warn(task.ID, "task", fmt.Sprintf("invalid review_mode %q; falling back to auto", reviewMode))
-		}
-		reviewMode = domain.ReviewModeAuto
-	}
-
-	autoFixMaxRetries := domain.DefaultAutoFixMaxRetries
-	if cfg != nil && cfg.Complete.AutoFixMaxRetries > 0 {
-		autoFixMaxRetries = cfg.Complete.AutoFixMaxRetries
-	}
-
-	switch reviewMode {
-	case domain.ReviewModeAutoFix:
-		// auto_fix mode: run review synchronously
-		retryCount := task.AutoFixRetryCount
-		if retryCount >= autoFixMaxRetries {
-			return nil, fmt.Errorf("auto_fix: reached maximum retries (%d): %w", autoFixMaxRetries, ErrAutoFixMaxRetries)
-		}
-
-		reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
-			ConfigLoader: uc.config,
-			Worktrees:    uc.worktrees,
-			RepoRoot:     uc.repoRoot,
-		}, shared.ReviewCommandInput{
-			Task: task,
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		reviewOut, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
-			Tasks:    uc.tasks,
-			Executor: uc.executor,
-			Clock:    uc.clock,
-			Stderr:   uc.stderr,
-		}, shared.ReviewInput{
-			Task:            task,
-			WorktreePath:    reviewCmd.WorktreePath,
-			Result:          reviewCmd.Result,
-			SkipStatusCheck: true,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("task #%d completed, but review failed: %w", task.ID, err)
-		}
-
-		if reviewOut.IsLGTM {
-			task.Status = domain.StatusDone
-			task.AutoFixRetryCount = 0
 		} else {
-			task.AutoFixRetryCount = retryCount + 1
+			uc.logger.Info(task.ID, "task", "completed (status: done, review requirement satisfied)")
 		}
-
-		if saveErr := uc.tasks.Save(task); saveErr != nil {
-			return nil, fmt.Errorf("save task: %w", saveErr)
-		}
-
-		if uc.logger != nil {
-			if reviewOut.IsLGTM {
-				uc.logger.Info(task.ID, "task", "completed (auto_fix LGTM, status: done)")
-			} else {
-				uc.logger.Info(task.ID, "task", "completed (auto_fix review feedback, status: in_progress)")
-			}
-		}
-
-		return &CompleteTaskOutput{
-			Task:              task,
-			ShouldStartReview: false,
-			ReviewMode:        reviewMode,
-			AutoFixMaxRetries: autoFixMaxRetries,
-			AutoFixReview:     reviewOut.Review,
-			AutoFixIsLGTM:     reviewOut.IsLGTM,
-			AutoFixRetryCount: task.AutoFixRetryCount,
-		}, nil
-
-	case domain.ReviewModeManual:
-		// manual mode: set status to done, do not start review
-		task.Status = domain.StatusDone
-
-		if saveErr := uc.tasks.Save(task); saveErr != nil {
-			return nil, fmt.Errorf("save task: %w", saveErr)
-		}
-
-		if uc.logger != nil {
-			uc.logger.Info(task.ID, "task", "completed (status: done, manual review mode)")
-		}
-
-		return &CompleteTaskOutput{
-			Task:              task,
-			ShouldStartReview: false,
-			ReviewMode:        reviewMode,
-			AutoFixMaxRetries: autoFixMaxRetries,
-		}, nil
-
-	case domain.ReviewModeAuto:
-		// auto mode (default): transition to done to signal that review should start
-		task.Status = domain.StatusDone
-
-		if saveErr := uc.tasks.Save(task); saveErr != nil {
-			return nil, fmt.Errorf("save task: %w", saveErr)
-		}
-
-		if uc.logger != nil {
-			uc.logger.Info(task.ID, "task", "completed (status: done, review should start)")
-		}
-
-		return &CompleteTaskOutput{
-			Task:              task,
-			ShouldStartReview: true,
-			ReviewMode:        reviewMode,
-			AutoFixMaxRetries: autoFixMaxRetries,
-		}, nil
 	}
 
-	return nil, fmt.Errorf("unexpected review mode: %q", reviewMode)
+	return &CompleteTaskOutput{
+		Task:              task,
+		ShouldStartReview: false,
+		ReviewMode:        domain.ReviewModeAuto,
+	}, nil
 }

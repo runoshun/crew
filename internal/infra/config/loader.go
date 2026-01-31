@@ -266,6 +266,14 @@ func convertRawToDomainConfig(raw map[string]any, sourcePath string) *domain.Con
 						if s, ok := v.(string); ok {
 							res.Complete.Command = s
 						}
+					case "min_reviews":
+						if i, ok := v.(int64); ok {
+							if i <= 0 {
+								warnings = append(warnings, fmt.Sprintf("invalid value for complete.min_reviews: %d (expected >= 1)", i))
+							} else {
+								res.Complete.MinReviews = int(i)
+							}
+						}
 					case "review_mode":
 						if s, ok := v.(string); ok {
 							mode := domain.ReviewMode(s)
@@ -688,6 +696,9 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	if override.Complete.AutoFixSet {
 		result.Complete.AutoFix = override.Complete.AutoFix //nolint:staticcheck // Legacy compatibility
 		result.Complete.AutoFixSet = true
+	}
+	if override.Complete.MinReviews > 0 {
+		result.Complete.MinReviews = override.Complete.MinReviews
 	}
 	if override.Complete.AutoFixMaxRetries > 0 {
 		result.Complete.AutoFixMaxRetries = override.Complete.AutoFixMaxRetries

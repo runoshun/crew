@@ -17,7 +17,8 @@ import (
 func TestReviewSessionEnded_Execute_Success(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Now()}
+	now := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	clock := &testutil.MockClock{NowTime: now}
 	crewDir := t.TempDir()
 
 	repo.Tasks[1] = &domain.Task{
@@ -32,7 +33,7 @@ func TestReviewSessionEnded_Execute_Success(t *testing.T) {
 	out, err := uc.Execute(context.Background(), ReviewSessionEndedInput{
 		TaskID:   1,
 		ExitCode: 0,
-		Output:   "Review passed: looks good!",
+		Output:   domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.",
 	})
 
 	// Assert
@@ -40,22 +41,27 @@ func TestReviewSessionEnded_Execute_Success(t *testing.T) {
 	require.NotNil(t, out)
 	assert.False(t, out.Ignored)
 
-	// Verify task was updated
+	// Verify task status remains unchanged
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusDone, task.Status)
+	assert.Equal(t, domain.StatusInProgress, task.Status)
 
 	// Verify comment was added via repository
 	comments, err := repo.GetComments(1)
 	require.NoError(t, err)
 	require.Len(t, comments, 1)
 	assert.Equal(t, "reviewer", comments[0].Author)
-	assert.Equal(t, "Review passed: looks good!", comments[0].Text)
+	assert.Equal(t, domain.ReviewLGTMPrefix+"\nLooks good.", comments[0].Text)
+	assert.Equal(t, 1, task.ReviewCount)
+	assert.Equal(t, now, task.LastReviewAt)
+	require.NotNil(t, task.LastReviewIsLGTM)
+	assert.True(t, *task.LastReviewIsLGTM)
 }
 
 func TestReviewSessionEnded_Execute_TaskNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Now()}
+	now := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	clock := &testutil.MockClock{NowTime: now}
 	crewDir := t.TempDir()
 
 	uc := NewReviewSessionEnded(repo, clock, crewDir, io.Discard)
@@ -76,7 +82,8 @@ func TestReviewSessionEnded_Execute_TaskNotFound(t *testing.T) {
 func TestReviewSessionEnded_Execute_FromDoneStatus(t *testing.T) {
 	// Setup - review can happen from done status (re-review)
 	repo := testutil.NewMockTaskRepository()
-	clock := &testutil.MockClock{NowTime: time.Now()}
+	now := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	clock := &testutil.MockClock{NowTime: now}
 	crewDir := t.TempDir()
 
 	repo.Tasks[1] = &domain.Task{
@@ -91,7 +98,7 @@ func TestReviewSessionEnded_Execute_FromDoneStatus(t *testing.T) {
 	out, err := uc.Execute(context.Background(), ReviewSessionEndedInput{
 		TaskID:   1,
 		ExitCode: 0,
-		Output:   "Review output",
+		Output:   domain.ReviewLGTMPrefix + " looks good",
 	})
 
 	// Assert - should succeed (done status is allowed)
@@ -107,6 +114,10 @@ func TestReviewSessionEnded_Execute_FromDoneStatus(t *testing.T) {
 	comments, err := repo.GetComments(1)
 	require.NoError(t, err)
 	require.Len(t, comments, 1)
+	assert.Equal(t, 1, task.ReviewCount)
+	assert.Equal(t, now, task.LastReviewAt)
+	require.NotNil(t, task.LastReviewIsLGTM)
+	assert.True(t, *task.LastReviewIsLGTM)
 }
 
 func TestReviewSessionEnded_Execute_TerminalStatus(t *testing.T) {
@@ -161,7 +172,7 @@ func TestReviewSessionEnded_Execute_NonZeroExitCode(t *testing.T) {
 		Output:   "Review failed with error",
 	})
 
-	// Assert - should still succeed and save comment
+	// Assert - should still succeed without saving comment
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.False(t, out.Ignored)
@@ -170,10 +181,13 @@ func TestReviewSessionEnded_Execute_NonZeroExitCode(t *testing.T) {
 	task := repo.Tasks[1]
 	assert.Equal(t, domain.StatusInProgress, task.Status)
 
-	// Verify comment was added (even with non-zero exit)
+	// Verify comment was not added on failure
 	comments, err := repo.GetComments(1)
 	require.NoError(t, err)
-	require.Len(t, comments, 1)
+	assert.Empty(t, comments)
+	assert.Equal(t, 0, task.ReviewCount)
+	assert.True(t, task.LastReviewAt.IsZero())
+	assert.Nil(t, task.LastReviewIsLGTM)
 }
 
 func TestReviewSessionEnded_Execute_CleanupsScriptFiles(t *testing.T) {

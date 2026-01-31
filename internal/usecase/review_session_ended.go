@@ -2,12 +2,11 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // ReviewSessionEndedInput contains the parameters for handling review session termination.
@@ -42,7 +41,7 @@ func NewReviewSessionEnded(tasks domain.TaskRepository, clock domain.Clock, crew
 }
 
 // Execute handles review session termination.
-// It saves the review output as a comment, updates status, and deletes script files.
+// It saves the review output as a comment, updates review metadata, and deletes script files.
 func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedInput) (*ReviewSessionEndedOutput, error) {
 	// Get task
 	task, err := uc.tasks.Get(in.TaskID)
@@ -61,31 +60,18 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 		return &ReviewSessionEndedOutput{Ignored: true}, nil
 	}
 
-	// Extract the review result
-	reviewResult := in.Output
-	if idx := strings.Index(in.Output, domain.ReviewResultMarker); idx != -1 {
-		reviewResult = in.Output[idx+len(domain.ReviewResultMarker):]
-	}
-	reviewResult = strings.TrimSpace(reviewResult)
-
-	// Save review result as comment if there's content
-	if reviewResult != "" {
-		comment := domain.Comment{
-			Text:   reviewResult,
-			Time:   uc.clock.Now(),
-			Author: "reviewer",
-		}
-		if err := uc.tasks.AddComment(task.ID, comment); err != nil {
-			// Log but don't fail - the review session completed
-			_, _ = fmt.Fprintf(uc.stderr, "warning: failed to add review comment: %v\n", err)
-		}
-	}
-
-	// Update status based on exit code
+	// Update task and comments only on successful review
 	if in.ExitCode == 0 {
-		task.Status = domain.StatusDone
+		_, err = shared.RecordReviewResult(shared.ReviewDeps{
+			Tasks:  uc.tasks,
+			Clock:  uc.clock,
+			Stderr: uc.stderr,
+		}, task, in.Output)
+		if err != nil {
+			return nil, err
+		}
 	}
-	// On error (non-zero exit code), keep as in_progress to allow retry
+	// On error (non-zero exit code), leave status unchanged
 
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {

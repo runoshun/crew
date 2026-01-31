@@ -427,6 +427,25 @@ review_mode = "invalid"
 	assert.Contains(t, cfg.Warnings, "invalid value for complete.review_mode: \"invalid\" (expected \"auto\", \"manual\", or \"auto_fix\")")
 }
 
+func TestLoader_Load_InvalidMinReviews(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	config := `
+[complete]
+min_reviews = 0
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, domain.DefaultMinReviews, cfg.Complete.MinReviews)
+	assert.Contains(t, cfg.Warnings, "invalid value for complete.min_reviews: 0 (expected >= 1)")
+}
+
 func TestLoader_Load_HelpFilePathResolution(t *testing.T) {
 	crewDir := t.TempDir()
 	globalDir := t.TempDir()
