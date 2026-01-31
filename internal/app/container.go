@@ -75,7 +75,7 @@ func New(dir string) (*Container, error) {
 	// Create configuration from git client
 	cfg := newConfig(gitClient)
 
-	// Load app config to determine store type
+	// Load app config to determine namespace and defaults
 	configLoader := config.NewLoader(cfg.CrewDir, cfg.RepoRoot)
 	appConfig, err := configLoader.Load()
 	if err != nil {

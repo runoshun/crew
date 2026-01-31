@@ -362,10 +362,6 @@ func convertRawToDomainConfig(raw map[string]any, sourcePath string) *domain.Con
 			if m, ok := value.(map[string]any); ok {
 				for k, v := range m {
 					switch k {
-					case "store":
-						if s, ok := v.(string); ok {
-							res.Tasks.Store = s
-						}
 					case "namespace":
 						if s, ok := v.(string); ok {
 							res.Tasks.Namespace = s
@@ -701,9 +697,6 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 	}
 	if override.Log.Level != "" {
 		result.Log.Level = override.Log.Level
-	}
-	if override.Tasks.Store != "" {
-		result.Tasks.Store = override.Tasks.Store
 	}
 	if override.Tasks.Namespace != "" {
 		result.Tasks.Namespace = override.Tasks.Namespace

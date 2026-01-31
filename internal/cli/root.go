@@ -202,9 +202,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 	managerCmd := newManagerCommand(c)
 	managerCmd.GroupID = groupSession
 
-	// Snapshot commands
-	snapshotCmd := newSnapshotCmd(c)
-
 	// Agent list command
 	listAgentsCmd := newListAgentsCommand(c)
 	listAgentsCmd.GroupID = groupSetup
@@ -245,9 +242,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 		pruneCmd,
 		tuiCmd,
 		managerCmd,
-		snapshotCmd,
 		workspaceCmd,
-		newSyncCmd(c),
 		sessionEndedCmd,
 		reviewSessionEndedCmd,
 	)

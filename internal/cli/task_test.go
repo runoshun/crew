@@ -211,6 +211,7 @@ func TestNewListCommand_Empty(t *testing.T) {
 	assert.NoError(t, err)
 	output := buf.String()
 	assert.Contains(t, output, "ID")
+	assert.Contains(t, output, "NAMESPACE")
 	assert.Contains(t, output, "TITLE")
 }
 
@@ -218,15 +219,17 @@ func TestNewListCommand_WithTasks(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "First task",
-		Status: domain.StatusTodo,
+		ID:        1,
+		Namespace: "test",
+		Title:     "First task",
+		Status:    domain.StatusTodo,
 	}
 	repo.Tasks[2] = &domain.Task{
-		ID:     2,
-		Title:  "Second task",
-		Status: domain.StatusInProgress,
-		Agent:  "claude",
+		ID:        2,
+		Namespace: "test",
+		Title:     "Second task",
+		Status:    domain.StatusInProgress,
+		Agent:     "claude",
 	}
 	container := newTestContainer(repo)
 
@@ -247,6 +250,7 @@ func TestNewListCommand_WithTasks(t *testing.T) {
 	assert.Contains(t, output, "todo")
 	assert.Contains(t, output, "in_progress")
 	assert.Contains(t, output, "claude")
+	assert.Contains(t, output, "test")
 }
 
 // =============================================================================
@@ -254,7 +258,6 @@ func TestNewListCommand_WithTasks(t *testing.T) {
 // =============================================================================
 
 func TestNewShowCommand_ByID(t *testing.T) {
-	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:          1,
@@ -270,7 +273,7 @@ func TestNewShowCommand_ByID(t *testing.T) {
 	cmd := newShowCommand(container)
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"1"})
+	cmd.SetArgs([]string{"1", "--json"})
 
 	// Execute
 	err := cmd.Execute()
@@ -278,61 +281,11 @@ func TestNewShowCommand_ByID(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	output := buf.String()
-	assert.Contains(t, output, "Task 1")
-	assert.Contains(t, output, "Test task")
-	assert.Contains(t, output, "Task description")
-	assert.Contains(t, output, "todo")
-}
-
-func TestNewShowCommand_WithSubtasks(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	parentID := 1
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Parent task",
-		Status:     domain.StatusInProgress,
-		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		BaseBranch: "main",
-	}
-	repo.Tasks[2] = &domain.Task{
-		ID:         2,
-		ParentID:   &parentID,
-		Title:      "Child task 1",
-		Status:     domain.StatusTodo,
-		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		BaseBranch: "main",
-	}
-	repo.Tasks[3] = &domain.Task{
-		ID:         3,
-		ParentID:   &parentID,
-		Title:      "Child task 2",
-		Status:     domain.StatusClosed,
-		Created:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		BaseBranch: "main",
-	}
-	container := newTestContainer(repo)
-
-	// Create command
-	cmd := newShowCommand(container)
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"1"})
-
-	// Execute
-	err := cmd.Execute()
-
-	// Assert
-	assert.NoError(t, err)
-	output := buf.String()
-	assert.Contains(t, output, "Parent task")
-	assert.Contains(t, output, "Sub-tasks:")
-	assert.Contains(t, output, "Child task 1")
-	assert.Contains(t, output, "Child task 2")
+	assert.Contains(t, output, "\"title\": \"Test task\"")
+	assert.Contains(t, output, "\"description\": \"Task description\"")
 }
 
 func TestNewShowCommand_WithComments(t *testing.T) {
-	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
@@ -353,7 +306,7 @@ func TestNewShowCommand_WithComments(t *testing.T) {
 	cmd := newShowCommand(container)
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"1"})
+	cmd.SetArgs([]string{"1", "--json"})
 
 	// Execute
 	err := cmd.Execute()
@@ -361,8 +314,7 @@ func TestNewShowCommand_WithComments(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	output := buf.String()
-	assert.Contains(t, output, "Comments:")
-	assert.Contains(t, output, "First comment")
+	assert.Contains(t, output, "\"text\": \"First comment\"")
 }
 
 func TestNewShowCommand_JSON(t *testing.T) {
@@ -459,7 +411,7 @@ func TestPrintTaskList_Empty(t *testing.T) {
 	printTaskList(&buf, []*domain.Task{}, clock)
 
 	// Should only have header
-	expected := "ID   PARENT   STATUS   AGENT   LABELS   TITLE\n"
+	expected := "ID   NAMESPACE   PARENT   STATUS   AGENT   LABELS   TITLE\n"
 	assert.Equal(t, expected, buf.String())
 }
 
@@ -469,9 +421,10 @@ func TestPrintTaskList_SingleTask(t *testing.T) {
 
 	tasks := []*domain.Task{
 		{
-			ID:     1,
-			Title:  "Test task",
-			Status: domain.StatusTodo,
+			ID:        1,
+			Namespace: "test",
+			Title:     "Test task",
+			Status:    domain.StatusTodo,
 		},
 	}
 
@@ -479,6 +432,7 @@ func TestPrintTaskList_SingleTask(t *testing.T) {
 
 	output := buf.String()
 	assert.Contains(t, output, "ID")
+	assert.Contains(t, output, "NAMESPACE")
 	assert.Contains(t, output, "PARENT")
 	assert.Contains(t, output, "STATUS")
 	assert.Contains(t, output, "AGENT")
@@ -487,6 +441,7 @@ func TestPrintTaskList_SingleTask(t *testing.T) {
 	assert.Contains(t, output, "1")
 	assert.Contains(t, output, "-") // PARENT is nil
 	assert.Contains(t, output, "todo")
+	assert.Contains(t, output, "test")
 	assert.Contains(t, output, "Test task")
 }
 
@@ -497,10 +452,11 @@ func TestPrintTaskList_WithParent(t *testing.T) {
 	parentID := 1
 	tasks := []*domain.Task{
 		{
-			ID:       2,
-			ParentID: &parentID,
-			Title:    "Child task",
-			Status:   domain.StatusTodo,
+			ID:        2,
+			Namespace: "test",
+			ParentID:  &parentID,
+			Title:     "Child task",
+			Status:    domain.StatusTodo,
 		},
 	}
 
@@ -518,10 +474,11 @@ func TestPrintTaskList_WithAgent(t *testing.T) {
 
 	tasks := []*domain.Task{
 		{
-			ID:     1,
-			Title:  "Task with agent",
-			Status: domain.StatusInProgress,
-			Agent:  "claude",
+			ID:        1,
+			Namespace: "test",
+			Title:     "Task with agent",
+			Status:    domain.StatusInProgress,
+			Agent:     "claude",
 		},
 	}
 
@@ -537,10 +494,11 @@ func TestPrintTaskList_WithLabels(t *testing.T) {
 
 	tasks := []*domain.Task{
 		{
-			ID:     1,
-			Title:  "Task with labels",
-			Status: domain.StatusTodo,
-			Labels: []string{"bug", "urgent"},
+			ID:        1,
+			Namespace: "test",
+			Title:     "Task with labels",
+			Status:    domain.StatusTodo,
+			Labels:    []string{"bug", "urgent"},
 		},
 	}
 
@@ -559,10 +517,11 @@ func TestPrintTaskList_InProgressWithElapsed(t *testing.T) {
 
 	tasks := []*domain.Task{
 		{
-			ID:      1,
-			Title:   "In progress task",
-			Status:  domain.StatusInProgress,
-			Started: started,
+			ID:        1,
+			Namespace: "test",
+			Title:     "In progress task",
+			Status:    domain.StatusInProgress,
+			Started:   started,
 		},
 	}
 
@@ -579,22 +538,25 @@ func TestPrintTaskList_MultipleTasks(t *testing.T) {
 	parentID := 1
 	tasks := []*domain.Task{
 		{
-			ID:     1,
-			Title:  "Parent task",
-			Status: domain.StatusInProgress,
-			Agent:  "claude",
-			Labels: []string{"feature"},
+			ID:        1,
+			Namespace: "test",
+			Title:     "Parent task",
+			Status:    domain.StatusInProgress,
+			Agent:     "claude",
+			Labels:    []string{"feature"},
 		},
 		{
-			ID:       2,
-			ParentID: &parentID,
-			Title:    "Child task",
-			Status:   domain.StatusTodo,
+			ID:        2,
+			Namespace: "test",
+			ParentID:  &parentID,
+			Title:     "Child task",
+			Status:    domain.StatusTodo,
 		},
 		{
-			ID:     3,
-			Title:  "Done task",
-			Status: domain.StatusClosed,
+			ID:        3,
+			Namespace: "test",
+			Title:     "Done task",
+			Status:    domain.StatusClosed,
 		},
 	}
 

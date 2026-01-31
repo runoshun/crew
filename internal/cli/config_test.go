@@ -269,9 +269,7 @@ func TestFormatEffectiveConfig(t *testing.T) {
 				Log: domain.LogConfig{
 					Level: "debug",
 				},
-				Tasks: domain.TasksConfig{
-					Store: "git",
-				},
+				Tasks: domain.TasksConfig{},
 				TUI: domain.TUIConfig{
 					Keybindings: map[string]domain.TUIKeybinding{},
 				},
@@ -301,7 +299,6 @@ func TestFormatEffectiveConfig(t *testing.T) {
 					Level: "warn",
 				},
 				Tasks: domain.TasksConfig{
-					Store:     "json",
 					Namespace: "custom",
 				},
 				Worktree: domain.WorktreeConfig{
@@ -311,7 +308,6 @@ func TestFormatEffectiveConfig(t *testing.T) {
 			wantContent: []string{
 				"command = 'test-command'",
 				"level = 'warn'",
-				"store = 'json'",
 				"namespace = 'custom'",
 				"setup_command = 'echo hello'",
 			},

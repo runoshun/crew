@@ -199,8 +199,7 @@ func TestIntegration_New(t *testing.T) {
 
 	// Verify with show
 	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Test task")
-	assert.Contains(t, out, "todo")
+	assert.Contains(t, out, "title: Test task")
 }
 
 func TestIntegration_New_WithAllOptions(t *testing.T) {
@@ -219,11 +218,13 @@ func TestIntegration_New_WithAllOptions(t *testing.T) {
 
 	// Verify with show
 	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Full task")
+	assert.Contains(t, out, "title: Full task")
 	assert.Contains(t, out, "Task description")
 	assert.Contains(t, out, "bug")
 	assert.Contains(t, out, "urgent")
-	assert.Contains(t, out, "#42")
+
+	out = crewMust(t, dir, "show", "1", "--json")
+	assert.Contains(t, out, "\"issue\": 42")
 }
 
 func TestIntegration_New_WithParent(t *testing.T) {
@@ -237,14 +238,9 @@ func TestIntegration_New_WithParent(t *testing.T) {
 	out := crewMust(t, dir, "new", "--title", "Child task", "--parent", "1")
 	assert.Contains(t, out, "Created task #2")
 
-	// Verify parent shows child in sub-tasks
-	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Sub-tasks:")
-	assert.Contains(t, out, "Child task")
-
-	// Verify child shows parent
+	// Verify child shows parent in frontmatter
 	out = crewMust(t, dir, "show", "2")
-	assert.Contains(t, out, "Parent: #1")
+	assert.Contains(t, out, "parent: 1")
 }
 
 // =============================================================================
@@ -265,6 +261,7 @@ func TestIntegration_List(t *testing.T) {
 	assert.Contains(t, out, "Task one")
 	assert.Contains(t, out, "Task two")
 	assert.Contains(t, out, "Task three")
+	assert.Contains(t, out, "test")
 }
 
 func TestIntegration_List_WithParentFilter(t *testing.T) {
@@ -312,11 +309,8 @@ func TestIntegration_Show(t *testing.T) {
 	crewMust(t, dir, "new", "--title", "Show test", "--body", "Test description")
 
 	out := crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Task 1: Show test")
+	assert.Contains(t, out, "title: Show test")
 	assert.Contains(t, out, "Test description")
-	assert.Contains(t, out, "Status: todo")
-	assert.Contains(t, out, "Parent: none")
-	assert.Contains(t, out, "Branch: crew-1")
 }
 
 func TestIntegration_Show_NotFound(t *testing.T) {
@@ -440,7 +434,6 @@ func TestIntegration_Comment(t *testing.T) {
 
 	// Verify comment in show
 	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Comments:")
 	assert.Contains(t, out, "This is a test comment")
 }
 
@@ -460,7 +453,7 @@ func TestIntegration_Comment_Multiple(t *testing.T) {
 	assert.Contains(t, out, "Second comment")
 }
 
-func TestIntegration_Show_Markdown(t *testing.T) {
+func TestIntegration_Show_MarkdownRemoved(t *testing.T) {
 	dir := testRepo(t)
 	crewMust(t, dir, "init")
 
@@ -471,14 +464,8 @@ func TestIntegration_Show_Markdown(t *testing.T) {
 	)
 	crewMust(t, dir, "comment", "1", "First markdown comment")
 
-	out := crewMust(t, dir, "show", "1", "--markdown")
-	assert.Contains(t, out, "# Task #1: Markdown task")
-	assert.Contains(t, out, "**Status:** todo")
-	assert.Contains(t, out, "**Labels:** docs")
-	assert.Contains(t, out, "## Description")
-	assert.Contains(t, out, "Markdown description")
-	assert.Contains(t, out, "## Comments")
-	assert.Contains(t, out, "First markdown comment")
+	_, err := crew(t, dir, "show", "1", "--markdown")
+	assert.Error(t, err)
 }
 
 // =============================================================================
@@ -510,12 +497,13 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 	assert.Contains(t, out, "Implement login")
 	assert.Contains(t, out, "Implement logout")
 
-	// Show parent with sub-tasks and comments
-	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Feature: Auth")
-	assert.Contains(t, out, "Sub-tasks:")
+	// Verify sub-tasks and comments
+	out = crewMust(t, dir, "list", "--parent", "1")
 	assert.Contains(t, out, "Implement login")
-	assert.Contains(t, out, "Comments:")
+	assert.Contains(t, out, "Implement logout")
+
+	out = crewMust(t, dir, "show", "1")
+	assert.Contains(t, out, "title: Feature: Auth")
 	assert.Contains(t, out, "Starting auth feature")
 
 	// Copy a task
