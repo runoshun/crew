@@ -159,7 +159,6 @@ Examples:
 // newAttachCommand creates the attach command for attaching to a session.
 func newAttachCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		review  bool
 		manager bool
 	}
 
@@ -172,7 +171,6 @@ This replaces the current process with the tmux session.
 Use Ctrl+G to detach from the session (configured in .crew/tmux.conf).
 
 By default, attaches to the work session (crew-<id>).
-Use --review to attach to the review session (crew-<id>-review).
 Use --manager to attach to the manager session (crew-manager).
 
 Preconditions:
@@ -182,9 +180,6 @@ Preconditions:
 Examples:
   # Attach to work session for task #1
   crew attach 1
-
-  # Attach to review session for task #1
-  crew attach 1 --review
 
   # Attach to manager session
   crew attach --manager`,
@@ -218,7 +213,6 @@ Examples:
 			uc := c.AttachSessionUseCase()
 			_, err = uc.Execute(cmd.Context(), usecase.AttachSessionInput{
 				TaskID: taskID,
-				Review: opts.review,
 			})
 			if err != nil {
 				return err
@@ -229,9 +223,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.review, "review", false, "Attach to review session instead of work session")
 	cmd.Flags().BoolVar(&opts.manager, "manager", false, "Attach to manager session (crew-manager)")
-	cmd.MarkFlagsMutuallyExclusive("review", "manager")
 
 	return cmd
 }
@@ -402,52 +394,6 @@ func newSessionEndedCommand(c *app.Container) *cobra.Command {
 	return cmd
 }
 
-// newReviewSessionEndedCommand creates the _review-session-ended internal command.
-// This is called by the review script's EXIT trap to handle review session termination.
-func newReviewSessionEndedCommand(c *app.Container) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:    "_review-session-ended <id> <exit-code> <output-file>",
-		Short:  "Handle review session termination (internal command)",
-		Hidden: true, // Internal command, not shown in help
-		Args:   cobra.ExactArgs(3),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			// Parse task ID
-			taskID, err := parseTaskID(args[0])
-			if err != nil {
-				return fmt.Errorf("invalid task ID: %w", err)
-			}
-
-			// Parse exit code
-			exitCode, err := strconv.Atoi(args[1])
-			if err != nil {
-				return fmt.Errorf("invalid exit code: %w", err)
-			}
-
-			// Read output from file
-			outputFile := args[2]
-			output := ""
-			if data, readErr := os.ReadFile(outputFile); readErr == nil {
-				output = string(data)
-			}
-
-			// Execute use case
-			uc := c.ReviewSessionEndedUseCase(cmd.ErrOrStderr())
-			_, err = uc.Execute(cmd.Context(), usecase.ReviewSessionEndedInput{
-				TaskID:   taskID,
-				ExitCode: exitCode,
-				Output:   output,
-			})
-			if err != nil {
-				return err
-			}
-
-			return nil
-		},
-	}
-
-	return cmd
-}
-
 // newSendCommand creates the send command for sending keys to a session.
 func newSendCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
@@ -507,7 +453,6 @@ Examples:
 // newStopCommand creates the stop command for stopping a task session.
 func newStopCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		review  bool
 		manager bool
 	}
 
@@ -525,9 +470,6 @@ The worktree is NOT deleted (use 'close' to also delete the worktree).
 Examples:
   # Stop session for task #1
   crew stop 1
-
-  # Stop review session for task #1
-  crew stop 1 --review
 
   # Stop manager session
   crew stop --manager`,
@@ -569,33 +511,22 @@ Examples:
 			uc := c.StopTaskUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.StopTaskInput{
 				TaskID: taskID,
-				Review: opts.review,
 			})
 			if err != nil {
 				return err
 			}
 
 			if out.SessionName == "" {
-				if opts.review {
-					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No review session running for task #%d\n", taskID)
-					return nil
-				}
 				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "No running session for task #%d\n", taskID)
 				return nil
 			}
 
-			label := "session"
-			if opts.review || out.SessionName == domain.ReviewSessionName(taskID) {
-				label = "review session"
-			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Stopped %s %s\n", label, out.SessionName)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Stopped session %s\n", out.SessionName)
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.review, "review", "r", false, "Stop the reviewer session instead of the work session")
 	cmd.Flags().BoolVar(&opts.manager, "manager", false, "Stop the manager session (crew-manager)")
-	cmd.MarkFlagsMutuallyExclusive("review", "manager")
 
 	return cmd
 }
@@ -662,8 +593,7 @@ Examples:
 // newLogsCommand creates the logs command for viewing session logs.
 func newLogsCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		lines  int
-		review bool
+		lines int
 	}
 
 	cmd := &cobra.Command{
@@ -685,10 +615,7 @@ Examples:
 
   # View last 50 lines of logs
   crew logs 1 --lines 50
-  crew logs 1 -n 50
-
-  # View review session logs
-  crew logs 1 --review`,
+  crew logs 1 -n 50`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -702,7 +629,6 @@ Examples:
 			out, err := uc.Execute(cmd.Context(), usecase.ShowLogsInput{
 				TaskID: taskID,
 				Lines:  opts.lines,
-				Review: opts.review,
 			})
 			if err != nil {
 				return err
@@ -715,7 +641,6 @@ Examples:
 	}
 
 	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 0, "Number of lines to display from the end (0 = all)")
-	cmd.Flags().BoolVar(&opts.review, "review", false, "View review session logs instead of work session")
 
 	return cmd
 }

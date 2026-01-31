@@ -48,20 +48,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgTaskStopped:
 		m.mode = ModeNormal
 		m.confirmAction = ConfirmNone
-		m.confirmReviewSession = false
 		if msg.SessionName == "" {
-			if msg.Review {
-				m.err = fmt.Errorf("no review session running for task #%d", msg.TaskID)
-			} else {
-				m.err = fmt.Errorf("no running session for task #%d", msg.TaskID)
-			}
+			m.err = fmt.Errorf("no running session for task #%d", msg.TaskID)
 			return m, m.loadTasks()
 		}
-		if msg.Review || msg.SessionName == domain.ReviewSessionName(msg.TaskID) {
-			m.err = fmt.Errorf("review session stopped for task #%d", msg.TaskID)
-		} else {
-			m.err = fmt.Errorf("work session stopped for task #%d", msg.TaskID)
-		}
+		m.err = fmt.Errorf("session stopped for task #%d", msg.TaskID)
 		return m, m.loadTasks()
 
 	case MsgTaskCreated:
@@ -105,7 +96,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgAttachSession:
 		// Use tea.Exec to attach to tmux session, returning to TUI after detach
-		return m, m.attachToSession(msg.TaskID, msg.Review)
+		return m, m.attachToSession(msg.TaskID)
 
 	case MsgReloadTasks:
 		// Reload tasks after returning from external commands
@@ -317,7 +308,6 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = ModeConfirm
 		m.confirmAction = ConfirmStop
 		m.confirmTaskID = task.ID
-		m.confirmReviewSession = false // Review is handled by session status, not task status
 		return m, nil
 
 	case key.Matches(msg, m.keys.Attach):
@@ -655,7 +645,7 @@ func (m *Model) handleConfirmMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case ConfirmClose:
 			return m, m.closeTask(m.confirmTaskID)
 		case ConfirmStop:
-			return m, m.stopTask(m.confirmTaskID, m.confirmReviewSession)
+			return m, m.stopTask(m.confirmTaskID)
 		case ConfirmMerge:
 			return m, m.mergeTask(m.confirmTaskID)
 		}

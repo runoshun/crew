@@ -16,7 +16,6 @@ import (
 func newReviewCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		model string
-		wait  bool
 	}
 
 	cmd := &cobra.Command{
@@ -27,8 +26,7 @@ func newReviewCommand(c *app.Container) *cobra.Command {
 The reviewer analyzes the diff and provides feedback on code quality,
 correctness, and adherence to best practices.
 
-By default, the review runs in background (similar to crew start).
-Use --wait for synchronous execution.
+The review runs synchronously and prints the result.
 
 The review result is saved as a comment with author "reviewer".
 
@@ -40,21 +38,18 @@ Arguments:
 The message can also be provided via stdin.
 
 Examples:
-  # Start background review
+  # Run review
   crew review 1
 
   # Review with specific agent
   crew review 1 claude-reviewer
-
-  # Wait for review to complete
-  crew review 1 --wait
 
   # Review with additional instructions
   crew review 1 -- "Focus on the last commit only"
   crew review 1 claude-reviewer -- "Check security aspects carefully"
 
   # Review with message from stdin
-  echo "Focus on performance" | crew review 1 --wait`,
+  echo "Focus on performance" | crew review 1`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -76,26 +71,19 @@ Examples:
 			}
 
 			// Execute use case
-			uc := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
+			uc := c.ReviewTaskUseCase(cmd.ErrOrStderr())
 			out, err := uc.Execute(cmd.Context(), usecase.ReviewTaskInput{
 				TaskID:  taskID,
 				Agent:   agent,
 				Model:   opts.model,
 				Message: message,
-				Wait:    opts.wait,
 			})
 			if err != nil {
 				return err
 			}
 
-			if opts.wait {
-				// Synchronous mode: print the review result
-				if out.Review != "" {
-					_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.Review)
-				}
-			} else {
-				// Background mode: print session info
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Review started in session %s\n", out.SessionName)
+			if out.Review != "" {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.Review)
 			}
 
 			return nil
@@ -103,7 +91,6 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
-	cmd.Flags().BoolVarP(&opts.wait, "wait", "w", false, "Wait for review to complete (synchronous mode)")
 
 	return cmd
 }
