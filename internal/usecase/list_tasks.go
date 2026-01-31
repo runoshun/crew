@@ -14,6 +14,11 @@ type ListTasksInput struct {
 	IncludeTerminal  bool     // Include terminal status tasks (closed)
 	IncludeSessions  bool     // Include session information
 	IncludeProcesses bool     // Include process information (implies IncludeSessions)
+	AllNamespaces    bool     // List tasks across all namespaces when supported
+}
+
+type taskNamespaceLister interface {
+	ListAll(filter domain.TaskFilter) ([]*domain.Task, error)
 }
 
 // TaskWithSession contains a task with session and process information.
@@ -52,7 +57,7 @@ func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOu
 		Labels:   in.Labels,
 	}
 
-	tasks, err := uc.tasks.List(filter)
+	tasks, err := uc.listTasks(filter, in.AllNamespaces)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +101,15 @@ func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOu
 	}
 
 	return &ListTasksOutput{TasksWithInfo: tasksWithInfo}, nil
+}
+
+func (uc *ListTasks) listTasks(filter domain.TaskFilter, allNamespaces bool) ([]*domain.Task, error) {
+	if allNamespaces {
+		if lister, ok := uc.tasks.(taskNamespaceLister); ok {
+			return lister.ListAll(filter)
+		}
+	}
+	return uc.tasks.List(filter)
 }
 
 // filterActiveOnly removes tasks with terminal status (closed).

@@ -12,6 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type mockNamespaceLister struct {
+	*testutil.MockTaskRepository
+	listAllCalled bool
+	listAllTasks  []*domain.Task
+	listAllErr    error
+}
+
+func (m *mockNamespaceLister) ListAll(filter domain.TaskFilter) ([]*domain.Task, error) {
+	m.listAllCalled = true
+	return m.listAllTasks, m.listAllErr
+}
+
 func TestListTasks_Execute_AllTasks(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
@@ -41,6 +53,21 @@ func TestListTasks_Execute_AllTasks(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.Len(t, out.Tasks, 3)
+}
+
+func TestListTasks_Execute_AllNamespaces(t *testing.T) {
+	repo := &mockNamespaceLister{MockTaskRepository: testutil.NewMockTaskRepository()}
+	repo.listAllTasks = []*domain.Task{
+		{ID: 1, Title: "Alpha", Status: domain.StatusTodo, Namespace: "alpha"},
+		{ID: 2, Title: "Beta", Status: domain.StatusTodo, Namespace: "beta"},
+	}
+
+	uc := NewListTasks(repo, nil)
+	out, err := uc.Execute(context.Background(), ListTasksInput{AllNamespaces: true})
+
+	require.NoError(t, err)
+	assert.True(t, repo.listAllCalled)
+	require.Len(t, out.Tasks, 2)
 }
 
 func TestListTasks_Execute_ExcludeTerminal(t *testing.T) {
