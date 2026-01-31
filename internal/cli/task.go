@@ -230,8 +230,8 @@ func newListCommand(c *app.Container) *cobra.Command {
 		Short: "List tasks",
 		Long: `Display a list of tasks.
 
-By default, tasks with terminal status (closed) are hidden.
-Use --all to show all tasks including closed tasks.
+By default, tasks with terminal status (merged/closed) are hidden.
+Use --all to show all tasks including merged/closed tasks.
 
 Output format is tab-separated with columns:
   ID, NAMESPACE, PARENT, STATUS, AGENT, LABELS, [ELAPSED], TITLE
@@ -242,10 +242,10 @@ With --sessions (-s), SESSION column is added showing the session name.
 With --processes (-p), process details are shown instead of the task list.
 
 Examples:
-  # List active tasks (default: exclude closed)
+  # List active tasks (default: exclude merged/closed)
   crew list
 
-  # List all tasks including closed
+  # List all tasks including merged/closed
   crew list --all
   crew list -a
 
@@ -302,11 +302,24 @@ Examples:
 	// Optional flags
 	cmd.Flags().IntVar(&opts.ParentID, "parent", 0, "Show only children of this task")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Filter by labels (AND condition)")
-	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all tasks including closed")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "Show all tasks including merged/closed")
 	cmd.Flags().BoolVarP(&opts.Sessions, "sessions", "s", false, "Include session information")
 	cmd.Flags().BoolVarP(&opts.Processes, "processes", "p", false, "Show process details")
 
 	return cmd
+}
+
+// formatTaskStatus formats status with optional elapsed time for in_progress.
+func formatTaskStatus(task *domain.Task, clock domain.Clock) string {
+	statusStr := task.Status.Display()
+	if task.Status == domain.StatusInProgress && !task.Started.IsZero() {
+		elapsed := clock.Now().Sub(task.Started)
+		if elapsed < 0 {
+			elapsed = 0
+		}
+		statusStr = fmt.Sprintf("%s (%s)", statusStr, formatDuration(elapsed))
+	}
+	return statusStr
 }
 
 // printTaskList prints tasks in TSV format.
@@ -339,12 +352,7 @@ func printTaskList(w io.Writer, tasks []*domain.Task, clock domain.Clock) {
 			labelsStr = "[" + strings.Join(task.Labels, ",") + "]"
 		}
 
-		// Format status with optional elapsed time for in_progress
-		statusStr := string(task.Status)
-		if task.Status == domain.StatusInProgress && !task.Started.IsZero() {
-			elapsed := clock.Now().Sub(task.Started)
-			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
-		}
+		statusStr := formatTaskStatus(task, clock)
 
 		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			task.ID,
@@ -394,12 +402,7 @@ func printTaskListWithSessions(w io.Writer, tasksWithInfo []usecase.TaskWithSess
 			labelsStr = "[" + strings.Join(task.Labels, ",") + "]"
 		}
 
-		// Format status with optional elapsed time for in_progress
-		statusStr := string(task.Status)
-		if task.Status == domain.StatusInProgress && !task.Started.IsZero() {
-			elapsed := clock.Now().Sub(task.Started)
-			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
-		}
+		statusStr := formatTaskStatus(task, clock)
 
 		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			task.ID,
@@ -561,6 +564,7 @@ Examples:
 				Branch           string        `json:"branch"`
 				Agent            string        `json:"agent"`
 				Status           domain.Status `json:"status"`
+				StatusDisplay    string        `json:"statusDisplay"`
 				Title            string        `json:"title"`
 				Description      string        `json:"description"`
 				Labels           []string      `json:"labels"`
@@ -577,6 +581,7 @@ Examples:
 				Agent:            out.Task.Agent,
 				Branch:           domain.BranchName(out.Task.ID, out.Task.Issue),
 				Status:           out.Task.Status,
+				StatusDisplay:    out.Task.Status.Display(),
 				Title:            out.Task.Title,
 				Labels:           out.Task.Labels,
 				ID:               out.Task.ID,
@@ -909,7 +914,7 @@ File format for --from:
 	// Optional flags
 	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
 	cmd.Flags().StringVar(&opts.Description, "body", "", "New task description")
-	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, needs_input, for_review, reviewing, reviewed, stopped, error, closed)")
+	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, done, error, merged, closed; legacy: needs_input, for_review, reviewing, reviewed, stopped)")
 	cmd.Flags().StringArrayVar(&opts.IfStatus, "if-status", nil, "Only update status if current status matches (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")

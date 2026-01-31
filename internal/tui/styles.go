@@ -75,7 +75,7 @@ var Colors = struct {
 	Todo:        lipgloss.Color("#89B4FA"), // Blue (pending)
 	InProgress:  lipgloss.Color("#F9E2AF"), // Yellow (active work)
 	Done:        lipgloss.Color("#A6E3A1"), // Green (complete, awaiting merge)
-	Merged:      lipgloss.Color("#CBA6F7"), // Mauve (merged)
+	Merged:      lipgloss.Color("#74C7EC"), // Blue (merged)
 	StatusError: lipgloss.Color("#F38BA8"), // Red
 	Closed:      lipgloss.Color("#6C7086"), // Overlay0
 

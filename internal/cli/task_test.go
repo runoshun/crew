@@ -247,8 +247,8 @@ func TestNewListCommand_WithTasks(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "First task")
 	assert.Contains(t, output, "Second task")
-	assert.Contains(t, output, "todo")
-	assert.Contains(t, output, "in_progress")
+	assert.Contains(t, output, "To Do")
+	assert.Contains(t, output, "In Progress")
 	assert.Contains(t, output, "claude")
 	assert.Contains(t, output, "test")
 }
@@ -448,7 +448,7 @@ func TestPrintTaskList_SingleTask(t *testing.T) {
 	assert.Contains(t, output, "TITLE")
 	assert.Contains(t, output, "1")
 	assert.Contains(t, output, "-") // PARENT is nil
-	assert.Contains(t, output, "todo")
+	assert.Contains(t, output, "To Do")
 	assert.Contains(t, output, "test")
 	assert.Contains(t, output, "Test task")
 }
@@ -536,7 +536,7 @@ func TestPrintTaskList_InProgressWithElapsed(t *testing.T) {
 	printTaskList(&buf, tasks, clock)
 
 	output := buf.String()
-	assert.Contains(t, output, "in_progress (1h)")
+	assert.Contains(t, output, "In Progress (1h)")
 }
 
 func TestPrintTaskList_MultipleTasks(t *testing.T) {
@@ -576,9 +576,9 @@ func TestPrintTaskList_MultipleTasks(t *testing.T) {
 	assert.Contains(t, output, "Child task")
 	assert.Contains(t, output, "Done task")
 	// Verify statuses
-	assert.Contains(t, output, "in_progress")
-	assert.Contains(t, output, "todo")
-	assert.Contains(t, output, "closed")
+	assert.Contains(t, output, "In Progress")
+	assert.Contains(t, output, "To Do")
+	assert.Contains(t, output, "Closed (Abandoned)")
 }
 
 func TestNewEditCommand_UpdateTitle(t *testing.T) {

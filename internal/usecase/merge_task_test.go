@@ -39,6 +39,7 @@ func TestMergeTask_Execute_Success(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, domain.StatusMerged, out.Task.Status)
+	assert.Equal(t, domain.CloseReasonMerged, out.Task.CloseReason)
 	assert.Empty(t, out.Task.Agent)
 	assert.Empty(t, out.Task.Session)
 
@@ -97,7 +98,7 @@ func TestMergeTask_Execute_StopsRunningSession(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task with running session",
-		Status:     domain.StatusInProgress,
+		Status:     domain.StatusDone,
 		Agent:      "claude",
 		Session:    "crew-1",
 		BaseBranch: "main",
@@ -122,6 +123,33 @@ func TestMergeTask_Execute_StopsRunningSession(t *testing.T) {
 	require.NotNil(t, out)
 	assert.True(t, sessions.StopCalled)
 	assert.Equal(t, domain.StatusMerged, out.Task.Status)
+}
+
+func TestMergeTask_Execute_InvalidStatus(t *testing.T) {
+	// Setup - only done status should be allowed
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task not ready to merge",
+		Status:     domain.StatusInProgress,
+		BaseBranch: "main",
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	git := &testutil.MockGit{
+		CurrentBranchName: testutil.StringPtr("main"),
+	}
+
+	uc := NewMergeTask(repo, sessions, worktrees, git, &testutil.MockClock{}, t.TempDir())
+
+	// Execute
+	_, err := uc.Execute(context.Background(), MergeTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrInvalidTransition)
+	assert.False(t, git.MergeCalled)
 }
 
 func TestMergeTask_Execute_NoWorktree(t *testing.T) {
@@ -343,7 +371,7 @@ func TestMergeTask_Execute_StopSessionError(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
 		Title:      "Task with running session",
-		Status:     domain.StatusInProgress,
+		Status:     domain.StatusDone,
 		Agent:      "claude",
 		Session:    "crew-1",
 		BaseBranch: "main",

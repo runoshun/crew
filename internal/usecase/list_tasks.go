@@ -11,7 +11,7 @@ import (
 type ListTasksInput struct {
 	ParentID         *int     // Filter by parent task ID (nil = all tasks)
 	Labels           []string // Filter by labels (AND condition)
-	IncludeTerminal  bool     // Include terminal status tasks (closed)
+	IncludeTerminal  bool     // Include terminal status tasks (merged/closed)
 	IncludeSessions  bool     // Include session information
 	IncludeProcesses bool     // Include process information (implies IncludeSessions)
 	AllNamespaces    bool     // List tasks across all namespaces when supported
@@ -112,7 +112,7 @@ func (uc *ListTasks) listTasks(filter domain.TaskFilter, allNamespaces bool) ([]
 	return uc.tasks.List(filter)
 }
 
-// filterActiveOnly removes tasks with terminal status (closed).
+// filterActiveOnly removes tasks with terminal status (merged/closed).
 func filterActiveOnly(tasks []*domain.Task) []*domain.Task {
 	var result []*domain.Task
 	for _, t := range tasks {

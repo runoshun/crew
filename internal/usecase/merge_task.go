@@ -65,12 +65,17 @@ func NewMergeTask(
 // 2. If session is running, stop it
 // 3. Delete worktree
 // 4. Delete branch
-// 5. Update status to closed (with CloseReasonMerged)
+// 5. Update status to merged (with CloseReasonMerged)
 func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOutput, error) {
 	// Get the task
 	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validate status transition (merge only allowed from done)
+	if task.Status != domain.StatusDone {
+		return nil, fmt.Errorf("cannot merge task in %s status (must be done): %w", task.Status.Display(), domain.ErrInvalidTransition)
 	}
 
 	// Determine target base branch
@@ -155,7 +160,7 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 
 	// Update status to merged
 	task.Status = domain.StatusMerged
-	task.CloseReason = domain.CloseReasonNone // CloseReason not needed for StatusMerged
+	task.CloseReason = domain.CloseReasonMerged
 	task.Agent = ""
 	task.Session = ""
 
