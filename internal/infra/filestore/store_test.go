@@ -206,6 +206,7 @@ func TestStore_ListWithLabelFilter(t *testing.T) {
 	assert.Equal(t, 1, bugTasks[0].ID)
 	assert.Equal(t, 3, bugTasks[1].ID)
 
+	// Label filter uses AND semantics (task must contain all labels).
 	both, err := store.List(domain.TaskFilter{Labels: []string{"bug", "feature"}})
 	require.NoError(t, err)
 	require.Len(t, both, 1)

@@ -44,6 +44,7 @@ Each task is split into:
 
 Operational note: when committing changes under `.crew/`, only include `.crew/tasks/**`.
 Other paths under `.crew/` (logs, runtime state, tmux socket) are local and should not be versioned.
+To prevent accidental staging, keep `.crew/logs/`, `.crew/config.runtime.toml`, and `.crew/tmux.sock` out of VCS via `.git/info/exclude` or `.gitignore` per repo policy.
 
 ---
 

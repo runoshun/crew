@@ -101,7 +101,7 @@ See `.golangci.yml` for linter configuration.
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         Infrastructure                              │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │   GitStore   │  │  TmuxClient  │  │  GitClient   │               │
+│  │  FileStore   │  │  TmuxClient  │  │  GitClient   │               │
 │  └──────────────┘  └──────────────┘  └──────────────┘               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │WorktreeClient│  │ GitHubClient │  │ ConfigLoader │               │
