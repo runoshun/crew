@@ -241,10 +241,10 @@ With --sessions (-s), SESSION column is added showing the session name.
 With --processes (-p), process details are shown instead of the task list.
 
 Examples:
-  # List active tasks (default: exclude closed)
+  # List active tasks (default: exclude merged/closed)
   crew list
 
-  # List all tasks including closed
+  # List all tasks including merged/closed
   crew list --all
   crew list -a
 
@@ -863,7 +863,7 @@ File format for --from:
 	// Optional flags
 	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
 	cmd.Flags().StringVar(&opts.Description, "body", "", "New task description")
-	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, needs_input, for_review, reviewing, reviewed, stopped, error, closed)")
+	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, done, error, merged, closed; legacy: needs_input, for_review, reviewing, reviewed, stopped)")
 	cmd.Flags().StringArrayVar(&opts.IfStatus, "if-status", nil, "Only update status if current status matches (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")

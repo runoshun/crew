@@ -52,7 +52,7 @@ func (uc *CloseTask) Execute(_ context.Context, in CloseTaskInput) (*CloseTaskOu
 
 	// Validate status transition
 	if !task.Status.CanTransitionTo(domain.StatusClosed) {
-		return nil, fmt.Errorf("cannot close task in %s status: %w", task.Status, domain.ErrInvalidTransition)
+		return nil, fmt.Errorf("cannot close task in %s status: %w", task.Status.Display(), domain.ErrInvalidTransition)
 	}
 
 	// Get branch name for worktree operations
