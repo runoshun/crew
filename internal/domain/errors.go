@@ -17,6 +17,7 @@ var (
 	ErrMergeConflict           = errors.New("merge conflict exists")
 	ErrAlreadyInitialized      = errors.New("crew already initialized")
 	ErrNotInitialized          = errors.New("crew not initialized (run 'crew init' first)")
+	ErrLegacyStoreNotFound     = errors.New("legacy store not found")
 	ErrEmptyTitle              = errors.New("title cannot be empty")
 	ErrEmptyMessage            = errors.New("message cannot be empty")
 	ErrNotOnMainBranch         = errors.New("not on main branch")
@@ -44,6 +45,8 @@ var (
 	ErrInvalidEnvVarName       = errors.New("invalid environment variable name")
 	ErrTaskBlocked             = errors.New("task is blocked")
 	ErrCopyAllRequiresManagers = errors.New("copy --all requires git and worktree managers (container wiring missing)")
+	ErrInvalidNamespace        = errors.New("invalid namespace")
+	ErrMigrationConflict       = errors.New("migration conflict: destination task differs")
 
 	// Workspace errors
 	ErrWorkspaceRepoNotFound  = errors.New("repository not found in workspace")

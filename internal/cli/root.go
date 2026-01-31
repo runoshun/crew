@@ -129,6 +129,9 @@ Use --help-manager-auto to see the auto mode guide.`,
 	configCmd := newConfigCommand(c)
 	configCmd.GroupID = groupSetup
 
+	migrateCmd := newMigrateCommand(c)
+	migrateCmd.GroupID = groupSetup
+
 	// Task management commands
 	newCmd := newNewCommand(c)
 	newCmd.GroupID = groupTask
@@ -218,6 +221,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 	root.AddCommand(
 		initCmd,
 		configCmd,
+		migrateCmd,
 		listAgentsCmd,
 		newCmd,
 		listCmd,
