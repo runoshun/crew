@@ -42,37 +42,6 @@ func TestShowLogs_Execute_Success(t *testing.T) {
 	assert.Equal(t, logContent, out.Content)
 }
 
-func TestShowLogs_Execute_ReviewSession(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Test task",
-		Status: domain.StatusInProgress,
-	}
-
-	crewDir := t.TempDir()
-	logsDir := filepath.Join(crewDir, "logs")
-	require.NoError(t, os.MkdirAll(logsDir, 0755))
-
-	logContent := "review log content\n"
-	logPath := domain.SessionLogPath(crewDir, "crew-1-review")
-	require.NoError(t, os.WriteFile(logPath, []byte(logContent), 0644))
-
-	uc := NewShowLogs(repo, crewDir)
-
-	// Execute
-	out, err := uc.Execute(context.Background(), ShowLogsInput{
-		TaskID: 1,
-		Review: true,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	assert.Equal(t, logPath, out.LogPath)
-	assert.Equal(t, logContent, out.Content)
-}
-
 func TestShowLogs_Execute_LastLines(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()

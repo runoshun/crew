@@ -11,8 +11,7 @@ import (
 
 // StopTaskInput contains the parameters for stopping a task session.
 type StopTaskInput struct {
-	Review bool // Stop review session instead of work session
-	TaskID int  // Task ID to stop
+	TaskID int // Task ID to stop
 }
 
 // StopTaskOutput contains the result of stopping a task session.
@@ -53,15 +52,6 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		return nil, err
 	}
 
-	if in.Review {
-		sessionStopped, stopErr := shared.StopReviewSession(uc.sessions, task.ID)
-		if stopErr != nil {
-			return nil, stopErr
-		}
-		uc.cleanupReviewScriptFiles(task.ID)
-		return &StopTaskOutput{Task: task, SessionName: sessionStopped}, nil
-	}
-
 	sessionStopped, err := shared.StopSession(uc.sessions, task.ID)
 	if err != nil {
 		return nil, err
@@ -78,15 +68,6 @@ func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutpu
 		task.Status = domain.StatusError
 		uc.cleanupScriptFiles(task.ID)
 		return uc.saveStoppedTask(task, "")
-	}
-
-	reviewStopped, err := shared.StopReviewSession(uc.sessions, task.ID)
-	if err != nil {
-		return nil, err
-	}
-	if reviewStopped != "" {
-		uc.cleanupReviewScriptFiles(task.ID)
-		return &StopTaskOutput{Task: task, SessionName: reviewStopped}, nil
 	}
 
 	uc.cleanupScriptFiles(task.ID)
@@ -110,12 +91,4 @@ func (uc *StopTask) saveStoppedTask(task *domain.Task, sessionStopped string) (*
 func (uc *StopTask) cleanupScriptFiles(taskID int) {
 	scriptPath := domain.ScriptPath(uc.crewDir, taskID)
 	_ = os.Remove(scriptPath)
-}
-
-// cleanupReviewScriptFiles removes the generated review script files.
-func (uc *StopTask) cleanupReviewScriptFiles(taskID int) {
-	scriptPath := domain.ReviewScriptPath(uc.crewDir, taskID)
-	_ = os.Remove(scriptPath)
-	promptPath := domain.ReviewPromptPath(uc.crewDir, taskID)
-	_ = os.Remove(promptPath)
 }

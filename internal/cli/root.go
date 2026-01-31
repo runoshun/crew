@@ -48,7 +48,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 		SilenceErrors: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			// Skip for some commands
-			if cmd.Name() == "_session-ended" || cmd.Name() == "_review-session-ended" || cmd.Name() == "init" {
+			if cmd.Name() == "_session-ended" || cmd.Name() == "init" {
 				return nil
 			}
 
@@ -215,7 +215,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 
 	// Internal commands (hidden)
 	sessionEndedCmd := newSessionEndedCommand(c)
-	reviewSessionEndedCmd := newReviewSessionEndedCommand(c)
 
 	// Add subcommands
 	root.AddCommand(
@@ -248,7 +247,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 		managerCmd,
 		workspaceCmd,
 		sessionEndedCmd,
-		reviewSessionEndedCmd,
 	)
 
 	return root

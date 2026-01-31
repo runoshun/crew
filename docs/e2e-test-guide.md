@@ -76,7 +76,7 @@ crew start <id> cc-medium
 crew list | grep <id>
 
 # 4. Run review(s) until requirement is satisfied
-crew review <id> --wait
+crew review <id>
 
 # 5. Complete task (should move to done)
 crew complete <id>
@@ -137,7 +137,7 @@ crew start <id> codex
 crew list | grep <id>
 
 # 4. Run review(s) until requirement is satisfied
-crew review <id> --wait
+crew review <id>
 
 # 5. Complete task (should move to done)
 crew complete <id>
@@ -251,13 +251,13 @@ crew new --title "E2E: Completion flow test" --body "Please run echo hello"
 crew start <id> cc-small
 
 # 3. Review (repeat until min_reviews is satisfied)
-crew review <id> --wait
+crew review <id>
 
 # 4. Complete (should fail until min_reviews is satisfied)
 crew complete <id>
 
 # 5. Repeat review/complete until it succeeds
-crew review <id> --wait
+crew review <id>
 crew complete <id>
 
 # 6. Merge
@@ -283,7 +283,7 @@ crew new --title "E2E: Review revision flow test"
 crew start <id> cc-small
 
 # 2. Review (request changes)
-crew review <id> --wait
+crew review <id>
 
 # 3. Send comment
 crew comment <id> -R "Please fix: XXX"
@@ -292,7 +292,7 @@ crew comment <id> -R "Please fix: XXX"
 crew list | grep <id>
 
 # 5. Re-review after fixes
-crew review <id> --wait
+crew review <id>
 
 # 6. Complete and merge
 crew complete <id>

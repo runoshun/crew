@@ -12,9 +12,8 @@ import (
 
 // ShowLogsInput contains the parameters for showing session logs.
 type ShowLogsInput struct {
-	TaskID int  // Task ID to show logs for
-	Lines  int  // Number of lines to display from the end (0 = all)
-	Review bool // Show review session logs instead of work session
+	TaskID int // Task ID to show logs for
+	Lines  int // Number of lines to display from the end (0 = all)
 }
 
 // ShowLogsOutput contains the result of showing session logs.
@@ -49,12 +48,7 @@ func (uc *ShowLogs) Execute(_ context.Context, in ShowLogsInput) (*ShowLogsOutpu
 	}
 
 	// Get session name
-	var sessionName string
-	if in.Review {
-		sessionName = domain.ReviewSessionName(task.ID)
-	} else {
-		sessionName = domain.SessionName(task.ID)
-	}
+	sessionName := domain.SessionName(task.ID)
 
 	// Get log file path
 	logPath := domain.SessionLogPath(uc.crewDir, sessionName)

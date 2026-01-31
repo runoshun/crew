@@ -43,7 +43,7 @@ crew complete          # Mark task as complete
 - Default: 1
 - `skip_review = true` bypasses the review requirement
 - Review count increments only when `crew review` exits with code 0
-- `crew review --wait` runs the external tool synchronously; without `--wait` it runs in background and does not change task status
+- `crew review` runs the external tool synchronously and does not change task status
 
 ### Configuration
 

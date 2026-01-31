@@ -151,22 +151,6 @@ func TestPathFunctions(t *testing.T) {
 		}
 	})
 
-	t.Run("ReviewScriptPath", func(t *testing.T) {
-		got := ReviewScriptPath(crewDir, 1)
-		want := "/repo/.crew/scripts/review-1.sh"
-		if got != want {
-			t.Errorf("ReviewScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
-		}
-	})
-
-	t.Run("ReviewPromptPath", func(t *testing.T) {
-		got := ReviewPromptPath(crewDir, 1)
-		want := "/repo/.crew/scripts/review-1-prompt.txt"
-		if got != want {
-			t.Errorf("ReviewPromptPath(%q, 1) = %q, want %q", crewDir, got, want)
-		}
-	})
-
 	t.Run("TaskLogPath", func(t *testing.T) {
 		got := TaskLogPath(crewDir, 1)
 		want := "/repo/.crew/logs/task-1.log"
@@ -188,14 +172,6 @@ func TestPathFunctions(t *testing.T) {
 		want := "/repo/.crew/logs/crew-1.log"
 		if got != want {
 			t.Errorf("SessionLogPath(%q, %q) = %q, want %q", crewDir, "crew-1", got, want)
-		}
-	})
-
-	t.Run("SessionLogPath_review", func(t *testing.T) {
-		got := SessionLogPath(crewDir, "crew-1-review")
-		want := "/repo/.crew/logs/crew-1-review.log"
-		if got != want {
-			t.Errorf("SessionLogPath(%q, %q) = %q, want %q", crewDir, "crew-1-review", got, want)
 		}
 	})
 

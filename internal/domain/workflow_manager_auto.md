@@ -5,7 +5,7 @@ Trigger: Say **"auto mode"** to activate this workflow for managing multiple in-
 ## Purpose
 
 Advance all in-progress tasks automatically with minimal human intervention. Continue looping until:
-- All tasks reach ✅ **LGTM** status, OR
+- All tasks reach ✅ **done** status, OR
 - ⚠️ An undecidable problem occurs (stop and report to user)
 
 ## Important: No Interaction During Auto Mode
@@ -19,12 +19,12 @@ Advance all in-progress tasks automatically with minimal human intervention. Con
 ## Task Flow (Expected)
 
 ```
-in_progress → run `crew review --wait`
+in_progress → run `crew review`
            → if LGTM: `crew complete` → done
 done → ready to merge
 ```
 
-Managers run `crew review --wait` and `crew complete` when a task is ready. Review does not change status.
+Managers run `crew review` and `crew complete` when a task is ready. Review does not change status.
 
 ## Target Statuses
 
@@ -114,7 +114,7 @@ crew send <id> Enter
 
 **Review step (sync):**
 ```bash
-crew review <id> --wait
+crew review <id>
 ```
 
 **If LGTM:**
