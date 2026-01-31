@@ -19,15 +19,17 @@ const defaultPollInterval = 200 * time.Millisecond
 
 // FileIPCFactory creates file-based ACP IPC instances.
 type FileIPCFactory struct {
+	logger       domain.Logger
 	crewDir      string
 	pollInterval time.Duration
 }
 
 // NewFileIPCFactory creates a new file-based IPC factory.
-func NewFileIPCFactory(crewDir string) *FileIPCFactory {
+func NewFileIPCFactory(crewDir string, logger domain.Logger) *FileIPCFactory {
 	return &FileIPCFactory{
 		crewDir:      crewDir,
 		pollInterval: defaultPollInterval,
+		logger:       logger,
 	}
 }
 
@@ -37,13 +39,17 @@ func (f *FileIPCFactory) ForTask(namespace string, taskID int) domain.ACPIPC {
 	return &FileIPC{
 		commandsDir:  filepath.Join(base, "commands"),
 		pollInterval: f.pollInterval,
+		logger:       f.logger,
+		taskID:       taskID,
 	}
 }
 
 // FileIPC implements ACP IPC using filesystem polling.
 type FileIPC struct {
+	logger       domain.Logger
 	commandsDir  string
 	pollInterval time.Duration
+	taskID       int
 }
 
 // Next blocks until a command is available or context is canceled.
@@ -140,18 +146,18 @@ func (f *FileIPC) ensureDir() error {
 func (f *FileIPC) readCommand(path string) (domain.ACPCommand, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		f.moveToFailed(path)
+		f.moveToFailed(path, fmt.Errorf("read command: %w", err))
 		return domain.ACPCommand{}, false
 	}
 
 	var cmd domain.ACPCommand
 	if err := json.Unmarshal(data, &cmd); err != nil {
-		f.moveToFailed(path)
+		f.moveToFailed(path, fmt.Errorf("decode command: %w", err))
 		return domain.ACPCommand{}, false
 	}
 
 	if err := cmd.Validate(); err != nil {
-		f.moveToFailed(path)
+		f.moveToFailed(path, fmt.Errorf("validate command: %w", err))
 		return domain.ACPCommand{}, false
 	}
 
@@ -162,7 +168,8 @@ func (f *FileIPC) readCommand(path string) (domain.ACPCommand, bool) {
 	return cmd, true
 }
 
-func (f *FileIPC) moveToFailed(path string) {
+func (f *FileIPC) moveToFailed(path string, reason error) {
+	f.warnFailed(path, reason)
 	failedDir := filepath.Join(f.commandsDir, "failed")
 	if err := os.MkdirAll(failedDir, 0750); err == nil {
 		base := filepath.Base(path)
@@ -172,6 +179,14 @@ func (f *FileIPC) moveToFailed(path string) {
 		}
 	}
 	_ = os.Rename(path, path+".bad")
+}
+
+func (f *FileIPC) warnFailed(path string, reason error) {
+	if f.logger == nil {
+		return
+	}
+	msg := fmt.Sprintf("failed to load command %s: %v", filepath.Base(path), reason)
+	f.logger.Warn(f.taskID, "acp-ipc", msg)
 }
 
 func newCommandID() string {

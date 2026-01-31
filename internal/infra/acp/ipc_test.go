@@ -16,7 +16,7 @@ func TestFileIPC_SendNext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	factory := acpinfra.NewFileIPCFactory(t.TempDir())
+	factory := acpinfra.NewFileIPCFactory(t.TempDir(), nil)
 	ipc := factory.ForTask("default", 1)
 
 	cmd1 := domain.ACPCommand{ID: "0001", Type: domain.ACPCommandPrompt, Text: "hello"}

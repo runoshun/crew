@@ -186,14 +186,14 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		return nil, fmt.Errorf("acp new session: %w", err)
 	}
 
-	ipc := uc.ipcFactory.ForTask(resolveNamespaceForIPC(cfg, uc.git), task.ID)
+	ipc := uc.ipcFactory.ForTask(shared.ResolveACPNamespace(cfg, uc.git), task.ID)
 	router := newACPCommandRouter(ipc, permissionCh, promptCh, cancelCh, stopCh)
 	routerErrCh := router.Start(cmdCtx)
 
 	for {
 		select {
 		case cmd := <-promptCh:
-			if err := uc.handlePrompt(ctx, conn, session.SessionId, cmd); err != nil {
+			if err := uc.handlePrompt(cmdCtx, conn, session.SessionId, cmd); err != nil {
 				uc.writeError("prompt", err)
 			}
 		case <-cancelCh:
@@ -216,6 +216,10 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			}
 			return nil, fmt.Errorf("agent process exited: %w", err)
 		case <-conn.Done():
+			cancel()
+			if err := <-procErrCh; err != nil && !errors.Is(cmdCtx.Err(), context.Canceled) {
+				return nil, fmt.Errorf("agent process exited: %w", err)
+			}
 			return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -496,25 +500,6 @@ func cancelPermissionResponse() acpsdk.RequestPermissionResponse {
 			},
 		},
 	}
-}
-
-func resolveNamespaceForIPC(cfg *domain.Config, git domain.Git) string {
-	if cfg != nil && cfg.Tasks.Namespace != "" {
-		namespace := domain.SanitizeNamespace(cfg.Tasks.Namespace)
-		if namespace != "" {
-			return namespace
-		}
-	}
-	if git != nil {
-		email, err := git.UserEmail()
-		if err == nil {
-			namespace := domain.NamespaceFromEmail(email)
-			if namespace != "" {
-				return namespace
-			}
-		}
-	}
-	return "default"
 }
 
 func buildEnv(env map[string]string) ([]string, error) {

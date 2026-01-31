@@ -114,7 +114,7 @@ func New(dir string) (*Container, error) {
 	commandExecutor := executor.NewClient()
 
 	// Create ACP IPC factory
-	acpIPCFactory := acpinfra.NewFileIPCFactory(cfg.CrewDir)
+	acpIPCFactory := acpinfra.NewFileIPCFactory(cfg.CrewDir, logger)
 
 	return &Container{
 		Tasks:            taskRepo,
@@ -282,6 +282,16 @@ func (c *Container) PruneTasksUseCase() *usecase.PruneTasks {
 // ExecCommandUseCase returns a new ExecCommand use case.
 func (c *Container) ExecCommandUseCase() *usecase.ExecCommand {
 	return usecase.NewExecCommand(c.Tasks, c.Worktrees)
+}
+
+// ACPControlUseCase returns a new ACPControl use case.
+func (c *Container) ACPControlUseCase() *usecase.ACPControl {
+	return usecase.NewACPControl(
+		c.Tasks,
+		c.ConfigLoader,
+		c.Git,
+		c.ACPIPCFactory,
+	)
 }
 
 // ACPRunUseCase returns a new ACPRun use case.
