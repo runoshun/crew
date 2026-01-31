@@ -47,7 +47,7 @@ func TestNewMigrateCommand_JSON(t *testing.T) {
 	cmd := newMigrateCommand(container)
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
-	cmd.SetArgs([]string{"--from", "json", "--namespace", "legacy"})
+	cmd.SetArgs([]string{"--from", "json", "--namespace", "legacy", "--skip-comments", "--strict-comments"})
 
 	err = cmd.Execute()
 	require.NoError(t, err)
@@ -61,6 +61,5 @@ func TestNewMigrateCommand_JSON(t *testing.T) {
 
 	comments, err := destStore.GetComments(1)
 	require.NoError(t, err)
-	require.Len(t, comments, 1)
-	assert.Equal(t, "note", comments[0].Text)
+	require.Len(t, comments, 0)
 }

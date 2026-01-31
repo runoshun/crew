@@ -128,10 +128,33 @@ func TestMigrateStore_Execute_CommentsError(t *testing.T) {
 	destInit := &testutil.MockStoreInitializer{}
 
 	uc := NewMigrateStore(source, dest, destInit)
-	_, err := uc.Execute(context.Background(), MigrateStoreInput{})
+	_, err := uc.Execute(context.Background(), MigrateStoreInput{StrictComments: true})
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "get source comments")
+}
+
+func TestMigrateStore_Execute_CommentsError_ToleratesWhenNotStrict(t *testing.T) {
+	source := &testutil.MockTaskRepositoryWithCommentsError{
+		MockTaskRepository: testutil.NewMockTaskRepository(),
+		CommentsErr:        assert.AnError,
+	}
+	source.Tasks[1] = &domain.Task{ID: 1, Title: "Task", Status: domain.StatusTodo, BaseBranch: "main"}
+	dest := testutil.NewMockTaskRepository()
+	destInit := &testutil.MockStoreInitializer{}
+
+	uc := NewMigrateStore(source, dest, destInit)
+	out, err := uc.Execute(context.Background(), MigrateStoreInput{})
+
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, 1, out.Total)
+	assert.Equal(t, 1, out.Migrated)
+	assert.Equal(t, 0, out.Skipped)
+	assert.Equal(t, 1, out.SkippedComments)
+
+	comments := dest.Comments[1]
+	require.Len(t, comments, 0)
 }
 
 func TestMigrateStore_Execute_SaveError(t *testing.T) {

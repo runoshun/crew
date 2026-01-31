@@ -184,6 +184,59 @@ func TestStore_ListAll(t *testing.T) {
 	assert.Equal(t, 1, tasks[1].ID)
 }
 
+func TestStore_List_IgnoresCommentMarkersInCodeFence(t *testing.T) {
+	crewDir := filepath.Join(t.TempDir(), ".crew")
+	store := New(crewDir, "default")
+	_, err := store.Initialize()
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	task := &domain.Task{
+		ID:            1,
+		Title:         "Has example",
+		Description:   "before\n\n~~~\n---\n# Comment: 0\n# Author: reviewer\n# Time: 2026-...\ntext\n~~~\n\nafter",
+		Status:        domain.StatusTodo,
+		Created:       now,
+		BaseBranch:    "main",
+		StatusVersion: domain.StatusVersionCurrent,
+	}
+	require.NoError(t, store.Save(task))
+
+	tasks, err := store.List(domain.TaskFilter{})
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+	assert.Equal(t, 1, tasks[0].ID)
+	assert.Equal(t, domain.StatusTodo, tasks[0].Status)
+}
+
+func TestStore_List_DoesNotTreatInvalidCommentHeaderAsComments(t *testing.T) {
+	crewDir := filepath.Join(t.TempDir(), ".crew")
+	store := New(crewDir, "default")
+	_, err := store.Initialize()
+	require.NoError(t, err)
+
+	mdPath := filepath.Join(crewDir, "tasks", "default", "1.md")
+	metaPath := filepath.Join(crewDir, "tasks", "default", "1.meta.json")
+
+	md := "---\ntitle: Task\n---\n\nBody\n\n---\n# Comment: 0\n# Author: reviewer\n# Time: 2026-...\n\nNot a real comment"
+	require.NoError(t, os.WriteFile(mdPath, []byte(md), 0o644))
+
+	meta := taskMetaPayload{
+		Schema:        intPtr(taskMetaSchema),
+		Status:        strPtr(string(domain.StatusTodo)),
+		Created:       strPtr(time.Now().UTC().Format(time.RFC3339)),
+		BaseBranch:    strPtr("main"),
+		StatusVersion: intPtr(domain.StatusVersionCurrent),
+	}
+	metaBytes, err := json.Marshal(meta)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(metaPath, metaBytes, 0o644))
+
+	tasks, err := store.List(domain.TaskFilter{})
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+}
+
 func TestStore_ListWithLabelFilter(t *testing.T) {
 	crewDir := filepath.Join(t.TempDir(), ".crew")
 	store := New(crewDir, "default")

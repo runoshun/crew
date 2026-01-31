@@ -12,13 +12,24 @@ import (
 )
 
 // MigrateStoreInput contains parameters for MigrateStore.
-type MigrateStoreInput struct{}
+type MigrateStoreInput struct {
+	// SkipComments migrates tasks without reading/writing comments.
+	// This is useful for performance testing or recovering from legacy comment corruption.
+	SkipComments bool
+
+	// StrictComments fails the migration if comments cannot be read from the legacy store.
+	// If false, comment read errors are tolerated and the task is migrated without comments.
+	StrictComments bool
+}
 
 // MigrateStoreOutput contains migration results.
 type MigrateStoreOutput struct {
 	Total    int
 	Migrated int
 	Skipped  int
+	// SkippedComments is the number of tasks whose comments could not be read
+	// from the legacy store and were migrated without comments.
+	SkippedComments int
 }
 
 // MigrateStore migrates tasks from a legacy store to the file store.
@@ -35,7 +46,7 @@ func NewMigrateStore(source, dest domain.TaskRepository, destInit domain.StoreIn
 
 // Execute migrates all tasks and comments from the legacy store.
 // Existing destination tasks are skipped if identical; otherwise it fails.
-func (uc *MigrateStore) Execute(_ context.Context, _ MigrateStoreInput) (*MigrateStoreOutput, error) {
+func (uc *MigrateStore) Execute(_ context.Context, in MigrateStoreInput) (*MigrateStoreOutput, error) {
 	if uc.destInit == nil {
 		return nil, errors.New("destination store initializer is nil")
 	}
@@ -58,23 +69,41 @@ func (uc *MigrateStore) Execute(_ context.Context, _ MigrateStoreInput) (*Migrat
 			continue
 		}
 
-		comments, err := uc.source.GetComments(task.ID)
-		if err != nil {
-			return nil, fmt.Errorf("get source comments for %d: %w", task.ID, err)
+		var comments []domain.Comment
+		commentsOK := true
+		if !in.SkipComments {
+			c, err := uc.source.GetComments(task.ID)
+			if err != nil {
+				if in.StrictComments {
+					return nil, fmt.Errorf("get source comments for %d: %w", task.ID, err)
+				}
+				commentsOK = false
+				out.SkippedComments++
+				comments = nil
+			} else {
+				comments = normalizeComments(c)
+			}
 		}
-		comments = normalizeComments(comments)
 
 		existing, err := uc.dest.Get(task.ID)
 		if err != nil {
 			return nil, fmt.Errorf("check destination task %d: %w", task.ID, err)
 		}
 		if existing != nil {
+			sameTask := tasksEqual(normalizeTaskForCompare(task), normalizeTaskForCompare(existing))
+			if in.SkipComments || !commentsOK {
+				if sameTask {
+					out.Skipped++
+					continue
+				}
+				return nil, fmt.Errorf("%w: task %d", domain.ErrMigrationConflict, task.ID)
+			}
+
 			destComments, err := uc.dest.GetComments(task.ID)
 			if err != nil {
 				return nil, fmt.Errorf("get destination comments for %d: %w", task.ID, err)
 			}
-			if tasksEqual(normalizeTaskForCompare(task), normalizeTaskForCompare(existing)) &&
-				commentsEqual(comments, normalizeComments(destComments)) {
+			if sameTask && commentsEqual(comments, normalizeComments(destComments)) {
 				out.Skipped++
 				continue
 			}

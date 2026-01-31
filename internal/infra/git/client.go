@@ -36,6 +36,12 @@ func (c *Client) RepoRoot() string {
 	return c.repoRoot
 }
 
+// WorkingDir returns the toplevel of the current working directory.
+// This is the worktree root if running inside a git worktree.
+func (c *Client) WorkingDir() string {
+	return c.workingDir
+}
+
 // GitDir returns the .git directory path.
 func (c *Client) GitDir() string {
 	return c.gitDir

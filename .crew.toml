@@ -69,6 +69,11 @@ setup_command = "mise trust"
 ## Log settings
 # level = "info"  # debug, info, warn, error
 
+[tasks]
+# Default namespace for this repository's task store.
+# Overrides the fallback derived from `git config user.email`.
+namespace = "crew"
+
 [tui]
 [tui.keybindings]
 [tui.keybindings.E]

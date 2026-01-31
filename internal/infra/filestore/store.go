@@ -61,7 +61,8 @@ func (s *Store) List(filter domain.TaskFilter) ([]*domain.Task, error) {
 		for _, id := range ids {
 			task, _, err := s.readTask(id)
 			if err != nil {
-				return err
+				tasks = append(tasks, s.corruptedTask(id, err))
+				continue
 			}
 			if task == nil {
 				continue
@@ -90,6 +91,40 @@ func (s *Store) List(filter domain.TaskFilter) ([]*domain.Task, error) {
 	})
 
 	return tasks, nil
+}
+
+func (s *Store) corruptedTask(id int, err error) *domain.Task {
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	msg = strings.ReplaceAll(msg, "\n", " ")
+	msg = strings.TrimSpace(msg)
+	if len(msg) > 160 {
+		msg = msg[:160] + "..."
+	}
+
+	return &domain.Task{
+		ID:            id,
+		Namespace:     s.namespace,
+		Title:         fmt.Sprintf("Task %d", id),
+		Description:   "",
+		Labels:        nil,
+		ParentID:      nil,
+		Created:       time.Time{},
+		Started:       time.Time{},
+		LastReviewAt:  time.Time{},
+		Agent:         "",
+		Session:       "",
+		BaseBranch:    "",
+		Status:        domain.StatusError,
+		CloseReason:   domain.CloseReasonNone,
+		BlockReason:   "corrupted: " + msg,
+		Issue:         0,
+		PR:            0,
+		ReviewCount:   0,
+		StatusVersion: domain.StatusVersionCurrent,
+	}
 }
 
 // ListAll retrieves tasks across all namespaces matching the filter.
@@ -797,16 +832,7 @@ func parseTaskMarkdown(content string) (taskFrontmatter, string, []domain.Commen
 		body = trimLeadingNewlines(joinLines(lines[bodyStart:]))
 	}
 
-	description := body
-	var commentSection string
-	commentSeparator := "\n\n---\n# Comment:"
-	if idx := strings.Index(body, commentSeparator); idx >= 0 {
-		description = body[:idx]
-		commentSection = body[idx+2:]
-	} else if strings.HasPrefix(body, "---\n# Comment:") {
-		description = ""
-		commentSection = body
-	}
+	description, commentSection := splitDescriptionAndCommentSection(body)
 
 	comments, err := parseCommentBlocks(commentSection)
 	if err != nil {
@@ -814,6 +840,76 @@ func parseTaskMarkdown(content string) (taskFrontmatter, string, []domain.Commen
 	}
 
 	return frontmatter, description, comments, nil
+}
+
+func splitDescriptionAndCommentSection(body string) (string, string) {
+	if body == "" {
+		return "", ""
+	}
+
+	lines := splitLines(body)
+
+	// Find the first line that starts a valid comment block.
+	// This avoids false positives when the body contains "---" and "# Comment:" as examples.
+	idx := findFirstValidCommentBlockLine(lines)
+	if idx < 0 {
+		return body, ""
+	}
+
+	description := joinLines(lines[:idx])
+	commentSection := joinLines(lines[idx:])
+	return strings.TrimRight(description, "\n"), trimLeadingNewlines(commentSection)
+}
+
+func findFirstValidCommentBlockLine(lines []string) int {
+	inCodeFence := false
+	for i := 0; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+
+		// Toggle fenced code blocks (``` or ~~~).
+		// We intentionally ignore comment markers inside code fences.
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inCodeFence = !inCodeFence
+			continue
+		}
+		if inCodeFence {
+			continue
+		}
+
+		if !isValidCommentBlockAt(lines, i) {
+			continue
+		}
+		return i
+	}
+	return -1
+}
+
+func isValidCommentBlockAt(lines []string, start int) bool {
+	if start < 0 || start+4 > len(lines) {
+		return false
+	}
+	if lines[start] != "---" {
+		return false
+	}
+	if len(lines[start+1]) < 12 || lines[start+1][:11] != "# Comment: " {
+		return false
+	}
+	idxStr := strings.TrimSpace(lines[start+1][11:])
+	idx, err := strconv.Atoi(idxStr)
+	if err != nil || idx < 0 {
+		return false
+	}
+	if len(lines[start+2]) < 9 || lines[start+2][:9] != "# Author:" {
+		return false
+	}
+	if len(lines[start+3]) < 8 || lines[start+3][:7] != "# Time:" {
+		return false
+	}
+	timeStr := strings.TrimSpace(lines[start+3][7:])
+	if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
+		return false
+	}
+	return true
 }
 
 func parseFrontmatter(lines []string) (taskFrontmatter, error) {

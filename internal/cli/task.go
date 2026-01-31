@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -285,10 +286,13 @@ Examples:
 
 			// Print output
 			if opts.Processes {
+				warnCorruptedTasks(cmd.ErrOrStderr(), extractTasksFromWithInfo(out.TasksWithInfo))
 				printProcessList(cmd.OutOrStdout(), out.TasksWithInfo)
 			} else if opts.Sessions {
+				warnCorruptedTasks(cmd.ErrOrStderr(), extractTasksFromWithInfo(out.TasksWithInfo))
 				printTaskListWithSessions(cmd.OutOrStdout(), out.TasksWithInfo, c.Clock)
 			} else {
+				warnCorruptedTasks(cmd.ErrOrStderr(), out.Tasks)
 				printTaskList(cmd.OutOrStdout(), out.Tasks, c.Clock)
 			}
 			return nil
@@ -613,10 +617,57 @@ Examples:
 
 // formatTaskTitle adds [BLOCKED] prefix if the task is blocked.
 func formatTaskTitle(task *domain.Task) string {
+	if task.Status == domain.StatusError && strings.HasPrefix(task.BlockReason, "corrupted:") {
+		return "[CORRUPTED] " + task.Title
+	}
 	if task.IsBlocked() {
 		return "[BLOCKED] " + task.Title
 	}
 	return task.Title
+}
+
+func extractTasksFromWithInfo(tasksWithInfo []usecase.TaskWithSession) []*domain.Task {
+	res := make([]*domain.Task, 0, len(tasksWithInfo))
+	for _, info := range tasksWithInfo {
+		if info.Task == nil {
+			continue
+		}
+		res = append(res, info.Task)
+	}
+	return res
+}
+
+func warnCorruptedTasks(w io.Writer, tasks []*domain.Task) {
+	if w == nil {
+		return
+	}
+
+	ids := make([]string, 0)
+	seen := make(map[string]bool)
+	for _, t := range tasks {
+		if t == nil {
+			continue
+		}
+		if t.Status != domain.StatusError || !strings.HasPrefix(t.BlockReason, "corrupted:") {
+			continue
+		}
+		ns := t.Namespace
+		if ns == "" {
+			ns = "-"
+		}
+		key := fmt.Sprintf("%s#%d", ns, t.ID)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		ids = append(ids, key)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	slices.Sort(ids)
+
+	_, _ = fmt.Fprintf(w, "Warning: detected %d corrupted task file(s): %s\n", len(ids), strings.Join(ids, ", "))
 }
 
 // resolveTaskID resolves the task ID from arguments or current branch.
