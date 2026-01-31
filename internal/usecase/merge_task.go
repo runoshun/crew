@@ -75,7 +75,7 @@ func (uc *MergeTask) Execute(_ context.Context, in MergeTaskInput) (*MergeTaskOu
 
 	// Validate status transition (merge only allowed from done)
 	if task.Status != domain.StatusDone {
-		return nil, fmt.Errorf("cannot merge task in %s status (must be done): %w", task.Status, domain.ErrInvalidTransition)
+		return nil, fmt.Errorf("cannot merge task in %s status (must be done): %w", task.Status.Display(), domain.ErrInvalidTransition)
 	}
 
 	// Determine target base branch

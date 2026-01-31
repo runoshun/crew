@@ -112,7 +112,7 @@ func (uc *ListTasks) listTasks(filter domain.TaskFilter, allNamespaces bool) ([]
 	return uc.tasks.List(filter)
 }
 
-// filterActiveOnly removes tasks with terminal status (closed).
+// filterActiveOnly removes tasks with terminal status (merged/closed).
 func filterActiveOnly(tasks []*domain.Task) []*domain.Task {
 	var result []*domain.Task
 	for _, t := range tasks {

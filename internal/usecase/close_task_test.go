@@ -17,10 +17,10 @@ func TestCloseTask_Execute_Success(t *testing.T) {
 	}{
 		{"from todo", domain.StatusTodo},
 		{"from in_progress", domain.StatusInProgress},
-		{"from for_review", domain.StatusDone},
-		{"from reviewing", domain.StatusInProgress},
-		{"from reviewed", domain.StatusDone},
-		{"from stopped", domain.StatusError},
+		{"from done", domain.StatusDone},
+		{"from in_progress (legacy reviewing)", domain.StatusInProgress},
+		{"from done (legacy reviewed)", domain.StatusDone},
+		{"from error (legacy stopped)", domain.StatusError},
 		{"from error", domain.StatusError},
 	}
 

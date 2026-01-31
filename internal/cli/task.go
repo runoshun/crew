@@ -310,6 +310,9 @@ func formatTaskStatus(task *domain.Task, clock domain.Clock) string {
 	statusStr := task.Status.Display()
 	if task.Status == domain.StatusInProgress && !task.Started.IsZero() {
 		elapsed := clock.Now().Sub(task.Started)
+		if elapsed < 0 {
+			elapsed = 0
+		}
 		statusStr = fmt.Sprintf("%s (%s)", statusStr, formatDuration(elapsed))
 	}
 	return statusStr
