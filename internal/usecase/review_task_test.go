@@ -552,5 +552,5 @@ func TestReviewTask_Execute_StatusReviewing(t *testing.T) {
 	// Assert - should succeed
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusDone, out.Task.Status)
+	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
 }

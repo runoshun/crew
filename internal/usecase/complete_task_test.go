@@ -132,9 +132,10 @@ func TestCompleteTask_Execute_CompleteCommandFails(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Task to complete",
-		Status: domain.StatusInProgress,
+		ID:          1,
+		Title:       "Task to complete",
+		Status:      domain.StatusInProgress,
+		ReviewCount: 1,
 	}
 
 	// Use actual directory for test

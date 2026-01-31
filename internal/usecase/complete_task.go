@@ -83,9 +83,10 @@ func NewCompleteTask(
 //   - No uncommitted changes in worktree
 //
 // Processing:
-//   - If [complete].command is configured, execute it (abort on failure)
-//   - If skip_review: set status to reviewed
-//   - If not skip_review: require review count to meet min_reviews
+//   - Validate review requirement (skip_review/min_reviews)
+//   - Check for merge conflicts with base branch
+//   - Run [complete].command if configured (abort on failure)
+//   - Set status to done and save
 func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*CompleteTaskOutput, error) {
 	// Get the task
 	task, err := shared.GetTask(uc.tasks, in.TaskID)
@@ -114,36 +115,10 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		return nil, domain.ErrUncommittedChanges
 	}
 
-	// Resolve base branch for conflict check
-	baseBranch, err := resolveBaseBranch(task, uc.git)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check for merge conflicts with base branch
-	conflictHandler := shared.NewConflictHandler(uc.tasks, uc.sessions, uc.git, uc.clock)
-	conflictOut, conflictErr := conflictHandler.CheckAndHandle(shared.ConflictCheckInput{
-		TaskID:     task.ID,
-		Branch:     branch,
-		BaseBranch: baseBranch,
-	})
-	if conflictErr != nil {
-		return &CompleteTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr
-	}
-
-	// Load config and execute complete.command if configured
+	// Load config for completion checks
 	cfg, err := uc.config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
-	}
-
-	if cfg != nil && cfg.Complete.Command != "" {
-		// Execute the complete command using CommandExecutor
-		cmd := domain.NewShellCommand(cfg.Complete.Command, worktreePath)
-		output, execErr := uc.executor.Execute(cmd)
-		if execErr != nil {
-			return nil, fmt.Errorf("[complete].command failed: %s: %w", string(output), execErr)
-		}
 	}
 
 	// Determine if we should skip review
@@ -174,6 +149,32 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	if !skipReview {
 		if task.ReviewCount < minReviews {
 			return nil, fmt.Errorf("review required: have %d, need %d (run \"crew review %d\")", task.ReviewCount, minReviews, task.ID)
+		}
+	}
+
+	// Resolve base branch for conflict check
+	baseBranch, err := resolveBaseBranch(task, uc.git)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check for merge conflicts with base branch
+	conflictHandler := shared.NewConflictHandler(uc.tasks, uc.sessions, uc.git, uc.clock)
+	conflictOut, conflictErr := conflictHandler.CheckAndHandle(shared.ConflictCheckInput{
+		TaskID:     task.ID,
+		Branch:     branch,
+		BaseBranch: baseBranch,
+	})
+	if conflictErr != nil {
+		return &CompleteTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr
+	}
+
+	if cfg != nil && cfg.Complete.Command != "" {
+		// Execute the complete command using CommandExecutor
+		cmd := domain.NewShellCommand(cfg.Complete.Command, worktreePath)
+		output, execErr := uc.executor.Execute(cmd)
+		if execErr != nil {
+			return nil, fmt.Errorf("[complete].command failed: %s: %w", string(output), execErr)
 		}
 	}
 

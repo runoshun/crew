@@ -86,7 +86,7 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 	}
 
 	// Validate status - must be in_progress or done
-	// done is allowed because CompleteTask transitions to it before starting review
+	// done is allowed for re-review; review does not change status
 	if task.Status != domain.StatusInProgress && task.Status != domain.StatusDone {
 		return nil, fmt.Errorf("cannot review task in %s status (must be in_progress or done): %w", task.Status, domain.ErrInvalidTransition)
 	}
@@ -122,13 +122,6 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 
 // executeSync runs the review synchronously and returns the result.
 func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput) (*ReviewTaskOutput, error) {
-	// Keep status as in_progress during review
-	originalStatus := task.Status
-	task.Status = domain.StatusInProgress
-	if err := uc.tasks.Save(task); err != nil {
-		return nil, fmt.Errorf("save task: %w", err)
-	}
-
 	reviewOut, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
 		Tasks:    uc.tasks,
 		Executor: uc.executor,
@@ -141,17 +134,11 @@ func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, review
 		SkipStatusCheck: true,
 	})
 	if err != nil {
-		// Revert status to original on error
-		task.Status = originalStatus
-		_ = uc.tasks.Save(task)
 		return nil, err
 	}
-
-	// Update task status to done (review complete)
-	task.Status = domain.StatusDone
 	if err := uc.tasks.Save(task); err != nil {
 		// Log but don't fail - the review was successful
-		_, _ = fmt.Fprintf(uc.stderr, "warning: failed to update task status: %v\n", err)
+		_, _ = fmt.Fprintf(uc.stderr, "warning: failed to save review metadata: %v\n", err)
 	}
 
 	return &ReviewTaskOutput{
@@ -168,14 +155,6 @@ func (uc *ReviewTask) executeBackground(ctx context.Context, task *domain.Task, 
 		return nil, fmt.Errorf("generate review script: %w", err)
 	}
 
-	// Keep status as in_progress during background review
-	originalStatus := task.Status
-	task.Status = domain.StatusInProgress
-	if err := uc.tasks.Save(task); err != nil {
-		uc.cleanupScript(task.ID)
-		return nil, fmt.Errorf("save task: %w", err)
-	}
-
 	// Start session with the generated script
 	if err := uc.sessions.Start(ctx, domain.StartSessionOptions{
 		Name:      sessionName,
@@ -186,9 +165,6 @@ func (uc *ReviewTask) executeBackground(ctx context.Context, task *domain.Task, 
 		TaskAgent: agentName,
 		Type:      domain.SessionTypeReviewer,
 	}); err != nil {
-		// Rollback status
-		task.Status = originalStatus
-		_ = uc.tasks.Save(task)
 		uc.cleanupScript(task.ID)
 		return nil, fmt.Errorf("start session: %w", err)
 	}

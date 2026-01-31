@@ -42,7 +42,7 @@ func NewReviewSessionEnded(tasks domain.TaskRepository, clock domain.Clock, crew
 }
 
 // Execute handles review session termination.
-// It saves the review output as a comment, updates status, and deletes script files.
+// It saves the review output as a comment, updates review metadata, and deletes script files.
 func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedInput) (*ReviewSessionEndedOutput, error) {
 	// Get task
 	task, err := uc.tasks.Get(in.TaskID)
@@ -87,9 +87,8 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 		task.ReviewCount++
 		task.LastReviewAt = now
 		task.LastReviewIsLGTM = &isLGTM
-		task.Status = domain.StatusDone
 	}
-	// On error (non-zero exit code), keep as in_progress to allow retry
+	// On error (non-zero exit code), leave status unchanged
 
 	// Save task
 	if err := uc.tasks.Save(task); err != nil {

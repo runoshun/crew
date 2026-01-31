@@ -41,9 +41,9 @@ func TestReviewSessionEnded_Execute_Success(t *testing.T) {
 	require.NotNil(t, out)
 	assert.False(t, out.Ignored)
 
-	// Verify task was updated
+	// Verify task status remains unchanged
 	task := repo.Tasks[1]
-	assert.Equal(t, domain.StatusDone, task.Status)
+	assert.Equal(t, domain.StatusInProgress, task.Status)
 
 	// Verify comment was added via repository
 	comments, err := repo.GetComments(1)
