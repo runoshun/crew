@@ -32,6 +32,7 @@ type Task struct {
 	Agent             string      `json:"agent,omitempty"`             // Running agent name (empty if not running)
 	Session           string      `json:"session,omitempty"`           // tmux session name (empty if not running)
 	BaseBranch        string      `json:"baseBranch"`                  // Base branch for worktree creation
+	Namespace         string      `json:"-" yaml:"-"`                  // Task namespace (derived from storage path)
 	Status            Status      `json:"status"`                      // Current status
 	CloseReason       CloseReason `json:"closeReason,omitempty"`       // Why the task was closed
 	Title             string      `json:"title"`                       // Title (required)
@@ -89,6 +90,17 @@ func (t *Task) ToMarkdownWithComments(comments []Comment) string {
 		result += "\n"
 	} else {
 		result += "labels:\n"
+	}
+
+	// Add skip_review field
+	if t.SkipReview != nil {
+		if *t.SkipReview {
+			result += "skip_review: true\n"
+		} else {
+			result += "skip_review: false\n"
+		}
+	} else {
+		result += "skip_review:\n"
 	}
 
 	result += "---\n\n" + t.Description
@@ -160,6 +172,10 @@ func (t *Task) FromMarkdown(content string) error {
 	title := ""
 	labelsStr := ""
 	labelsFound := false
+	parentStr := ""
+	parentFound := false
+	skipReviewStr := ""
+	skipReviewFound := false
 	for i := 0; i < endIdx; i++ {
 		line := lines[i]
 		if len(line) > 7 && line[:7] == "title: " {
@@ -169,6 +185,16 @@ func (t *Task) FromMarkdown(content string) error {
 			if len(line) > 7 {
 				// Skip "labels:" (7 chars) and trim leading whitespace
 				labelsStr = trimSpace(line[7:])
+			}
+		} else if len(line) >= 7 && line[:7] == "parent:" {
+			parentFound = true
+			if len(line) > 7 {
+				parentStr = trimSpace(line[7:])
+			}
+		} else if len(line) >= 12 && line[:12] == "skip_review:" {
+			skipReviewFound = true
+			if len(line) > 12 {
+				skipReviewStr = trimSpace(line[12:])
 			}
 		}
 	}
@@ -221,6 +247,46 @@ func (t *Task) FromMarkdown(content string) error {
 		t.Labels = labels
 	}
 	t.Description = description
+
+	// Update parent if present
+	if parentFound {
+		if parentStr == "" {
+			t.ParentID = nil
+		} else {
+			id, err := strToInt(parentStr)
+			if err != nil || id < 0 {
+				return ErrInvalidParentID
+			}
+			if id == 0 {
+				t.ParentID = nil
+			} else {
+				t.ParentID = &id
+			}
+		}
+	}
+
+	// Update skip_review if present
+	if skipReviewFound {
+		if skipReviewStr == "" {
+			t.SkipReview = nil
+		} else {
+			value := skipReviewStr
+			switch value {
+			case "true", "false", "TRUE", "FALSE", "True", "False":
+				// Normalize case
+				if value == "TRUE" || value == "True" {
+					value = "true"
+				}
+				if value == "FALSE" || value == "False" {
+					value = "false"
+				}
+				parsed := value == "true"
+				t.SkipReview = &parsed
+			default:
+				return ErrInvalidSkipReview
+			}
+		}
+	}
 
 	return nil
 }
@@ -309,13 +375,15 @@ type ParsedComment struct {
 // EditorContent represents the parsed content from editor markdown format.
 // Fields are ordered to minimize memory padding.
 type EditorContent struct {
-	ParentID    *int // New parent ID (nil if not found or empty)
-	Title       string
-	Description string
-	Labels      []string
-	Comments    []ParsedComment
-	LabelsFound bool // True if labels field was present in frontmatter
-	ParentFound bool // True if parent field was present in frontmatter
+	ParentID        *int // New parent ID (nil if not found or empty)
+	SkipReview      *bool
+	Title           string
+	Description     string
+	Labels          []string
+	Comments        []ParsedComment
+	LabelsFound     bool // True if labels field was present in frontmatter
+	ParentFound     bool // True if parent field was present in frontmatter
+	SkipReviewFound bool
 }
 
 // ParseEditorContent parses the editor markdown format and extracts task info and comments.
@@ -346,6 +414,8 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 	labelsFound := false
 	parentStr := ""
 	parentFound := false
+	skipReviewStr := ""
+	skipReviewFound := false
 	for i := 0; i < endIdx; i++ {
 		line := lines[i]
 		if len(line) > 7 && line[:7] == "title: " {
@@ -359,6 +429,11 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 			parentFound = true
 			if len(line) > 7 {
 				parentStr = trimSpace(line[7:])
+			}
+		} else if len(line) >= 12 && line[:12] == "skip_review:" {
+			skipReviewFound = true
+			if len(line) > 12 {
+				skipReviewStr = trimSpace(line[12:])
 			}
 		}
 	}
@@ -405,6 +480,25 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 		// id == 0 means remove parent (parentID stays nil)
 	}
 
+	// Parse skip_review
+	var skipReview *bool
+	if skipReviewFound && skipReviewStr != "" {
+		switch skipReviewStr {
+		case "true", "false", "TRUE", "FALSE", "True", "False":
+			value := skipReviewStr
+			if value == "TRUE" || value == "True" {
+				value = "true"
+			}
+			if value == "FALSE" || value == "False" {
+				value = "false"
+			}
+			parsed := value == "true"
+			skipReview = &parsed
+		default:
+			return nil, ErrInvalidSkipReview
+		}
+	}
+
 	// Get body after frontmatter (description + comments)
 	bodyStartIdx := 4 // Skip "---\n"
 	for i := 0; i <= endIdx; i++ {
@@ -449,13 +543,15 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 	}
 
 	return &EditorContent{
-		Title:       title,
-		Description: description,
-		Labels:      labels,
-		Comments:    comments,
-		ParentID:    parentID,
-		LabelsFound: labelsFound,
-		ParentFound: parentFound,
+		Title:           title,
+		Description:     description,
+		Labels:          labels,
+		Comments:        comments,
+		ParentID:        parentID,
+		SkipReview:      skipReview,
+		LabelsFound:     labelsFound,
+		ParentFound:     parentFound,
+		SkipReviewFound: skipReviewFound,
 	}, nil
 }
 

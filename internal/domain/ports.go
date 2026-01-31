@@ -185,6 +185,10 @@ type Git interface {
 	// CurrentBranch returns the name of the current branch.
 	CurrentBranch() (string, error)
 
+	// UserEmail returns the configured git user.email value.
+	// Returns empty string if not set.
+	UserEmail() (string, error)
+
 	// BranchExists checks if a branch exists.
 	BranchExists(branch string) (bool, error)
 

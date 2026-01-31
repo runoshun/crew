@@ -248,6 +248,7 @@ func (m *MockTaskRepositoryWithUpdateCommentError) UpdateComment(_ int, _ int, _
 // Fields are ordered to minimize memory padding.
 type MockGit struct {
 	CurrentBranchErr       error
+	UserEmailErr           error
 	HasUncommittedErr      error
 	MergeErr               error
 	DeleteBranchErr        error
@@ -255,6 +256,7 @@ type MockGit struct {
 	MergeConflictErr       error
 	BranchExistsErr        error
 	CurrentBranchName      *string
+	UserEmailValue         *string
 	DefaultBranchName      *string
 	MergeBranch            *string
 	DeletedBranch          *string
@@ -278,6 +280,17 @@ func (m *MockGit) CurrentBranch() (string, error) {
 	}
 	if m.CurrentBranchName != nil {
 		return *m.CurrentBranchName, nil
+	}
+	return "", nil
+}
+
+// UserEmail returns the configured email or error.
+func (m *MockGit) UserEmail() (string, error) {
+	if m.UserEmailErr != nil {
+		return "", m.UserEmailErr
+	}
+	if m.UserEmailValue != nil {
+		return *m.UserEmailValue, nil
 	}
 	return "", nil
 }

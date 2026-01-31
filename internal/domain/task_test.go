@@ -20,7 +20,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Test Task",
 				Description: "This is a test description",
 			},
-			want: "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nThis is a test description",
+			want: "---\ntitle: Test Task\nparent:\nlabels:\nskip_review:\n---\n\nThis is a test description",
 		},
 		{
 			name: "with title only",
@@ -28,7 +28,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Title Only",
 				Description: "",
 			},
-			want: "---\ntitle: Title Only\nparent:\nlabels:\n---\n\n",
+			want: "---\ntitle: Title Only\nparent:\nlabels:\nskip_review:\n---\n\n",
 		},
 		{
 			name: "with multiline description",
@@ -36,7 +36,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:       "Multi-line",
 				Description: "Line 1\nLine 2\nLine 3",
 			},
-			want: "---\ntitle: Multi-line\nparent:\nlabels:\n---\n\nLine 1\nLine 2\nLine 3",
+			want: "---\ntitle: Multi-line\nparent:\nlabels:\nskip_review:\n---\n\nLine 1\nLine 2\nLine 3",
 		},
 		{
 			name: "with single label",
@@ -45,7 +45,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Description: "Description",
 				Labels:      []string{"bug"},
 			},
-			want: "---\ntitle: Task with label\nparent:\nlabels: bug\n---\n\nDescription",
+			want: "---\ntitle: Task with label\nparent:\nlabels: bug\nskip_review:\n---\n\nDescription",
 		},
 		{
 			name: "with multiple labels",
@@ -54,7 +54,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Description: "Description",
 				Labels:      []string{"bug", "urgent", "frontend"},
 			},
-			want: "---\ntitle: Task with labels\nparent:\nlabels: bug, urgent, frontend\n---\n\nDescription",
+			want: "---\ntitle: Task with labels\nparent:\nlabels: bug, urgent, frontend\nskip_review:\n---\n\nDescription",
 		},
 		{
 			name: "with labels and no description",
@@ -62,7 +62,7 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:  "Labels only",
 				Labels: []string{"feature"},
 			},
-			want: "---\ntitle: Labels only\nparent:\nlabels: feature\n---\n\n",
+			want: "---\ntitle: Labels only\nparent:\nlabels: feature\nskip_review:\n---\n\n",
 		},
 		{
 			name: "with parent",
@@ -70,7 +70,23 @@ func TestTask_ToMarkdown(t *testing.T) {
 				Title:    "Sub task",
 				ParentID: intPtr(5),
 			},
-			want: "---\ntitle: Sub task\nparent: 5\nlabels:\n---\n\n",
+			want: "---\ntitle: Sub task\nparent: 5\nlabels:\nskip_review:\n---\n\n",
+		},
+		{
+			name: "with skip_review true",
+			task: &Task{
+				Title:      "Skip review",
+				SkipReview: boolPtr(true),
+			},
+			want: "---\ntitle: Skip review\nparent:\nlabels:\nskip_review: true\n---\n\n",
+		},
+		{
+			name: "with skip_review false",
+			task: &Task{
+				Title:      "Require review",
+				SkipReview: boolPtr(false),
+			},
+			want: "---\ntitle: Require review\nparent:\nlabels:\nskip_review: false\n---\n\n",
 		},
 	}
 
@@ -351,7 +367,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 				Description: "Description",
 			},
 			comments: nil,
-			want:     "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nDescription",
+			want:     "---\ntitle: Test Task\nparent:\nlabels:\nskip_review:\n---\n\nDescription",
 		},
 		{
 			name: "single comment",
@@ -362,7 +378,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 			comments: []Comment{
 				{Text: "First comment", Author: "worker", Time: now},
 			},
-			want: "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment",
+			want: "---\ntitle: Test Task\nparent:\nlabels:\nskip_review:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment",
 		},
 		{
 			name: "multiple comments",
@@ -375,7 +391,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 				{Text: "First comment", Author: "worker", Time: now},
 				{Text: "Second comment", Author: "manager", Time: later},
 			},
-			want: "---\ntitle: Test Task\nparent:\nlabels: bug\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment\n\n---\n# Comment: 1\n# Author: manager\n# Time: 2026-01-18T11:00:00Z\n\nSecond comment",
+			want: "---\ntitle: Test Task\nparent:\nlabels: bug\nskip_review:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment\n\n---\n# Comment: 1\n# Author: manager\n# Time: 2026-01-18T11:00:00Z\n\nSecond comment",
 		},
 		{
 			name: "comment with empty author",
@@ -386,7 +402,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 			comments: []Comment{
 				{Text: "Comment without author", Author: "", Time: now},
 			},
-			want: "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: \n# Time: 2026-01-18T10:00:00Z\n\nComment without author",
+			want: "---\ntitle: Test Task\nparent:\nlabels:\nskip_review:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: \n# Time: 2026-01-18T10:00:00Z\n\nComment without author",
 		},
 		{
 			name: "multiline comment",
@@ -397,7 +413,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 			comments: []Comment{
 				{Text: "Line 1\nLine 2\nLine 3", Author: "worker", Time: now},
 			},
-			want: "---\ntitle: Test Task\nparent:\nlabels:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nLine 1\nLine 2\nLine 3",
+			want: "---\ntitle: Test Task\nparent:\nlabels:\nskip_review:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nLine 1\nLine 2\nLine 3",
 		},
 		{
 			name: "task with parent",
@@ -407,7 +423,7 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 				ParentID:    intPtr(10),
 			},
 			comments: nil,
-			want:     "---\ntitle: Sub Task\nparent: 10\nlabels:\n---\n\nDescription",
+			want:     "---\ntitle: Sub Task\nparent: 10\nlabels:\nskip_review:\n---\n\nDescription",
 		},
 	}
 
@@ -760,6 +776,56 @@ Description`,
 	}
 }
 
+func TestParseEditorContent_SkipReview(t *testing.T) {
+	content := `---
+title: Test Task
+skip_review: true
+labels:
+---
+
+Description`
+	got, err := ParseEditorContent(content)
+	require.NoError(t, err)
+	require.True(t, got.SkipReviewFound)
+	require.NotNil(t, got.SkipReview)
+	assert.True(t, *got.SkipReview)
+
+	content = `---
+title: Test Task
+skip_review: false
+labels:
+---
+
+Description`
+	got, err = ParseEditorContent(content)
+	require.NoError(t, err)
+	require.True(t, got.SkipReviewFound)
+	require.NotNil(t, got.SkipReview)
+	assert.False(t, *got.SkipReview)
+
+	content = `---
+title: Test Task
+skip_review:
+labels:
+---
+
+Description`
+	got, err = ParseEditorContent(content)
+	require.NoError(t, err)
+	require.True(t, got.SkipReviewFound)
+	assert.Nil(t, got.SkipReview)
+
+	content = `---
+title: Test Task
+skip_review: yes
+labels:
+---
+
+Description`
+	_, err = ParseEditorContent(content)
+	require.Error(t, err)
+}
+
 func TestRoundTripWithComments(t *testing.T) {
 	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
 	later := now.Add(time.Hour)
@@ -830,6 +896,10 @@ func TestRoundTripWithComments(t *testing.T) {
 // intPtr returns a pointer to the given int.
 func intPtr(n int) *int {
 	return &n
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }
 
 func TestTask_IsBlocked(t *testing.T) {

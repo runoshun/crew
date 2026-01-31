@@ -290,6 +290,11 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 		}
 	}
 
+	// Handle skip_review change from editor
+	if content.SkipReviewFound {
+		task.SkipReview = content.SkipReview
+	}
+
 	// Atomically save task and comments together
 	if err := uc.tasks.SaveTaskWithComments(task, updatedComments); err != nil {
 		return nil, fmt.Errorf("save task with comments: %w", err)

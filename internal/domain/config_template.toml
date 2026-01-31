@@ -50,6 +50,9 @@
 
 [tasks]
 ## Task settings
+## - namespace: Task namespace (defaults to git user.email local part or "default")
+##   - Set explicitly to override namespace resolution
+## # namespace = ""
 ## - new_task_base: Base branch for new tasks
 ##   - "current" (default): Use the current branch as base
 ##   - "default": Use the default branch (main) as base

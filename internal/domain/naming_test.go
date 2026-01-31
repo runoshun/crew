@@ -42,6 +42,53 @@ func TestParseBranchTaskID(t *testing.T) {
 	}
 }
 
+func TestNamespaceFromEmail(t *testing.T) {
+	tests := []struct {
+		name  string
+		email string
+		want  string
+	}{
+		{name: "empty", email: "", want: ""},
+		{name: "missing at", email: "invalid", want: ""},
+		{name: "simple", email: "user@example.com", want: "user"},
+		{name: "sanitize", email: "User.Name+tag@example.com", want: "user-name-tag"},
+		{name: "leading symbols", email: ".user@example.com", want: "user"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NamespaceFromEmail(tt.email)
+			if got != tt.want {
+				t.Errorf("NamespaceFromEmail(%q) = %q, want %q", tt.email, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSanitizeNamespace(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "empty", input: "", want: ""},
+		{name: "simple", input: "crew", want: "crew"},
+		{name: "uppercase", input: "Crew", want: "crew"},
+		{name: "spaces", input: "crew tasks", want: "crew-tasks"},
+		{name: "symbols", input: "user.name+tag", want: "user-name-tag"},
+		{name: "trim hyphens", input: "-name-", want: "name"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SanitizeNamespace(tt.input)
+			if got != tt.want {
+				t.Errorf("SanitizeNamespace(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestBranchName(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -154,7 +201,7 @@ func TestPathFunctions(t *testing.T) {
 
 	t.Run("TasksStorePath", func(t *testing.T) {
 		got := TasksStorePath(crewDir)
-		want := "/repo/.crew/tasks.json"
+		want := "/repo/.crew/tasks"
 		if got != want {
 			t.Errorf("TasksStorePath(%q) = %q, want %q", crewDir, got, want)
 		}

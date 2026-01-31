@@ -31,7 +31,7 @@ func TestInitRepo_Execute_Success(t *testing.T) {
 	// Setup temp directory
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".git", "crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 
 	// Create mock initializer
 	mock := &mockInitializer{}
@@ -74,7 +74,7 @@ func TestInitRepo_Execute_AlreadyInitialized(t *testing.T) {
 	// Execute
 	out, err := uc.Execute(context.Background(), InitRepoInput{
 		CrewDir:   crewDir,
-		StorePath: filepath.Join(crewDir, "tasks.json"),
+		StorePath: filepath.Join(crewDir, "tasks"),
 	})
 
 	// Assert - now returns success with AlreadyInitialized flag
@@ -95,7 +95,7 @@ func TestInitRepo_Execute_InitializerError(t *testing.T) {
 	// Execute
 	_, err := uc.Execute(context.Background(), InitRepoInput{
 		CrewDir:   crewDir,
-		StorePath: filepath.Join(crewDir, "tasks.json"),
+		StorePath: filepath.Join(crewDir, "tasks"),
 	})
 
 	// Assert
@@ -107,7 +107,7 @@ func TestInitRepo_Execute_GitignoreNeedsAdd(t *testing.T) {
 	// Setup temp directory without .gitignore
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 
 	mock := &mockInitializer{}
 	uc := NewInitRepo(mock)
@@ -128,7 +128,7 @@ func TestInitRepo_Execute_GitignoreAlreadyContainsCrew(t *testing.T) {
 	// Setup temp directory with .gitignore containing .crew/
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 
 	require.NoError(t, os.WriteFile(gitignorePath, []byte(".crew/\n"), 0o644))
@@ -152,7 +152,7 @@ func TestInitRepo_Execute_GitignoreContainsCrewWithoutSlash(t *testing.T) {
 	// Setup temp directory with .gitignore containing .crew (without slash)
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 
 	require.NoError(t, os.WriteFile(gitignorePath, []byte(".crew\n"), 0o644))
@@ -176,7 +176,7 @@ func TestInitRepo_Execute_GitignoreWithComment(t *testing.T) {
 	// Setup temp directory with .gitignore containing comment before .crew/
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 
 	require.NoError(t, os.WriteFile(gitignorePath, []byte("# crew directory\n.crew/\n"), 0o644))
@@ -200,7 +200,7 @@ func TestInitRepo_Execute_GitignoreWithAnchoredPattern(t *testing.T) {
 	// Setup temp directory with .gitignore containing anchored pattern /.crew/
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 
 	require.NoError(t, os.WriteFile(gitignorePath, []byte("/.crew/\n"), 0o644))
@@ -224,7 +224,7 @@ func TestInitRepo_Execute_GitignoreWithTrailingWhitespace(t *testing.T) {
 	// Setup temp directory with .gitignore containing .crew with trailing space
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 
 	require.NoError(t, os.WriteFile(gitignorePath, []byte(".crew  \n"), 0o644))
@@ -248,7 +248,7 @@ func TestInitRepo_Execute_GitignoreWithWindowsLineEndings(t *testing.T) {
 	// Setup temp directory with .gitignore containing CRLF line endings
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 
 	require.NoError(t, os.WriteFile(gitignorePath, []byte("node_modules\r\n.crew/\r\n"), 0o644))
@@ -272,7 +272,7 @@ func TestInitRepo_Execute_AlreadyInitializedButGitignoreMissing(t *testing.T) {
 	// Setup temp directory without .gitignore, already initialized (migration case)
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 
 	// Create .crew directory (simulating already initialized)
 	require.NoError(t, os.MkdirAll(crewDir, 0o750))
@@ -297,7 +297,7 @@ func TestInitRepo_Execute_GitignoreWithLeadingWhitespace(t *testing.T) {
 	// Setup temp directory with .gitignore containing .crew with leading whitespace
 	tmpDir := t.TempDir()
 	crewDir := filepath.Join(tmpDir, ".crew")
-	storePath := filepath.Join(crewDir, "tasks.json")
+	storePath := filepath.Join(crewDir, "tasks")
 	gitignorePath := filepath.Join(tmpDir, ".gitignore")
 
 	require.NoError(t, os.WriteFile(gitignorePath, []byte("  .crew/\n"), 0o644))

@@ -168,9 +168,9 @@ func TestIntegration_Init(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, info.IsDir())
 
-	// Verify tasks.json exists
-	tasksFile := filepath.Join(crewDir, "tasks.json")
-	_, err = os.Stat(tasksFile)
+	// Verify tasks namespace meta exists
+	metaFile := filepath.Join(crewDir, "tasks", "test", "meta.json")
+	_, err = os.Stat(metaFile)
 	require.NoError(t, err)
 }
 

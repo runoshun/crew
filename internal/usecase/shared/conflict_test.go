@@ -107,6 +107,7 @@ func (m *mockGit) GetMergeConflictFiles(_, _ string) ([]string, error) {
 
 // Unused methods
 func (m *mockGit) CurrentBranch() (string, error)               { return "", nil }
+func (m *mockGit) UserEmail() (string, error)                   { return "", nil }
 func (m *mockGit) BranchExists(_ string) (bool, error)          { return true, nil }
 func (m *mockGit) HasUncommittedChanges(_ string) (bool, error) { return false, nil }
 func (m *mockGit) HasMergeConflict(_, _ string) (bool, error)   { return false, nil }

@@ -10,8 +10,8 @@ import (
 func newSyncCmd(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Sync tasks with remote",
-		Long:  "Push and fetch task refs to/from remote repository",
+		Short: "Sync tasks with remote (deprecated)",
+		Long:  "Deprecated: tasks are stored locally and are not synced with remotes",
 	}
 
 	cmd.AddCommand(newPushCmd(c))
@@ -22,34 +22,29 @@ func newSyncCmd(c *app.Container) *cobra.Command {
 }
 
 func newPushCmd(c *app.Container) *cobra.Command {
+	_ = c
 	return &cobra.Command{
 		Use:   "push",
-		Short: "Push task refs to remote",
+		Short: "Push task refs to remote (deprecated)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := c.Tasks.Push(); err != nil {
-				return fmt.Errorf("push failed: %w", err)
+			if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "sync push is deprecated and currently a no-op"); err != nil {
+				return fmt.Errorf("write warning: %w", err)
 			}
-
 			return nil
 		},
 	}
 }
 
 func newFetchCmd(c *app.Container) *cobra.Command {
+	_ = c
 	cmd := &cobra.Command{
 		Use:   "fetch [namespace]",
-		Short: "Fetch task refs from remote",
+		Short: "Fetch task refs from remote (deprecated)",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			namespace := ""
-			if len(args) > 0 {
-				namespace = args[0]
+			if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "sync fetch is deprecated and currently a no-op"); err != nil {
+				return fmt.Errorf("write warning: %w", err)
 			}
-
-			if err := c.Tasks.Fetch(namespace); err != nil {
-				return fmt.Errorf("fetch failed: %w", err)
-			}
-
 			return nil
 		},
 	}
@@ -57,22 +52,13 @@ func newFetchCmd(c *app.Container) *cobra.Command {
 }
 
 func newNamespacesCmd(c *app.Container) *cobra.Command {
+	_ = c
 	return &cobra.Command{
 		Use:   "namespaces",
-		Short: "List available namespaces on remote",
+		Short: "List available namespaces on remote (deprecated)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			namespaces, err := c.Tasks.ListNamespaces()
-			if err != nil {
-				return fmt.Errorf("list namespaces failed: %w", err)
-			}
-
-			if len(namespaces) == 0 {
-				fmt.Println("No namespaces found on remote")
-				return nil
-			}
-
-			for _, ns := range namespaces {
-				fmt.Println(ns)
+			if _, err := fmt.Fprintln(cmd.ErrOrStderr(), "sync namespaces is deprecated and currently a no-op"); err != nil {
+				return fmt.Errorf("write warning: %w", err)
 			}
 			return nil
 		},

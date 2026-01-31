@@ -53,6 +53,21 @@ func (c *Client) CurrentBranch() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// UserEmail returns the configured git user.email value.
+// Returns empty string if not set.
+func (c *Client) UserEmail() (string, error) {
+	cmd := exec.Command("git", "config", "user.email")
+	cmd.Dir = c.repoRoot
+	out, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return "", nil
+		}
+		return "", fmt.Errorf("failed to get user.email: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // BranchExists checks if a branch exists.
 func (c *Client) BranchExists(branch string) (bool, error) {
 	//nolint:gosec // branch name is used as argument, not shell command
