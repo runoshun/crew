@@ -32,6 +32,7 @@ func (m *mockGitForPrune) DeleteBranch(branch string, force bool) error {
 
 // Implement other methods required by interface but not used
 func (m *mockGitForPrune) CurrentBranch() (string, error)                { return "", nil }
+func (m *mockGitForPrune) UserEmail() (string, error)                    { return "", nil }
 func (m *mockGitForPrune) BranchExists(string) (bool, error)             { return true, nil }
 func (m *mockGitForPrune) HasUncommittedChanges(string) (bool, error)    { return false, nil }
 func (m *mockGitForPrune) HasMergeConflict(string, string) (bool, error) { return false, nil }

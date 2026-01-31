@@ -15,7 +15,7 @@ import (
 type InitRepoInput struct {
 	CrewDir   string // Path to .crew directory
 	RepoRoot  string // Path to repository root
-	StorePath string // Path to tasks.json
+	StorePath string // Path to tasks directory
 }
 
 // InitRepoOutput contains the output from InitRepo.
@@ -37,7 +37,7 @@ func NewInitRepo(storeInit domain.StoreInitializer) *InitRepo {
 }
 
 // Execute initializes a repository for git-crew.
-// It creates the .crew/ directory, tmux.conf, and empty tasks.json.
+// It creates the .crew/ directory, tmux.conf, and task store metadata.
 // If already initialized, it still runs Initialize() to repair any inconsistencies.
 func (uc *InitRepo) Execute(_ context.Context, in InitRepoInput) (*InitRepoOutput, error) {
 	alreadyInitialized := uc.storeInit.IsInitialized()
@@ -73,7 +73,7 @@ set -g escape-time 0       # No escape delay
 		}
 	}
 
-	// Initialize task store (creates empty tasks.json or repairs inconsistencies)
+	// Initialize task store (creates meta or repairs inconsistencies)
 	repaired, err := uc.storeInit.Initialize()
 	if err != nil {
 		return nil, fmt.Errorf("initialize task store: %w", err)

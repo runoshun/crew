@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // BranchName returns the branch name for a task.
@@ -70,9 +71,9 @@ func SessionLogPath(crewDir string, sessionName string) string {
 	return filepath.Join(crewDir, "logs", sessionName+".log")
 }
 
-// TasksStorePath returns the path to the tasks.json file.
+// TasksStorePath returns the path to the tasks directory.
 func TasksStorePath(crewDir string) string {
-	return filepath.Join(crewDir, "tasks.json")
+	return filepath.Join(crewDir, "tasks")
 }
 
 // TmuxSocketPath returns the path to the tmux socket.
@@ -121,4 +122,45 @@ func ParseBranchTaskID(branch string) (int, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+// NamespaceFromEmail derives a namespace from the local part of an email address.
+// Returns empty string if the email is invalid or cannot be sanitized.
+func NamespaceFromEmail(email string) string {
+	if email == "" {
+		return ""
+	}
+	idx := strings.Index(email, "@")
+	if idx <= 0 {
+		return ""
+	}
+	local := email[:idx]
+	return SanitizeNamespace(local)
+}
+
+// SanitizeNamespace converts a raw namespace string to a safe format.
+// Keeps lowercase letters and digits, converts other characters to single hyphens.
+func SanitizeNamespace(input string) string {
+	if input == "" {
+		return ""
+	}
+	var b strings.Builder
+	prevDash := false
+	for i := 0; i < len(input); i++ {
+		ch := input[i]
+		if ch >= 'A' && ch <= 'Z' {
+			ch = ch - 'A' + 'a'
+		}
+		if (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') {
+			b.WriteByte(ch)
+			prevDash = false
+			continue
+		}
+		if !prevDash {
+			b.WriteByte('-')
+			prevDash = true
+		}
+	}
+	result := strings.Trim(b.String(), "-")
+	return result
 }

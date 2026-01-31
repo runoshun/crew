@@ -10,9 +10,8 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/infra/config"
 	"github.com/runoshun/git-crew/v2/internal/infra/executor"
+	"github.com/runoshun/git-crew/v2/internal/infra/filestore"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
-	"github.com/runoshun/git-crew/v2/internal/infra/gitstore"
-	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/logging"
 	"github.com/runoshun/git-crew/v2/internal/infra/runner"
 	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
@@ -26,7 +25,7 @@ type Config struct {
 	GitDir      string // Path to .git directory
 	CrewDir     string // Path to .crew directory
 	SocketPath  string // Path to tmux socket
-	StorePath   string // Path to tasks.json
+	StorePath   string // Path to tasks directory
 	WorktreeDir string // Path to worktrees directory
 }
 
@@ -39,7 +38,7 @@ func newConfig(gitClient *git.Client) Config {
 		GitDir:      gitClient.GitDir(),
 		CrewDir:     crewDir,
 		SocketPath:  filepath.Join(crewDir, "tmux.sock"),
-		StorePath:   filepath.Join(crewDir, "tasks.json"),
+		StorePath:   filepath.Join(crewDir, "tasks"),
 		WorktreeDir: filepath.Join(crewDir, "worktrees"),
 	}
 }
@@ -85,26 +84,11 @@ func New(dir string) (*Container, error) {
 		appConfig = domain.NewDefaultConfig()
 	}
 
-	// Create task repository based on config
-	// Default is "git" store; use "json" only if explicitly specified
-	var taskRepo domain.TaskRepository
-	var storeInit domain.StoreInitializer
-	if appConfig != nil && appConfig.Tasks.Store == "json" {
-		jsonStore := jsonstore.New(cfg.StorePath)
-		taskRepo = jsonStore
-		storeInit = jsonStore
-	} else {
-		namespace := "crew"
-		if appConfig != nil && appConfig.Tasks.Namespace != "" {
-			namespace = appConfig.Tasks.Namespace
-		}
-		gitStore, err := gitstore.New(cfg.RepoRoot, namespace)
-		if err != nil {
-			return nil, err
-		}
-		taskRepo = gitStore
-		storeInit = gitStore
-	}
+	// Create task repository (file store)
+	namespace := resolveNamespace(appConfig, gitClient)
+	fileStore := filestore.New(cfg.CrewDir, namespace)
+	var taskRepo domain.TaskRepository = fileStore
+	var storeInit domain.StoreInitializer = fileStore
 
 	// Create logger
 	logLevel := logging.ParseLevel(appConfig.Log.Level)
@@ -324,4 +308,23 @@ func (c *Container) PollStatusUseCase(stdout io.Writer) *usecase.PollStatus {
 // ShowLogsUseCase returns a new ShowLogs use case.
 func (c *Container) ShowLogsUseCase() *usecase.ShowLogs {
 	return usecase.NewShowLogs(c.Tasks, c.Config.CrewDir)
+}
+
+func resolveNamespace(cfg *domain.Config, gitClient domain.Git) string {
+	if cfg != nil && cfg.Tasks.Namespace != "" {
+		namespace := domain.SanitizeNamespace(cfg.Tasks.Namespace)
+		if namespace != "" {
+			return namespace
+		}
+	}
+	if gitClient != nil {
+		email, err := gitClient.UserEmail()
+		if err == nil {
+			namespace := domain.NamespaceFromEmail(email)
+			if namespace != "" {
+				return namespace
+			}
+		}
+	}
+	return "default"
 }

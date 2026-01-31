@@ -246,7 +246,11 @@ These exclusions are applied automatically when starting a task with the agent, 
 
 ```
 .crew/
-├── tasks.json              # Task store
+├── tasks/                  # Task store (namespaced)
+│   ├── default/
+│   │   ├── meta.json
+│   │   ├── 1.md
+│   │   └── 1.meta.json
 ├── config.toml             # Repository config
 ├── config.runtime.toml     # Runtime config (TUI/system state)
 ├── tmux.sock               # tmux socket
@@ -271,4 +275,3 @@ These exclusions are applied automatically when starting a task with the agent, 
 | git | Version control, worktree | Yes |
 | tmux | Session management | Yes |
 | gh | GitHub integration | No |
-

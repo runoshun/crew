@@ -23,6 +23,10 @@ func (m *MockGitForBaseBranch) CurrentBranch() (string, error) {
 	return "", errors.New("not implemented")
 }
 
+func (m *MockGitForBaseBranch) UserEmail() (string, error) {
+	return "", errors.New("not implemented")
+}
+
 func (m *MockGitForBaseBranch) BranchExists(_ string) (bool, error) {
 	return false, errors.New("not implemented")
 }
@@ -122,6 +126,10 @@ func (m *MockGitForNewTaskBaseBranch) GetDefaultBranch() (string, error) {
 
 func (m *MockGitForNewTaskBaseBranch) CurrentBranch() (string, error) {
 	return m.currentBranch, m.currentBranchErr
+}
+
+func (m *MockGitForNewTaskBaseBranch) UserEmail() (string, error) {
+	return "", errors.New("not implemented")
 }
 
 func (m *MockGitForNewTaskBaseBranch) BranchExists(_ string) (bool, error) {

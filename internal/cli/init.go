@@ -21,7 +21,7 @@ func newInitCommand(c *app.Container) *cobra.Command {
 
 This command creates the .crew/ directory with:
 - tmux.conf: minimal tmux configuration
-- tasks.json: empty task store
+- tasks/: task files and metadata
 - scripts/: directory for task scripts
 - logs/: directory for log files
 
