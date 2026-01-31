@@ -283,7 +283,7 @@ func (t *Task) FromMarkdown(content string) error {
 				parsed := value == "true"
 				t.SkipReview = &parsed
 			default:
-				return errors.New("invalid skip_review value")
+				return ErrInvalidSkipReview
 			}
 		}
 	}
@@ -495,7 +495,7 @@ func ParseEditorContent(content string) (*EditorContent, error) {
 			parsed := value == "true"
 			skipReview = &parsed
 		default:
-			return nil, errors.New("invalid skip_review value")
+			return nil, ErrInvalidSkipReview
 		}
 	}
 

@@ -833,7 +833,7 @@ func parseBool(value string) (bool, error) {
 	case "false":
 		return false, nil
 	default:
-		return false, errors.New("invalid skip_review value")
+		return false, domain.ErrInvalidSkipReview
 	}
 }
 
@@ -993,12 +993,32 @@ func decodeJSONStrict(content []byte, v any) error {
 }
 
 func writeAtomic(path string, content []byte, perm os.FileMode) error {
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, content, perm); err != nil {
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	file, err := os.CreateTemp(dir, base+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	name := file.Name()
+	cleanup := func() {
+		_ = os.Remove(name)
+	}
+	if _, err := file.Write(content); err != nil {
+		_ = file.Close()
+		cleanup()
 		return fmt.Errorf("write temp file: %w", err)
 	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
+	if err := file.Chmod(perm); err != nil {
+		_ = file.Close()
+		cleanup()
+		return fmt.Errorf("chmod temp file: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		cleanup()
+		return fmt.Errorf("close temp file: %w", err)
+	}
+	if err := os.Rename(name, path); err != nil {
+		cleanup()
 		return fmt.Errorf("rename temp file: %w", err)
 	}
 	return nil
