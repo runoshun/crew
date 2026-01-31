@@ -85,11 +85,11 @@ func (s Status) Display() string {
 	case StatusInProgress, statusNeedsInputLegacy, statusForReviewLegacy, statusReviewingLegacy, statusStoppedLegacy:
 		return "In Progress"
 	case StatusDone, statusReviewedLegacy:
-		return "Done"
+		return "Done (Unmerged)"
 	case StatusMerged:
 		return "Merged"
 	case StatusClosed:
-		return "Closed"
+		return "Closed (Abandoned)"
 	case StatusError:
 		return "Error"
 	default:

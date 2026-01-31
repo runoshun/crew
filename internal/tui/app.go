@@ -388,10 +388,10 @@ func (m *Model) dialogWidth() int {
 }
 
 var statusPriority = map[domain.Status]int{
-	domain.StatusInProgress: 0, // Work in progress
-	domain.StatusDone:       1, // Complete, awaiting merge
-	domain.StatusError:      2,
-	domain.StatusTodo:       3,
+	domain.StatusTodo:       0,
+	domain.StatusInProgress: 1, // Work in progress
+	domain.StatusDone:       2, // Complete, awaiting merge
+	domain.StatusError:      3,
 	domain.StatusMerged:     4,
 	domain.StatusClosed:     5,
 }

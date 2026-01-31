@@ -120,9 +120,9 @@ func TestStatus_Display(t *testing.T) {
 	}{
 		{StatusTodo, "To Do"},
 		{StatusInProgress, "In Progress"},
-		{StatusDone, "Done"},
+		{StatusDone, "Done (Unmerged)"},
 		{StatusMerged, "Merged"},
-		{StatusClosed, "Closed"},
+		{StatusClosed, "Closed (Abandoned)"},
 		{StatusError, "Error"},
 		{Status("unknown"), "unknown"},
 	}
