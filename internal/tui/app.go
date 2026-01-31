@@ -1177,11 +1177,10 @@ func renderTemplate(tmpl string, data any) (string, error) {
 // reviewTask returns a command that reviews a task using the AI reviewer.
 func (m *Model) reviewTask(taskID int, agent string) tea.Cmd {
 	return func() tea.Msg {
-		uc := m.container.ReviewTaskUseCase(io.Discard, io.Discard)
+		uc := m.container.ReviewTaskUseCase(io.Discard)
 		_, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
 			TaskID: taskID,
 			Agent:  agent,
-			Wait:   false, // TUI uses background execution (tmux review session)
 		})
 		if err != nil {
 			return MsgError{Err: err}

@@ -284,9 +284,9 @@ func (c *Container) StartManagerUseCase() *usecase.StartManager {
 }
 
 // ReviewTaskUseCase returns a new ReviewTask use case.
-// stdout and stderr are the writers for command output.
-func (c *Container) ReviewTaskUseCase(stdout, stderr io.Writer) *usecase.ReviewTask {
-	return usecase.NewReviewTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Executor, c.Clock, c.Logger, c.Config.CrewDir, c.Config.RepoRoot, stdout, stderr)
+// stderr is the writer for warning messages.
+func (c *Container) ReviewTaskUseCase(stderr io.Writer) *usecase.ReviewTask {
+	return usecase.NewReviewTask(c.Tasks, c.Sessions, c.Worktrees, c.ConfigLoader, c.Executor, c.Clock, c.Config.RepoRoot, stderr)
 }
 
 // ReviewSessionEndedUseCase returns a new ReviewSessionEnded use case.
