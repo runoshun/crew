@@ -155,11 +155,13 @@ END_OF_PROMPT
 	}
 
 	review := strings.TrimSpace(extractReviewResult(stdoutBuf.String()))
+	isLGTM := strings.HasPrefix(review, domain.ReviewLGTMPrefix)
 
+	now := deps.Clock.Now()
 	if review != "" {
 		comment := domain.Comment{
 			Text:   review,
-			Time:   deps.Clock.Now(),
+			Time:   now,
 			Author: "reviewer",
 		}
 		if err := deps.Tasks.AddComment(in.Task.ID, comment); err != nil {
@@ -169,9 +171,14 @@ END_OF_PROMPT
 		}
 	}
 
+	in.Task.ReviewCount++
+	in.Task.LastReviewAt = now
+	lastReviewIsLGTM := isLGTM
+	in.Task.LastReviewIsLGTM = &lastReviewIsLGTM
+
 	return &ReviewOutput{
 		Review: review,
-		IsLGTM: strings.HasPrefix(review, domain.ReviewLGTMPrefix),
+		IsLGTM: isLGTM,
 	}, nil
 }
 

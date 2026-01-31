@@ -175,6 +175,9 @@ func TestIntegration_SessionWorkflow(t *testing.T) {
 	crewDir := filepath.Join(dir, ".git", "crew")
 	configPath := filepath.Join(crewDir, domain.ConfigFileName)
 	configContent := `default_agent = "true"
+
+[tasks]
+skip_review = true
 `
 	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
 
@@ -225,9 +228,9 @@ func TestIntegration_Complete_Success(t *testing.T) {
 	out = crewMust(t, dir, "complete", "1")
 	assert.Contains(t, out, "Completed task #1")
 
-	// Verify status changed to for_review
+	// Verify status changed to done
 	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: for_review")
+	assert.Contains(t, out, "Status: done")
 }
 
 func TestIntegration_Complete_NotInProgress(t *testing.T) {
@@ -288,6 +291,9 @@ func TestIntegration_Complete_WithCompleteCommand(t *testing.T) {
 	configPath := filepath.Join(crewDir, domain.ConfigFileName)
 	configContent := `default_agent = "true"
 
+[tasks]
+skip_review = true
+
 [complete]
 command = "echo 'CI passed'"
 `
@@ -302,9 +308,9 @@ command = "echo 'CI passed'"
 	out := crewMust(t, dir, "complete", "1")
 	assert.Contains(t, out, "Completed task #1")
 
-	// Verify status changed to for_review
+	// Verify status changed to done
 	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: for_review")
+	assert.Contains(t, out, "Status: done")
 }
 
 func TestIntegration_Complete_FailingCompleteCommand(t *testing.T) {
@@ -317,6 +323,9 @@ func TestIntegration_Complete_FailingCompleteCommand(t *testing.T) {
 	crewDir := filepath.Join(dir, ".git", "crew")
 	configPath := filepath.Join(crewDir, domain.ConfigFileName)
 	configContent := `default_agent = "true"
+
+[tasks]
+skip_review = true
 
 [complete]
 command = "exit 1"

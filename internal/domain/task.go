@@ -26,8 +26,10 @@ const StatusVersionCurrent = 2
 type Task struct {
 	Created           time.Time   `json:"created"`                     // Creation time
 	Started           time.Time   `json:"started,omitempty"`           // When status became in_progress
+	LastReviewAt      time.Time   `json:"lastReviewAt,omitempty"`      // When the last review succeeded
 	ParentID          *int        `json:"parentID"`                    // Parent task ID (nil = root task)
 	SkipReview        *bool       `json:"skipReview,omitempty"`        // Skip review on completion (nil=use config, true=skip, false=require review)
+	LastReviewIsLGTM  *bool       `json:"lastReviewIsLGTM,omitempty"`  // Whether the last review was LGTM
 	Description       string      `json:"description,omitempty"`       // Description (optional)
 	Agent             string      `json:"agent,omitempty"`             // Running agent name (empty if not running)
 	Session           string      `json:"session,omitempty"`           // tmux session name (empty if not running)
@@ -41,6 +43,7 @@ type Task struct {
 	ID                int         `json:"-"`                           // Task ID (stored as map key, not in value)
 	Issue             int         `json:"issue,omitempty"`             // GitHub issue number (0 = not linked)
 	PR                int         `json:"pr,omitempty"`                // GitHub PR number (0 = not created)
+	ReviewCount       int         `json:"reviewCount,omitempty"`       // Number of successful reviews
 	AutoFixRetryCount int         `json:"autoFixRetryCount,omitempty"` // Current retry count for auto_fix mode
 	StatusVersion     int         `json:"statusVersion,omitempty"`     // Status model version (0=legacy, 2=current)
 }

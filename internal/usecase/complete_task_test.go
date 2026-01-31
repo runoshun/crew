@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -17,9 +16,9 @@ func boolPtr(b bool) *bool {
 }
 
 // newTestCompleteTask creates a CompleteTask use case for testing.
-// skip_review tests need actual review to start, so we use a simpler approach:
-// - For tests that don't involve review, we skip the review part by setting skipReview=true on the task
-// - For tests that test the skip_review flag, we check the output status directly
+// For tests that don't involve review requirements, we either:
+// - set SkipReview=true, or
+// - set ReviewCount to satisfy min_reviews
 func newTestCompleteTask(
 	repo *testutil.MockTaskRepository,
 	sessions *testutil.MockSessionManager,
@@ -583,10 +582,11 @@ func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing
 	// This is the key fix: explicit false should prevent skipping even when config says skip
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Task with skip_review explicitly set to false",
-		Status:     domain.StatusInProgress,
-		SkipReview: boolPtr(false), // Task explicitly requires review (--no-skip-review)
+		ID:          1,
+		Title:       "Task with skip_review explicitly set to false",
+		Status:      domain.StatusInProgress,
+		SkipReview:  boolPtr(false), // Task explicitly requires review (--no-skip-review)
+		ReviewCount: 1,
 	}
 
 	worktrees := testutil.NewMockWorktreeManager()
@@ -616,9 +616,58 @@ func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing
 	// Task goes to done (ready for review in new model)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// Status should be done (review should start)
+	// Status should be done (review requirement satisfied)
 	assert.Equal(t, domain.StatusDone, out.Task.Status)
-	assert.True(t, out.ShouldStartReview)
+	assert.False(t, out.ShouldStartReview)
+}
+
+func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
+	// Insufficient reviews should fail without changing status or adding comments.
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:          1,
+		Title:       "Task requiring reviews",
+		Status:      domain.StatusInProgress,
+		SkipReview:  boolPtr(false),
+		ReviewCount: 0,
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	git := &testutil.MockGit{
+		HasUncommittedChangesV: false,
+	}
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Complete.MinReviews = 2
+	clock := &testutil.MockClock{}
+	executor := testutil.NewMockCommandExecutor()
+
+	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+
+	_, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID:  1,
+		Comment: "Ready to complete",
+	})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "review required: have 0, need 2")
+	assert.Contains(t, err.Error(), "crew review 1")
+	assert.Equal(t, domain.StatusInProgress, repo.Tasks[1].Status)
+	assert.Empty(t, repo.Comments[1])
+
+	// Sufficient reviews should allow completion.
+	repo.Tasks[1].ReviewCount = 2
+
+	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID: 1,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
+	assert.False(t, out.ShouldStartReview)
 }
 
 func TestCompleteTask_Execute_MergeConflict(t *testing.T) {
@@ -712,14 +761,13 @@ func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {
 	assert.Equal(t, domain.StatusDone, out.Task.Status)
 }
 
-func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
-	// Test: auto_fix mode enabled -> review runs and sets status to reviewed on LGTM
+func TestCompleteTask_Execute_DeprecatedReviewSettingsWarn(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
-		Title:      "Task with auto_fix",
+		Title:      "Task with deprecated review settings",
 		Status:     domain.StatusInProgress,
-		SkipReview: nil,
+		SkipReview: boolPtr(true),
 	}
 
 	worktrees := testutil.NewMockWorktreeManager()
@@ -732,88 +780,7 @@ func TestCompleteTask_Execute_AutoFixEnabled_LGTM(t *testing.T) {
 	configLoader := testutil.NewMockConfigLoader()
 	configLoader.Config.Complete.ReviewMode = domain.ReviewModeAutoFix
 	configLoader.Config.Complete.ReviewModeSet = true
-	configLoader.Config.Complete.AutoFixMaxRetries = 5
-
-	clock := &testutil.MockClock{}
-	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nAll good.")
-
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
-
-	// Execute
-	out, err := uc.Execute(context.Background(), CompleteTaskInput{
-		TaskID: 1,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusDone, out.Task.Status)
-	assert.Equal(t, domain.ReviewModeAutoFix, out.ReviewMode)
-	assert.Equal(t, 5, out.AutoFixMaxRetries)
-	assert.True(t, out.AutoFixIsLGTM)
-	assert.Equal(t, 0, out.AutoFixRetryCount)
-	assert.Contains(t, out.AutoFixReview, domain.ReviewLGTMPrefix)
-	assert.False(t, out.ShouldStartReview)
-}
-
-func TestCompleteTask_Execute_AutoMode(t *testing.T) {
-	// Test: auto mode (default) -> ReviewMode = auto, ShouldStartReview = true
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Task with auto mode",
-		Status:     domain.StatusInProgress,
-		SkipReview: nil,
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	git := &testutil.MockGit{
-		HasUncommittedChangesV: false,
-	}
-
-	configLoader := testutil.NewMockConfigLoader()
-	// Default: no ReviewModeSet, no AutoFixSet -> auto mode
-	clock := &testutil.MockClock{}
-	executor := testutil.NewMockCommandExecutor()
-
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
-
-	// Execute
-	out, err := uc.Execute(context.Background(), CompleteTaskInput{
-		TaskID: 1,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusDone, out.Task.Status)
-	assert.Equal(t, domain.ReviewModeAuto, out.ReviewMode)
-	assert.True(t, out.ShouldStartReview) // Background review should start
-}
-
-func TestCompleteTask_Execute_InvalidReviewModeFallsBackToAuto(t *testing.T) {
-	// Test: invalid review mode falls back to auto and logs warning
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Task with invalid review mode",
-		Status:     domain.StatusInProgress,
-		SkipReview: nil,
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	git := &testutil.MockGit{
-		HasUncommittedChangesV: false,
-	}
-
-	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.ReviewMode = domain.ReviewMode("broken")
-	configLoader.Config.Complete.ReviewModeSet = true
+	configLoader.Config.Complete.AutoFixSet = true
 
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
@@ -821,144 +788,25 @@ func TestCompleteTask_Execute_InvalidReviewModeFallsBackToAuto(t *testing.T) {
 
 	uc := NewCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, logger, executor, nil, "/tmp/crew", "/tmp/repo")
 
-	// Execute
-	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+	_, err := uc.Execute(context.Background(), CompleteTaskInput{
 		TaskID: 1,
 	})
 
-	// Assert
 	require.NoError(t, err)
-	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusDone, out.Task.Status)
-	assert.Equal(t, domain.ReviewModeAuto, out.ReviewMode)
-	assert.True(t, out.ShouldStartReview)
 
-	var warned bool
+	var reviewModeWarned bool
+	var autoFixWarned bool
 	for _, entry := range logger.Entries {
-		if entry.Level == "WARN" && entry.TaskID == 1 && entry.Category == "task" && strings.Contains(entry.Msg, "invalid review_mode") {
-			warned = true
-			break
+		if entry.Level != "WARN" || entry.TaskID != 1 || entry.Category != "task" {
+			continue
+		}
+		if entry.Msg == "complete.review_mode is deprecated and ignored" {
+			reviewModeWarned = true
+		}
+		if entry.Msg == "complete.auto_fix is deprecated and ignored" {
+			autoFixWarned = true
 		}
 	}
-	assert.True(t, warned)
-}
-
-func TestCompleteTask_Execute_AutoFixDefaultMaxRetries(t *testing.T) {
-	// Test: auto_fix mode enabled without max_retries -> default value (3) and retry count increments
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Task with auto_fix default max retries",
-		Status:     domain.StatusInProgress,
-		SkipReview: nil,
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	git := &testutil.MockGit{
-		HasUncommittedChangesV: false,
-	}
-
-	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.ReviewMode = domain.ReviewModeAutoFix
-	configLoader.Config.Complete.ReviewModeSet = true
-	configLoader.Config.Complete.AutoFixMaxRetries = 0
-
-	clock := &testutil.MockClock{}
-	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n❌ Needs changes\nFix tests.")
-
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
-
-	// Execute
-	out, err := uc.Execute(context.Background(), CompleteTaskInput{
-		TaskID: 1,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusInProgress, out.Task.Status)
-	assert.Equal(t, domain.ReviewModeAutoFix, out.ReviewMode)
-	assert.Equal(t, domain.DefaultAutoFixMaxRetries, out.AutoFixMaxRetries)
-	assert.False(t, out.AutoFixIsLGTM)
-	assert.Equal(t, 1, out.AutoFixRetryCount)
-}
-
-func TestCompleteTask_Execute_AutoFixMaxRetries(t *testing.T) {
-	// Test: auto_fix retry limit reached -> error
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:                1,
-		Title:             "Task with retries",
-		Status:            domain.StatusInProgress,
-		SkipReview:        nil,
-		AutoFixRetryCount: 3,
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	git := &testutil.MockGit{
-		HasUncommittedChangesV: false,
-	}
-
-	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.ReviewMode = domain.ReviewModeAutoFix
-	configLoader.Config.Complete.ReviewModeSet = true
-	configLoader.Config.Complete.AutoFixMaxRetries = 3
-
-	clock := &testutil.MockClock{}
-	executor := testutil.NewMockCommandExecutor()
-
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
-
-	// Execute
-	out, err := uc.Execute(context.Background(), CompleteTaskInput{
-		TaskID: 1,
-	})
-
-	// Assert
-	require.ErrorIs(t, err, ErrAutoFixMaxRetries)
-	assert.Nil(t, out)
-}
-
-func TestCompleteTask_Execute_ManualMode(t *testing.T) {
-	// Test: manual mode -> status set to for_review, ShouldStartReview = false
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:         1,
-		Title:      "Task with manual mode",
-		Status:     domain.StatusInProgress,
-		SkipReview: nil,
-	}
-
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = "/tmp/worktree"
-
-	git := &testutil.MockGit{
-		HasUncommittedChangesV: false,
-	}
-
-	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.ReviewMode = domain.ReviewModeManual
-	configLoader.Config.Complete.ReviewModeSet = true
-
-	clock := &testutil.MockClock{}
-	executor := testutil.NewMockCommandExecutor()
-
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
-
-	// Execute
-	out, err := uc.Execute(context.Background(), CompleteTaskInput{
-		TaskID: 1,
-	})
-
-	// Assert
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusDone, out.Task.Status)
-	assert.Equal(t, domain.ReviewModeManual, out.ReviewMode)
-	assert.False(t, out.ShouldStartReview) // No automatic review in manual mode
+	assert.True(t, reviewModeWarned)
+	assert.True(t, autoFixWarned)
 }

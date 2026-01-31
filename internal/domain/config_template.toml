@@ -68,13 +68,11 @@
 [complete]
 ## CI gate on completion
 # command = "mise run ci"
-## Review mode
-## - "auto" (default): start review asynchronously after completion
-## - "manual": set status to for_review without starting review
-## - "auto_fix": run review synchronously and output feedback
-## Worker will see the feedback and can fix issues before running crew complete again
+## Minimum successful reviews required before completion (default: 1)
+# min_reviews = 1
+## Deprecated review settings (ignored; kept for compatibility)
 # review_mode = "auto"
-## Maximum retry attempts for auto-fix mode (default: 3)
+# auto_fix = false
 # auto_fix_max_retries = 3
 
 [diff]

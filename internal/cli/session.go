@@ -306,32 +306,25 @@ func newCompleteCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "complete [id]",
 		Short: "Mark task as complete",
-		Long: `Mark a task as complete and trigger review.
+		Long: `Mark a task as complete.
 
 If no ID is provided, the task ID is auto-detected from the current branch name.
 
 Preconditions:
-  - Task status must be 'in_progress' or 'needs_input'
-  - No uncommitted changes in the worktree
+	  - Task status must be 'in_progress'
+	  - No uncommitted changes in the worktree
 
 If [complete].command is configured, it will be executed before transitioning
 the status. If the command fails, the completion is aborted.
 
-Status transitions:
-  - skip_review enabled: directly to 'reviewed'
-  - auto_fix enabled: status remains 'in_progress' during synchronous review,
-    then transitions to 'reviewed' only on LGTM
-  - normal mode: transitions to 'reviewing' and starts background review session
-
-Auto-fix mode:
-  When [complete].auto_fix is enabled, the review runs synchronously.
-  - If LGTM: sets status to 'reviewed', outputs "LGTM" and exits successfully
-  - If not LGTM: status remains 'in_progress', outputs review feedback
-  - Use [complete].auto_fix_max_retries to limit retry attempts (default: 3)
+Review requirement:
+	  - skip_review enabled: bypasses review count requirement
+	  - otherwise: requires ReviewCount >= [complete].min_reviews (default: 1)
+	  - review count increases only when 'crew review' exits with code 0
 
 Examples:
-  # Complete task by ID
-  crew complete 1
+	  # Complete task by ID
+	  crew complete 1
 
   # Complete with a comment
   crew complete 1 --comment "Implementation complete"
@@ -360,39 +353,7 @@ Examples:
 				return err
 			}
 
-			// Handle auto_fix mode
-			if out.ReviewMode == domain.ReviewModeAutoFix {
-				if out.AutoFixIsLGTM {
-					_, _ = fmt.Fprintln(cmd.OutOrStdout(), "LGTM")
-					return nil
-				}
-				reviewResult := strings.TrimSpace(out.AutoFixReview)
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Review feedback (retry %d/%d):\n%s\n",
-					out.AutoFixRetryCount, out.AutoFixMaxRetries, reviewResult)
-				return nil
-			}
-
-			if out.ShouldStartReview {
-				// Start review automatically (background)
-				reviewUC := c.ReviewTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
-				reviewOut, reviewErr := reviewUC.Execute(cmd.Context(), usecase.ReviewTaskInput{
-					TaskID: taskID,
-					Wait:   false, // Background execution
-				})
-
-				if reviewErr != nil {
-					// Review failed to start
-					// Note: Task is already in reviewing status. We log the error but don't fail the command.
-					// The user can try 'crew review' later or manually fix the state.
-					_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Task #%d completed, but failed to start review: %v\n", out.Task.ID, reviewErr)
-					// We might consider reverting status here, but CompleteTask has committed it.
-					// Leaving it as is for now as per minimal changes strategy.
-				} else {
-					_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d and started review (session: %s): %s\n", out.Task.ID, reviewOut.SessionName, out.Task.Title)
-				}
-			} else {
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
-			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
 
 			return nil
 		},

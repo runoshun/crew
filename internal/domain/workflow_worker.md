@@ -36,39 +36,25 @@ crew complete          # Mark task as complete
 
 ---
 
-## Review Mode
+## Review Requirements
 
-`[complete].review_mode` controls how reviews run on completion:
+`[complete].min_reviews` controls how many successful reviews are required before completion.
 
-- **auto** (default): Start review asynchronously in the background
-- **manual**: Set status to `for_review` without starting review automatically
-- **auto_fix**: Run review synchronously and output the result
-
-### Workflow with auto_fix
-
-```bash
-# 1. Make changes and commit
-git add . && git commit -m "feat: ..."
-
-# 2. Run crew complete
-crew complete
-# → If LGTM: Done!
-# → If not LGTM: Review feedback is shown
-
-# 3. If feedback received, fix issues and repeat
-git add . && git commit -m "fix: address review feedback"
-crew complete
-# → Loop until LGTM or max retries reached
-```
+- Default: 1
+- `skip_review = true` bypasses the review requirement
+- Review count increments only when `crew review` exits with code 0
 
 ### Configuration
 
 ```toml
 [complete]
 command = "mise run ci"
-review_mode = "auto_fix"  # auto, manual, or auto_fix
-auto_fix_max_retries = 3  # Maximum retry attempts (default: 3)
+min_reviews = 1
 ```
+
+### Deprecated Settings
+
+`[complete].review_mode` and `auto_fix` are deprecated and ignored.
 
 ---
 

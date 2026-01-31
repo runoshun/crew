@@ -61,28 +61,32 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 		return &ReviewSessionEndedOutput{Ignored: true}, nil
 	}
 
-	// Extract the review result
-	reviewResult := in.Output
-	if idx := strings.Index(in.Output, domain.ReviewResultMarker); idx != -1 {
-		reviewResult = in.Output[idx+len(domain.ReviewResultMarker):]
-	}
-	reviewResult = strings.TrimSpace(reviewResult)
-
-	// Save review result as comment if there's content
-	if reviewResult != "" {
-		comment := domain.Comment{
-			Text:   reviewResult,
-			Time:   uc.clock.Now(),
-			Author: "reviewer",
-		}
-		if err := uc.tasks.AddComment(task.ID, comment); err != nil {
-			// Log but don't fail - the review session completed
-			_, _ = fmt.Fprintf(uc.stderr, "warning: failed to add review comment: %v\n", err)
-		}
-	}
-
-	// Update status based on exit code
+	// Update task and comments only on successful review
 	if in.ExitCode == 0 {
+		// Extract the review result
+		reviewResult := in.Output
+		if idx := strings.Index(in.Output, domain.ReviewResultMarker); idx != -1 {
+			reviewResult = in.Output[idx+len(domain.ReviewResultMarker):]
+		}
+		reviewResult = strings.TrimSpace(reviewResult)
+
+		now := uc.clock.Now()
+		if reviewResult != "" {
+			comment := domain.Comment{
+				Text:   reviewResult,
+				Time:   now,
+				Author: "reviewer",
+			}
+			if err := uc.tasks.AddComment(task.ID, comment); err != nil {
+				// Log but don't fail - the review session completed
+				_, _ = fmt.Fprintf(uc.stderr, "warning: failed to add review comment: %v\n", err)
+			}
+		}
+
+		isLGTM := strings.HasPrefix(reviewResult, domain.ReviewLGTMPrefix)
+		task.ReviewCount++
+		task.LastReviewAt = now
+		task.LastReviewIsLGTM = &isLGTM
 		task.Status = domain.StatusDone
 	}
 	// On error (non-zero exit code), keep as in_progress to allow retry

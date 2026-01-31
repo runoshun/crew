@@ -15,7 +15,8 @@ func TestExecuteReview_StatusCheck(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	executor := testutil.NewMockCommandExecutor()
 	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
-	clock := &testutil.MockClock{NowTime: time.Now()}
+	now := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	clock := &testutil.MockClock{NowTime: now}
 
 	deps := ReviewDeps{
 		Tasks:    repo,
@@ -43,12 +44,13 @@ func TestExecuteReview_StatusCheck(t *testing.T) {
 	})
 
 	t.Run("valid status - in_progress", func(t *testing.T) {
+		task := &domain.Task{
+			ID:     2,
+			Title:  "Review task",
+			Status: domain.StatusInProgress, // Valid for review
+		}
 		input := ReviewInput{
-			Task: &domain.Task{
-				ID:     2,
-				Title:  "Review task",
-				Status: domain.StatusInProgress, // Valid for review
-			},
+			Task:         task,
 			WorktreePath: "/tmp/worktree",
 			Result: domain.RenderCommandResult{
 				Prompt:  "prompt",
@@ -59,15 +61,20 @@ func TestExecuteReview_StatusCheck(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, reviewOut)
 		assert.True(t, reviewOut.IsLGTM)
+		assert.Equal(t, 1, task.ReviewCount)
+		assert.Equal(t, now, task.LastReviewAt)
+		require.NotNil(t, task.LastReviewIsLGTM)
+		assert.True(t, *task.LastReviewIsLGTM)
 	})
 
 	t.Run("skip status check", func(t *testing.T) {
+		task := &domain.Task{
+			ID:     3,
+			Title:  "Review task",
+			Status: domain.StatusError, // Would be invalid without skip
+		}
 		input := ReviewInput{
-			Task: &domain.Task{
-				ID:     3,
-				Title:  "Review task",
-				Status: domain.StatusError, // Would be invalid without skip
-			},
+			Task:            task,
 			WorktreePath:    "/tmp/worktree",
 			Result:          domain.RenderCommandResult{Prompt: "prompt", Command: "echo review"},
 			SkipStatusCheck: true,
@@ -76,5 +83,9 @@ func TestExecuteReview_StatusCheck(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, reviewOut)
 		assert.True(t, reviewOut.IsLGTM)
+		assert.Equal(t, 1, task.ReviewCount)
+		assert.Equal(t, now, task.LastReviewAt)
+		require.NotNil(t, task.LastReviewIsLGTM)
+		assert.True(t, *task.LastReviewIsLGTM)
 	})
 }
