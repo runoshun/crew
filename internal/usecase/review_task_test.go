@@ -26,6 +26,12 @@ func newTestReviewTask(
 	return NewReviewTask(repo, worktrees, configLoader, executor, clock, repoRoot, stderr)
 }
 
+// addReviewerCommentOnExecute sets up the executor to simulate adding a reviewer comment.
+// The callback is called during ExecuteWithContext to simulate the reviewer agent running `crew comment`.
+func addReviewerCommentOnExecute(executor *testutil.MockCommandExecutor, addComment func()) {
+	executor.OnExecuteWithContext = addComment
+}
+
 func TestReviewTask_Execute_TaskNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
@@ -200,7 +206,17 @@ func TestReviewTask_Execute_UsesDefaultReviewer(t *testing.T) {
 	require.Contains(t, cfg.Agents, cfg.AgentsConfig.DefaultReviewer)
 
 	executor := testutil.NewMockCommandExecutor()
-	clock := &testutil.MockClock{NowTime: time.Now()}
+	now := time.Now()
+	clock := &testutil.MockClock{NowTime: now}
+
+	// Setup reviewer to add a comment during execution
+	addReviewerCommentOnExecute(executor, func() {
+		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+			Author: "reviewer",
+			Text:   domain.ReviewLGTMPrefix + " Looks good!",
+			Time:   now,
+		})
+	})
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -283,7 +299,7 @@ func TestReviewTask_Execute_TaskWithIssue(t *testing.T) {
 	assert.Equal(t, "crew-1-gh-123", expectedBranch)
 }
 
-func TestReviewTask_Execute_WithReviewerPrompt(t *testing.T) {
+func TestReviewTask_Execute_ReviewerAddsComment(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
@@ -296,18 +312,24 @@ func TestReviewTask_Execute_WithReviewerPrompt(t *testing.T) {
 	worktrees.ResolvePath = t.TempDir()
 
 	configLoader := testutil.NewMockConfigLoader()
-	// Set ReviewerPrompt in AgentsConfig
-	configLoader.Config.AgentsConfig.ReviewerPrompt = "Custom reviewer prompt from config"
-	// Use an agent without a custom prompt (so ReviewerPrompt should be used)
 	configLoader.Config.Agents["test-reviewer"] = domain.Agent{
 		Role:            domain.RoleReviewer,
-		CommandTemplate: "echo {{.Prompt}}",
-		// Prompt is empty, so ReviewerPrompt should be used
+		CommandTemplate: "echo review",
 	}
 
 	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte("Custom reviewer prompt from config")
-	clock := &testutil.MockClock{NowTime: time.Now()}
+	now := time.Now()
+	clock := &testutil.MockClock{NowTime: now}
+
+	// Simulate reviewer adding a comment during execution
+	reviewText := domain.ReviewLGTMPrefix + " All checks passed!"
+	addReviewerCommentOnExecute(executor, func() {
+		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+			Author: "reviewer",
+			Text:   reviewText,
+			Time:   now,
+		})
+	})
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -321,12 +343,14 @@ func TestReviewTask_Execute_WithReviewerPrompt(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// Verify Review output contains ReviewerPrompt
-	assert.Contains(t, out.Review, "Custom reviewer prompt from config")
+	assert.Equal(t, reviewText, out.Review)
+	assert.Equal(t, 1, out.Task.ReviewCount)
+	require.NotNil(t, out.Task.LastReviewIsLGTM)
+	assert.True(t, *out.Task.LastReviewIsLGTM)
 }
 
-func TestReviewTask_Execute_AgentPromptOverridesReviewerPrompt(t *testing.T) {
-	// Setup
+func TestReviewTask_Execute_NoReviewComment(t *testing.T) {
+	// Setup - reviewer does NOT add a comment
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
@@ -338,118 +362,27 @@ func TestReviewTask_Execute_AgentPromptOverridesReviewerPrompt(t *testing.T) {
 	worktrees.ResolvePath = t.TempDir()
 
 	configLoader := testutil.NewMockConfigLoader()
-	// Set both ReviewerPrompt and Agent.Prompt
-	configLoader.Config.AgentsConfig.ReviewerPrompt = "Reviewer prompt from config"
 	configLoader.Config.Agents["test-reviewer"] = domain.Agent{
 		Role:            domain.RoleReviewer,
-		CommandTemplate: "echo {{.Prompt}}",
-		Prompt:          "Agent-specific prompt", // This should take precedence
+		CommandTemplate: "echo review",
 	}
 
 	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte("Agent-specific prompt")
+	// No OnExecuteWithContext - reviewer doesn't add a comment
 	clock := &testutil.MockClock{NowTime: time.Now()}
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
 
 	// Execute
-	out, err := uc.Execute(context.Background(), ReviewTaskInput{
+	_, err := uc.Execute(context.Background(), ReviewTaskInput{
 		TaskID: 1,
 		Agent:  "test-reviewer",
 	})
 
-	// Assert
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	// Verify Agent.Prompt takes precedence over ReviewerPrompt
-	assert.Contains(t, out.Review, "Agent-specific prompt")
-	assert.NotContains(t, out.Review, "Reviewer prompt from config")
-}
-
-func TestReviewTask_Execute_MessageOverridesReviewerPrompt(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Test task",
-		Status: domain.StatusDone,
-	}
-	sessions := testutil.NewMockSessionManager()
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = t.TempDir()
-
-	configLoader := testutil.NewMockConfigLoader()
-	// Set ReviewerPrompt in config
-	configLoader.Config.AgentsConfig.ReviewerPrompt = "Reviewer prompt from config"
-	// Use an agent without a custom prompt
-	configLoader.Config.Agents["test-reviewer"] = domain.Agent{
-		Role:            domain.RoleReviewer,
-		CommandTemplate: "echo {{.Prompt}}",
-	}
-
-	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte("User-provided review message")
-	clock := &testutil.MockClock{NowTime: time.Now()}
-
-	var stderr bytes.Buffer
-	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
-
-	// Execute with Message - should override ReviewerPrompt
-	out, err := uc.Execute(context.Background(), ReviewTaskInput{
-		TaskID:  1,
-		Agent:   "test-reviewer",
-		Message: "User-provided review message",
-	})
-
-	// Assert
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	// Verify Message takes precedence over ReviewerPrompt
-	assert.Contains(t, out.Review, "User-provided review message")
-	assert.NotContains(t, out.Review, "Reviewer prompt from config")
-}
-
-func TestReviewTask_Execute_AgentPromptOverridesMessage(t *testing.T) {
-	// Setup
-	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{
-		ID:     1,
-		Title:  "Test task",
-		Status: domain.StatusDone,
-	}
-	sessions := testutil.NewMockSessionManager()
-	worktrees := testutil.NewMockWorktreeManager()
-	worktrees.ResolvePath = t.TempDir()
-
-	configLoader := testutil.NewMockConfigLoader()
-	// Set both Message and Agent.Prompt
-	configLoader.Config.Agents["test-reviewer"] = domain.Agent{
-		Role:            domain.RoleReviewer,
-		CommandTemplate: "echo {{.Prompt}}",
-		Prompt:          "Agent-specific prompt", // This should take precedence over Message
-	}
-
-	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte("Agent-specific prompt")
-	clock := &testutil.MockClock{NowTime: time.Now()}
-
-	var stderr bytes.Buffer
-	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
-
-	// Execute with both Agent.Prompt and Message
-	out, err := uc.Execute(context.Background(), ReviewTaskInput{
-		TaskID:  1,
-		Agent:   "test-reviewer",
-		Message: "User-provided review message",
-	})
-
-	// Assert
-	require.NoError(t, err)
-	require.NotNil(t, out)
-	// Verify Agent.Prompt takes precedence over Message
-	assert.Contains(t, out.Review, "Agent-specific prompt")
-	assert.NotContains(t, out.Review, "User-provided review message")
+	// Assert - should fail because reviewer didn't add a comment
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrNoReviewComment)
 }
 
 func TestReviewTask_Execute_WithDisabledAgent(t *testing.T) {
@@ -502,14 +435,24 @@ func TestReviewTask_Execute_StatusReviewing(t *testing.T) {
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
-		Status: domain.StatusInProgress, // Already reviewing
+		Status: domain.StatusInProgress,
 	}
 	sessions := testutil.NewMockSessionManager()
 	worktrees := testutil.NewMockWorktreeManager()
 	worktrees.ResolvePath = "/tmp/worktree"
 	configLoader := testutil.NewMockConfigLoader()
 	executor := testutil.NewMockCommandExecutor()
-	clock := &testutil.MockClock{NowTime: time.Now()}
+	now := time.Now()
+	clock := &testutil.MockClock{NowTime: now}
+
+	// Setup reviewer to add a comment during execution
+	addReviewerCommentOnExecute(executor, func() {
+		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+			Author: "reviewer",
+			Text:   domain.ReviewLGTMPrefix + " Looks good!",
+			Time:   now,
+		})
+	})
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -539,8 +482,17 @@ func TestReviewTask_Execute_SaveMetadataFails(t *testing.T) {
 	worktrees.ResolvePath = "/tmp/worktree"
 	configLoader := testutil.NewMockConfigLoader()
 	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
-	clock := &testutil.MockClock{NowTime: time.Now()}
+	now := time.Now()
+	clock := &testutil.MockClock{NowTime: now}
+
+	// Setup reviewer to add a comment during execution
+	addReviewerCommentOnExecute(executor, func() {
+		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+			Author: "reviewer",
+			Text:   domain.ReviewLGTMPrefix + "\nLooks good.",
+			Time:   now,
+		})
+	})
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -569,9 +521,19 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		worktrees.ResolvePath = "/tmp/worktree"
 		configLoader := testutil.NewMockConfigLoader()
 		executor := testutil.NewMockCommandExecutor()
-		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\nReview output")
+		executor.ExecuteOutput = []byte("Review output\n")
 		executor.StderrOutput = []byte("stderr output\n")
-		clock := &testutil.MockClock{NowTime: time.Now()}
+		now := time.Now()
+		clock := &testutil.MockClock{NowTime: now}
+
+		// Setup reviewer to add a comment during execution
+		addReviewerCommentOnExecute(executor, func() {
+			repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+				Author: "reviewer",
+				Text:   domain.ReviewLGTMPrefix + " Looks good!",
+				Time:   now,
+			})
+		})
 
 		var stderr bytes.Buffer
 		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -587,7 +549,7 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		require.NotNil(t, out)
 		// In verbose mode, both stdout and stderr are streamed to stderr
 		output := stderr.String()
-		assert.Contains(t, output, domain.ReviewResultMarker)
+		assert.Contains(t, output, "Review output")
 		assert.Contains(t, output, "stderr output")
 	})
 
@@ -604,9 +566,19 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		worktrees.ResolvePath = "/tmp/worktree"
 		configLoader := testutil.NewMockConfigLoader()
 		executor := testutil.NewMockCommandExecutor()
-		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\nReview output")
+		executor.ExecuteOutput = []byte("Review output\n")
 		executor.StderrOutput = []byte("stderr output\n")
-		clock := &testutil.MockClock{NowTime: time.Now()}
+		now := time.Now()
+		clock := &testutil.MockClock{NowTime: now}
+
+		// Setup reviewer to add a comment during execution
+		addReviewerCommentOnExecute(executor, func() {
+			repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+				Author: "reviewer",
+				Text:   domain.ReviewLGTMPrefix + " Looks good!",
+				Time:   now,
+			})
+		})
 
 		var stderr bytes.Buffer
 		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -622,4 +594,130 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		require.NotNil(t, out)
 		assert.Empty(t, stderr.String())
 	})
+}
+
+func TestReviewTask_Execute_LGTMDetection(t *testing.T) {
+	t.Run("LGTM review", func(t *testing.T) {
+		// Setup
+		repo := testutil.NewMockTaskRepository()
+		repo.Tasks[1] = &domain.Task{
+			ID:     1,
+			Title:  "Test task",
+			Status: domain.StatusInProgress,
+		}
+		sessions := testutil.NewMockSessionManager()
+		worktrees := testutil.NewMockWorktreeManager()
+		worktrees.ResolvePath = "/tmp/worktree"
+		configLoader := testutil.NewMockConfigLoader()
+		executor := testutil.NewMockCommandExecutor()
+		now := time.Now()
+		clock := &testutil.MockClock{NowTime: now}
+
+		// Setup reviewer to add an LGTM comment
+		addReviewerCommentOnExecute(executor, func() {
+			repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+				Author: "reviewer",
+				Text:   domain.ReviewLGTMPrefix + " All good!",
+				Time:   now,
+			})
+		})
+
+		var stderr bytes.Buffer
+		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
+
+		// Execute
+		out, err := uc.Execute(context.Background(), ReviewTaskInput{
+			TaskID: 1,
+		})
+
+		// Assert
+		require.NoError(t, err)
+		require.NotNil(t, out.Task.LastReviewIsLGTM)
+		assert.True(t, *out.Task.LastReviewIsLGTM)
+	})
+
+	t.Run("non-LGTM review", func(t *testing.T) {
+		// Setup
+		repo := testutil.NewMockTaskRepository()
+		repo.Tasks[1] = &domain.Task{
+			ID:     1,
+			Title:  "Test task",
+			Status: domain.StatusInProgress,
+		}
+		sessions := testutil.NewMockSessionManager()
+		worktrees := testutil.NewMockWorktreeManager()
+		worktrees.ResolvePath = "/tmp/worktree"
+		configLoader := testutil.NewMockConfigLoader()
+		executor := testutil.NewMockCommandExecutor()
+		now := time.Now()
+		clock := &testutil.MockClock{NowTime: now}
+
+		// Setup reviewer to add a non-LGTM comment
+		addReviewerCommentOnExecute(executor, func() {
+			repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+				Author: "reviewer",
+				Text:   "❌ Needs changes",
+				Time:   now,
+			})
+		})
+
+		var stderr bytes.Buffer
+		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
+
+		// Execute
+		out, err := uc.Execute(context.Background(), ReviewTaskInput{
+			TaskID: 1,
+		})
+
+		// Assert
+		require.NoError(t, err)
+		require.NotNil(t, out.Task.LastReviewIsLGTM)
+		assert.False(t, *out.Task.LastReviewIsLGTM)
+	})
+}
+
+func TestReviewTask_Execute_MultipleReviewerComments(t *testing.T) {
+	// Setup - there are existing comments, and reviewer adds a new one
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusInProgress,
+	}
+	// Pre-existing comments
+	repo.Comments[1] = []domain.Comment{
+		{Author: "worker", Text: "Work done", Time: time.Now().Add(-time.Hour)},
+		{Author: "reviewer", Text: "First review: needs changes", Time: time.Now().Add(-30 * time.Minute)},
+	}
+	sessions := testutil.NewMockSessionManager()
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+	configLoader := testutil.NewMockConfigLoader()
+	executor := testutil.NewMockCommandExecutor()
+	now := time.Now()
+	clock := &testutil.MockClock{NowTime: now}
+
+	// Setup reviewer to add a new LGTM comment
+	newReviewText := domain.ReviewLGTMPrefix + " Fixed now!"
+	addReviewerCommentOnExecute(executor, func() {
+		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
+			Author: "reviewer",
+			Text:   newReviewText,
+			Time:   now,
+		})
+	})
+
+	var stderr bytes.Buffer
+	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), ReviewTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert - should return the latest reviewer comment
+	require.NoError(t, err)
+	assert.Equal(t, newReviewText, out.Review)
+	require.NotNil(t, out.Task.LastReviewIsLGTM)
+	assert.True(t, *out.Task.LastReviewIsLGTM)
 }

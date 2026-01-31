@@ -73,6 +73,13 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, fmt.Errorf("cannot review task in %s status (must be in_progress or done): %w", task.Status, domain.ErrInvalidTransition)
 	}
 
+	// Count reviewer comments before running review
+	preComments, err := uc.tasks.GetComments(in.TaskID)
+	if err != nil {
+		return nil, fmt.Errorf("get comments: %w", err)
+	}
+	preReviewerCount := countReviewerComments(preComments)
+
 	reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
 		ConfigLoader: uc.configLoader,
 		Worktrees:    uc.worktrees,
@@ -87,12 +94,23 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, err
 	}
 
-	return uc.executeSync(ctx, task, reviewCmd, in.Verbose)
+	return uc.executeSync(ctx, task, reviewCmd, in.Verbose, preReviewerCount)
+}
+
+// countReviewerComments counts comments with Author == "reviewer".
+func countReviewerComments(comments []domain.Comment) int {
+	count := 0
+	for _, c := range comments {
+		if c.Author == "reviewer" {
+			count++
+		}
+	}
+	return count
 }
 
 // executeSync runs the review synchronously and returns the result.
-func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput, verbose bool) (*ReviewTaskOutput, error) {
-	reviewOut, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
+func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput, verbose bool, preReviewerCount int) (*ReviewTaskOutput, error) {
+	_, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
 		Tasks:    uc.tasks,
 		Executor: uc.executor,
 		Clock:    uc.clock,
@@ -107,12 +125,35 @@ func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, review
 	if err != nil {
 		return nil, err
 	}
+
+	// Check if reviewer added a comment
+	postComments, err := uc.tasks.GetComments(task.ID)
+	if err != nil {
+		return nil, fmt.Errorf("get comments: %w", err)
+	}
+	postReviewerCount := countReviewerComments(postComments)
+
+	if postReviewerCount <= preReviewerCount {
+		return nil, fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+	}
+
+	// Get the last reviewer comment as the review result
+	var lastReviewerComment domain.Comment
+	for i := len(postComments) - 1; i >= 0; i-- {
+		if postComments[i].Author == "reviewer" {
+			lastReviewerComment = postComments[i]
+			break
+		}
+	}
+
+	// Update review metadata
+	shared.UpdateReviewMetadata(uc.clock, task, lastReviewerComment.Text)
 	if err := uc.tasks.Save(task); err != nil {
 		return nil, fmt.Errorf("save review metadata: %w", err)
 	}
 
 	return &ReviewTaskOutput{
-		Review: reviewOut.Review,
+		Review: lastReviewerComment.Text,
 		Task:   task,
 	}, nil
 }

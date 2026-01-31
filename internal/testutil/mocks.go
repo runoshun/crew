@@ -866,6 +866,7 @@ func (m *MockScriptRunner) Run(dir, script string) error {
 // MockCommandExecutor is a test double for domain.CommandExecutor.
 // Fields are ordered to minimize memory padding.
 type MockCommandExecutor struct {
+	OnExecuteWithContext     func() // Optional callback called during ExecuteWithContext
 	ExecutedCmd              *domain.ExecCommand
 	ExecuteErr               error
 	ExecuteInteractiveErr    error
@@ -911,6 +912,9 @@ func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.
 	}
 	if m.StderrOutput != nil && stderr != nil {
 		_, _ = stderr.Write(m.StderrOutput)
+	}
+	if m.OnExecuteWithContext != nil {
+		m.OnExecuteWithContext()
 	}
 	return m.ExecuteWithContextErr
 }
