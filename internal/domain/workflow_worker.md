@@ -124,7 +124,7 @@ crew complete
 
 ```bash
 # Using shell timeout command
-timeout 1200 crew review
+timeout 1200 crew review <id>
 
 # Or with Bash tool timeout parameter (1200000ms = 20 minutes)
 ```
