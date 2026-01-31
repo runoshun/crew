@@ -208,7 +208,7 @@ out, err := c.StartTask().Execute(ctx, usecase.StartTaskInput{TaskID: id})
 
 ### Infrastructure Layer
 
-- Port implementations: `gitstore/`, `tmux/`, `git/`, `worktree/`, `config/`
+- Port implementations: `filestore/`, `tmux/`, `git/`, `worktree/`, `config/`
 - Use `panic("not implemented")` for interface methods not yet needed
 
 ---
@@ -335,4 +335,3 @@ level = "info"  # debug, info, warn, error
 - Logs are appended to files (not rotated)
 - Task logs contain only entries for that specific task
 - Global log contains all entries
-

@@ -151,8 +151,8 @@ func TestListTasks_Execute_WithParentFilter(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
-	// mockTaskRepository.List doesn't implement filtering, so we just test the usecase passes the filter
-	// The actual filtering is tested in jsonstore tests
+	// mockTaskRepository.List doesn't implement filtering, so we just test the usecase passes the filter.
+	// Filtering behavior is covered in filestore tests.
 	require.NotNil(t, out.Tasks)
 }
 

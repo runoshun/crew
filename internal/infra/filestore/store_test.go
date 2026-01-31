@@ -184,6 +184,113 @@ func TestStore_ListAll(t *testing.T) {
 	assert.Equal(t, 1, tasks[1].ID)
 }
 
+func TestStore_ListWithLabelFilter(t *testing.T) {
+	crewDir := filepath.Join(t.TempDir(), ".crew")
+	store := New(crewDir, "default")
+	_, err := store.Initialize()
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	tasks := []*domain.Task{
+		{ID: 1, Title: "Task 1", Status: domain.StatusTodo, Created: now, BaseBranch: "main", Labels: []string{"bug"}, StatusVersion: domain.StatusVersionCurrent},
+		{ID: 2, Title: "Task 2", Status: domain.StatusTodo, Created: now, BaseBranch: "main", Labels: []string{"feature"}, StatusVersion: domain.StatusVersionCurrent},
+		{ID: 3, Title: "Task 3", Status: domain.StatusTodo, Created: now, BaseBranch: "main", Labels: []string{"bug", "feature"}, StatusVersion: domain.StatusVersionCurrent},
+	}
+	for _, task := range tasks {
+		require.NoError(t, store.Save(task))
+	}
+
+	bugTasks, err := store.List(domain.TaskFilter{Labels: []string{"bug"}})
+	require.NoError(t, err)
+	require.Len(t, bugTasks, 2)
+	assert.Equal(t, 1, bugTasks[0].ID)
+	assert.Equal(t, 3, bugTasks[1].ID)
+
+	both, err := store.List(domain.TaskFilter{Labels: []string{"bug", "feature"}})
+	require.NoError(t, err)
+	require.Len(t, both, 1)
+	assert.Equal(t, 3, both[0].ID)
+}
+
+func TestStore_ListWithParentFilter(t *testing.T) {
+	crewDir := filepath.Join(t.TempDir(), ".crew")
+	store := New(crewDir, "default")
+	_, err := store.Initialize()
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	parentID := 1
+	tasks := []*domain.Task{
+		{ID: 1, Title: "Parent", Status: domain.StatusTodo, Created: now, BaseBranch: "main", StatusVersion: domain.StatusVersionCurrent},
+		{ID: 2, Title: "Child 1", ParentID: &parentID, Status: domain.StatusTodo, Created: now, BaseBranch: "main", StatusVersion: domain.StatusVersionCurrent},
+		{ID: 3, Title: "Child 2", ParentID: &parentID, Status: domain.StatusTodo, Created: now, BaseBranch: "main", StatusVersion: domain.StatusVersionCurrent},
+		{ID: 4, Title: "Orphan", Status: domain.StatusTodo, Created: now, BaseBranch: "main", StatusVersion: domain.StatusVersionCurrent},
+	}
+	for _, task := range tasks {
+		require.NoError(t, store.Save(task))
+	}
+
+	children, err := store.List(domain.TaskFilter{ParentID: &parentID})
+	require.NoError(t, err)
+	require.Len(t, children, 2)
+	assert.Equal(t, 2, children[0].ID)
+	assert.Equal(t, 3, children[1].ID)
+}
+
+func TestStore_GetChildren(t *testing.T) {
+	crewDir := filepath.Join(t.TempDir(), ".crew")
+	store := New(crewDir, "default")
+	_, err := store.Initialize()
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	parentID := 1
+	for _, task := range []*domain.Task{
+		{ID: 1, Title: "Parent", Status: domain.StatusTodo, Created: now, BaseBranch: "main", StatusVersion: domain.StatusVersionCurrent},
+		{ID: 2, Title: "Child 1", ParentID: &parentID, Status: domain.StatusTodo, Created: now, BaseBranch: "main", StatusVersion: domain.StatusVersionCurrent},
+		{ID: 3, Title: "Child 2", ParentID: &parentID, Status: domain.StatusTodo, Created: now, BaseBranch: "main", StatusVersion: domain.StatusVersionCurrent},
+	} {
+		require.NoError(t, store.Save(task))
+	}
+
+	children, err := store.GetChildren(1)
+	require.NoError(t, err)
+	require.Len(t, children, 2)
+	assert.Equal(t, 2, children[0].ID)
+	assert.Equal(t, 3, children[1].ID)
+}
+
+func TestStore_Delete(t *testing.T) {
+	crewDir := filepath.Join(t.TempDir(), ".crew")
+	store := New(crewDir, "default")
+	_, err := store.Initialize()
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	task := &domain.Task{
+		ID:            1,
+		Title:         "To Delete",
+		Status:        domain.StatusTodo,
+		Created:       now,
+		BaseBranch:    "main",
+		StatusVersion: domain.StatusVersionCurrent,
+	}
+	require.NoError(t, store.Save(task))
+
+	comment := domain.Comment{Text: "Test comment", Author: "worker", Time: now}
+	require.NoError(t, store.AddComment(1, comment))
+
+	require.NoError(t, store.Delete(1))
+
+	loaded, err := store.Get(1)
+	require.NoError(t, err)
+	assert.Nil(t, loaded)
+
+	comments, err := store.GetComments(1)
+	require.NoError(t, err)
+	assert.Empty(t, comments)
+}
+
 type namespaceMetaFile struct {
 	Schema    int    `json:"schema"`
 	Namespace string `json:"namespace"`

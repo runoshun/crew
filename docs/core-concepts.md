@@ -35,7 +35,15 @@ AI agents run in tmux sessions, enabling background execution and attach/detach.
 
 ### 2.3 Task Data Store
 
-Task data is stored in Git refs under `refs/crew/` namespace. This enables sharing tasks across clones and leveraging Git's built-in integrity and versioning.
+Task data is stored as files under `.crew/tasks/<namespace>/`.
+Each task is split into:
+
+- `<id>.md` (frontmatter, description, comments)
+- `<id>.meta.json` (status and lifecycle metadata)
+- `meta.json` (namespace schema and next_id)
+
+Operational note: when committing changes under `.crew/`, only include `.crew/tasks/**`.
+Other paths under `.crew/` (logs, runtime state, tmux socket) are local and should not be versioned.
 
 ---
 
