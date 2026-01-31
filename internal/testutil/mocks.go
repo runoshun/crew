@@ -871,6 +871,7 @@ type MockCommandExecutor struct {
 	ExecuteInteractiveErr    error
 	ExecuteWithContextErr    error
 	ExecuteOutput            []byte
+	StderrOutput             []byte // Output to write to stderr in ExecuteWithContext
 	ExecuteCalled            bool
 	ExecuteInteractiveCalled bool
 	ExecuteWithContextCalled bool
@@ -907,6 +908,9 @@ func (m *MockCommandExecutor) ExecuteWithContext(_ context.Context, cmd *domain.
 	m.ExecutedCmd = cmd
 	if m.ExecuteOutput != nil && stdout != nil {
 		_, _ = stdout.Write(m.ExecuteOutput)
+	}
+	if m.StderrOutput != nil && stderr != nil {
+		_, _ = stderr.Write(m.StderrOutput)
 	}
 	return m.ExecuteWithContextErr
 }

@@ -554,3 +554,72 @@ func TestReviewTask_Execute_SaveMetadataFails(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "save review metadata")
 }
+
+func TestReviewTask_Execute_Verbose(t *testing.T) {
+	t.Run("verbose mode streams stdout and stderr", func(t *testing.T) {
+		// Setup
+		repo := testutil.NewMockTaskRepository()
+		repo.Tasks[1] = &domain.Task{
+			ID:     1,
+			Title:  "Test task",
+			Status: domain.StatusInProgress,
+		}
+		sessions := testutil.NewMockSessionManager()
+		worktrees := testutil.NewMockWorktreeManager()
+		worktrees.ResolvePath = "/tmp/worktree"
+		configLoader := testutil.NewMockConfigLoader()
+		executor := testutil.NewMockCommandExecutor()
+		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\nReview output")
+		executor.StderrOutput = []byte("stderr output\n")
+		clock := &testutil.MockClock{NowTime: time.Now()}
+
+		var stderr bytes.Buffer
+		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
+
+		// Execute with Verbose=true
+		out, err := uc.Execute(context.Background(), ReviewTaskInput{
+			TaskID:  1,
+			Verbose: true,
+		})
+
+		// Assert
+		require.NoError(t, err)
+		require.NotNil(t, out)
+		// In verbose mode, both stdout and stderr are streamed to stderr
+		output := stderr.String()
+		assert.Contains(t, output, domain.ReviewResultMarker)
+		assert.Contains(t, output, "stderr output")
+	})
+
+	t.Run("non-verbose mode does not stream output", func(t *testing.T) {
+		// Setup
+		repo := testutil.NewMockTaskRepository()
+		repo.Tasks[1] = &domain.Task{
+			ID:     1,
+			Title:  "Test task",
+			Status: domain.StatusInProgress,
+		}
+		sessions := testutil.NewMockSessionManager()
+		worktrees := testutil.NewMockWorktreeManager()
+		worktrees.ResolvePath = "/tmp/worktree"
+		configLoader := testutil.NewMockConfigLoader()
+		executor := testutil.NewMockCommandExecutor()
+		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\nReview output")
+		executor.StderrOutput = []byte("stderr output\n")
+		clock := &testutil.MockClock{NowTime: time.Now()}
+
+		var stderr bytes.Buffer
+		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
+
+		// Execute with Verbose=false
+		out, err := uc.Execute(context.Background(), ReviewTaskInput{
+			TaskID:  1,
+			Verbose: false,
+		})
+
+		// Assert
+		require.NoError(t, err)
+		require.NotNil(t, out)
+		assert.Empty(t, stderr.String())
+	})
+}
