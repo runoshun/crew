@@ -2,12 +2,11 @@ package usecase
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // ReviewSessionEndedInput contains the parameters for handling review session termination.
@@ -63,30 +62,14 @@ func (uc *ReviewSessionEnded) Execute(_ context.Context, in ReviewSessionEndedIn
 
 	// Update task and comments only on successful review
 	if in.ExitCode == 0 {
-		// Extract the review result
-		reviewResult := in.Output
-		if idx := strings.Index(in.Output, domain.ReviewResultMarker); idx != -1 {
-			reviewResult = in.Output[idx+len(domain.ReviewResultMarker):]
+		_, err = shared.RecordReviewResult(shared.ReviewDeps{
+			Tasks:  uc.tasks,
+			Clock:  uc.clock,
+			Stderr: uc.stderr,
+		}, task, in.Output)
+		if err != nil {
+			return nil, err
 		}
-		reviewResult = strings.TrimSpace(reviewResult)
-
-		now := uc.clock.Now()
-		if reviewResult != "" {
-			comment := domain.Comment{
-				Text:   reviewResult,
-				Time:   now,
-				Author: "reviewer",
-			}
-			if err := uc.tasks.AddComment(task.ID, comment); err != nil {
-				// Log but don't fail - the review session completed
-				_, _ = fmt.Fprintf(uc.stderr, "warning: failed to add review comment: %v\n", err)
-			}
-		}
-
-		isLGTM := strings.HasPrefix(reviewResult, domain.ReviewLGTMPrefix)
-		task.ReviewCount++
-		task.LastReviewAt = now
-		task.LastReviewIsLGTM = &isLGTM
 	}
 	// On error (non-zero exit code), leave status unchanged
 

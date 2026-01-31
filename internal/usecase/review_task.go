@@ -137,8 +137,7 @@ func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, review
 		return nil, err
 	}
 	if err := uc.tasks.Save(task); err != nil {
-		// Log but don't fail - the review was successful
-		_, _ = fmt.Fprintf(uc.stderr, "warning: failed to save review metadata: %v\n", err)
+		return nil, fmt.Errorf("save review metadata: %w", err)
 	}
 
 	return &ReviewTaskOutput{
