@@ -112,6 +112,22 @@ crew complete
 | `crew complete` | Mark task as complete |
 | `crew comment` | Add a comment |
 | `crew diff` | Show diff |
+| `crew review` | Run AI code review |
+
+---
+
+## Running Reviews
+
+`crew review` runs synchronously and waits for the AI reviewer to complete. This can take a significant amount of time.
+
+**Important**: Always set a 20-minute timeout when running reviews to avoid hanging indefinitely.
+
+```bash
+# Using shell timeout command
+timeout 1200 crew review <id>
+
+# Or with Bash tool timeout parameter (1200000ms = 20 minutes)
+```
 
 ---
 

@@ -62,6 +62,9 @@ Examples:
 				return fmt.Errorf("invalid task ID: %w", err)
 			}
 
+			// Print start message early (before stdin read which can be slow)
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Reviewing task #%d...\n", taskID)
+
 			// Parse agent and message from remaining args
 			agent, message := parseReviewArgs(args[1:])
 
