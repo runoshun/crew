@@ -27,20 +27,21 @@ func newReviewCommand(c *app.Container) *cobra.Command {
 The reviewer analyzes the diff and provides feedback on code quality,
 correctness, and adherence to best practices.
 
-By default, the review runs in background (similar to crew start).
-Use --wait for synchronous execution.
+Reviews run via an external tool and do not change task status.
+By default, the review runs in background and prints the review session name.
+Use --wait for synchronous execution and to print the review output.
 
 The review result is saved as a comment with author "reviewer".
 
 Arguments:
-  <id>      Task ID to review (must be in for_review status)
+  <id>      Task ID to review (must be in in_progress or done status)
   [agent]   Reviewer agent name (optional, uses default if not specified)
   [-- message...]  Additional instructions for the reviewer (optional)
 
 The message can also be provided via stdin.
 
 Examples:
-  # Start background review
+  # Start background review (prints session name)
   crew review 1
 
   # Review with specific agent

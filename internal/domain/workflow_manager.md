@@ -34,7 +34,7 @@ Get up and running in 5 steps:
 
 5. **Review, complete, merge** → Finish the task:
    ```bash
-   crew review <id>      # External review (sync). Repeat until min_reviews is satisfied.
+   crew review <id> --wait      # External review (sync). Repeat until min_reviews is satisfied.
    crew complete <id>    # Mark task done after review requirements pass
    crew merge <id>       # Merge to main (or close if abandoned)
    ```
@@ -202,7 +202,7 @@ crew peek <id>
 
 ```bash
 # Run review (external tool, synchronous). Repeat until min_reviews is met.
-crew review <id>
+crew review <id> --wait
 
 # If changes are requested, send feedback
 crew comment <id> -R "Fix the error handling in auth.go"
@@ -314,7 +314,8 @@ crew diff <id>                     # Show changes
 
 ### Review & Completion
 ```bash
-crew review <id>                   # Start AI code review
+crew review <id> --wait            # Start AI code review (sync)
+crew complete <id>                 # Mark task done after reviews
 crew merge <id>                    # Merge to main
 ```
 
