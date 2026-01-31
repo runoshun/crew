@@ -144,6 +144,46 @@ func TestStore_StrictValidation(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestStore_ListAll(t *testing.T) {
+	crewDir := filepath.Join(t.TempDir(), ".crew")
+	storeAlpha := New(crewDir, "alpha")
+	storeBeta := New(crewDir, "beta")
+
+	_, err := storeAlpha.Initialize()
+	require.NoError(t, err)
+	_, err = storeBeta.Initialize()
+	require.NoError(t, err)
+
+	now := time.Date(2026, 1, 18, 10, 0, 0, 0, time.UTC)
+	require.NoError(t, storeAlpha.Save(&domain.Task{
+		ID:            1,
+		Title:         "Alpha task",
+		Description:   "Alpha body",
+		Status:        domain.StatusTodo,
+		Created:       now,
+		BaseBranch:    "main",
+		StatusVersion: domain.StatusVersionCurrent,
+	}))
+	require.NoError(t, storeBeta.Save(&domain.Task{
+		ID:            1,
+		Title:         "Beta task",
+		Description:   "Beta body",
+		Status:        domain.StatusTodo,
+		Created:       now,
+		BaseBranch:    "main",
+		StatusVersion: domain.StatusVersionCurrent,
+	}))
+
+	tasks, err := storeAlpha.ListAll(domain.TaskFilter{})
+	require.NoError(t, err)
+	require.Len(t, tasks, 2)
+
+	assert.Equal(t, "alpha", tasks[0].Namespace)
+	assert.Equal(t, 1, tasks[0].ID)
+	assert.Equal(t, "beta", tasks[1].Namespace)
+	assert.Equal(t, 1, tasks[1].ID)
+}
+
 type namespaceMetaFile struct {
 	Schema    int    `json:"schema"`
 	Namespace string `json:"namespace"`

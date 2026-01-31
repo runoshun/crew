@@ -92,6 +92,47 @@ func (s *Store) List(filter domain.TaskFilter) ([]*domain.Task, error) {
 	return tasks, nil
 }
 
+// ListAll retrieves tasks across all namespaces matching the filter.
+func (s *Store) ListAll(filter domain.TaskFilter) ([]*domain.Task, error) {
+	entries, err := os.ReadDir(s.rootDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, domain.ErrNotInitialized
+		}
+		return nil, fmt.Errorf("read tasks dir: %w", err)
+	}
+
+	crewDir := filepath.Dir(s.rootDir)
+	var tasks []*domain.Task
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		namespace := entry.Name()
+		if namespace == "" || strings.HasPrefix(namespace, ".") {
+			continue
+		}
+		nsStore := New(crewDir, namespace)
+		nsTasks, err := nsStore.List(filter)
+		if err != nil {
+			return nil, fmt.Errorf("list namespace %s: %w", namespace, err)
+		}
+		tasks = append(tasks, nsTasks...)
+	}
+
+	slices.SortFunc(tasks, func(a, b *domain.Task) int {
+		if a.Namespace == b.Namespace {
+			return a.ID - b.ID
+		}
+		if a.Namespace < b.Namespace {
+			return -1
+		}
+		return 1
+	})
+
+	return tasks, nil
+}
+
 // GetChildren retrieves direct children of a task.
 func (s *Store) GetChildren(parentID int) ([]*domain.Task, error) {
 	return s.List(domain.TaskFilter{ParentID: &parentID})

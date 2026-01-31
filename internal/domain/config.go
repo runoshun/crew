@@ -32,7 +32,6 @@ type Config struct {
 
 // TasksConfig holds settings for task storage from [tasks] section.
 type TasksConfig struct {
-	Store       string `toml:"store,omitempty"`         // Legacy storage backend (ignored; file store is used)
 	Namespace   string `toml:"namespace,omitempty"`     // Task namespace (default from git user.email or "default")
 	NewTaskBase string `toml:"new_task_base,omitempty"` // Base branch for new tasks: "current" (default) or "default"
 	Encrypt     bool   `toml:"encrypt,omitempty"`       // Enable encryption for task data (default: false)

@@ -28,8 +28,8 @@ func TestIntegration_Close(t *testing.T) {
 	crewMust(t, dir, "close", "1")
 
 	// Verify task is closed
-	out := crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: closed")
+	out := crewMust(t, dir, "show", "1", "--json")
+	assert.Contains(t, out, "\"status\": \"closed\"")
 }
 
 func TestIntegration_Close_NotFound(t *testing.T) {
@@ -78,9 +78,9 @@ func TestIntegration_Start_WithAgent(t *testing.T) {
 	assert.Contains(t, out, "session: crew-1")
 
 	// Verify task status changed to in_progress
-	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: in_progress")
-	assert.Contains(t, out, "Agent: echo")
+	out = crewMust(t, dir, "show", "1", "--json")
+	assert.Contains(t, out, "\"status\": \"in_progress\"")
+	assert.Contains(t, out, "\"agent\": \"echo\"")
 }
 
 func TestIntegration_Start_WithDefaultAgent(t *testing.T) {
@@ -103,8 +103,8 @@ func TestIntegration_Start_WithDefaultAgent(t *testing.T) {
 	assert.Contains(t, out, "Started task #1")
 
 	// Verify task uses default agent
-	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Agent: echo")
+	out = crewMust(t, dir, "show", "1", "--json")
+	assert.Contains(t, out, "\"agent\": \"echo\"")
 }
 
 func TestIntegration_Start_NoAgentNoConfig(t *testing.T) {
@@ -185,17 +185,17 @@ skip_review = true
 	crewMust(t, dir, "new", "--title", "Workflow test", "--body", "Test session workflow")
 
 	// Verify initial status
-	out := crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: todo")
+	out := crewMust(t, dir, "show", "1", "--json")
+	assert.Contains(t, out, "\"status\": \"todo\"")
 
 	// Start the task (uses default_agent "true" which exits immediately with code 0)
 	out = crewMust(t, dir, "start", "1")
 	assert.Contains(t, out, "Started task #1")
 
 	// Verify status changed
-	out = crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: in_progress")
-	assert.Contains(t, out, "Agent: true")
+	out = crewMust(t, dir, "show", "1", "--json")
+	assert.Contains(t, out, "\"status\": \"in_progress\"")
+	assert.Contains(t, out, "\"agent\": \"true\"")
 }
 
 // =============================================================================
@@ -212,6 +212,9 @@ func TestIntegration_Complete_Success(t *testing.T) {
 	crewDir := filepath.Join(dir, ".git", "crew")
 	configPath := filepath.Join(crewDir, domain.ConfigFileName)
 	configContent := `default_agent = "true"
+
+[tasks]
+skip_review = true
 `
 	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
 
@@ -221,8 +224,8 @@ func TestIntegration_Complete_Success(t *testing.T) {
 	crewMust(t, dir, "start", "1")
 
 	// Verify status is in_progress
-	out := crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: in_progress")
+	out := crewMust(t, dir, "show", "1", "--json")
+	assert.Contains(t, out, "\"status\": \"in_progress\"")
 
 	// Complete the task
 	out = crewMust(t, dir, "complete", "1")
@@ -342,6 +345,6 @@ command = "exit 1"
 	assert.Error(t, err)
 
 	// Verify status is still in_progress
-	out := crewMust(t, dir, "show", "1")
-	assert.Contains(t, out, "Status: in_progress")
+	out := crewMust(t, dir, "show", "1", "--json")
+	assert.Contains(t, out, "\"status\": \"in_progress\"")
 }

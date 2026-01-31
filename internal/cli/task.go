@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 	"github.com/spf13/cobra"
 )
 
@@ -231,7 +233,7 @@ By default, tasks with terminal status (closed) are hidden.
 Use --all to show all tasks including closed tasks.
 
 Output format is tab-separated with columns:
-  ID, PARENT, STATUS, AGENT, LABELS, [ELAPSED], TITLE
+  ID, NAMESPACE, PARENT, STATUS, AGENT, LABELS, [ELAPSED], TITLE
 
 ELAPSED is only shown for tasks with status 'in_progress'.
 
@@ -266,6 +268,7 @@ Examples:
 				IncludeTerminal:  opts.All,
 				IncludeSessions:  opts.Sessions,
 				IncludeProcesses: opts.Processes,
+				AllNamespaces:    true,
 			}
 
 			// Set parent ID if specified
@@ -308,10 +311,15 @@ func printTaskList(w io.Writer, tasks []*domain.Task, clock domain.Clock) {
 	defer func() { _ = tw.Flush() }()
 
 	// Header
-	_, _ = fmt.Fprintln(tw, "ID\tPARENT\tSTATUS\tAGENT\tLABELS\tTITLE")
+	_, _ = fmt.Fprintln(tw, "ID\tNAMESPACE\tPARENT\tSTATUS\tAGENT\tLABELS\tTITLE")
 
 	// Rows
 	for _, task := range tasks {
+		namespaceStr := "-"
+		if task.Namespace != "" {
+			namespaceStr = task.Namespace
+		}
+
 		parentStr := "-"
 		if task.ParentID != nil {
 			parentStr = fmt.Sprintf("%d", *task.ParentID)
@@ -334,8 +342,9 @@ func printTaskList(w io.Writer, tasks []*domain.Task, clock domain.Clock) {
 			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
 		}
 
-		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			task.ID,
+			namespaceStr,
 			parentStr,
 			statusStr,
 			agentStr,
@@ -351,11 +360,16 @@ func printTaskListWithSessions(w io.Writer, tasksWithInfo []usecase.TaskWithSess
 	defer func() { _ = tw.Flush() }()
 
 	// Header
-	_, _ = fmt.Fprintln(tw, "ID\tPARENT\tSTATUS\tAGENT\tSESSION\tLABELS\tTITLE")
+	_, _ = fmt.Fprintln(tw, "ID\tNAMESPACE\tPARENT\tSTATUS\tAGENT\tSESSION\tLABELS\tTITLE")
 
 	// Rows
 	for _, info := range tasksWithInfo {
 		task := info.Task
+		namespaceStr := "-"
+		if task.Namespace != "" {
+			namespaceStr = task.Namespace
+		}
+
 		parentStr := "-"
 		if task.ParentID != nil {
 			parentStr = fmt.Sprintf("%d", *task.ParentID)
@@ -383,8 +397,9 @@ func printTaskListWithSessions(w io.Writer, tasksWithInfo []usecase.TaskWithSess
 			statusStr = fmt.Sprintf("%s (%s)", task.Status, formatDuration(elapsed))
 		}
 
-		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			task.ID,
+			namespaceStr,
 			parentStr,
 			statusStr,
 			agentStr,
@@ -401,7 +416,7 @@ func printProcessList(w io.Writer, tasksWithInfo []usecase.TaskWithSession) {
 	defer func() { _ = tw.Flush() }()
 
 	// Header
-	_, _ = fmt.Fprintln(tw, "ID\tSESSION\tPID\tSTATE\tPROCESS")
+	_, _ = fmt.Fprintln(tw, "ID\tNAMESPACE\tSESSION\tPID\tSTATE\tPROCESS")
 
 	// Rows
 	for _, info := range tasksWithInfo {
@@ -414,8 +429,14 @@ func printProcessList(w io.Writer, tasksWithInfo []usecase.TaskWithSession) {
 
 		// Print first process
 		first := info.Processes[0]
-		_, _ = fmt.Fprintf(tw, "%d\t%s\t%d\t%s\t%s\n",
+		namespaceStr := "-"
+		if task.Namespace != "" {
+			namespaceStr = task.Namespace
+		}
+
+		_, _ = fmt.Fprintf(tw, "%d\t%s\t%s\t%d\t%s\t%s\n",
 			task.ID,
+			namespaceStr,
 			info.SessionName,
 			first.PID,
 			first.State,
@@ -425,7 +446,7 @@ func printProcessList(w io.Writer, tasksWithInfo []usecase.TaskWithSession) {
 		// Print child processes with indentation
 		for i := 1; i < len(info.Processes); i++ {
 			proc := info.Processes[i]
-			_, _ = fmt.Fprintf(tw, "\t\t%d\t%s\t└─ %s\n",
+			_, _ = fmt.Fprintf(tw, "\t\t\t%d\t%s\t└─ %s\n",
 				proc.PID,
 				proc.State,
 				proc.Command,
@@ -454,25 +475,18 @@ func newShowCommand(c *app.Container) *cobra.Command {
 		CommentsBy string
 		JSON       bool
 		LastReview bool
-		Markdown   bool
 	}
 
 	cmd := &cobra.Command{
 		Use:   "show [id]",
-		Short: "Display task details",
-		Long: `Display detailed information about a task.
+		Short: "Display task content",
+		Long: `Display task content.
 
 If no ID is provided, the task ID is auto-detected from the current branch name.
 The branch must follow the naming convention: crew-<id> or crew-<id>-gh-<issue>
 
-Output includes:
-  - Task ID and title
-  - Description
-  - Status, parent, branch, labels
-  - GitHub issue and PR numbers (if linked)
-  - Running agent and session info
-  - Sub-tasks (if any)
-  - Comments (if any)
+By default, this command outputs the task Markdown file as-is.
+Use --json for structured output (supports --comments-by and --last-review).
 
 Examples:
   # Show task by ID
@@ -484,20 +498,37 @@ Examples:
   # Output in JSON format
   crew show 1 --json
 
-		# Show only the latest reviewer comment
-		crew show 1 --last-review
+  # Show only the latest reviewer comment (JSON only)
+  crew show 1 --json --last-review
 
-		# Output in Markdown format
-		crew show 1 --markdown
-
-		# Show comments by a specific author
-		crew show 1 --comments-by reviewer`,
+  # Show comments by a specific author (JSON only)
+  crew show 1 --json --comments-by reviewer`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve task ID
 			taskID, err := resolveTaskID(args, c.Git)
 			if err != nil {
 				return err
+			}
+
+			if !opts.JSON {
+				if opts.CommentsBy != "" || opts.LastReview {
+					return fmt.Errorf("--comments-by/--last-review require --json")
+				}
+				task, taskErr := shared.GetTask(c.Tasks, taskID)
+				if taskErr != nil {
+					return taskErr
+				}
+				markdownPath := filepath.Join(c.Config.CrewDir, "tasks", task.Namespace, fmt.Sprintf("%d.md", task.ID))
+				file, openErr := os.Open(markdownPath)
+				if openErr != nil {
+					return fmt.Errorf("read task markdown: %w", openErr)
+				}
+				defer func() { _ = file.Close() }()
+				if _, copyErr := io.Copy(cmd.OutOrStdout(), file); copyErr != nil {
+					return fmt.Errorf("write task markdown: %w", copyErr)
+				}
+				return nil
 			}
 
 			// Execute use case
@@ -511,76 +542,61 @@ Examples:
 				return err
 			}
 
-			if opts.JSON && opts.Markdown {
-				return fmt.Errorf("cannot use --json and --markdown together")
-			}
-
 			// Print output
-			if opts.JSON {
-				type jsonComment struct {
-					Time   time.Time `json:"time"`
-					Text   string    `json:"text"`
-					Author string    `json:"author,omitempty"`
-				}
-				type jsonTask struct {
-					Created     time.Time     `json:"created"`
-					Started     *time.Time    `json:"started,omitempty"`
-					ParentID    *int          `json:"parent_id"`
-					Description string        `json:"description"`
-					Agent       string        `json:"agent"`
-					Branch      string        `json:"branch"`
-					Status      domain.Status `json:"status"`
-					Title       string        `json:"title"`
-					Labels      []string      `json:"labels"`
-					Comments    []jsonComment `json:"comments"`
-					ID          int           `json:"id"`
-					Issue       int           `json:"issue"`
-				}
-
-				jt := jsonTask{
-					Created:     out.Task.Created,
-					ParentID:    out.Task.ParentID,
-					Description: out.Task.Description,
-					Agent:       out.Task.Agent,
-					Branch:      domain.BranchName(out.Task.ID, out.Task.Issue),
-					Status:      out.Task.Status,
-					Title:       out.Task.Title,
-					Labels:      out.Task.Labels,
-					ID:          out.Task.ID,
-					Issue:       out.Task.Issue,
-					Comments:    make([]jsonComment, len(out.Comments)),
-				}
-				if !out.Task.Started.IsZero() {
-					jt.Started = &out.Task.Started
-				}
-				if jt.Labels == nil {
-					jt.Labels = []string{}
-				}
-				for i, c := range out.Comments {
-					jt.Comments[i] = jsonComment{
-						Time:   c.Time,
-						Text:   c.Text,
-						Author: c.Author,
-					}
-				}
-
-				enc := json.NewEncoder(cmd.OutOrStdout())
-				enc.SetIndent("", "  ")
-				return enc.Encode(jt)
+			type jsonComment struct {
+				Time   time.Time `json:"time"`
+				Text   string    `json:"text"`
+				Author string    `json:"author,omitempty"`
+			}
+			type jsonTask struct {
+				Created     time.Time     `json:"created"`
+				Started     *time.Time    `json:"started,omitempty"`
+				ParentID    *int          `json:"parent_id"`
+				Description string        `json:"description"`
+				Agent       string        `json:"agent"`
+				Branch      string        `json:"branch"`
+				Status      domain.Status `json:"status"`
+				Title       string        `json:"title"`
+				Labels      []string      `json:"labels"`
+				Comments    []jsonComment `json:"comments"`
+				ID          int           `json:"id"`
+				Issue       int           `json:"issue"`
 			}
 
-			if opts.Markdown {
-				printTaskDetailsMarkdown(cmd.OutOrStdout(), out)
-				return nil
+			jt := jsonTask{
+				Created:     out.Task.Created,
+				ParentID:    out.Task.ParentID,
+				Description: out.Task.Description,
+				Agent:       out.Task.Agent,
+				Branch:      domain.BranchName(out.Task.ID, out.Task.Issue),
+				Status:      out.Task.Status,
+				Title:       out.Task.Title,
+				Labels:      out.Task.Labels,
+				ID:          out.Task.ID,
+				Issue:       out.Task.Issue,
+				Comments:    make([]jsonComment, len(out.Comments)),
+			}
+			if !out.Task.Started.IsZero() {
+				jt.Started = &out.Task.Started
+			}
+			if jt.Labels == nil {
+				jt.Labels = []string{}
+			}
+			for i, c := range out.Comments {
+				jt.Comments[i] = jsonComment{
+					Time:   c.Time,
+					Text:   c.Text,
+					Author: c.Author,
+				}
 			}
 
-			printTaskDetails(cmd.OutOrStdout(), out)
-			return nil
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			enc.SetIndent("", "  ")
+			return enc.Encode(jt)
 		},
 	}
 
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Output in JSON format")
-	cmd.Flags().BoolVar(&opts.Markdown, "markdown", false, "Output in Markdown format")
 	cmd.Flags().StringVar(&opts.CommentsBy, "comments-by", "", "Filter comments by author")
 	cmd.Flags().BoolVar(&opts.LastReview, "last-review", false, "Show only the latest review comment")
 
@@ -1187,148 +1203,4 @@ Examples:
 		},
 	}
 	return cmd
-}
-
-// printTaskDetails prints task details in a formatted output.
-func printTaskDetails(w io.Writer, out *usecase.ShowTaskOutput) {
-	task := out.Task
-
-	// Header
-	_, _ = fmt.Fprintf(w, "# Task %d: %s\n\n", task.ID, task.Title)
-
-	// Description
-	if task.Description != "" {
-		_, _ = fmt.Fprintf(w, "%s\n\n", task.Description)
-	}
-
-	// Fields
-	_, _ = fmt.Fprintf(w, "Status: %s\n", task.Status)
-
-	if task.ParentID != nil {
-		_, _ = fmt.Fprintf(w, "Parent: #%d\n", *task.ParentID)
-	} else {
-		_, _ = fmt.Fprintln(w, "Parent: none")
-	}
-
-	_, _ = fmt.Fprintf(w, "Branch: %s\n", domain.BranchName(task.ID, task.Issue))
-
-	if len(task.Labels) > 0 {
-		_, _ = fmt.Fprintf(w, "Labels: [%s]\n", strings.Join(task.Labels, ", "))
-	} else {
-		_, _ = fmt.Fprintln(w, "Labels: none")
-	}
-
-	_, _ = fmt.Fprintf(w, "Created: %s\n", task.Created.Format(time.RFC3339))
-
-	if task.Issue > 0 {
-		_, _ = fmt.Fprintf(w, "Issue: #%d\n", task.Issue)
-	}
-
-	if task.PR > 0 {
-		_, _ = fmt.Fprintf(w, "PR: #%d\n", task.PR)
-	}
-
-	if task.Agent != "" {
-		_, _ = fmt.Fprintf(w, "Agent: %s (session: %s)\n", task.Agent, task.Session)
-	}
-
-	// Sub-tasks
-	if len(out.Children) > 0 {
-		_, _ = fmt.Fprintln(w, "\nSub-tasks:")
-		for _, child := range out.Children {
-			_, _ = fmt.Fprintf(w, "  #%d [%s] %s\n", child.ID, child.Status, child.Title)
-		}
-	}
-
-	// Comments
-	if len(out.Comments) > 0 {
-		_, _ = fmt.Fprintln(w, "\nComments:")
-		separator := "  ─────────────────"
-		for _, comment := range out.Comments {
-			_, _ = fmt.Fprintln(w, separator)
-			authorPart := ""
-			if comment.Author != "" {
-				authorPart = " " + comment.Author
-			}
-			_, _ = fmt.Fprintf(w, "  [%s]%s\n", comment.Time.Format(time.RFC3339), authorPart)
-			// Indent message
-			lines := strings.Split(strings.TrimSpace(comment.Text), "\n")
-			for _, line := range lines {
-				_, _ = fmt.Fprintf(w, "  %s\n", line)
-			}
-		}
-	}
-}
-
-// printTaskDetailsMarkdown prints task details in Markdown format.
-func printTaskDetailsMarkdown(w io.Writer, out *usecase.ShowTaskOutput) {
-	const markdownTimeLayout = "2006-01-02 15:04"
-
-	task := out.Task
-
-	_, _ = fmt.Fprintf(w, "# Task #%d: %s\n\n", task.ID, task.Title)
-	_, _ = fmt.Fprintf(w, "**Status:** %s\n", task.Status)
-
-	labels := "none"
-	if len(task.Labels) > 0 {
-		labels = strings.Join(task.Labels, ", ")
-	}
-	_, _ = fmt.Fprintf(w, "**Labels:** %s\n", labels)
-
-	parent := "none"
-	if task.ParentID != nil {
-		parent = fmt.Sprintf("#%d", *task.ParentID)
-	}
-	_, _ = fmt.Fprintf(w, "**Parent:** %s\n", parent)
-	_, _ = fmt.Fprintf(w, "**Branch:** %s\n", domain.BranchName(task.ID, task.Issue))
-	_, _ = fmt.Fprintf(w, "**Created:** %s\n", task.Created.Format(markdownTimeLayout))
-
-	if task.Issue > 0 {
-		_, _ = fmt.Fprintf(w, "**Issue:** #%d\n", task.Issue)
-	}
-	if task.PR > 0 {
-		_, _ = fmt.Fprintf(w, "**PR:** #%d\n", task.PR)
-	}
-	if task.Agent != "" {
-		_, _ = fmt.Fprintf(w, "**Agent:** %s (session: %s)\n", task.Agent, task.Session)
-	}
-
-	_, _ = fmt.Fprintln(w)
-
-	if task.Description != "" {
-		_, _ = fmt.Fprintln(w, "## Description")
-		_, _ = fmt.Fprintln(w, strings.TrimSpace(task.Description))
-		_, _ = fmt.Fprintln(w)
-	}
-
-	if len(out.Children) > 0 {
-		_, _ = fmt.Fprintln(w, "## Sub-tasks")
-		for _, child := range out.Children {
-			_, _ = fmt.Fprintf(w, "- #%d [%s] %s\n", child.ID, child.Status, child.Title)
-		}
-		_, _ = fmt.Fprintln(w)
-	}
-
-	if len(out.Comments) > 0 {
-		_, _ = fmt.Fprintln(w, "## Comments")
-		for _, comment := range out.Comments {
-			authorPart := ""
-			if comment.Author != "" {
-				authorPart = " (" + comment.Author + ")"
-			}
-
-			text := strings.TrimSpace(comment.Text)
-			lines := strings.Split(text, "\n")
-			prefix := fmt.Sprintf("- %s%s", comment.Time.Format(markdownTimeLayout), authorPart)
-			if text == "" {
-				_, _ = fmt.Fprintln(w, prefix)
-				continue
-			}
-
-			_, _ = fmt.Fprintf(w, "%s: %s\n", prefix, lines[0])
-			for _, line := range lines[1:] {
-				_, _ = fmt.Fprintf(w, "  %s\n", line)
-			}
-		}
-	}
 }
