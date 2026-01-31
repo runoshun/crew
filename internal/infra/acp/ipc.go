@@ -140,18 +140,18 @@ func (f *FileIPC) ensureDir() error {
 func (f *FileIPC) readCommand(path string) (domain.ACPCommand, bool) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		_ = os.Remove(path)
+		f.moveToFailed(path)
 		return domain.ACPCommand{}, false
 	}
 
 	var cmd domain.ACPCommand
 	if err := json.Unmarshal(data, &cmd); err != nil {
-		_ = os.Remove(path)
+		f.moveToFailed(path)
 		return domain.ACPCommand{}, false
 	}
 
 	if err := cmd.Validate(); err != nil {
-		_ = os.Remove(path)
+		f.moveToFailed(path)
 		return domain.ACPCommand{}, false
 	}
 
@@ -160,6 +160,18 @@ func (f *FileIPC) readCommand(path string) (domain.ACPCommand, bool) {
 	}
 
 	return cmd, true
+}
+
+func (f *FileIPC) moveToFailed(path string) {
+	failedDir := filepath.Join(f.commandsDir, "failed")
+	if err := os.MkdirAll(failedDir, 0750); err == nil {
+		base := filepath.Base(path)
+		target := filepath.Join(failedDir, base)
+		if err := os.Rename(path, target); err == nil {
+			return
+		}
+	}
+	_ = os.Rename(path, path+".bad")
 }
 
 func newCommandID() string {

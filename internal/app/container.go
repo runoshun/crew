@@ -293,7 +293,6 @@ func (c *Container) ACPRunUseCase(stdout, stderr io.Writer) *usecase.ACPRun {
 		c.Git,
 		c.Runner,
 		c.ACPIPCFactory,
-		c.Config.CrewDir,
 		c.Config.RepoRoot,
 		stdout,
 		stderr,

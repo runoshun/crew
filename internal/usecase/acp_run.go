@@ -41,7 +41,6 @@ type ACPRun struct {
 	ipcFactory   domain.ACPIPCFactory
 	stdout       io.Writer
 	stderr       io.Writer
-	crewDir      string
 	repoRoot     string
 }
 
@@ -53,7 +52,6 @@ func NewACPRun(
 	git domain.Git,
 	runner domain.ScriptRunner,
 	ipcFactory domain.ACPIPCFactory,
-	crewDir string,
 	repoRoot string,
 	stdout io.Writer,
 	stderr io.Writer,
@@ -65,7 +63,6 @@ func NewACPRun(
 		git:          git,
 		runner:       runner,
 		ipcFactory:   ipcFactory,
-		crewDir:      crewDir,
 		repoRoot:     repoRoot,
 		stdout:       stdout,
 		stderr:       stderr,
@@ -122,7 +119,14 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 	cmdCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	cmd := exec.CommandContext(cmdCtx, "sh", "-c", command)
+	args := splitCommand(command)
+	if len(args) == 0 {
+		cancel()
+		return nil, fmt.Errorf("parse command: empty command")
+	}
+
+	// #nosec G204 - command comes from trusted agent configuration
+	cmd := exec.CommandContext(cmdCtx, args[0], args[1:]...)
 	cmd.Dir = wtPath
 	cmd.Env = env
 	if uc.stderr != nil {
@@ -152,7 +156,7 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 	stopCh := make(chan struct{})
 	permissionCh := make(chan domain.ACPCommand, 10)
 	promptCh := make(chan domain.ACPCommand, 10)
-	cancelCh := make(chan domain.ACPCommand, 10)
+	cancelCh := make(chan struct{}, 10)
 
 	client := &acpRunClient{
 		permissionCh: permissionCh,
@@ -335,7 +339,7 @@ type acpCommandRouter struct {
 	ipc          domain.ACPIPC
 	permissionCh chan<- domain.ACPCommand
 	promptCh     chan<- domain.ACPCommand
-	cancelCh     chan<- domain.ACPCommand
+	cancelCh     chan<- struct{}
 	stopCh       chan<- struct{}
 	stopOnce     sync.Once
 }
@@ -344,7 +348,7 @@ func newACPCommandRouter(
 	ipc domain.ACPIPC,
 	permissionCh chan<- domain.ACPCommand,
 	promptCh chan<- domain.ACPCommand,
-	cancelCh chan<- domain.ACPCommand,
+	cancelCh chan<- struct{},
 	stopCh chan<- struct{},
 ) *acpCommandRouter {
 	return &acpCommandRouter{
@@ -375,7 +379,7 @@ func (r *acpCommandRouter) Start(ctx context.Context) <-chan error {
 			case domain.ACPCommandPermission:
 				r.permissionCh <- cmd
 			case domain.ACPCommandCancel:
-				r.cancelCh <- cmd
+				r.cancelCh <- struct{}{}
 			case domain.ACPCommandStop:
 				r.stopOnce.Do(func() { close(r.stopCh) })
 				return
@@ -528,7 +532,7 @@ func buildEnv(env map[string]string) ([]string, error) {
 	}
 
 	for key, value := range env {
-		if !envNamePattern.MatchString(key) {
+		if !shared.IsValidEnvVarName(key) {
 			return nil, fmt.Errorf("%w: %q", domain.ErrInvalidEnvVarName, key)
 		}
 		merged[key] = value
