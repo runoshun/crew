@@ -12,6 +12,8 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/infra/executor"
 	"github.com/runoshun/git-crew/v2/internal/infra/filestore"
 	"github.com/runoshun/git-crew/v2/internal/infra/git"
+	"github.com/runoshun/git-crew/v2/internal/infra/gitstore"
+	"github.com/runoshun/git-crew/v2/internal/infra/jsonstore"
 	"github.com/runoshun/git-crew/v2/internal/infra/logging"
 	"github.com/runoshun/git-crew/v2/internal/infra/runner"
 	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
@@ -308,6 +310,32 @@ func (c *Container) PollStatusUseCase(stdout io.Writer) *usecase.PollStatus {
 // ShowLogsUseCase returns a new ShowLogs use case.
 func (c *Container) ShowLogsUseCase() *usecase.ShowLogs {
 	return usecase.NewShowLogs(c.Tasks, c.Config.CrewDir)
+}
+
+// MigrateStoreUseCase returns a new MigrateStore use case.
+func (c *Container) MigrateStoreUseCase(source domain.TaskRepository, dest domain.TaskRepository, destInit domain.StoreInitializer) *usecase.MigrateStore {
+	return usecase.NewMigrateStore(source, dest, destInit)
+}
+
+// FileStore returns a file-based task store for a namespace.
+func (c *Container) FileStore(namespace string) (domain.TaskRepository, domain.StoreInitializer) {
+	store := filestore.New(c.Config.CrewDir, namespace)
+	return store, store
+}
+
+// GitStore returns a git ref-based task store for a namespace.
+func (c *Container) GitStore(namespace string) (domain.TaskRepository, domain.StoreInitializer, error) {
+	store, err := gitstore.New(c.Config.RepoRoot, namespace)
+	if err != nil {
+		return nil, nil, err
+	}
+	return store, store, nil
+}
+
+// JSONStore returns a JSON file-based task store for a path.
+func (c *Container) JSONStore(path string) (domain.TaskRepository, domain.StoreInitializer) {
+	store := jsonstore.New(path)
+	return store, store
 }
 
 func resolveNamespace(cfg *domain.Config, gitClient domain.Git) string {
