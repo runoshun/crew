@@ -74,6 +74,9 @@ Examples:
 				message = stdinMessage
 			}
 
+			// Print start message
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Reviewing task #%d...\n", taskID)
+
 			// Execute use case
 			uc := c.ReviewTaskUseCase(cmd.ErrOrStderr())
 			out, err := uc.Execute(cmd.Context(), usecase.ReviewTaskInput{
