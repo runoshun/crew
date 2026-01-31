@@ -17,6 +17,7 @@ const (
 	groupSetup   = "setup"
 	groupTask    = "task"
 	groupSession = "session"
+	groupACP     = "acp"
 )
 
 // launchTUIFunc is a function variable for launching TUI, allowing it to be mocked in tests.
@@ -120,6 +121,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 		&cobra.Group{ID: groupSetup, Title: "Setup Commands:"},
 		&cobra.Group{ID: groupTask, Title: "Task Management:"},
 		&cobra.Group{ID: groupSession, Title: "Session Management:"},
+		&cobra.Group{ID: groupACP, Title: "ACP Commands:"},
 	)
 
 	// Setup commands
@@ -213,6 +215,10 @@ Use --help-manager-auto to see the auto mode guide.`,
 	workspaceCmd := newWorkspaceCommand(c)
 	workspaceCmd.GroupID = groupSession
 
+	// ACP commands
+	acpCmd := newACPCommand(c)
+	acpCmd.GroupID = groupACP
+
 	// Internal commands (hidden)
 	sessionEndedCmd := newSessionEndedCommand(c)
 	reviewSessionEndedCmd := newReviewSessionEndedCommand(c)
@@ -247,6 +253,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 		tuiCmd,
 		managerCmd,
 		workspaceCmd,
+		acpCmd,
 		sessionEndedCmd,
 		reviewSessionEndedCmd,
 	)
