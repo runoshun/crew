@@ -250,13 +250,15 @@ crew new --title "E2E: Completion flow test" --body "Please run echo hello"
 # 2. Start
 crew start <id> cc-small
 
-# 3. Set min_reviews=2 for this test
+# 3. Set min_reviews=2 for this test (restore after test)
+cp .crew/config.toml /tmp/crew-config.toml
 cat >> .crew/config.toml << 'EOF'
 [complete]
 min_reviews = 2
 EOF
 
 # 4. Review (repeat until min_reviews is satisfied)
+# Note: only successful (exit code 0) reviews increment the count
 crew review <id>
 
 # 5. Complete (should fail until min_reviews is satisfied)
@@ -271,6 +273,9 @@ echo "y" | crew merge <id>
 
 # 8. Verify
 crew show <id>  # status: merged
+
+# 9. Restore config
+mv /tmp/crew-config.toml .crew/config.toml
 ```
 
 **Verification Points:**

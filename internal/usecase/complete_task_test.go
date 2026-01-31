@@ -464,7 +464,7 @@ func TestCompleteTask_Execute_WithComment(t *testing.T) {
 }
 
 func TestCompleteTask_Execute_SkipReview_TaskLevel(t *testing.T) {
-	// Test: task.SkipReview = true -> goes directly to reviewed
+	// Test: task.SkipReview = true -> goes directly to done
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,

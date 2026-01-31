@@ -62,37 +62,6 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
           }
         ]
       }
-    ],
-    "Notification": [
-      {
-        "matcher": "permission_prompt|idle_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "crew edit {{.TaskID}} --status in_progress --if-status in_progress"
-          }
-        ]
-      }
-    ],
-	  "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-             "command": "crew edit {{.TaskID}} --status in_progress --if-status in_progress"
-          }
-        ]
-      }
-		],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-             "command": "crew edit {{.TaskID}} --status in_progress --if-status in_progress"
-          }
-        ]
-      }
     ]
   }
 }
