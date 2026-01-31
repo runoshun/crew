@@ -29,7 +29,6 @@ type ReviewTaskOutput struct {
 // Fields are ordered to minimize memory padding.
 type ReviewTask struct {
 	tasks        domain.TaskRepository
-	sessions     domain.SessionManager
 	worktrees    domain.WorktreeManager
 	configLoader domain.ConfigLoader
 	executor     domain.CommandExecutor
@@ -41,7 +40,6 @@ type ReviewTask struct {
 // NewReviewTask creates a new ReviewTask use case.
 func NewReviewTask(
 	tasks domain.TaskRepository,
-	sessions domain.SessionManager,
 	worktrees domain.WorktreeManager,
 	configLoader domain.ConfigLoader,
 	executor domain.CommandExecutor,
@@ -51,7 +49,6 @@ func NewReviewTask(
 ) *ReviewTask {
 	return &ReviewTask{
 		tasks:        tasks,
-		sessions:     sessions,
 		worktrees:    worktrees,
 		configLoader: configLoader,
 		executor:     executor,
@@ -73,11 +70,6 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 	// done is allowed for re-review; review does not change status
 	if task.Status != domain.StatusInProgress && task.Status != domain.StatusDone {
 		return nil, fmt.Errorf("cannot review task in %s status (must be in_progress or done): %w", task.Status, domain.ErrInvalidTransition)
-	}
-
-	// Check if review session is already running
-	if runningErr := shared.EnsureNoRunningReviewSession(uc.sessions, task.ID); runningErr != nil {
-		return nil, runningErr
 	}
 
 	reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{

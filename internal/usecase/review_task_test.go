@@ -22,7 +22,8 @@ func newTestReviewTask(
 	repoRoot string,
 	stderr *bytes.Buffer,
 ) *ReviewTask {
-	return NewReviewTask(repo, sessions, worktrees, configLoader, executor, clock, repoRoot, stderr)
+	_ = sessions
+	return NewReviewTask(repo, worktrees, configLoader, executor, clock, repoRoot, stderr)
 }
 
 func TestReviewTask_Execute_TaskNotFound(t *testing.T) {

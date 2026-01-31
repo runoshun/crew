@@ -98,26 +98,25 @@ type Model struct {
 	blockInput textinput.Model
 
 	// Numeric state (smaller types last)
-	mode                 Mode
-	confirmAction        ConfirmAction
-	sortMode             SortMode
-	newTaskField         NewTaskField
-	width                int
-	height               int
-	confirmTaskID        int
-	agentCursor          int
-	managerAgentCursor   int
-	reviewerCursor       int
-	statusCursor         int
-	actionMenuCursor     int
-	reviewTaskID         int // Task being reviewed
-	reviewActionCursor   int // Cursor for action selection
-	editCommentIndex     int // Index of comment being edited
-	startFocusCustom     bool
-	showAll              bool
-	detailFocused        bool // Right pane is focused for scrolling
-	confirmReviewSession bool
-	blockFocusUnblock    bool // True when Unblock button is focused in Block dialog
+	mode               Mode
+	confirmAction      ConfirmAction
+	sortMode           SortMode
+	newTaskField       NewTaskField
+	width              int
+	height             int
+	confirmTaskID      int
+	agentCursor        int
+	managerAgentCursor int
+	reviewerCursor     int
+	statusCursor       int
+	actionMenuCursor   int
+	reviewTaskID       int // Task being reviewed
+	reviewActionCursor int // Cursor for action selection
+	editCommentIndex   int // Index of comment being edited
+	startFocusCustom   bool
+	showAll            bool
+	detailFocused      bool // Right pane is focused for scrolling
+	blockFocusUnblock  bool // True when Unblock button is focused in Block dialog
 }
 
 // New creates a new TUI Model with the given container.
@@ -456,16 +455,16 @@ func (m *Model) startTask(taskID int, agent string) tea.Cmd {
 }
 
 // stopTask returns a command that stops a task session.
-func (m *Model) stopTask(taskID int, review bool) tea.Cmd {
+func (m *Model) stopTask(taskID int) tea.Cmd {
 	return func() tea.Msg {
 		out, err := m.container.StopTaskUseCase().Execute(
 			context.Background(),
-			usecase.StopTaskInput{TaskID: taskID, Review: review},
+			usecase.StopTaskInput{TaskID: taskID},
 		)
 		if err != nil {
 			return MsgError{Err: err}
 		}
-		return MsgTaskStopped{TaskID: taskID, Review: review, SessionName: out.SessionName}
+		return MsgTaskStopped{TaskID: taskID, SessionName: out.SessionName}
 	}
 }
 
@@ -667,23 +666,6 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			},
 			IsAvailable: func() bool {
 				return task.IsRunning()
-			},
-		},
-		{
-			ActionID: "attach_review",
-			Label:    "Attach Review",
-			Desc:     "Open review session",
-			Key:      "A",
-			Action: func() (tea.Model, tea.Cmd) {
-				return m, func() tea.Msg {
-					return MsgAttachSession{TaskID: task.ID, Review: true}
-				}
-			},
-			IsAvailable: func() bool {
-				// Review session uses a separate session name (crew-{id}-review)
-				// not stored in task.Session, so we can't check if it's running here.
-				// Allow when task is in reviewable status; actual session check happens on attach.
-				return task.Status == domain.StatusInProgress || task.Status == domain.StatusDone
 			},
 		},
 		{
@@ -1036,15 +1018,9 @@ func (c *domainExecCmd) SetStderr(w io.Writer) { c.stderr = w }
 
 // attachToSession returns a tea.Cmd that attaches to a tmux session.
 // After the attach completes (user detaches), it triggers a task reload.
-// If review is true, attaches to the review session instead of the work session.
-func (m *Model) attachToSession(taskID int, review bool) tea.Cmd {
+func (m *Model) attachToSession(taskID int) tea.Cmd {
 	socketPath := m.container.Config.SocketPath
-	var sessionName string
-	if review {
-		sessionName = domain.ReviewSessionName(taskID)
-	} else {
-		sessionName = domain.SessionName(taskID)
-	}
+	sessionName := domain.SessionName(taskID)
 
 	cmd := domain.NewCommand("tmux", []string{"-S", socketPath, "attach", "-t", sessionName}, "")
 	return tea.Exec(&domainExecCmd{cmd: cmd}, func(err error) tea.Msg {

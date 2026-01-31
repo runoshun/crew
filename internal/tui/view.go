@@ -436,11 +436,7 @@ func (m *Model) viewConfirmDialog() string {
 		color = Colors.Closed
 	case ConfirmStop:
 		action = "Stop"
-		if m.confirmReviewSession {
-			target = fmt.Sprintf("review session for task #%d", m.confirmTaskID)
-		} else {
-			target = fmt.Sprintf("work session for task #%d", m.confirmTaskID)
-		}
+		target = fmt.Sprintf("session for task #%d", m.confirmTaskID)
 		color = Colors.StatusError
 	case ConfirmMerge:
 		action = "Merge"

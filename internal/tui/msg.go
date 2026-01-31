@@ -29,7 +29,6 @@ func (MsgTaskStarted) sealed() {}
 type MsgTaskStopped struct {
 	SessionName string
 	TaskID      int
-	Review      bool
 }
 
 func (MsgTaskStopped) sealed() {}
@@ -101,7 +100,6 @@ func (MsgConfigLoaded) sealed() {}
 // This is handled specially to suspend the TUI.
 type MsgAttachSession struct {
 	TaskID int
-	Review bool // If true, attach to review session instead of work session
 }
 
 func (MsgAttachSession) sealed() {}
