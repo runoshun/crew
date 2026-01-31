@@ -15,7 +15,8 @@ import (
 // newReviewCommand creates the review command for reviewing task changes with AI.
 func newReviewCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		model string
+		model   string
+		verbose bool
 	}
 
 	cmd := &cobra.Command{
@@ -49,7 +50,10 @@ Examples:
   crew review 1 claude-reviewer -- "Check security aspects carefully"
 
   # Review with message from stdin
-  echo "Focus on performance" | crew review 1`,
+  echo "Focus on performance" | crew review 1
+
+  # Review with verbose output (shows real-time reviewer output)
+  crew review 1 --verbose`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse task ID
@@ -77,6 +81,7 @@ Examples:
 				Agent:   agent,
 				Model:   opts.model,
 				Message: message,
+				Verbose: opts.verbose,
 			})
 			if err != nil {
 				return err
@@ -91,6 +96,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model to use (overrides agent default)")
+	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "Show reviewer output in real-time")
 
 	return cmd
 }

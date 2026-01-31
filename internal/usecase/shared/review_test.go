@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -87,5 +88,67 @@ func TestExecuteReview_StatusCheck(t *testing.T) {
 		assert.Equal(t, now, task.LastReviewAt)
 		require.NotNil(t, task.LastReviewIsLGTM)
 		assert.True(t, *task.LastReviewIsLGTM)
+	})
+}
+
+func TestExecuteReview_Verbose(t *testing.T) {
+	repo := testutil.NewMockTaskRepository()
+	executor := testutil.NewMockCommandExecutor()
+	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
+	executor.StderrOutput = []byte("verbose output from reviewer\n")
+	now := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	clock := &testutil.MockClock{NowTime: now}
+
+	var stderrBuf bytes.Buffer
+
+	deps := ReviewDeps{
+		Tasks:    repo,
+		Executor: executor,
+		Clock:    clock,
+		Stderr:   &stderrBuf,
+	}
+
+	t.Run("verbose mode streams stderr to deps.Stderr", func(t *testing.T) {
+		stderrBuf.Reset()
+		task := &domain.Task{
+			ID:     1,
+			Title:  "Review task",
+			Status: domain.StatusInProgress,
+		}
+		input := ReviewInput{
+			Task:            task,
+			WorktreePath:    "/tmp/worktree",
+			Result:          domain.RenderCommandResult{Prompt: "prompt", Command: "echo review"},
+			SkipStatusCheck: true,
+			Verbose:         true,
+		}
+		reviewOut, err := ExecuteReview(context.Background(), deps, input)
+		require.NoError(t, err)
+		require.NotNil(t, reviewOut)
+
+		// In verbose mode, stderr should be written to deps.Stderr
+		assert.Equal(t, "verbose output from reviewer\n", stderrBuf.String())
+	})
+
+	t.Run("non-verbose mode does not stream to deps.Stderr", func(t *testing.T) {
+		stderrBuf.Reset()
+		task := &domain.Task{
+			ID:     2,
+			Title:  "Review task",
+			Status: domain.StatusInProgress,
+		}
+		input := ReviewInput{
+			Task:            task,
+			WorktreePath:    "/tmp/worktree",
+			Result:          domain.RenderCommandResult{Prompt: "prompt", Command: "echo review"},
+			SkipStatusCheck: true,
+			Verbose:         false, // Non-verbose mode
+		}
+		reviewOut, err := ExecuteReview(context.Background(), deps, input)
+		require.NoError(t, err)
+		require.NotNil(t, reviewOut)
+
+		// In non-verbose mode, stderr should NOT be written to deps.Stderr
+		assert.Empty(t, stderrBuf.String())
 	})
 }

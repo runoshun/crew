@@ -16,6 +16,7 @@ type ReviewTaskInput struct {
 	Model   string // Model name override (optional, uses agent's default if empty)
 	Message string // Additional instructions for the reviewer (optional)
 	TaskID  int    // Task ID to review
+	Verbose bool   // When true, stream reviewer output to stderr in real-time
 }
 
 // ReviewTaskOutput contains the result of reviewing a task.
@@ -86,11 +87,11 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, err
 	}
 
-	return uc.executeSync(ctx, task, reviewCmd)
+	return uc.executeSync(ctx, task, reviewCmd, in.Verbose)
 }
 
 // executeSync runs the review synchronously and returns the result.
-func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput) (*ReviewTaskOutput, error) {
+func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput, verbose bool) (*ReviewTaskOutput, error) {
 	reviewOut, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
 		Tasks:    uc.tasks,
 		Executor: uc.executor,
@@ -101,6 +102,7 @@ func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, review
 		WorktreePath:    reviewCmd.WorktreePath,
 		Result:          reviewCmd.Result,
 		SkipStatusCheck: true,
+		Verbose:         verbose,
 	})
 	if err != nil {
 		return nil, err

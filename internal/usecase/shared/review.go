@@ -116,6 +116,7 @@ type ReviewInput struct {
 	WorktreePath    string
 	Result          domain.RenderCommandResult
 	SkipStatusCheck bool
+	Verbose         bool // When true, stream command output to Stderr in real-time
 }
 
 // ReviewOutput contains the review result.
@@ -181,7 +182,14 @@ END_OF_PROMPT
 	execCmd := domain.NewBashCommand(script, in.WorktreePath)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	if err := deps.Executor.ExecuteWithContext(ctx, execCmd, &stdoutBuf, &stderrBuf); err != nil {
+
+	// Set up stderr writer: in verbose mode, stream to both buffer and deps.Stderr
+	var stderrWriter io.Writer = &stderrBuf
+	if in.Verbose && deps.Stderr != nil {
+		stderrWriter = io.MultiWriter(&stderrBuf, deps.Stderr)
+	}
+
+	if err := deps.Executor.ExecuteWithContext(ctx, execCmd, &stdoutBuf, stderrWriter); err != nil {
 		errMsg := strings.TrimSpace(stderrBuf.String())
 		if errMsg != "" {
 			return nil, fmt.Errorf("run reviewer: %w: %s", err, errMsg)
