@@ -93,23 +93,22 @@ func TestExecuteReview_StatusCheck(t *testing.T) {
 
 func TestExecuteReview_Verbose(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
-	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
-	executor.StderrOutput = []byte("verbose output from reviewer\n")
 	now := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	clock := &testutil.MockClock{NowTime: now}
 
-	var stderrBuf bytes.Buffer
+	t.Run("verbose mode streams both stdout and stderr to deps.Stderr", func(t *testing.T) {
+		executor := testutil.NewMockCommandExecutor()
+		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
+		executor.StderrOutput = []byte("stderr output\n")
 
-	deps := ReviewDeps{
-		Tasks:    repo,
-		Executor: executor,
-		Clock:    clock,
-		Stderr:   &stderrBuf,
-	}
+		var stderrBuf bytes.Buffer
+		deps := ReviewDeps{
+			Tasks:    repo,
+			Executor: executor,
+			Clock:    clock,
+			Stderr:   &stderrBuf,
+		}
 
-	t.Run("verbose mode streams stderr to deps.Stderr", func(t *testing.T) {
-		stderrBuf.Reset()
 		task := &domain.Task{
 			ID:     1,
 			Title:  "Review task",
@@ -126,12 +125,26 @@ func TestExecuteReview_Verbose(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, reviewOut)
 
-		// In verbose mode, stderr should be written to deps.Stderr
-		assert.Equal(t, "verbose output from reviewer\n", stderrBuf.String())
+		// In verbose mode, both stdout and stderr should be written to deps.Stderr
+		// stdout contains the reviewer output, stderr contains any error/debug output
+		output := stderrBuf.String()
+		assert.Contains(t, output, domain.ReviewResultMarker)
+		assert.Contains(t, output, "stderr output")
 	})
 
 	t.Run("non-verbose mode does not stream to deps.Stderr", func(t *testing.T) {
-		stderrBuf.Reset()
+		executor := testutil.NewMockCommandExecutor()
+		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
+		executor.StderrOutput = []byte("stderr output\n")
+
+		var stderrBuf bytes.Buffer
+		deps := ReviewDeps{
+			Tasks:    repo,
+			Executor: executor,
+			Clock:    clock,
+			Stderr:   &stderrBuf,
+		}
+
 		task := &domain.Task{
 			ID:     2,
 			Title:  "Review task",
@@ -148,7 +161,7 @@ func TestExecuteReview_Verbose(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, reviewOut)
 
-		// In non-verbose mode, stderr should NOT be written to deps.Stderr
+		// In non-verbose mode, nothing should be written to deps.Stderr
 		assert.Empty(t, stderrBuf.String())
 	})
 }

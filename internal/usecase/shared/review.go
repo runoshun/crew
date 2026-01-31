@@ -183,13 +183,16 @@ END_OF_PROMPT
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 
-	// Set up stderr writer: in verbose mode, stream to both buffer and deps.Stderr
+	// Set up writers: in verbose mode, stream both stdout and stderr to deps.Stderr
+	// This allows seeing the reviewer agent's real-time output during execution
+	var stdoutWriter io.Writer = &stdoutBuf
 	var stderrWriter io.Writer = &stderrBuf
 	if in.Verbose && deps.Stderr != nil {
+		stdoutWriter = io.MultiWriter(&stdoutBuf, deps.Stderr)
 		stderrWriter = io.MultiWriter(&stderrBuf, deps.Stderr)
 	}
 
-	if err := deps.Executor.ExecuteWithContext(ctx, execCmd, &stdoutBuf, stderrWriter); err != nil {
+	if err := deps.Executor.ExecuteWithContext(ctx, execCmd, stdoutWriter, stderrWriter); err != nil {
 		errMsg := strings.TrimSpace(stderrBuf.String())
 		if errMsg != "" {
 			return nil, fmt.Errorf("run reviewer: %w: %s", err, errMsg)

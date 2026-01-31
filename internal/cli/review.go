@@ -32,7 +32,7 @@ The review runs synchronously and prints the result.
 The review result is saved as a comment with author "reviewer".
 
 Arguments:
-  <id>      Task ID to review (must be in for_review status)
+  <id>      Task ID to review (must be in in_progress or done status)
   [agent]   Reviewer agent name (optional, uses default if not specified)
   [-- message...]  Additional instructions for the reviewer (optional)
 

@@ -556,7 +556,7 @@ func TestReviewTask_Execute_SaveMetadataFails(t *testing.T) {
 }
 
 func TestReviewTask_Execute_Verbose(t *testing.T) {
-	t.Run("verbose mode streams stderr", func(t *testing.T) {
+	t.Run("verbose mode streams stdout and stderr", func(t *testing.T) {
 		// Setup
 		repo := testutil.NewMockTaskRepository()
 		repo.Tasks[1] = &domain.Task{
@@ -570,7 +570,7 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		configLoader := testutil.NewMockConfigLoader()
 		executor := testutil.NewMockCommandExecutor()
 		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\nReview output")
-		executor.StderrOutput = []byte("verbose stderr output\n")
+		executor.StderrOutput = []byte("stderr output\n")
 		clock := &testutil.MockClock{NowTime: time.Now()}
 
 		var stderr bytes.Buffer
@@ -585,10 +585,13 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		// Assert
 		require.NoError(t, err)
 		require.NotNil(t, out)
-		assert.Equal(t, "verbose stderr output\n", stderr.String())
+		// In verbose mode, both stdout and stderr are streamed to stderr
+		output := stderr.String()
+		assert.Contains(t, output, domain.ReviewResultMarker)
+		assert.Contains(t, output, "stderr output")
 	})
 
-	t.Run("non-verbose mode does not stream stderr", func(t *testing.T) {
+	t.Run("non-verbose mode does not stream output", func(t *testing.T) {
 		// Setup
 		repo := testutil.NewMockTaskRepository()
 		repo.Tasks[1] = &domain.Task{
@@ -602,7 +605,7 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		configLoader := testutil.NewMockConfigLoader()
 		executor := testutil.NewMockCommandExecutor()
 		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\nReview output")
-		executor.StderrOutput = []byte("verbose stderr output\n")
+		executor.StderrOutput = []byte("stderr output\n")
 		clock := &testutil.MockClock{NowTime: time.Now()}
 
 		var stderr bytes.Buffer
