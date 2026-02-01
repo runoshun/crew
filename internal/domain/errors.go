@@ -47,6 +47,7 @@ var (
 	ErrCopyAllRequiresManagers = errors.New("copy --all requires git and worktree managers (container wiring missing)")
 	ErrInvalidNamespace        = errors.New("invalid namespace")
 	ErrMigrationConflict       = errors.New("migration conflict: destination task differs")
+	ErrInvalidACPCommand       = errors.New("invalid ACP command")
 
 	// Workspace errors
 	ErrWorkspaceRepoNotFound  = errors.New("repository not found in workspace")

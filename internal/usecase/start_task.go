@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"text/template"
@@ -344,7 +343,7 @@ func buildEnvExports(env map[string]string) (string, error) {
 
 	var builder strings.Builder
 	for _, key := range keys {
-		if !envNamePattern.MatchString(key) {
+		if !shared.IsValidEnvVarName(key) {
 			return "", fmt.Errorf("%w: %q", domain.ErrInvalidEnvVarName, key)
 		}
 		builder.WriteString("export ")
@@ -356,8 +355,6 @@ func buildEnvExports(env map[string]string) (string, error) {
 
 	return strings.TrimRight(builder.String(), "\n"), nil
 }
-
-var envNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func shellQuote(value string) string {
 	if value == "" {
