@@ -275,11 +275,12 @@ func (m ReviewMode) NextMode() ReviewMode {
 // CompleteConfig holds completion gate settings from [complete] section.
 // Fields are ordered to minimize memory padding.
 type CompleteConfig struct {
-	Command           string     `toml:"command,omitempty"`              // Command to run as CI gate on complete
-	ReviewMode        ReviewMode `toml:"review_mode,omitempty"`          // Review mode: auto (default), manual, auto_fix
-	MinReviews        int        `toml:"min_reviews,omitempty"`          // Minimum successful reviews required to complete
-	AutoFixMaxRetries int        `toml:"auto_fix_max_retries,omitempty"` // Maximum retry count for auto-fix mode (default: 3)
-	ReviewModeSet     bool       `toml:"-"`                              // True if ReviewMode was explicitly set in config (not exported to TOML)
+	Command            string     `toml:"command,omitempty"`              // Command to run as CI gate on complete
+	ReviewMode         ReviewMode `toml:"review_mode,omitempty"`          // Review mode: auto (default), manual, auto_fix
+	ReviewSuccessRegex string     `toml:"review_success_regex,omitempty"` // Regex that must match review result (from start)
+	MaxReviews         int        `toml:"max_reviews,omitempty"`          // Maximum review attempts before completion fails
+	AutoFixMaxRetries  int        `toml:"auto_fix_max_retries,omitempty"` // Maximum retry count for auto-fix mode (default: 3)
+	ReviewModeSet      bool       `toml:"-"`                              // True if ReviewMode was explicitly set in config (not exported to TOML)
 
 	// Deprecated: Use ReviewMode instead. Kept for backward compatibility with existing configs.
 	AutoFix    bool `toml:"auto_fix,omitempty"` // Enable auto-fix mode (run review synchronously)
@@ -411,8 +412,9 @@ func GlobalOverrideConfigPath(configHome string) string {
 
 // Default configuration values for CompleteConfig.
 const (
-	DefaultAutoFixMaxRetries = 3
-	DefaultMinReviews        = 1
+	DefaultAutoFixMaxRetries  = 3
+	DefaultMaxReviews         = 1
+	DefaultReviewSuccessRegex = ReviewLGTMPrefix
 )
 
 // NewDefaultConfig returns a Config with default values.
@@ -424,13 +426,22 @@ func NewDefaultConfig() *Config {
 		Agents:       make(map[string]Agent),
 		AgentsConfig: AgentsConfig{},
 		Complete: CompleteConfig{
-			AutoFixMaxRetries: DefaultAutoFixMaxRetries,
-			MinReviews:        DefaultMinReviews,
+			AutoFixMaxRetries:  DefaultAutoFixMaxRetries,
+			MaxReviews:         DefaultMaxReviews,
+			ReviewSuccessRegex: DefaultReviewSuccessRegex,
 		},
 		Log: LogConfig{
 			Level: DefaultLogLevel,
 		},
 	}
+}
+
+// AnchorReviewSuccessRegex ensures the pattern matches from the start.
+func AnchorReviewSuccessRegex(pattern string) string {
+	if pattern == "" {
+		return ""
+	}
+	return "^(?:" + pattern + ")"
 }
 
 // agentTemplateData holds data for a single agent in the template.

@@ -32,16 +32,20 @@ Add comments in these situations:
 ### Complete Task
 ```bash
 crew complete          # Mark task as complete
+crew complete --force-review  # Run review even if not required
 ```
 
 ---
 
 ## Review Requirements
 
-`[complete].min_reviews` controls how many successful reviews are required before completion.
+`[complete].max_reviews` controls how many review attempts are allowed before completion fails.
+`[complete].review_success_regex` controls which review result is considered successful (matched from the start of the comment).
 
-- Default: 1
+- Default `max_reviews`: 1
+- Default `review_success_regex`: `✅ LGTM`
 - `skip_review = true` bypasses the review requirement
+- `crew complete --force-review` runs review even when not required
 - Review count increments only when the review result is recorded
 - Review runs synchronously inside `crew complete` and does not change task status unless completion succeeds
 
@@ -50,12 +54,14 @@ crew complete          # Mark task as complete
 ```toml
 [complete]
 command = "mise run ci"
-min_reviews = 1
+max_reviews = 1
+review_success_regex = "✅ LGTM"
 ```
 
 ### Deprecated Settings
 
-`[complete].review_mode` and `auto_fix` are deprecated and ignored.
+- `[complete].min_reviews` is deprecated; use `max_reviews` instead.
+- `[complete].review_mode` and `auto_fix` are deprecated and ignored.
 
 ---
 

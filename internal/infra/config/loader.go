@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 
 	"github.com/pelletier/go-toml/v2"
@@ -260,18 +261,41 @@ func convertRawToDomainConfig(raw map[string]any, sourcePath string) *domain.Con
 			}
 		case "complete":
 			if m, ok := value.(map[string]any); ok {
+				var maxReviewsValue int
+				var maxReviewsSet bool
+				var minReviewsValue int
+				var minReviewsSet bool
 				for k, v := range m {
 					switch k {
 					case "command":
 						if s, ok := v.(string); ok {
 							res.Complete.Command = s
 						}
+					case "max_reviews":
+						if i, ok := v.(int64); ok {
+							if i <= 0 {
+								warnings = append(warnings, fmt.Sprintf("invalid value for complete.max_reviews: %d (expected >= 1)", i))
+							} else {
+								maxReviewsValue = int(i)
+								maxReviewsSet = true
+							}
+						}
 					case "min_reviews":
 						if i, ok := v.(int64); ok {
+							minReviewsSet = true
 							if i <= 0 {
 								warnings = append(warnings, fmt.Sprintf("invalid value for complete.min_reviews: %d (expected >= 1)", i))
 							} else {
-								res.Complete.MinReviews = int(i)
+								minReviewsValue = int(i)
+							}
+						}
+					case "review_success_regex":
+						if s, ok := v.(string); ok {
+							pattern := domain.AnchorReviewSuccessRegex(s)
+							if _, err := regexp.Compile(pattern); err != nil {
+								warnings = append(warnings, fmt.Sprintf("invalid value for complete.review_success_regex: %q (%v)", s, err))
+							} else {
+								res.Complete.ReviewSuccessRegex = s
 							}
 						}
 					case "review_mode":
@@ -296,6 +320,15 @@ func convertRawToDomainConfig(raw map[string]any, sourcePath string) *domain.Con
 						}
 					default:
 						warnings = append(warnings, fmt.Sprintf("unknown key in [complete]: %s", k))
+					}
+				}
+				if maxReviewsSet {
+					res.Complete.MaxReviews = maxReviewsValue
+				}
+				if minReviewsSet {
+					warnings = append(warnings, "complete.min_reviews is deprecated; use complete.max_reviews")
+					if !maxReviewsSet && minReviewsValue > 0 {
+						res.Complete.MaxReviews = minReviewsValue
 					}
 				}
 			}
@@ -697,8 +730,11 @@ func mergeConfigs(base, override *domain.Config) *domain.Config {
 		result.Complete.AutoFix = override.Complete.AutoFix //nolint:staticcheck // Legacy compatibility
 		result.Complete.AutoFixSet = true
 	}
-	if override.Complete.MinReviews > 0 {
-		result.Complete.MinReviews = override.Complete.MinReviews
+	if override.Complete.MaxReviews > 0 {
+		result.Complete.MaxReviews = override.Complete.MaxReviews
+	}
+	if override.Complete.ReviewSuccessRegex != "" {
+		result.Complete.ReviewSuccessRegex = override.Complete.ReviewSuccessRegex
 	}
 	if override.Complete.AutoFixMaxRetries > 0 {
 		result.Complete.AutoFixMaxRetries = override.Complete.AutoFixMaxRetries

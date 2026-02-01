@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -28,6 +29,7 @@ type CompleteTaskInput struct {
 	Comment     string // Optional completion comment
 	ReviewAgent string // Reviewer agent override (optional)
 	TaskID      int    // Task ID to complete
+	ForceReview bool   // Force running review even if not required
 	Verbose     bool   // Stream reviewer output while waiting
 }
 
@@ -47,7 +49,7 @@ type CompleteTaskOutput struct {
 // CompleteTask is the use case for marking a task as complete.
 // Status transitions depend on configuration:
 //   - skip_review: directly to done
-//   - otherwise: require review count to meet min_reviews, then set done
+//   - otherwise: run review until success or max_reviews, then set done
 //
 // Fields are ordered to minimize memory padding.
 type CompleteTask struct {
@@ -99,7 +101,7 @@ func NewCompleteTask(
 //   - No uncommitted changes in worktree
 //
 // Processing:
-//   - Validate review requirement (skip_review/min_reviews)
+//   - Validate review requirement (skip_review/max_reviews or forced review)
 //   - Check for merge conflicts with base branch
 //   - Run [complete].command if configured (abort on failure)
 //   - Set status to done and save
@@ -149,9 +151,15 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	}
 	// else: default false
 
-	minReviews := domain.DefaultMinReviews
-	if cfg != nil && cfg.Complete.MinReviews > 0 {
-		minReviews = cfg.Complete.MinReviews
+	maxReviews := domain.DefaultMaxReviews
+	reviewSuccessRegex := domain.DefaultReviewSuccessRegex
+	if cfg != nil {
+		if cfg.Complete.MaxReviews > 0 {
+			maxReviews = cfg.Complete.MaxReviews
+		}
+		if cfg.Complete.ReviewSuccessRegex != "" {
+			reviewSuccessRegex = cfg.Complete.ReviewSuccessRegex
+		}
 	}
 	if cfg != nil && uc.logger != nil {
 		if cfg.Complete.ReviewModeSet {
@@ -188,14 +196,29 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		return &CompleteTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr
 	}
 
-	if !skipReview && task.ReviewCount < minReviews {
-		reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent, cfg)
-		if reviewErr != nil {
-			return nil, reviewErr
+	shouldRunReview := in.ForceReview || !skipReview
+	requireReviewSuccess := !skipReview
+	if shouldRunReview {
+		pattern := domain.AnchorReviewSuccessRegex(reviewSuccessRegex)
+		reviewMatcher, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid review success regex: %w", err)
 		}
-	}
-	if !skipReview && task.ReviewCount < minReviews {
-		return nil, fmt.Errorf("review required: have %d, need %d", task.ReviewCount, minReviews)
+
+		reviewSucceeded := false
+		for attempt := 1; attempt <= maxReviews; attempt++ {
+			reviewResult, reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent, cfg)
+			if reviewErr != nil {
+				return nil, reviewErr
+			}
+			if reviewMatcher.MatchString(reviewResult) {
+				reviewSucceeded = true
+				break
+			}
+		}
+		if requireReviewSuccess && !reviewSucceeded {
+			return nil, fmt.Errorf("review required: no review comment matched %q after %d attempt(s)", reviewSuccessRegex, maxReviews)
+		}
 	}
 
 	// Add comment if provided (only after completion conditions are met)
@@ -230,11 +253,11 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	}, nil
 }
 
-func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbose bool, agent string, cfg *domain.Config) error {
+func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbose bool, agent string, cfg *domain.Config) (string, error) {
 	reviewSessionName := domain.ReviewSessionName(task.ID)
 	running, err := uc.sessions.IsRunning(reviewSessionName)
 	if err != nil {
-		return fmt.Errorf("check review session: %w", err)
+		return "", fmt.Errorf("check review session: %w", err)
 	}
 
 	startedAt := uc.clock.Now()
@@ -246,7 +269,7 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 		if t, ok := readReviewRunStartedAtFromLog(logPath); ok {
 			startedAt = t
 		}
-		if info, err := os.Stat(logPath); err == nil {
+		if info, statErr := os.Stat(logPath); statErr == nil {
 			logOffset = info.Size()
 		}
 	}
@@ -258,7 +281,7 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 	} else {
 		uc.writeReviewMessage(fmt.Sprintf("Starting review for task #%d...", task.ID))
 		uc.writeReviewMessage(fmt.Sprintf("Note: review may take a while. If it takes too long, re-run 'crew complete %d'.", task.ID))
-		reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
+		reviewCmd, prepareErr := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
 			ConfigLoader: uc.config,
 			Config:       cfg,
 			Worktrees:    uc.worktrees,
@@ -267,19 +290,20 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 			Task:  task,
 			Agent: agent,
 		})
-		if err != nil {
-			return err
+		if prepareErr != nil {
+			return "", prepareErr
 		}
 
-		reviewScriptPath, err = uc.writeReviewScript(reviewSessionName, task.ID, reviewCmd, startedAt)
-		if err != nil {
-			return err
+		var scriptErr error
+		reviewScriptPath, scriptErr = uc.writeReviewScript(reviewSessionName, task.ID, reviewCmd, startedAt)
+		if scriptErr != nil {
+			return "", scriptErr
 		}
 		defer func() {
 			_ = os.Remove(reviewScriptPath)
 		}()
 
-		if err := uc.sessions.Start(ctx, domain.StartSessionOptions{
+		startErr := uc.sessions.Start(ctx, domain.StartSessionOptions{
 			Name:      reviewSessionName,
 			Dir:       reviewCmd.WorktreePath,
 			Command:   reviewScriptPath,
@@ -287,21 +311,24 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 			TaskTitle: task.Title,
 			TaskAgent: reviewCmd.AgentName,
 			Type:      domain.SessionTypeReviewer,
-		}); err != nil {
-			return fmt.Errorf("start review session: %w", err)
+		})
+		if startErr != nil {
+			return "", fmt.Errorf("start review session: %w", startErr)
 		}
 	}
 
-	if err := uc.waitForReview(ctx, reviewSessionName, verbose, startedAt); err != nil {
-		return err
+	waitErr := uc.waitForReview(ctx, reviewSessionName, verbose, startedAt)
+	if waitErr != nil {
+		return "", waitErr
 	}
 	uc.writeReviewMessage(fmt.Sprintf("Review finished for task #%d.", task.ID))
 
-	if err := uc.updateReviewMetadata(task, reviewSessionName, logOffset); err != nil {
-		return err
+	result, err := uc.updateReviewMetadata(task, reviewSessionName, logOffset)
+	if err != nil {
+		return "", err
 	}
 
-	return nil
+	return result, nil
 }
 
 func (uc *CompleteTask) writeReviewScript(sessionName string, taskID int, reviewCmd *shared.ReviewCommandOutput, startedAt time.Time) (string, error) {
@@ -454,16 +481,16 @@ func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *stri
 	return nil
 }
 
-func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, sessionName string, logOffset int64) error {
+func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, sessionName string, logOffset int64) (string, error) {
 	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
 	logTail := readFileTailBytes(logPath, logOffset, reviewLogReadMaxBytes)
 	result, ok := extractReviewResult(logTail)
 	if !ok {
-		return uc.noReviewCommentError(sessionName)
+		return "", uc.noReviewCommentError(sessionName)
 	}
 	result = strings.TrimSpace(result)
 	if result == "" {
-		return uc.noReviewCommentError(sessionName)
+		return "", uc.noReviewCommentError(sessionName)
 	}
 
 	comment := domain.Comment{
@@ -472,15 +499,15 @@ func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, sessionName stri
 		Time:   uc.clock.Now(),
 	}
 	if err := uc.tasks.AddComment(task.ID, comment); err != nil {
-		return fmt.Errorf("add review comment: %w", err)
+		return "", fmt.Errorf("add review comment: %w", err)
 	}
 
 	shared.UpdateReviewMetadata(uc.clock, task, result)
 	if err := uc.tasks.Save(task); err != nil {
-		return fmt.Errorf("save review metadata: %w", err)
+		return "", fmt.Errorf("save review metadata: %w", err)
 	}
 
-	return nil
+	return result, nil
 }
 
 func (uc *CompleteTask) writeReviewMessage(message string) {

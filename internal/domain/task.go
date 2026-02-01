@@ -44,7 +44,7 @@ type Task struct {
 	ID                int                  `json:"-"`                           // Task ID (stored as map key, not in value)
 	Issue             int                  `json:"issue,omitempty"`             // GitHub issue number (0 = not linked)
 	PR                int                  `json:"pr,omitempty"`                // GitHub PR number (0 = not created)
-	ReviewCount       int                  `json:"reviewCount,omitempty"`       // Number of successful reviews
+	ReviewCount       int                  `json:"reviewCount,omitempty"`       // Number of recorded reviews
 	AutoFixRetryCount int                  `json:"autoFixRetryCount,omitempty"` // Current retry count for auto_fix mode
 	StatusVersion     int                  `json:"statusVersion,omitempty"`     // Status model version (0=legacy, 2=current)
 }

@@ -78,7 +78,7 @@ Filter for in-scope statuses. If no tasks in scope, exit with message: "No targe
 crew show <id> --json --last-review
 ```
 
-- If no review is found (skip_review or min_reviews=0), add to completion list
+- If no review is found (skip_review enabled), add to completion list
 - If issues are found, send feedback and return the task to the loop:
   ```bash
   crew comment <id> -R "Please check the review comments and address them."

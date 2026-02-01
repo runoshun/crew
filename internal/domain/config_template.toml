@@ -68,8 +68,10 @@
 [complete]
 ## CI gate on completion
 # command = "mise run ci"
-## Minimum successful reviews required before completion (default: 1)
-# min_reviews = 1
+## Maximum review attempts before completion fails (default: 1)
+# max_reviews = 1
+## Review success regex (matched from start; default: "✅ LGTM")
+# review_success_regex = "✅ LGTM"
 ## Deprecated review settings (ignored; kept for compatibility)
 # review_mode = "auto"
 # auto_fix = false

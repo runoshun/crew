@@ -244,7 +244,7 @@ crew new --title "E2E: Completion flow test" --body "Please run echo hello"
 # 2. Start
 crew start <id> cc-small
 
-# 3. Set min_reviews=2 for this test (restore after test)
+# 3. Set max_reviews=2 for this test (restore after test)
 backup_path="$(mktemp /tmp/crew-config.XXXXXX.toml)"
 tmp_config="$(mktemp /tmp/crew-config.edit.XXXXXX.toml)"
 cp .crew/config.toml "$backup_path"
@@ -252,24 +252,24 @@ awk '
 BEGIN { in_complete = 0; inserted = 0 }
 /^\[complete\]/ { in_complete = 1; print; next }
 in_complete && /^\[/ {
-  if (!inserted) { print "min_reviews = 2"; inserted = 1 }
+  if (!inserted) { print "max_reviews = 2"; inserted = 1 }
   in_complete = 0
 }
-in_complete && /^min_reviews[[:space:]]*=/ {
-  print "min_reviews = 2"; inserted = 1; next
+in_complete && /^max_reviews[[:space:]]*=/ {
+  print "max_reviews = 2"; inserted = 1; next
 }
 { print }
 END {
-  if (in_complete && !inserted) { print "min_reviews = 2" }
-  if (!inserted) { print ""; print "[complete]"; print "min_reviews = 2" }
+  if (in_complete && !inserted) { print "max_reviews = 2" }
+  if (!inserted) { print ""; print "[complete]"; print "max_reviews = 2" }
 }
 ' .crew/config.toml > "$tmp_config"
 mv "$tmp_config" .crew/config.toml
 
-# 4. Complete (runs review; should fail until min_reviews is satisfied)
+# 4. Complete (runs review; retries until success or max_reviews reached)
 crew complete <id>
 
-# 5. Repeat complete until it succeeds
+# 5. If it fails (max reached), fix issues and re-run
 crew complete <id>
 
 # 6. Merge
@@ -284,7 +284,7 @@ mv "$backup_path" .crew/config.toml
 
 **Verification Points:**
 - [ ] Transitions todo → in_progress → done → merged
-- [ ] `crew complete` fails until `min_reviews` is satisfied
+- [ ] `crew complete` retries review up to `max_reviews` and fails if no success match
 - [ ] worktree is deleted
 - [ ] Merged to main
 
@@ -316,7 +316,7 @@ echo "y" | crew merge <id>
 **Verification Points:**
 - [ ] comment -R keeps status as in_progress
 - [ ] Agent reads comment and makes fixes
-- [ ] Review count increments and completion succeeds after requirements are met
+- [ ] Review count increments and completion succeeds after the success pattern matches
 
 ---
 
@@ -388,7 +388,7 @@ crew poll <id> --expect todo --command 'echo "Change detected!"' &
 ### Workflow
 - [ ] Completion flow (todo → done → merged)
 - [ ] Review revision flow
-- [ ] `crew complete` blocked until `min_reviews` is satisfied
+- [ ] `crew complete` blocks when no success match within `max_reviews`
 
 ### Error Cases
 - [ ] Access to non-existent resources

@@ -292,9 +292,10 @@ Examples:
 // newCompleteCommand creates the complete command for marking a task as complete.
 func newCompleteCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		comment  string
-		reviewer string
-		verbose  bool
+		comment     string
+		reviewer    string
+		forceReview bool
+		verbose     bool
 	}
 
 	cmd := &cobra.Command{
@@ -312,8 +313,10 @@ If [complete].command is configured, it will be executed before transitioning
 the status. If the command fails, the completion is aborted.
 
 		Review requirement:
-		  - skip_review enabled: bypasses review count requirement
-		  - otherwise: runs review automatically when ReviewCount < [complete].min_reviews (default: 1)
+		  - skip_review enabled: bypasses review requirement
+		  - otherwise: runs review until the result matches [complete].review_success_regex (default: "✅ LGTM")
+		    or [complete].max_reviews attempts are reached (default: 1)
+		  - --force-review runs review even if skip_review is enabled
 		  - review count increases when a review result is recorded
 
 Examples:
@@ -323,8 +326,11 @@ Examples:
   # Complete with a comment
   crew complete 1 --comment "Implementation complete"
 
-  # Complete with reviewer override
-  crew complete 1 --reviewer claude-reviewer
+	  # Complete with reviewer override
+	  crew complete 1 --reviewer claude-reviewer
+
+	  # Force review even if not required
+	  crew complete 1 --force-review
 
   # Auto-detect task from current branch (when working in a worktree)
   crew complete`,
@@ -341,6 +347,7 @@ Examples:
 			out, err := uc.Execute(cmd.Context(), usecase.CompleteTaskInput{
 				TaskID:      taskID,
 				Comment:     opts.comment,
+				ForceReview: opts.forceReview,
 				ReviewAgent: opts.reviewer,
 				Verbose:     opts.verbose,
 			})
@@ -359,6 +366,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.comment, "comment", "m", "", "Add a completion comment")
+	cmd.Flags().BoolVar(&opts.forceReview, "force-review", false, "Run review even when not required")
 	cmd.Flags().StringVarP(&opts.reviewer, "reviewer", "r", "", "Reviewer agent override")
 	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "Show reviewer output in real-time")
 

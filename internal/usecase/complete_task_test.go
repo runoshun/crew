@@ -21,7 +21,7 @@ func boolPtr(b bool) *bool {
 // newTestCompleteTask creates a CompleteTask use case for testing.
 // For tests that don't involve review requirements, we either:
 // - set SkipReview=true, or
-// - set ReviewCount to satisfy min_reviews
+// - set review mocks to return a successful review result
 func newTestCompleteTask(
 	t *testing.T,
 	repo *testutil.MockTaskRepository,
@@ -590,10 +590,56 @@ func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing
 	// This is the key fix: explicit false should prevent skipping even when config says skip
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
+		ID:         1,
+		Title:      "Task with skip_review explicitly set to false",
+		Status:     domain.StatusInProgress,
+		SkipReview: boolPtr(false), // Task explicitly requires review (--no-skip-review)
+	}
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ResolvePath = "/tmp/worktree"
+
+	git := &testutil.MockGit{
+		HasUncommittedChangesV: false,
+	}
+
+	configLoader := testutil.NewMockConfigLoader()
+	configLoader.Config.Tasks.SkipReview = true // Config says skip, but task overrides
+	clock := &testutil.MockClock{}
+	executor := testutil.NewMockCommandExecutor()
+	sessions := testutil.NewMockSessionManager()
+
+	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
+	sessions.WaitFunc = func(_ context.Context, sessionName string) error {
+		logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+		if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
+			return err
+		}
+		content := "some output\n" + domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good\n"
+		return os.WriteFile(logPath, []byte(content), 0o644)
+	}
+
+	// Execute
+	out, err := uc.Execute(context.Background(), CompleteTaskInput{
+		TaskID: 1,
+	})
+
+	// Assert - task.SkipReview=false should take precedence over config
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.True(t, sessions.StartCalled)
+	assert.True(t, sessions.WaitCalled)
+	assert.Equal(t, domain.StatusDone, out.Task.Status)
+	assert.False(t, out.ShouldStartReview)
+}
+
+func TestCompleteTask_Execute_ForceReview(t *testing.T) {
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
 		ID:          1,
-		Title:       "Task with skip_review explicitly set to false",
+		Title:       "Task with forced review",
 		Status:      domain.StatusInProgress,
-		SkipReview:  boolPtr(false), // Task explicitly requires review (--no-skip-review)
+		SkipReview:  boolPtr(true),
 		ReviewCount: 1,
 	}
 
@@ -605,32 +651,35 @@ func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config = &domain.Config{
-		Tasks: domain.TasksConfig{
-			SkipReview: true, // Config says skip, but task overrides
-		},
-	}
-	clock := &testutil.MockClock{}
+	clock := &testutil.MockClock{NowTime: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)}
 	executor := testutil.NewMockCommandExecutor()
+	sessions := testutil.NewMockSessionManager()
 
-	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
+	sessions.WaitFunc = func(_ context.Context, sessionName string) error {
+		logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+		if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
+			return err
+		}
+		content := "some output\n" + domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good\n"
+		return os.WriteFile(logPath, []byte(content), 0o644)
+	}
 
-	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
-		TaskID: 1,
+		TaskID:      1,
+		ForceReview: true,
 	})
 
-	// Assert - task.SkipReview=false should take precedence over config
-	// Task goes to done (ready for review in new model)
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	// Status should be done (review requirement satisfied)
+	assert.True(t, sessions.StartCalled)
+	assert.True(t, sessions.WaitCalled)
+	assert.Equal(t, 2, out.Task.ReviewCount)
 	assert.Equal(t, domain.StatusDone, out.Task.Status)
-	assert.False(t, out.ShouldStartReview)
 }
 
-func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
-	t.Run("runs review when below min", func(t *testing.T) {
+func TestCompleteTask_Execute_ReviewMax(t *testing.T) {
+	t.Run("retries until success within max", func(t *testing.T) {
 		repo := testutil.NewMockTaskRepository()
 		repo.Tasks[1] = &domain.Task{
 			ID:          1,
@@ -648,18 +697,24 @@ func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
 		}
 
 		configLoader := testutil.NewMockConfigLoader()
-		configLoader.Config.Complete.MinReviews = 1
+		configLoader.Config.Complete.MaxReviews = 2
 		clock := &testutil.MockClock{NowTime: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)}
 		executor := testutil.NewMockCommandExecutor()
 		sessions := testutil.NewMockSessionManager()
+		attempt := 0
 
 		uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
 		sessions.WaitFunc = func(_ context.Context, sessionName string) error {
+			attempt++
 			logPath := domain.SessionLogPath(uc.crewDir, sessionName)
 			if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
 				return err
 			}
-			content := "some output\n" + domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good\n"
+			result := "❌ Needs changes"
+			if attempt == 2 {
+				result = domain.ReviewLGTMPrefix + " Looks good"
+			}
+			content := "some output\n" + domain.ReviewResultMarker + "\n" + result + "\n"
 			return os.WriteFile(logPath, []byte(content), 0o644)
 		}
 
@@ -672,6 +727,54 @@ func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
 		require.NotNil(t, out)
 		assert.True(t, sessions.StartCalled)
 		assert.True(t, sessions.WaitCalled)
+		assert.Equal(t, 2, out.Task.ReviewCount)
+		assert.Equal(t, domain.StatusDone, out.Task.Status)
+	})
+
+	t.Run("respects custom success regex", func(t *testing.T) {
+		repo := testutil.NewMockTaskRepository()
+		repo.Tasks[1] = &domain.Task{
+			ID:          1,
+			Title:       "Task requiring reviews",
+			Status:      domain.StatusInProgress,
+			SkipReview:  boolPtr(false),
+			ReviewCount: 0,
+		}
+
+		worktrees := testutil.NewMockWorktreeManager()
+		worktrees.ResolvePath = "/tmp/worktree"
+
+		git := &testutil.MockGit{
+			HasUncommittedChangesV: false,
+		}
+
+		configLoader := testutil.NewMockConfigLoader()
+		configLoader.Config.Complete.MaxReviews = 2
+		configLoader.Config.Complete.ReviewSuccessRegex = "❌"
+		clock := &testutil.MockClock{NowTime: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)}
+		executor := testutil.NewMockCommandExecutor()
+		sessions := testutil.NewMockSessionManager()
+		attempt := 0
+
+		uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
+		sessions.WaitFunc = func(_ context.Context, sessionName string) error {
+			attempt++
+			logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+			if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
+				return err
+			}
+			result := "❌ Needs changes"
+			content := "some output\n" + domain.ReviewResultMarker + "\n" + result + "\n"
+			return os.WriteFile(logPath, []byte(content), 0o644)
+		}
+
+		out, err := uc.Execute(context.Background(), CompleteTaskInput{
+			TaskID: 1,
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, out)
+		assert.Equal(t, 1, attempt)
 		assert.Equal(t, 1, out.Task.ReviewCount)
 		assert.Equal(t, domain.StatusDone, out.Task.Status)
 	})
@@ -694,7 +797,7 @@ func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
 		}
 
 		configLoader := testutil.NewMockConfigLoader()
-		configLoader.Config.Complete.MinReviews = 1
+		configLoader.Config.Complete.MaxReviews = 1
 		clock := &testutil.MockClock{}
 		executor := testutil.NewMockCommandExecutor()
 		sessions := testutil.NewMockSessionManager()
@@ -706,6 +809,52 @@ func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
 		})
 
 		assert.ErrorIs(t, err, domain.ErrNoReviewComment)
+		assert.Equal(t, domain.StatusInProgress, repo.Tasks[1].Status)
+	})
+
+	t.Run("fails when review never matches within max", func(t *testing.T) {
+		repo := testutil.NewMockTaskRepository()
+		repo.Tasks[1] = &domain.Task{
+			ID:          1,
+			Title:       "Task requiring reviews",
+			Status:      domain.StatusInProgress,
+			SkipReview:  boolPtr(false),
+			ReviewCount: 0,
+		}
+
+		worktrees := testutil.NewMockWorktreeManager()
+		worktrees.ResolvePath = "/tmp/worktree"
+
+		git := &testutil.MockGit{
+			HasUncommittedChangesV: false,
+		}
+
+		configLoader := testutil.NewMockConfigLoader()
+		configLoader.Config.Complete.MaxReviews = 2
+		clock := &testutil.MockClock{NowTime: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)}
+		executor := testutil.NewMockCommandExecutor()
+		sessions := testutil.NewMockSessionManager()
+		attempt := 0
+
+		uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
+		sessions.WaitFunc = func(_ context.Context, sessionName string) error {
+			attempt++
+			logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+			if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
+				return err
+			}
+			result := "❌ Needs changes"
+			content := "some output\n" + domain.ReviewResultMarker + "\n" + result + "\n"
+			return os.WriteFile(logPath, []byte(content), 0o644)
+		}
+
+		_, err := uc.Execute(context.Background(), CompleteTaskInput{
+			TaskID: 1,
+		})
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "review required")
+		assert.Equal(t, 2, repo.Tasks[1].ReviewCount)
 		assert.Equal(t, domain.StatusInProgress, repo.Tasks[1].Status)
 	})
 }
@@ -728,7 +877,7 @@ func TestCompleteTask_Execute_ReviewSessionAlreadyRunning(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.MinReviews = 1
+	configLoader.Config.Complete.MaxReviews = 1
 	clock := &testutil.MockClock{NowTime: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)}
 	executor := testutil.NewMockCommandExecutor()
 	sessions := testutil.NewMockSessionManager()

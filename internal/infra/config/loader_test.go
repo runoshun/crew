@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -427,13 +428,13 @@ review_mode = "invalid"
 	assert.Contains(t, cfg.Warnings, "invalid value for complete.review_mode: \"invalid\" (expected \"auto\", \"manual\", or \"auto_fix\")")
 }
 
-func TestLoader_Load_InvalidMinReviews(t *testing.T) {
+func TestLoader_Load_InvalidMaxReviews(t *testing.T) {
 	crewDir := t.TempDir()
 	globalDir := t.TempDir()
 
 	config := `
 [complete]
-min_reviews = 0
+max_reviews = 0
 `
 	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
 	require.NoError(t, err)
@@ -442,8 +443,53 @@ min_reviews = 0
 	cfg, err := loader.Load()
 	require.NoError(t, err)
 
-	assert.Equal(t, domain.DefaultMinReviews, cfg.Complete.MinReviews)
-	assert.Contains(t, cfg.Warnings, "invalid value for complete.min_reviews: 0 (expected >= 1)")
+	assert.Equal(t, domain.DefaultMaxReviews, cfg.Complete.MaxReviews)
+	assert.Contains(t, cfg.Warnings, "invalid value for complete.max_reviews: 0 (expected >= 1)")
+}
+
+func TestLoader_Load_MinReviewsDeprecated(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	config := `
+[complete]
+min_reviews = 2
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, cfg.Complete.MaxReviews)
+	assert.Contains(t, cfg.Warnings, "complete.min_reviews is deprecated; use complete.max_reviews")
+}
+
+func TestLoader_Load_InvalidReviewSuccessRegex(t *testing.T) {
+	crewDir := t.TempDir()
+	globalDir := t.TempDir()
+
+	config := `
+[complete]
+review_success_regex = "("
+`
+	err := os.WriteFile(filepath.Join(crewDir, domain.ConfigFileName), []byte(config), 0o644)
+	require.NoError(t, err)
+
+	loader := NewLoaderWithGlobalDir(crewDir, "", globalDir)
+	cfg, err := loader.Load()
+	require.NoError(t, err)
+
+	assert.Equal(t, domain.DefaultReviewSuccessRegex, cfg.Complete.ReviewSuccessRegex)
+	var found bool
+	for _, warning := range cfg.Warnings {
+		if strings.Contains(warning, "invalid value for complete.review_success_regex: \"(\"") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found)
 }
 
 func TestLoader_Load_HelpFilePathResolution(t *testing.T) {
