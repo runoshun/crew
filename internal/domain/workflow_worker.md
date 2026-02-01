@@ -42,7 +42,7 @@ crew complete          # Mark task as complete
 
 - Default: 1
 - `skip_review = true` bypasses the review requirement
-- Review count increments only when the reviewer adds a comment
+- Review count increments only when the review result is recorded
 - Review runs synchronously inside `crew complete` and does not change task status unless completion succeeds
 
 ### Configuration

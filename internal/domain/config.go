@@ -354,7 +354,7 @@ IMPORTANT: First run 'crew --help-manager' and follow the usage instructions.
 // DefaultReviewerSystemPrompt is the default system prompt template for reviewers.
 const DefaultReviewerSystemPrompt = `You are a code reviewer for crew Task #{{.TaskID}}.
 
-IMPORTANT: First run 'crew --help-reviwer' and follow the workflow instructions.
+IMPORTANT: First run 'crew --help-reviewer' and follow the workflow instructions.
 
 ## Output Format
 

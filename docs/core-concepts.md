@@ -40,7 +40,7 @@ todo -> in_progress -> done -> merged
 error -> in_progress
 ```
 
-Reviews run synchronously inside `crew complete` and do not change task status unless completion succeeds. Review count increments only when the reviewer adds a comment. `crew complete` requires the review count to satisfy `min_reviews` (unless `skip_review` is enabled) and then transitions the task to `done`.
+Reviews run synchronously inside `crew complete` and do not change task status unless completion succeeds. Review count increments only when the review result is recorded. `crew complete` requires the review count to satisfy `min_reviews` (unless `skip_review` is enabled) and then transitions the task to `done`.
 
 ---
 

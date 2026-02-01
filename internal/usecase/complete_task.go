@@ -18,6 +18,7 @@ const (
 	reviewPeekLines       = 2000
 	reviewLogTailLines    = 20
 	reviewLogTailMaxBytes = 64 * 1024
+	reviewLogReadMaxBytes = 256 * 1024
 )
 
 // CompleteTaskInput contains the parameters for completing a task.
@@ -159,14 +160,13 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}
 	}
 
-	if !skipReview && task.ReviewCount < minReviews {
-		reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent, cfg)
-		if reviewErr != nil {
-			return nil, reviewErr
+	// Run [complete].command before conflict/review (CI gate)
+	if cfg != nil && cfg.Complete.Command != "" {
+		cmd := domain.NewShellCommand(cfg.Complete.Command, worktreePath)
+		output, execErr := uc.executor.Execute(cmd)
+		if execErr != nil {
+			return nil, fmt.Errorf("[complete].command failed: %s: %w", string(output), execErr)
 		}
-	}
-	if !skipReview && task.ReviewCount < minReviews {
-		return nil, fmt.Errorf("review required: have %d, need %d", task.ReviewCount, minReviews)
 	}
 
 	// Resolve base branch for conflict check
@@ -186,13 +186,14 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		return &CompleteTaskOutput{ConflictMessage: conflictOut.Message}, conflictErr
 	}
 
-	if cfg != nil && cfg.Complete.Command != "" {
-		// Execute the complete command using CommandExecutor
-		cmd := domain.NewShellCommand(cfg.Complete.Command, worktreePath)
-		output, execErr := uc.executor.Execute(cmd)
-		if execErr != nil {
-			return nil, fmt.Errorf("[complete].command failed: %s: %w", string(output), execErr)
+	if !skipReview && task.ReviewCount < minReviews {
+		reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent, cfg)
+		if reviewErr != nil {
+			return nil, reviewErr
 		}
+	}
+	if !skipReview && task.ReviewCount < minReviews {
+		return nil, fmt.Errorf("review required: have %d, need %d", task.ReviewCount, minReviews)
 	}
 
 	// Add comment if provided (only after completion conditions are met)
@@ -228,12 +229,6 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 }
 
 func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbose bool, agent string, cfg *domain.Config) error {
-	preComments, err := uc.tasks.GetComments(task.ID)
-	if err != nil {
-		return fmt.Errorf("get comments: %w", err)
-	}
-	preReviewerCount := countReviewerComments(preComments)
-
 	reviewSessionName := domain.ReviewSessionName(task.ID)
 	running, err := uc.sessions.IsRunning(reviewSessionName)
 	if err != nil {
@@ -284,7 +279,7 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 	}
 	uc.writeReviewMessage(fmt.Sprintf("Review finished for task #%d.", task.ID))
 
-	if err := uc.updateReviewMetadata(task, preReviewerCount, reviewSessionName); err != nil {
+	if err := uc.updateReviewMetadata(task, reviewSessionName); err != nil {
 		return err
 	}
 
@@ -387,21 +382,28 @@ func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *stri
 	return nil
 }
 
-func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, preReviewerCount int, sessionName string) error {
-	postComments, err := uc.tasks.GetComments(task.ID)
-	if err != nil {
-		return fmt.Errorf("get comments: %w", err)
-	}
-	postReviewerCount := countReviewerComments(postComments)
-	if postReviewerCount <= preReviewerCount {
-		return uc.noReviewCommentError(sessionName)
-	}
-	lastReviewerComment, ok := lastReviewerComment(postComments)
+func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, sessionName string) error {
+	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+	logTail := readFileTailBytes(logPath, reviewLogReadMaxBytes)
+	result, ok := extractReviewResult(logTail)
 	if !ok {
 		return uc.noReviewCommentError(sessionName)
 	}
+	result = strings.TrimSpace(result)
+	if result == "" {
+		return uc.noReviewCommentError(sessionName)
+	}
 
-	shared.UpdateReviewMetadata(uc.clock, task, lastReviewerComment.Text)
+	comment := domain.Comment{
+		Author: "reviewer",
+		Text:   result,
+		Time:   uc.clock.Now(),
+	}
+	if err := uc.tasks.AddComment(task.ID, comment); err != nil {
+		return fmt.Errorf("add review comment: %w", err)
+	}
+
+	shared.UpdateReviewMetadata(uc.clock, task, result)
 	if err := uc.tasks.Save(task); err != nil {
 		return fmt.Errorf("save review metadata: %w", err)
 	}
@@ -420,10 +422,79 @@ func (uc *CompleteTask) noReviewCommentError(sessionName string) error {
 	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
 	logTail := tailFileLines(logPath, reviewLogTailLines)
 	if logTail == "" {
-		return fmt.Errorf("reviewer did not add a comment: %w (log: %s)", domain.ErrNoReviewComment, logPath)
+		return fmt.Errorf("reviewer did not output a review result: %w (log: %s)", domain.ErrNoReviewComment, logPath)
 	}
 
-	return fmt.Errorf("reviewer did not add a comment: %w\n\nreview log (tail from %s):\n%s", domain.ErrNoReviewComment, logPath, logTail)
+	return fmt.Errorf("reviewer did not output a review result: %w\n\nreview log (tail from %s):\n%s", domain.ErrNoReviewComment, logPath, logTail)
+}
+
+func readFileTailBytes(path string, maxBytes int64) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	info, err := file.Stat()
+	if err != nil {
+		return ""
+	}
+	if info.Size() == 0 {
+		return ""
+	}
+
+	offset := int64(0)
+	if info.Size() > maxBytes {
+		offset = info.Size() - maxBytes
+	}
+	if offset > 0 {
+		if _, seekErr := file.Seek(offset, io.SeekStart); seekErr != nil {
+			return ""
+		}
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return ""
+	}
+
+	text := string(data)
+	if offset > 0 {
+		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
+			text = text[idx+1:]
+		}
+	}
+	return text
+}
+
+func extractReviewResult(logText string) (string, bool) {
+	if strings.TrimSpace(logText) == "" {
+		return "", false
+	}
+	lines := strings.Split(logText, "\n")
+	markerIdx := -1
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.TrimSpace(lines[i]) == domain.ReviewResultMarker {
+			markerIdx = i
+			break
+		}
+	}
+	if markerIdx < 0 {
+		return "", false
+	}
+	if markerIdx+1 >= len(lines) {
+		return "", false
+	}
+	result := strings.Join(lines[markerIdx+1:], "\n")
+	result = strings.TrimSpace(result)
+	if result == "" {
+		return "", false
+	}
+	return result, true
 }
 
 func tailFileLines(path string, maxLines int) string {
@@ -489,23 +560,4 @@ func diffOutput(prev, curr string) string {
 		}
 	}
 	return curr
-}
-
-func countReviewerComments(comments []domain.Comment) int {
-	count := 0
-	for _, c := range comments {
-		if c.Author == "reviewer" {
-			count++
-		}
-	}
-	return count
-}
-
-func lastReviewerComment(comments []domain.Comment) (domain.Comment, bool) {
-	for i := len(comments) - 1; i >= 0; i-- {
-		if comments[i].Author == "reviewer" {
-			return comments[i], true
-		}
-	}
-	return domain.Comment{}, false
 }

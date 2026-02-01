@@ -34,6 +34,8 @@ crew diff <id>
 
 ## Output Format
 
+IMPORTANT: Do NOT run `crew comment`. `crew complete` will record your review result.
+
 Start with: `✅ LGTM`, `⚠️ Minor issues`, or `❌ Needs changes`.
 Then list specific issues with file:line references.
 

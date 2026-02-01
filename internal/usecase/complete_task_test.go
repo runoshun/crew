@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -650,15 +652,16 @@ func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
 		clock := &testutil.MockClock{NowTime: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)}
 		executor := testutil.NewMockCommandExecutor()
 		sessions := testutil.NewMockSessionManager()
-		sessions.WaitFunc = func(_ context.Context, _ string) error {
-			return repo.AddComment(1, domain.Comment{
-				Author: "reviewer",
-				Text:   domain.ReviewLGTMPrefix + " Looks good",
-				Time:   clock.Now(),
-			})
-		}
 
 		uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
+		sessions.WaitFunc = func(_ context.Context, sessionName string) error {
+			logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+			if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
+				return err
+			}
+			content := "some output\n" + domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good\n"
+			return os.WriteFile(logPath, []byte(content), 0o644)
+		}
 
 		out, err := uc.Execute(context.Background(), CompleteTaskInput{
 			TaskID:  1,
@@ -730,15 +733,16 @@ func TestCompleteTask_Execute_ReviewSessionAlreadyRunning(t *testing.T) {
 	executor := testutil.NewMockCommandExecutor()
 	sessions := testutil.NewMockSessionManager()
 	sessions.IsRunningVal = true
-	sessions.WaitFunc = func(_ context.Context, _ string) error {
-		return repo.AddComment(1, domain.Comment{
-			Author: "reviewer",
-			Text:   domain.ReviewLGTMPrefix + " Looks good",
-			Time:   clock.Now(),
-		})
-	}
 
 	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
+	sessions.WaitFunc = func(_ context.Context, sessionName string) error {
+		logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+		if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
+			return err
+		}
+		content := "some output\n" + domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good\n"
+		return os.WriteFile(logPath, []byte(content), 0o644)
+	}
 
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
 		TaskID: 1,

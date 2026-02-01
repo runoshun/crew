@@ -28,6 +28,12 @@ func TestShowWorkerHelp(t *testing.T) {
 	assert.Contains(t, content, "git push") // in prohibited actions section
 }
 
+func TestRootHelpFlags_IncludeReviewer(t *testing.T) {
+	root := NewRootCommand(nil, "test")
+	usage := root.UsageString()
+	assert.Contains(t, usage, "--help-reviewer")
+}
+
 func TestShowReviewerHelp(t *testing.T) {
 	var buf bytes.Buffer
 	var errBuf bytes.Buffer
@@ -40,7 +46,7 @@ func TestShowReviewerHelp(t *testing.T) {
 	assert.Contains(t, content, "# git-crew Reviewer Guide")
 	assert.Contains(t, content, "crew show")
 	assert.Contains(t, content, "crew diff")
-	assert.Contains(t, content, "crew comment")
+	assert.Contains(t, content, "Do NOT run")
 }
 
 func TestShowManagerHelp(t *testing.T) {

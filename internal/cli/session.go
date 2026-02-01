@@ -311,10 +311,10 @@ Preconditions:
 If [complete].command is configured, it will be executed before transitioning
 the status. If the command fails, the completion is aborted.
 
-Review requirement:
-	  - skip_review enabled: bypasses review count requirement
-	  - otherwise: runs review automatically when ReviewCount < [complete].min_reviews (default: 1)
-	  - review count increases only when the reviewer adds a comment
+		Review requirement:
+		  - skip_review enabled: bypasses review count requirement
+		  - otherwise: runs review automatically when ReviewCount < [complete].min_reviews (default: 1)
+		  - review count increases when a review result is recorded
 
 Examples:
 	  # Complete task by ID
