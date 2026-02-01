@@ -48,6 +48,7 @@ var (
 	ErrInvalidNamespace        = errors.New("invalid namespace")
 	ErrMigrationConflict       = errors.New("migration conflict: destination task differs")
 	ErrNoReviewComment         = errors.New("reviewer did not add a comment")
+	ErrInvalidACPCommand       = errors.New("invalid ACP command")
 
 	// Workspace errors
 	ErrWorkspaceRepoNotFound  = errors.New("repository not found in workspace")

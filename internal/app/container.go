@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	acpinfra "github.com/runoshun/git-crew/v2/internal/infra/acp"
 	"github.com/runoshun/git-crew/v2/internal/infra/config"
 	"github.com/runoshun/git-crew/v2/internal/infra/executor"
 	"github.com/runoshun/git-crew/v2/internal/infra/filestore"
@@ -60,6 +61,7 @@ type Container struct {
 	Logger           domain.Logger
 	Runner           domain.ScriptRunner
 	Executor         domain.CommandExecutor
+	ACPIPCFactory    domain.ACPIPCFactory
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 
 	// Configuration
@@ -111,6 +113,9 @@ func New(dir string) (*Container, error) {
 	// Create command executor
 	commandExecutor := executor.NewClient()
 
+	// Create ACP IPC factory
+	acpIPCFactory := acpinfra.NewFileIPCFactory(cfg.CrewDir, logger)
+
 	return &Container{
 		Tasks:            taskRepo,
 		StoreInitializer: storeInit,
@@ -123,6 +128,7 @@ func New(dir string) (*Container, error) {
 		Logger:           logger,
 		Runner:           scriptRunner,
 		Executor:         commandExecutor,
+		ACPIPCFactory:    acpIPCFactory,
 		Config:           cfg,
 	}, nil
 }
@@ -276,6 +282,31 @@ func (c *Container) PruneTasksUseCase() *usecase.PruneTasks {
 // ExecCommandUseCase returns a new ExecCommand use case.
 func (c *Container) ExecCommandUseCase() *usecase.ExecCommand {
 	return usecase.NewExecCommand(c.Tasks, c.Worktrees)
+}
+
+// ACPControlUseCase returns a new ACPControl use case.
+func (c *Container) ACPControlUseCase() *usecase.ACPControl {
+	return usecase.NewACPControl(
+		c.Tasks,
+		c.ConfigLoader,
+		c.Git,
+		c.ACPIPCFactory,
+	)
+}
+
+// ACPRunUseCase returns a new ACPRun use case.
+func (c *Container) ACPRunUseCase(stdout, stderr io.Writer) *usecase.ACPRun {
+	return usecase.NewACPRun(
+		c.Tasks,
+		c.Worktrees,
+		c.ConfigLoader,
+		c.Git,
+		c.Runner,
+		c.ACPIPCFactory,
+		c.Config.RepoRoot,
+		stdout,
+		stderr,
+	)
 }
 
 // StartManagerUseCase returns a new StartManager use case.
