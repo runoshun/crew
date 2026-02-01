@@ -65,6 +65,7 @@ func TestACPPeek_Execute_NoSession(t *testing.T) {
 
 	_, err := uc.Execute(context.Background(), ACPPeekInput{TaskID: 1})
 	assert.ErrorIs(t, err, domain.ErrNoSession)
+	assert.Contains(t, err.Error(), "crew acp start 1")
 }
 
 func TestACPPeek_Execute_IsRunningError(t *testing.T) {

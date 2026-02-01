@@ -71,7 +71,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.agent, "agent", "", "Agent name (default: worker_default)")
+	cmd.Flags().StringVar(&opts.agent, "agent", "", "Agent name (default: config agents.default_worker)")
 	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model override")
 
 	return cmd
@@ -175,7 +175,7 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "permission <task-id> <option-id|index>",
+		Use:   "permission <task-id> <option-id|#index>",
 		Short: "Respond to a permission request",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
@@ -195,8 +195,8 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 				return fmt.Errorf("option is required")
 			}
 
-			optionID := opts.optionID
-			if _, err := strconv.Atoi(strings.TrimSpace(optionID)); err == nil {
+			optionID := strings.TrimSpace(opts.optionID)
+			if strings.HasPrefix(optionID, "#") {
 				logUC := c.ACPLogUseCase()
 				out, err := logUC.Execute(cmd.Context(), usecase.ACPLogInput{TaskID: opts.taskID})
 				if err != nil {
@@ -219,7 +219,7 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd.Flags().IntVar(&opts.taskID, "task", 0, "Task ID")
-	cmd.Flags().StringVar(&opts.optionID, "option", "", "Permission option ID")
+	cmd.Flags().StringVar(&opts.optionID, "option", "", "Permission option ID or #index")
 
 	return cmd
 }
@@ -435,9 +435,16 @@ Examples:
 
 func resolvePermissionOptionID(option string, events []domain.ACPEvent) (string, error) {
 	option = strings.TrimSpace(option)
-	idx, err := strconv.Atoi(option)
-	if err != nil {
+	if !strings.HasPrefix(option, "#") {
 		return option, nil
+	}
+	idxText := strings.TrimPrefix(option, "#")
+	if idxText == "" {
+		return "", fmt.Errorf("option index must be >= 1")
+	}
+	idx, err := strconv.Atoi(idxText)
+	if err != nil {
+		return "", fmt.Errorf("option index must be numeric")
 	}
 	if idx <= 0 {
 		return "", fmt.Errorf("option index must be >= 1")

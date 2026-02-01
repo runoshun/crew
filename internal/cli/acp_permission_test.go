@@ -24,7 +24,7 @@ func TestResolvePermissionOptionID_Index(t *testing.T) {
 		{Type: domain.ACPEventRequestPermission, Payload: payload},
 	}
 
-	optionID, err := resolvePermissionOptionID("2", events)
+	optionID, err := resolvePermissionOptionID("#2", events)
 	require.NoError(t, err)
 	assert.Equal(t, "opt-2", optionID)
 }
@@ -48,13 +48,13 @@ func TestResolvePermissionOptionID_OutOfRange(t *testing.T) {
 		{Type: domain.ACPEventRequestPermission, Payload: payload},
 	}
 
-	_, err = resolvePermissionOptionID("2", events)
+	_, err = resolvePermissionOptionID("#2", events)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "out of range")
 }
 
 func TestResolvePermissionOptionID_NoEvents(t *testing.T) {
-	_, err := resolvePermissionOptionID("1", nil)
+	_, err := resolvePermissionOptionID("#1", nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no permission requests")
 }
@@ -73,7 +73,13 @@ func TestResolvePermissionOptionID_SkipsInvalidPayload(t *testing.T) {
 		{Type: domain.ACPEventRequestPermission, Payload: validPayload},
 	}
 
-	optionID, err := resolvePermissionOptionID("1", events)
+	optionID, err := resolvePermissionOptionID("#1", events)
 	require.NoError(t, err)
 	assert.Equal(t, "opt-1", optionID)
+}
+
+func TestResolvePermissionOptionID_NonNumericIndex(t *testing.T) {
+	_, err := resolvePermissionOptionID("#x", nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "numeric")
 }

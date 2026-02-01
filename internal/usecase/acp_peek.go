@@ -51,7 +51,7 @@ func (uc *ACPPeek) Execute(_ context.Context, in ACPPeekInput) (*ACPPeekOutput, 
 		return nil, fmt.Errorf("check session: %w", err)
 	}
 	if !running {
-		return nil, domain.ErrNoSession
+		return nil, fmt.Errorf("%w: acp session stopped or missing. Recover: crew acp start %d --agent <name>, crew acp peek %d", domain.ErrNoSession, in.TaskID, in.TaskID)
 	}
 
 	lines := in.Lines
