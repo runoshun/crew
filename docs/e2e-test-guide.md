@@ -251,13 +251,26 @@ crew new --title "E2E: Completion flow test" --body "Please run echo hello"
 crew start <id> cc-small
 
 # 3. Set min_reviews=2 for this test (restore after test)
-# If [complete] already exists, edit that section instead of appending.
-backup_path="/tmp/crew-config.$(date +%s).toml"
+backup_path="$(mktemp /tmp/crew-config.XXXXXX.toml)"
+tmp_config="$(mktemp /tmp/crew-config.edit.XXXXXX.toml)"
 cp .crew/config.toml "$backup_path"
-cat >> .crew/config.toml << 'EOF'
-[complete]
-min_reviews = 2
-EOF
+awk '
+BEGIN { in_complete = 0; inserted = 0 }
+/^\[complete\]/ { in_complete = 1; print; next }
+in_complete && /^\[/ {
+  if (!inserted) { print "min_reviews = 2"; inserted = 1 }
+  in_complete = 0
+}
+in_complete && /^min_reviews[[:space:]]*=/ {
+  print "min_reviews = 2"; inserted = 1; next
+}
+{ print }
+END {
+  if (in_complete && !inserted) { print "min_reviews = 2" }
+  if (!inserted) { print ""; print "[complete]"; print "min_reviews = 2" }
+}
+' .crew/config.toml > "$tmp_config"
+mv "$tmp_config" .crew/config.toml
 
 # 4. Review (repeat until min_reviews is satisfied)
 # Note: only successful (exit code 0) reviews increment the count
