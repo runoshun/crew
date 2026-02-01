@@ -75,16 +75,13 @@ crew start <id> cc-medium
 # 3. Check status (should be in_progress)
 crew list | grep <id>
 
-# 4. Run review(s) until requirement is satisfied
-crew review <id>
-
-# 5. Complete task (should move to done)
+# 4. Complete task (runs review; should move to done)
 crew complete <id>
 
-# 6. Merge task (should move to merged)
+# 5. Merge task (should move to merged)
 echo "y" | crew merge <id>
 
-# 7. Check status (should be merged)
+# 6. Check status (should be merged)
 crew show <id>
 ```
 
@@ -136,16 +133,13 @@ crew start <id> codex
 # 3. Check status (should be in_progress)
 crew list | grep <id>
 
-# 4. Run review(s) until requirement is satisfied
-crew review <id>
-
-# 5. Complete task (should move to done)
+# 4. Complete task (runs review; should move to done)
 crew complete <id>
 
-# 6. Merge task (should move to merged)
+# 5. Merge task (should move to merged)
 echo "y" | crew merge <id>
 
-# 7. Check status (should be merged)
+# 6. Check status (should be merged)
 crew show <id>
 ```
 
@@ -272,24 +266,19 @@ END {
 ' .crew/config.toml > "$tmp_config"
 mv "$tmp_config" .crew/config.toml
 
-# 4. Review (repeat until min_reviews is satisfied)
-# Note: only successful (exit code 0) reviews increment the count
-crew review <id>
-
-# 5. Complete (should fail until min_reviews is satisfied)
+# 4. Complete (runs review; should fail until min_reviews is satisfied)
 crew complete <id>
 
-# 6. Repeat review/complete until it succeeds
-crew review <id>
+# 5. Repeat complete until it succeeds
 crew complete <id>
 
-# 7. Merge
+# 6. Merge
 echo "y" | crew merge <id>
 
-# 8. Verify
+# 7. Verify
 crew show <id>  # status: merged
 
-# 9. Restore config
+# 8. Restore config
 mv "$backup_path" .crew/config.toml
 ```
 
@@ -308,8 +297,8 @@ mv "$backup_path" .crew/config.toml
 crew new --title "E2E: Review revision flow test"
 crew start <id> cc-small
 
-# 2. Review (request changes)
-crew review <id>
+# 2. Complete (runs review; request changes)
+crew complete <id>
 
 # 3. Send comment
 crew comment <id> -R "Please fix: XXX"
@@ -317,11 +306,10 @@ crew comment <id> -R "Please fix: XXX"
 # 4. Check status (should remain in_progress)
 crew list | grep <id>
 
-# 5. Re-review after fixes
-crew review <id>
-
-# 6. Complete and merge
+# 5. Re-run complete after fixes
 crew complete <id>
+
+# 6. Merge
 echo "y" | crew merge <id>
 ```
 

@@ -195,9 +195,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 	mergeCmd := newMergeCommand(c)
 	mergeCmd.GroupID = groupSession
 
-	reviewCmd := newReviewCommand(c)
-	reviewCmd.GroupID = groupSession
-
 	pollCmd := newPollCommand(c)
 	pollCmd.GroupID = groupSession
 
@@ -253,7 +250,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 		diffCmd,
 		completeCmd,
 		mergeCmd,
-		reviewCmd,
 		pollCmd,
 		logsCmd,
 		pruneCmd,

@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/testutil"
@@ -20,6 +21,7 @@ func boolPtr(b bool) *bool {
 // - set SkipReview=true, or
 // - set ReviewCount to satisfy min_reviews
 func newTestCompleteTask(
+	t *testing.T,
 	repo *testutil.MockTaskRepository,
 	sessions *testutil.MockSessionManager,
 	worktrees *testutil.MockWorktreeManager,
@@ -28,7 +30,10 @@ func newTestCompleteTask(
 	clock *testutil.MockClock,
 	executor *testutil.MockCommandExecutor,
 ) *CompleteTask {
-	return NewCompleteTask(repo, sessions, worktrees, git, configLoader, clock, nil, executor, nil, "/tmp/crew", "/tmp/repo")
+	t.Helper()
+	crewDir := t.TempDir()
+	repoRoot := t.TempDir()
+	return NewCompleteTask(repo, sessions, worktrees, git, configLoader, clock, nil, executor, nil, crewDir, repoRoot)
 }
 
 func TestCompleteTask_Execute_Success(t *testing.T) {
@@ -62,7 +67,7 @@ func TestCompleteTask_Execute_Success(t *testing.T) {
 			clock := &testutil.MockClock{}
 			executor := testutil.NewMockCommandExecutor()
 
-			uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+			uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 			// Execute
 			out, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -111,7 +116,7 @@ func TestCompleteTask_Execute_WithCompleteCommand(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -159,7 +164,7 @@ func TestCompleteTask_Execute_CompleteCommandFails(t *testing.T) {
 	executor.ExecuteErr = assert.AnError
 	executor.ExecuteOutput = []byte("command failed")
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -195,7 +200,7 @@ func TestCompleteTask_Execute_UncommittedChanges(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -238,7 +243,7 @@ func TestCompleteTask_Execute_NotInProgress(t *testing.T) {
 			clock := &testutil.MockClock{}
 			executor := testutil.NewMockCommandExecutor()
 
-			uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+			uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 			// Execute
 			_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -260,7 +265,7 @@ func TestCompleteTask_Execute_TaskNotFound(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -282,7 +287,7 @@ func TestCompleteTask_Execute_GetError(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -311,7 +316,7 @@ func TestCompleteTask_Execute_WorktreeResolveError(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -343,7 +348,7 @@ func TestCompleteTask_Execute_HasUncommittedChangesError(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -376,7 +381,7 @@ func TestCompleteTask_Execute_ConfigLoadError(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -410,7 +415,7 @@ func TestCompleteTask_Execute_SaveError(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -443,7 +448,7 @@ func TestCompleteTask_Execute_WithComment(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -484,7 +489,7 @@ func TestCompleteTask_Execute_SkipReview_TaskLevel(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -524,7 +529,7 @@ func TestCompleteTask_Execute_SkipReview_ConfigLevel(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -564,7 +569,7 @@ func TestCompleteTask_Execute_SkipReview_TaskTrueOverridesConfigFalse(t *testing
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -606,7 +611,7 @@ func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -623,7 +628,86 @@ func TestCompleteTask_Execute_SkipReview_TaskFalseOverridesConfigTrue(t *testing
 }
 
 func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
-	// Insufficient reviews should fail without changing status or adding comments.
+	t.Run("runs review when below min", func(t *testing.T) {
+		repo := testutil.NewMockTaskRepository()
+		repo.Tasks[1] = &domain.Task{
+			ID:          1,
+			Title:       "Task requiring reviews",
+			Status:      domain.StatusInProgress,
+			SkipReview:  boolPtr(false),
+			ReviewCount: 0,
+		}
+
+		worktrees := testutil.NewMockWorktreeManager()
+		worktrees.ResolvePath = "/tmp/worktree"
+
+		git := &testutil.MockGit{
+			HasUncommittedChangesV: false,
+		}
+
+		configLoader := testutil.NewMockConfigLoader()
+		configLoader.Config.Complete.MinReviews = 1
+		clock := &testutil.MockClock{NowTime: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)}
+		executor := testutil.NewMockCommandExecutor()
+		sessions := testutil.NewMockSessionManager()
+		sessions.WaitFunc = func(_ context.Context, _ string) error {
+			return repo.AddComment(1, domain.Comment{
+				Author: "reviewer",
+				Text:   domain.ReviewLGTMPrefix + " Looks good",
+				Time:   clock.Now(),
+			})
+		}
+
+		uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
+
+		out, err := uc.Execute(context.Background(), CompleteTaskInput{
+			TaskID:  1,
+			Comment: "Ready to complete",
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, out)
+		assert.True(t, sessions.StartCalled)
+		assert.True(t, sessions.WaitCalled)
+		assert.Equal(t, 1, out.Task.ReviewCount)
+		assert.Equal(t, domain.StatusDone, out.Task.Status)
+	})
+
+	t.Run("fails when reviewer does not comment", func(t *testing.T) {
+		repo := testutil.NewMockTaskRepository()
+		repo.Tasks[1] = &domain.Task{
+			ID:          1,
+			Title:       "Task requiring reviews",
+			Status:      domain.StatusInProgress,
+			SkipReview:  boolPtr(false),
+			ReviewCount: 0,
+		}
+
+		worktrees := testutil.NewMockWorktreeManager()
+		worktrees.ResolvePath = "/tmp/worktree"
+
+		git := &testutil.MockGit{
+			HasUncommittedChangesV: false,
+		}
+
+		configLoader := testutil.NewMockConfigLoader()
+		configLoader.Config.Complete.MinReviews = 1
+		clock := &testutil.MockClock{}
+		executor := testutil.NewMockCommandExecutor()
+		sessions := testutil.NewMockSessionManager()
+
+		uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
+
+		_, err := uc.Execute(context.Background(), CompleteTaskInput{
+			TaskID: 1,
+		})
+
+		assert.ErrorIs(t, err, domain.ErrNoReviewComment)
+		assert.Equal(t, domain.StatusInProgress, repo.Tasks[1].Status)
+	})
+}
+
+func TestCompleteTask_Execute_ReviewSessionAlreadyRunning(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:          1,
@@ -641,25 +725,20 @@ func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
 	}
 
 	configLoader := testutil.NewMockConfigLoader()
-	configLoader.Config.Complete.MinReviews = 2
-	clock := &testutil.MockClock{}
+	configLoader.Config.Complete.MinReviews = 1
+	clock := &testutil.MockClock{NowTime: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)}
 	executor := testutil.NewMockCommandExecutor()
+	sessions := testutil.NewMockSessionManager()
+	sessions.IsRunningVal = true
+	sessions.WaitFunc = func(_ context.Context, _ string) error {
+		return repo.AddComment(1, domain.Comment{
+			Author: "reviewer",
+			Text:   domain.ReviewLGTMPrefix + " Looks good",
+			Time:   clock.Now(),
+		})
+	}
 
-	uc := newTestCompleteTask(repo, testutil.NewMockSessionManager(), worktrees, git, configLoader, clock, executor)
-
-	_, err := uc.Execute(context.Background(), CompleteTaskInput{
-		TaskID:  1,
-		Comment: "Ready to complete",
-	})
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "review required: have 0, need 2")
-	assert.Contains(t, err.Error(), "crew review 1")
-	assert.Equal(t, domain.StatusInProgress, repo.Tasks[1].Status)
-	assert.Empty(t, repo.Comments[1])
-
-	// Sufficient reviews should allow completion.
-	repo.Tasks[1].ReviewCount = 2
+	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
 
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
 		TaskID: 1,
@@ -667,8 +746,9 @@ func TestCompleteTask_Execute_ReviewCountRequirement(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, out)
+	assert.False(t, sessions.StartCalled)
+	assert.True(t, sessions.WaitCalled)
 	assert.Equal(t, domain.StatusDone, out.Task.Status)
-	assert.False(t, out.ShouldStartReview)
 }
 
 func TestCompleteTask_Execute_MergeConflict(t *testing.T) {
@@ -698,7 +778,7 @@ func TestCompleteTask_Execute_MergeConflict(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, sessions, worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
@@ -749,7 +829,7 @@ func TestCompleteTask_Execute_NoMergeConflict(t *testing.T) {
 	clock := &testutil.MockClock{}
 	executor := testutil.NewMockCommandExecutor()
 
-	uc := newTestCompleteTask(repo, sessions, worktrees, git, configLoader, clock, executor)
+	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{

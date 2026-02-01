@@ -14,6 +14,7 @@ import (
 // Fields are ordered to minimize memory padding.
 type ReviewCommandDeps struct {
 	ConfigLoader domain.ConfigLoader
+	Config       *domain.Config
 	Worktrees    domain.WorktreeManager
 	RepoRoot     string
 }
@@ -37,9 +38,13 @@ type ReviewCommandOutput struct {
 
 // PrepareReviewCommand resolves agent configuration and builds the review command.
 func PrepareReviewCommand(deps ReviewCommandDeps, in ReviewCommandInput) (*ReviewCommandOutput, error) {
-	cfg, err := deps.ConfigLoader.Load()
-	if err != nil {
-		return nil, fmt.Errorf("load config: %w", err)
+	cfg := deps.Config
+	if cfg == nil {
+		loaded, err := deps.ConfigLoader.Load()
+		if err != nil {
+			return nil, fmt.Errorf("load config: %w", err)
+		}
+		cfg = loaded
 	}
 
 	agentName := in.Agent

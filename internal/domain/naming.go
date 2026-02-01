@@ -23,6 +23,12 @@ func SessionName(taskID int) string {
 	return fmt.Sprintf("crew-%d", taskID)
 }
 
+// ReviewSessionName returns the tmux session name for a task review.
+// Format: crew-<id>-review
+func ReviewSessionName(taskID int) string {
+	return fmt.Sprintf("crew-%d-review", taskID)
+}
+
 // ACPSessionName returns the tmux session name for an ACP task session.
 // Format: crew-acp-<id>
 func ACPSessionName(taskID int) string {

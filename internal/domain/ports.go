@@ -126,6 +126,9 @@ type SessionManager interface {
 	// IsRunning checks if a session is running.
 	IsRunning(sessionName string) (bool, error)
 
+	// Wait waits for a session to stop running.
+	Wait(ctx context.Context, sessionName string) error
+
 	// GetPaneProcesses retrieves process information for a session.
 	GetPaneProcesses(sessionName string) ([]ProcessInfo, error)
 }
