@@ -221,7 +221,7 @@ const (
 	ReviewModeAuto ReviewMode = "auto"
 
 	// ReviewModeManual does not start review automatically.
-	// Sets status to for_review and waits for manual review initiation.
+	// Requires manual review initiation (review does not change task status).
 	ReviewModeManual ReviewMode = "manual"
 
 	// ReviewModeAutoFix starts review synchronously and attempts auto-correction.

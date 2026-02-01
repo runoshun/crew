@@ -34,24 +34,10 @@ import type { Plugin } from "@opencode-ai/plugin"
 
 export const CrewHooksPlugin: Plugin = async ({ $ }) => {
   return {
-	event: async ({ event }) => {
-		// Transition to needs_input: session idle
-		if (event.type === "session.idle") {
-			await ` + "$`crew edit {{.TaskID}} --status needs_input --if-status in_progress`" + `;
-		}
-
-		// Transition to needs_input or in_progress: session status change
-		if (event.type === "session.status") {
-			if (event.status.type === "idle") {
-				await ` + "$`crew edit {{.TaskID}} --status needs_input --if-status in_progress`" + `;
-			} else if (event.status.type === "busy") {
-				await ` + "$`crew edit {{.TaskID}} --status in_progress --if-status needs_input`" + `;
-			}
-		}
-
-		// Transition to needs_input: permission asked
-		if (event.type === "permission.asked") {
-			const { id, metadata } = event.properties;
+		event: async ({ event }) => {
+			// Permission asked: auto-approve safe git operations in worktree
+			if (event.type === "permission.asked") {
+				const { id, metadata } = event.properties;
 			
 			// Auto-approve safe git operations in worktree
 			if (metadata && typeof metadata.command === 'string') {
@@ -74,14 +60,8 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 				}
 			}
 
-			await ` + "$`crew edit {{.TaskID}} --status needs_input --if-status in_progress`" + `;
+			}
 		}
-
-		// Transition to in_progress: permission replied
-		if (event.type === "permission.replied") {
-			await ` + "$`crew edit {{.TaskID}} --status in_progress --if-status needs_input`" + `;
-		}
-	}
   }
 }
 EOF

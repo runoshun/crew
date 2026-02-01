@@ -32,9 +32,10 @@ Get up and running in 5 steps:
    crew peek <id>
    ```
 
-5. **Review & merge** → Finish the task:
+5. **Review, complete, merge** → Finish the task:
    ```bash
-   crew review <id>      # If review needed
+   crew review <id>      # External review (sync). Repeat until min_reviews is satisfied.
+   crew complete <id>    # Mark task done after review requirements pass
    crew merge <id>       # Merge to main (or close if abandoned)
    ```
 
@@ -200,17 +201,15 @@ crew peek <id>
 ### Review & Merge
 
 ```bash
-# Start review
+# Run review (external tool, synchronous). Repeat until min_reviews is met.
 crew review <id>
 
-# Check review result
-crew show <id>
-
-# If approved, merge to main
-crew merge <id>
-
-# If not approved, send feedback
+# If changes are requested, send feedback
 crew comment <id> -R "Fix the error handling in auth.go"
+
+# Once review requirements are satisfied, complete and merge
+crew complete <id>
+crew merge <id>
 ```
 
 ### Restart a Task
@@ -231,13 +230,11 @@ crew start <id> <worker>
 | Status | Meaning | Action |
 |--------|---------|--------|
 | `todo` | Created, waiting to start | `crew start <id> <worker>` |
-| `in_progress` | Agent actively working | `crew peek <id>` to check |
-| `needs_input` | Agent waiting for user input | `crew send <id> "..."` to respond |
-| `reviewing` | Review in progress | `crew peek <id>` to check |
-| `reviewed` | Review complete | `crew show <id>` to see results |
-| `stopped` | Manually stopped by manager | `crew start <id> <worker>` to resume |
-| `error` | Session crashed | Check logs, then `crew start` to retry |
-| `closed` | Task finished or abandoned | Complete |
+| `in_progress` | Work in progress (includes input waiting/paused) | `crew peek <id>` or `crew send <id> "..."` |
+| `done` | Complete, awaiting merge or close | `crew merge <id>` or `crew close <id>` |
+| `merged` | Merged to base branch | Terminal |
+| `closed` | Closed without merge | Terminal |
+| `error` | Session crashed or stopped | Check logs, then `crew start` to retry |
 
 ---
 
@@ -317,7 +314,8 @@ crew diff <id>                     # Show changes
 
 ### Review & Completion
 ```bash
-crew review <id>                   # Start AI code review
+crew review <id>                   # Start AI code review (sync)
+crew complete <id>                 # Mark task done after reviews
 crew merge <id>                    # Merge to main
 ```
 

@@ -136,7 +136,7 @@ File format for --from:
 	cmd.Flags().IntVar(&opts.Issue, "issue", 0, "Linked GitHub issue number")
 	cmd.Flags().StringArrayVar(&opts.Labels, "label", nil, "Labels (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Base, "base", "", "Base branch for worktree (default: current branch)")
-	cmd.Flags().BoolVar(&opts.SkipReview, "skip-review", false, "Skip review on task completion (go directly to reviewed)")
+	cmd.Flags().BoolVar(&opts.SkipReview, "skip-review", false, "Skip review on task completion (go directly to done)")
 	cmd.Flags().StringVar(&opts.From, "from", "", "Create tasks from a Markdown file")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "Preview tasks without creating (requires --from)")
 
@@ -760,13 +760,13 @@ Examples:
   crew edit 1 --body "Updated description text"
 
   # Change task status
-  crew edit 1 --status for_review
+  crew edit 1 --status in_progress
 
   # Conditional status change (only if current status matches)
-  crew edit 1 --status needs_input --if-status in_progress
+  crew edit 1 --status in_progress --if-status error
 
   # Multiple conditions (status change only if current status is one of these)
-  crew edit 1 --status needs_input --if-status in_progress --if-status needs_input
+  crew edit 1 --status closed --if-status done --if-status error
 
   # Replace all labels (comma-separated)
   crew edit 1 --labels bug,urgent
@@ -914,7 +914,7 @@ File format for --from:
 	// Optional flags
 	cmd.Flags().StringVar(&opts.Title, "title", "", "New task title")
 	cmd.Flags().StringVar(&opts.Description, "body", "", "New task description")
-	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, done, error, merged, closed; legacy: needs_input, for_review, reviewing, reviewed, stopped)")
+	cmd.Flags().StringVar(&opts.Status, "status", "", "New task status (todo, in_progress, done, error, merged, closed)")
 	cmd.Flags().StringArrayVar(&opts.IfStatus, "if-status", nil, "Only update status if current status matches (can specify multiple)")
 	cmd.Flags().StringVar(&opts.Labels, "labels", "", "Replace all labels (comma-separated, empty string clears all)")
 	cmd.Flags().StringArrayVar(&opts.AddLabels, "add-label", nil, "Labels to add (can specify multiple)")

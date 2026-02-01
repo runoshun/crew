@@ -37,7 +37,7 @@ Two modes are available:
 2. Status Mode (--status):
    Wait for any task with the specified status to appear.
    Usage: crew poll --status <status>
-   Output: "<status> <task_id>" when found (e.g., "for_review 42")
+   Output: "<status> <task_id>" when found (e.g., "done 42")
 
 Task ID Mode Details:
   The poll command checks the task status at regular intervals and executes
@@ -66,16 +66,17 @@ Task ID Mode Details:
 
   Terminal States:
     Reaching a terminal state is also treated as a status change:
-      - closed - Task closed (merged or abandoned)
+      - merged - Task merged to base branch
+      - closed - Task closed without merge
       - error  - Task session terminated with error
 
 Examples:
-  # Status mode: Wait for any task with for_review status
-  crew poll --status for_review
-  # Output: "for_review 42" (when task 42 becomes for_review)
+  # Status mode: Wait for any task with done status
+  crew poll --status done
+  # Output: "done 42" (when task 42 becomes done)
 
   # Status mode with timeout
-  crew poll --status for_review --timeout 60
+  crew poll --status done --timeout 60
 
   # Poll multiple tasks (exit when any changes)
   crew poll 220 221 222 --command 'echo "Task {{.TaskID}}: {{.OldStatus}} -> {{.NewStatus}}"'
@@ -84,7 +85,7 @@ Examples:
   crew poll 175 176 177 --expect todo --command 'notify-send "Task {{.TaskID}} started!"'
 
   # Multiple expected statuses (exit if status becomes something else)
-  crew poll 199 200 --expect in_progress,needs_input --command 'say "Task {{.TaskID}} changed to {{.NewStatus}}"'
+  crew poll 199 200 --expect in_progress,done --command 'say "Task {{.TaskID}} changed to {{.NewStatus}}"'
 
   # Poll with custom interval and timeout
   crew poll 175 176 --expect todo --interval 5 --timeout 60
@@ -176,8 +177,8 @@ Examples:
 	}
 
 	// Flags
-	cmd.Flags().StringVarP(&opts.Status, "status", "s", "", "Wait for any task with this status (e.g., 'for_review')")
-	cmd.Flags().StringVarP(&opts.Expect, "expect", "e", "", "Expected status(es) - comma-separated (e.g., 'in_progress' or 'in_progress,needs_input')")
+	cmd.Flags().StringVarP(&opts.Status, "status", "s", "", "Wait for any task with this status (e.g., 'done')")
+	cmd.Flags().StringVarP(&opts.Expect, "expect", "e", "", "Expected status(es) - comma-separated (e.g., 'in_progress' or 'in_progress,done')")
 	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", 10, "Polling interval in seconds")
 	cmd.Flags().IntVarP(&opts.Timeout, "timeout", "t", 300, "Timeout in seconds")
 	cmd.Flags().StringVarP(&opts.Command, "command", "c", "", "Command template to execute on status change")

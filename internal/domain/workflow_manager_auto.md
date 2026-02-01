@@ -5,7 +5,7 @@ Trigger: Say **"auto mode"** to activate this workflow for managing multiple in-
 ## Purpose
 
 Advance all in-progress tasks automatically with minimal human intervention. Continue looping until:
-- All tasks reach ✅ **LGTM** status, OR
+- All tasks reach ✅ **done** status, OR
 - ⚠️ An undecidable problem occurs (stop and report to user)
 
 ## Important: No Interaction During Auto Mode
@@ -13,31 +13,29 @@ Advance all in-progress tasks automatically with minimal human intervention. Con
 - **NO confirmations/questions until exit conditions are met** (y/n, selections, etc.)
 - Manager makes autonomous decisions about:
   - When to execute `crew comment -R`
-  - Whether to approve `needs_input` requests
+  - Whether to approve permission/input requests
 - **Exception**: Only stop and report when encountering undecidable situations
 
 ## Task Flow (Expected)
 
 ```
-in_progress → worker calls `crew complete`
-           → reviewing (auto-review starts)
-           → reviewed (review complete)
-           → LGTM or feedback sent
+in_progress → run `crew review`
+           → if LGTM: `crew complete` → done
+done → ready to merge
 ```
 
-Workers are expected to call `crew complete` when done. This triggers auto-review.
+Managers run `crew review` and `crew complete` when a task is ready. Review does not change status.
 
 ## Target Statuses
 
 | Status | In Scope | Notes |
 |--------|----------|-------|
-| `in_progress` | ✅ | Worker is working |
-| `needs_input` | ✅ | Worker waiting for approval |
-| `reviewing` | ✅ | Auto-review in progress |
-| `reviewed` | ✅ | Review complete, needs evaluation |
+| `in_progress` | ✅ | Worker is working or waiting for input |
+| `done` | ✅ | Ready to merge or close |
 | `error` | ✅ | Problem occurred, report to user |
-| `for_review` | ✅ | Legacy/fallback, start review if seen |
 | `todo` | ❌ | Requires explicit start instruction |
+| `merged` | ❌ | Terminal |
+| `closed` | ❌ | Terminal |
 
 ---
 
@@ -60,11 +58,8 @@ Filter for in-scope statuses. If no tasks in scope, exit with message: "No targe
 | Priority | Status | Action |
 |----------|--------|--------|
 | 1 | `error` | Add to problem list |
-| 2 | `reviewed` | Process review result |
-| 3 | `needs_input` | Evaluate input request |
-| 4 | `for_review` | Start review (legacy fallback) |
-| 5 | `reviewing` | Skip (wait) |
-| 6 | `in_progress` | Check progress only |
+| 2 | `done` | Add to completion list |
+| 3 | `in_progress` | Evaluate and review |
 
 ---
 
@@ -77,31 +72,27 @@ Filter for in-scope statuses. If no tasks in scope, exit with message: "No targe
 
 ---
 
-### 3.2 `reviewed`
+### 3.2 `done`
 
 ```bash
-crew show <id> --last-review
+crew show <id> --json --last-review
 ```
 
-**Evaluation:** Manager reads the review content and judges whether it's LGTM with no issues.
-
-**If LGTM:**
-- Add to completion list (exclude from loop)
-
-**If issues found:**
-```bash
-crew comment <id> -R "Please check the review comments and address them."
-```
+- If no review is found (skip_review or min_reviews=0), add to completion list
+- If issues are found, send feedback and return the task to the loop:
+  ```bash
+  crew comment <id> -R "Please check the review comments and address them."
+  ```
 
 ---
 
-### 3.3 `needs_input`
+### 3.3 `in_progress`
 
 ```bash
 crew peek <id> -n 50
 ```
 
-**Evaluation criteria:**
+**Input/permission request evaluation:**
 
 | Approve (auto-continue) | Deny (flag as problem) |
 |-------------------------|------------------------|
@@ -121,42 +112,26 @@ crew send <id> Enter
 - Add to problem list and exit loop
 - Delegate decision to user
 
----
-
-### 3.4 `for_review` (Legacy Fallback)
-
-This status should rarely occur with the new flow. If seen:
-
+**Review step (sync):**
 ```bash
 crew review <id>
 ```
 
-Status changes to `reviewing` → then `reviewed` when complete.
-
----
-
-### 3.5 `reviewing`
-
-- No action (wait for review to complete)
-- Add to warning list if exceeds 10 minutes
-
----
-
-### 3.6 `in_progress`
-
+**If LGTM:**
 ```bash
-crew peek <id> -n 30
+crew complete <id>
 ```
 
-**Stall detection:**
-- Same output 3 times in a row → add to warning list
-- Error message detected → add to problem list
+**If issues found:**
+```bash
+crew comment <id> -R "Please check the review comments and address them."
+```
 
 ---
 
 ## 4. Wait Handling
 
-When all tasks are only `in_progress` or `reviewing`:
+When all tasks are only `in_progress`:
 
 ```bash
 sleep 60
@@ -170,7 +145,7 @@ Return to loop start.
 ## 5. Loop Exit Conditions
 
 Exit when any of the following:
-- All target tasks reach ✅ LGTM
+- All target tasks reach ✅ `done` (ready to merge)
 - ⚠️ Undecidable problem occurs
 - Fatal error occurs
 
@@ -181,12 +156,12 @@ Exit when any of the following:
 ```
 ## Auto Mode Complete
 
-### ✅ LGTM (Ready to merge)
+### ✅ Done (Ready to merge)
 - #101: feat: add login button
 - #103: fix: validation error
 
 ### ⚠️ Needs Attention
-- #102: needs_input with undecidable request → manual review required
+- #102: in_progress with undecidable request → manual review required
 - #105: error status → session terminated unexpectedly
 
 ### 📊 Statistics

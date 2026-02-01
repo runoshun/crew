@@ -27,7 +27,7 @@ func newReviewCommand(c *app.Container) *cobra.Command {
 The reviewer analyzes the diff and provides feedback on code quality,
 correctness, and adherence to best practices.
 
-The review runs synchronously and prints the result.
+The review runs synchronously via an external tool and does not change task status.
 
 The review result is saved as a comment with author "reviewer".
 

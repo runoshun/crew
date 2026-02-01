@@ -44,7 +44,7 @@ func NewStopTask(
 // 1. Terminating the tmux session
 // 2. Deleting the task script
 // 3. Clearing agent info (work sessions only)
-// 4. Updating status to stopped (if session exists)
+// 4. Updating status to error (if session exists)
 func (uc *StopTask) Execute(_ context.Context, in StopTaskInput) (*StopTaskOutput, error) {
 	// Get the task
 	task, err := shared.GetTask(uc.tasks, in.TaskID)
