@@ -372,7 +372,7 @@ func newACPAttachCommand(c *app.Container) *cobra.Command {
 		Long: `Attach to a running tmux session for an ACP task.
 
 This replaces the current process with the tmux session.
-Use Ctrl+G to detach from the session (configured in .crew/tmux.conf).
+Use your configured tmux detach key to leave the session (see .crew/tmux.conf if available).
 
 Examples:
   crew acp attach 1`,
@@ -436,7 +436,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 0, "Number of lines to display (default: 30)")
+	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 0, fmt.Sprintf("Number of lines to display (default: %d)", usecase.DefaultPeekLines))
 	cmd.Flags().BoolVarP(&opts.escape, "escape", "e", false, "Include ANSI escape sequences (colors)")
 
 	return cmd
