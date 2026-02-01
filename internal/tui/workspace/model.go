@@ -42,7 +42,6 @@ type Model struct {
 
 	// Repo models
 	models     map[string]*tui.Model
-	containers map[string]*app.Container
 	activeRepo string
 
 	// State
@@ -80,7 +79,6 @@ func New() *Model {
 	return &Model{
 		store:       store,
 		models:      make(map[string]*tui.Model),
-		containers:  make(map[string]*app.Container),
 		activeRepo:  "",
 		repos:       nil,
 		repoInfos:   make(map[string]domain.WorkspaceRepoInfo),
@@ -228,8 +226,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.Err
 		} else {
 			delete(m.models, msg.Path)
-			delete(m.containers, msg.Path)
 			delete(m.repoInfos, msg.Path)
+			if msg.Path == m.activeRepo {
+				m.activeRepo = ""
+				m.leftFocused = true
+			}
 		}
 		m.mode = ModeNormal
 		if m.cursor >= len(m.repos)-1 && m.cursor > 0 {
@@ -243,14 +244,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tui.MsgTick:
 		return m.forwardToActiveModel(msg)
-
-	case MsgRepoExited:
-		// Returned from repo TUI, show error if any and reload repos
-		if msg.Err != nil {
-			m.err = fmt.Errorf("crew tui failed: %w", msg.Err)
-		}
-		m.loading = true
-		return m, m.loadRepos()
 
 	case MsgTick:
 		// Periodic refresh (could add auto-refresh here)
@@ -458,7 +451,6 @@ func (m *Model) pruneRepoState() {
 	if len(m.repos) == 0 {
 		m.repoInfos = make(map[string]domain.WorkspaceRepoInfo)
 		m.models = make(map[string]*tui.Model)
-		m.containers = make(map[string]*app.Container)
 		return
 	}
 	valid := make(map[string]struct{}, len(m.repos))
@@ -473,11 +465,6 @@ func (m *Model) pruneRepoState() {
 	for path := range m.models {
 		if _, ok := valid[path]; !ok {
 			delete(m.models, path)
-		}
-	}
-	for path := range m.containers {
-		if _, ok := valid[path]; !ok {
-			delete(m.containers, path)
 		}
 	}
 }
@@ -501,7 +488,6 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 		}
 		model := tui.New(container)
 		m.models[m.activeRepo] = model
-		m.containers[m.activeRepo] = container
 		initCmd := model.Init()
 		sizeCmd := m.updateModelSize(m.activeRepo)
 		return tea.Batch(initCmd, sizeCmd)
