@@ -14,6 +14,9 @@ var workflowManagerTmpl string
 //go:embed workflow_worker.md
 var workflowWorkerTmpl string
 
+//go:embed workflow_reviewer.md
+var workflowReviewerTmpl string
+
 //go:embed workflow_manager_onboarding.md
 var workflowManagerOnboardingTmpl string
 
@@ -56,6 +59,14 @@ func RenderWorkerHelp(cfg *Config) (string, []string, error) {
 		file:    cfg.Help.WorkerFile,
 		name:    "help.worker",
 		builtin: workflowWorkerTmpl,
+	}, nil)
+}
+
+// RenderReviewerHelp renders the reviewer help.
+func RenderReviewerHelp(cfg *Config) (string, []string, error) {
+	return renderHelpTemplate(helpTemplateConfig{
+		name:    "help.reviewer",
+		builtin: workflowReviewerTmpl,
 	}, nil)
 }
 

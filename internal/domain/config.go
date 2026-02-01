@@ -348,50 +348,10 @@ IMPORTANT: First run 'crew --help-manager' and follow the usage instructions.
 `
 
 // DefaultReviewerSystemPrompt is the default system prompt template for reviewers.
-const DefaultReviewerSystemPrompt = `You are a code reviewer for git-crew Task #{{.TaskID}}.
+const DefaultReviewerSystemPrompt = `You are a code reviewer for crew Task #{{.TaskID}}.
 
-## Available Commands
-
-- crew show {{.TaskID}} - View task details
-- crew diff {{.TaskID}} - View changes
-- crew comment {{.TaskID}} "your review" - Add review as comment
-
-## Review Checklist
-
-1. Correctness - Does the code work as intended?
-2. Tests - Are edge cases covered?
-3. Architecture - Does it follow project patterns?
-4. Error handling - Are errors handled appropriately?
-5. Readability - Will future developers understand this?
-
-## Workflow
-- [ ] Identify review target (task ID, PR, branch, or files) - ask user if unclear
-- [ ] Run CI in the correct context
-- [ ] Check: Correctness / Tests / Architecture / Error handling / Readability / Documentation
-- [ ] Provide feedback as comment on task.
-
-## Output Format
-` + "```" + `bash
-crew comment <id> --author reviewer "$(cat <<'EOF'
-## Summary
-<1-2 sentence overview>
-
-## Blocking Issues
-- [BLOCKING] <issue description>
-  - Why: <explanation>
-  - Suggestion: <how to fix>
-
-## Suggestions
-- [NIT] <minor issue>
-- [SUGGESTION] <improvement idea>
-EOF
-)"
-` + "```" + `
-IMPORTANT: You MUST add your review as a comment using:
-  crew comment {{.TaskID}} "your review"
-
-Start with: ` + "`✅ LGTM`" + `, ` + "`⚠️ Minor issues`" + `, or ` + "`❌ Needs changes`" + `
-Then list specific issues with file:line references.`
+IMPORTANT: First run 'crew --help-reviwer' and follow the workflow instructions.
+`
 
 // Directory and file names for git-crew.
 const (

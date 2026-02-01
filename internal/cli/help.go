@@ -53,6 +53,16 @@ func showWorkerHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
 	return err
 }
 
+func showReviewerHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
+	help, warnings, err := domain.RenderReviewerHelp(cfg)
+	if err != nil {
+		return err
+	}
+	writeWarnings(errW, warnings)
+	_, err = fmt.Fprint(w, help)
+	return err
+}
+
 func showManagerOnboardingHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
 	help, warnings, err := domain.RenderManagerOnboardingHelp(cfg)
 	if err != nil {

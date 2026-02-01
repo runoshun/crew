@@ -27,6 +27,7 @@ var launchTUIFunc = launchTUI
 // It receives the container for dependency injection and version for display.
 func NewRootCommand(c *app.Container, version string) *cobra.Command {
 	var fullWorker bool
+	var fullReviewer bool
 	var fullManager bool
 	var managerOnboarding bool
 	var managerAuto bool
@@ -39,7 +40,7 @@ It combines git worktree + tmux to achieve a model where
 1 task = 1 worktree = 1 AI session, enabling fully parallel
 and isolated task execution.
 
-Use --help-worker or --help-manager for role-specific detailed help.
+Use --help-worker, --help-reviwer, or --help-manager for role-specific detailed help.
 Use --help-manager-onboarding to see the onboarding guide for new projects.
 Use --help-manager-auto to see the auto mode guide.`,
 		Version: version,
@@ -75,6 +76,9 @@ Use --help-manager-auto to see the auto mode guide.`,
 			if fullWorker {
 				flagCount++
 			}
+			if fullReviewer {
+				flagCount++
+			}
 			if fullManager {
 				flagCount++
 			}
@@ -96,6 +100,9 @@ Use --help-manager-auto to see the auto mode guide.`,
 			if fullWorker {
 				return showWorkerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
 			}
+			if fullReviewer {
+				return showReviewerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
+			}
 			if fullManager {
 				return showManagerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
 			}
@@ -112,6 +119,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 
 	// Add role-specific help flags
 	root.Flags().BoolVar(&fullWorker, "help-worker", false, "Show detailed help for worker agents")
+	root.Flags().BoolVar(&fullReviewer, "help-reviwer", false, "Show detailed help for reviewer agents")
 	root.Flags().BoolVar(&fullManager, "help-manager", false, "Show detailed help for manager agents")
 	root.Flags().BoolVar(&managerOnboarding, "help-manager-onboarding", false, "Show onboarding guide for setting up crew")
 	root.Flags().BoolVar(&managerAuto, "help-manager-auto", false, "Show auto mode guide for manager agents")
