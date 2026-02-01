@@ -238,6 +238,7 @@ func newACPRunTest(t *testing.T, mode string, ipc domain.ACPIPC) (*ACPRun, *test
 		testutil.NewMockScriptRunner(),
 		stubACPIPCFactory{ipc: ipc},
 		stateStore,
+		stubACPEventWriterFactory{},
 		clock,
 		t.TempDir(),
 		io.Discard,
@@ -264,6 +265,22 @@ func (s *stubACPIPC) Next(ctx context.Context) (domain.ACPCommand, error) {
 }
 
 func (s *stubACPIPC) Send(context.Context, domain.ACPCommand) error {
+	return nil
+}
+
+type stubACPEventWriterFactory struct{}
+
+func (f stubACPEventWriterFactory) ForTask(string, int) (domain.ACPEventWriter, error) {
+	return stubACPEventWriter{}, nil
+}
+
+type stubACPEventWriter struct{}
+
+func (w stubACPEventWriter) Write(context.Context, domain.ACPEvent) error {
+	return nil
+}
+
+func (w stubACPEventWriter) Close() error {
 	return nil
 }
 

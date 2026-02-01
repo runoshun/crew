@@ -50,19 +50,20 @@ func newConfig(gitClient *git.Client) Config {
 // It holds all port implementations and provides factory methods for use cases.
 type Container struct {
 	// Ports (interfaces bound to implementations)
-	Tasks            domain.TaskRepository
-	StoreInitializer domain.StoreInitializer
-	Clock            domain.Clock
-	Git              domain.Git
-	Worktrees        domain.WorktreeManager
-	Sessions         domain.SessionManager
-	ConfigLoader     domain.ConfigLoader
-	ConfigManager    domain.ConfigManager
-	Logger           domain.Logger
-	Runner           domain.ScriptRunner
-	Executor         domain.CommandExecutor
-	ACPIPCFactory    domain.ACPIPCFactory
-	ACPStateStore    domain.ACPStateStore
+	Tasks                 domain.TaskRepository
+	StoreInitializer      domain.StoreInitializer
+	Clock                 domain.Clock
+	Git                   domain.Git
+	Worktrees             domain.WorktreeManager
+	Sessions              domain.SessionManager
+	ConfigLoader          domain.ConfigLoader
+	ConfigManager         domain.ConfigManager
+	Logger                domain.Logger
+	Runner                domain.ScriptRunner
+	Executor              domain.CommandExecutor
+	ACPIPCFactory         domain.ACPIPCFactory
+	ACPStateStore         domain.ACPStateStore
+	ACPEventWriterFactory domain.ACPEventWriterFactory
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 
 	// Configuration
@@ -118,21 +119,25 @@ func New(dir string) (*Container, error) {
 	acpIPCFactory := acpinfra.NewFileIPCFactory(cfg.CrewDir, logger)
 	acpStateStore := acpinfra.NewFileStateStore(cfg.CrewDir)
 
+	// Create ACP event writer factory
+	acpEventWriterFactory := acpinfra.NewFileEventWriterFactory(cfg.CrewDir)
+
 	return &Container{
-		Tasks:            taskRepo,
-		StoreInitializer: storeInit,
-		Clock:            domain.RealClock{},
-		Git:              gitClient,
-		Worktrees:        worktreeClient,
-		Sessions:         sessionClient,
-		ConfigLoader:     configLoader,
-		ConfigManager:    configManager,
-		Logger:           logger,
-		Runner:           scriptRunner,
-		Executor:         commandExecutor,
-		ACPIPCFactory:    acpIPCFactory,
-		ACPStateStore:    acpStateStore,
-		Config:           cfg,
+		Tasks:                 taskRepo,
+		StoreInitializer:      storeInit,
+		Clock:                 domain.RealClock{},
+		Git:                   gitClient,
+		Worktrees:             worktreeClient,
+		Sessions:              sessionClient,
+		ConfigLoader:          configLoader,
+		ConfigManager:         configManager,
+		Logger:                logger,
+		Runner:                scriptRunner,
+		Executor:              commandExecutor,
+		ACPIPCFactory:         acpIPCFactory,
+		ACPStateStore:         acpStateStore,
+		ACPEventWriterFactory: acpEventWriterFactory,
+		Config:                cfg,
 	}, nil
 }
 
@@ -308,10 +313,23 @@ func (c *Container) ACPRunUseCase(stdout, stderr io.Writer) *usecase.ACPRun {
 		c.Runner,
 		c.ACPIPCFactory,
 		c.ACPStateStore,
+		c.ACPEventWriterFactory,
 		c.Clock,
 		c.Config.RepoRoot,
 		stdout,
 		stderr,
+	)
+}
+
+// ACPLogUseCase returns a new ACPLog use case.
+func (c *Container) ACPLogUseCase() *usecase.ACPLog {
+	return usecase.NewACPLog(
+		c.Tasks,
+		c.ConfigLoader,
+		c.Git,
+		func(namespace string, taskID int) domain.ACPEventReader {
+			return acpinfra.NewFileEventReader(c.Config.CrewDir, namespace, taskID)
+		},
 	)
 }
 

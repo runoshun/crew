@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	acpsdk "github.com/coder/acp-go-sdk"
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -33,17 +35,18 @@ type ACPRunOutput struct {
 
 // ACPRun is the use case for running an ACP client session.
 type ACPRun struct {
-	tasks        domain.TaskRepository
-	worktrees    domain.WorktreeManager
-	configLoader domain.ConfigLoader
-	git          domain.Git
-	runner       domain.ScriptRunner
-	ipcFactory   domain.ACPIPCFactory
-	acpStates    domain.ACPStateStore
-	clock        domain.Clock
-	stdout       io.Writer
-	stderr       io.Writer
-	repoRoot     string
+	tasks              domain.TaskRepository
+	worktrees          domain.WorktreeManager
+	configLoader       domain.ConfigLoader
+	git                domain.Git
+	runner             domain.ScriptRunner
+	ipcFactory         domain.ACPIPCFactory
+	acpStates          domain.ACPStateStore
+	eventWriterFactory domain.ACPEventWriterFactory
+	clock              domain.Clock
+	stdout             io.Writer
+	stderr             io.Writer
+	repoRoot           string
 }
 
 // NewACPRun creates a new ACPRun use case.
@@ -55,23 +58,25 @@ func NewACPRun(
 	runner domain.ScriptRunner,
 	ipcFactory domain.ACPIPCFactory,
 	acpStates domain.ACPStateStore,
+	eventWriterFactory domain.ACPEventWriterFactory,
 	clock domain.Clock,
 	repoRoot string,
 	stdout io.Writer,
 	stderr io.Writer,
 ) *ACPRun {
 	return &ACPRun{
-		tasks:        tasks,
-		worktrees:    worktrees,
-		configLoader: configLoader,
-		git:          git,
-		runner:       runner,
-		ipcFactory:   ipcFactory,
-		acpStates:    acpStates,
-		clock:        clock,
-		repoRoot:     repoRoot,
-		stdout:       stdout,
-		stderr:       stderr,
+		tasks:              tasks,
+		worktrees:          worktrees,
+		configLoader:       configLoader,
+		git:                git,
+		runner:             runner,
+		ipcFactory:         ipcFactory,
+		acpStates:          acpStates,
+		eventWriterFactory: eventWriterFactory,
+		clock:              clock,
+		repoRoot:           repoRoot,
+		stdout:             stdout,
+		stderr:             stderr,
 	}
 }
 
@@ -208,9 +213,22 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 	router := newACPCommandRouter(ipc, permissionCh, promptCh, cancelCh, stopCh)
 	routerErrCh := router.Start(cmdCtx)
 
+	// Create event writer for logging
+	client.sessionID = string(session.SessionId)
+	if uc.eventWriterFactory != nil {
+		eventWriter, err := uc.eventWriterFactory.ForTask(namespace, task.ID)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("create event writer: %w", err)
+		}
+		defer func() { _ = eventWriter.Close() }()
+		client.eventWriter = eventWriter
+	}
+
 	for {
 		select {
 		case cmd := <-promptCh:
+			client.writePromptSentEvent(cmdCtx, cmd)
 			if err := uc.handlePrompt(cmdCtx, conn, session.SessionId, cmd, namespace, task.ID); err != nil {
 				uc.writeError("prompt", err)
 			}
@@ -482,12 +500,14 @@ func (r *acpCommandRouter) Start(ctx context.Context) <-chan error {
 }
 
 type acpRunClient struct {
-	permissionCh <-chan domain.ACPCommand
-	stopCh       <-chan struct{}
+	eventWriter  domain.ACPEventWriter
 	stdout       io.Writer
 	stderr       io.Writer
 	stateStore   domain.ACPStateStore
+	permissionCh <-chan domain.ACPCommand
+	stopCh       <-chan struct{}
 	stateNS      string
+	sessionID    string
 	taskID       int
 }
 
@@ -496,6 +516,8 @@ var _ acpsdk.Client = (*acpRunClient)(nil)
 func (c *acpRunClient) RequestPermission(ctx context.Context, params acpsdk.RequestPermissionRequest) (acpsdk.RequestPermissionResponse, error) {
 	c.setExecutionSubstate(ctx, domain.ACPExecutionAwaitingPermission)
 	c.writePermissionRequest(params)
+	c.writeEvent(ctx, domain.ACPEventRequestPermission, params)
+
 	options := make(map[string]struct{}, len(params.Options))
 	for _, opt := range params.Options {
 		options[string(opt.OptionId)] = struct{}{}
@@ -509,22 +531,27 @@ func (c *acpRunClient) RequestPermission(ctx context.Context, params acpsdk.Requ
 				continue
 			}
 			c.setExecutionSubstate(ctx, domain.ACPExecutionRunning)
-			return acpsdk.RequestPermissionResponse{
+			resp := acpsdk.RequestPermissionResponse{
 				Outcome: acpsdk.RequestPermissionOutcome{
 					Selected: &acpsdk.RequestPermissionOutcomeSelected{
 						OptionId: acpsdk.PermissionOptionId(cmd.OptionID),
 						Outcome:  "selected",
 					},
 				},
-			}, nil
+			}
+			c.writeEvent(ctx, domain.ACPEventPermissionResponse, resp)
+			return resp, nil
 		case <-c.stopCh:
-			return cancelPermissionResponse(), nil
+			resp := cancelPermissionResponse()
+			c.writeEvent(ctx, domain.ACPEventPermissionResponse, resp)
+			return resp, nil
 		case <-ctx.Done():
-			return cancelPermissionResponse(), nil
+			resp := cancelPermissionResponse()
+			c.writeEvent(ctx, domain.ACPEventPermissionResponse, resp)
+			return resp, nil
 		}
 	}
 }
-
 func (c *acpRunClient) setExecutionSubstate(ctx context.Context, substate domain.ACPExecutionSubstate) {
 	if c.stateStore == nil {
 		return
@@ -534,7 +561,9 @@ func (c *acpRunClient) setExecutionSubstate(ctx context.Context, substate domain
 	}
 }
 
-func (c *acpRunClient) SessionUpdate(_ context.Context, params acpsdk.SessionNotification) error {
+func (c *acpRunClient) SessionUpdate(ctx context.Context, params acpsdk.SessionNotification) error {
+	// Write event based on update type
+	c.writeSessionUpdateEvent(ctx, params)
 	if c.stdout == nil {
 		return nil
 	}
@@ -543,6 +572,35 @@ func (c *acpRunClient) SessionUpdate(_ context.Context, params acpsdk.SessionNot
 		_, _ = fmt.Fprint(c.stdout, update.AgentMessageChunk.Content.Text.Text)
 	}
 	return nil
+}
+
+func (c *acpRunClient) writeSessionUpdateEvent(ctx context.Context, params acpsdk.SessionNotification) {
+	update := params.Update
+
+	// Determine event type based on update content
+	var eventType domain.ACPEventType
+	switch {
+	case update.AgentMessageChunk != nil:
+		eventType = domain.ACPEventAgentMessageChunk
+	case update.AgentThoughtChunk != nil:
+		eventType = domain.ACPEventAgentThoughtChunk
+	case update.ToolCall != nil:
+		eventType = domain.ACPEventToolCall
+	case update.ToolCallUpdate != nil:
+		eventType = domain.ACPEventToolCallUpdate
+	case update.UserMessageChunk != nil:
+		eventType = domain.ACPEventUserMessageChunk
+	case update.Plan != nil:
+		eventType = domain.ACPEventPlan
+	case update.CurrentModeUpdate != nil:
+		eventType = domain.ACPEventCurrentModeUpdate
+	case update.AvailableCommandsUpdate != nil:
+		eventType = domain.ACPEventAvailableCommands
+	default:
+		eventType = domain.ACPEventSessionUpdate
+	}
+
+	c.writeEvent(ctx, eventType, params)
 }
 
 func (c *acpRunClient) WriteTextFile(_ context.Context, _ acpsdk.WriteTextFileRequest) (acpsdk.WriteTextFileResponse, error) {
@@ -592,6 +650,42 @@ func (c *acpRunClient) writeWarning(msg string) {
 		return
 	}
 	_, _ = fmt.Fprintf(c.stderr, "[acp] %s\n", msg)
+}
+
+func (c *acpRunClient) writeEvent(ctx context.Context, eventType domain.ACPEventType, payload any) {
+	if c.eventWriter == nil {
+		return
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		if c.stderr != nil {
+			_, _ = fmt.Fprintf(c.stderr, "[acp:event] marshal error: %v\n", err)
+		}
+		return
+	}
+
+	event := domain.ACPEvent{
+		Timestamp: time.Now().UTC(),
+		Type:      eventType,
+		SessionID: c.sessionID,
+		Payload:   payloadBytes,
+	}
+
+	if err := c.eventWriter.Write(ctx, event); err != nil {
+		if c.stderr != nil {
+			_, _ = fmt.Fprintf(c.stderr, "[acp:event] write error: %v\n", err)
+		}
+	}
+}
+
+// promptSentPayload is the payload for ACPEventPromptSent events.
+type promptSentPayload struct {
+	Text string `json:"text"`
+}
+
+func (c *acpRunClient) writePromptSentEvent(ctx context.Context, cmd domain.ACPCommand) {
+	c.writeEvent(ctx, domain.ACPEventPromptSent, promptSentPayload{Text: cmd.Text})
 }
 
 func cancelPermissionResponse() acpsdk.RequestPermissionResponse {

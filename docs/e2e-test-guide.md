@@ -60,9 +60,8 @@ Verify that each agent transitions status correctly.
 
 **Expected Behavior:**
 - On start: `todo` → `in_progress`
-- On idle/permission request: `in_progress` → `needs_input`
-- After user input: `needs_input` → `in_progress`
-- After `crew complete`: `in_progress` → `for_review`
+- After completion: `in_progress` → `done`
+- After merge: `done` → `merged`
 
 **Steps:**
 
@@ -76,46 +75,29 @@ crew start <id> cc-medium
 # 3. Check status (should be in_progress)
 crew list | grep <id>
 
-# 4. Wait for agent to become idle
-sleep 30
+# 4. Run review(s) until requirement is satisfied
+crew review <id>
 
-# 5. Check status (should be needs_input)
-crew list | grep <id>
+# 5. Complete task (should move to done)
+crew complete <id>
 
-# 6. Send some input
-crew send <id> "echo test"
-crew send <id> Enter
+# 6. Merge task (should move to merged)
+echo "y" | crew merge <id>
 
-# 7. Check status (should return to in_progress)
-sleep 5
-crew list | grep <id>
-
-# 8. Send completion instruction
-crew send <id> "crew complete <id>"
-crew send <id> Enter
-# Allow permission
-crew send <id> y
-crew send <id> Enter
-
-# 9. Check status (should be for_review)
-sleep 10
-crew list | grep <id>
-
-# 10. Cleanup
-crew close <id>
+# 7. Check status (should be merged)
+crew show <id>
 ```
 
 **Verification Points:**
 - [ ] Transitions to `in_progress` after start
-- [ ] Transitions to `needs_input` when idle
-- [ ] Returns to `in_progress` after input
-- [ ] Transitions to `for_review` after complete
+- [ ] Transitions to `done` after complete
+- [ ] Transitions to `merged` after merge
 
 ---
 
 ### 1.2 OpenCode (oc-medium-ag) Status Transitions
 
-**Expected Behavior:** Same as Claude
+**Expected Behavior:** Same as Claude (todo → in_progress → done → merged)
 
 **Steps:**
 
@@ -126,22 +108,21 @@ crew new --title "E2E: OpenCode status transition test"
 # 2. Start task
 crew start <id> oc-medium-ag
 
-# 3-9. Follow the same steps as Claude
-
-# 10. Cleanup
-crew close <id>
+# 3-7. Follow the same steps as Claude
 ```
 
 **Verification Points:**
 - [ ] TypeScript plugin loads correctly
-- [ ] Status transitions on each event
+- [ ] Status transitions on each step
 
 ---
 
 ### 1.3 Codex Status Transitions
 
 **Expected Behavior:**
-- On `agent-turn-complete` event: `in_progress` → `needs_input`
+- On start: `todo` → `in_progress`
+- After completion: `in_progress` → `done`
+- After merge: `done` → `merged`
 
 **Steps:**
 
@@ -152,27 +133,29 @@ crew new --title "E2E: Codex status transition test"
 # 2. Start task
 crew start <id> codex
 
-# 3. Check status
+# 3. Check status (should be in_progress)
 crew list | grep <id>
 
-# 4. Wait for agent to complete turn (prompt display, etc.)
-# codex only has notify for agent-turn-complete,
-# so idle detection is limited
+# 4. Run review(s) until requirement is satisfied
+crew review <id>
 
-# 5. Check status
-crew list | grep <id>
+# 5. Complete task (should move to done)
+crew complete <id>
 
-# 6. Cleanup
-crew close <id>
+# 6. Merge task (should move to merged)
+echo "y" | crew merge <id>
+
+# 7. Check status (should be merged)
+crew show <id>
 ```
 
 **Verification Points:**
 - [ ] notify configuration is parsed correctly
-- [ ] Status transitions on turn completion
+- [ ] Status transitions on completion and merge
 
 **Known Limitations:**
 - codex notify only supports `agent-turn-complete`
-- Immediate idle state detection is not possible
+- Status does not change mid-turn; it remains `in_progress` until completion
 
 ---
 
@@ -235,10 +218,10 @@ crew
 **Steps:**
 
 ```bash
-# 1. Start task (in needs_input state)
+# 1. Start task (in_progress)
 crew start <id> cc-small
 
-# 2. Wait for needs_input
+# 2. Wait for input request (status stays in_progress)
 sleep 30
 
 # 3. Send keys
@@ -267,20 +250,52 @@ crew new --title "E2E: Completion flow test" --body "Please run echo hello"
 # 2. Start
 crew start <id> cc-small
 
-# 3. Wait for completion (or manually run crew complete)
+# 3. Set min_reviews=2 for this test (restore after test)
+backup_path="$(mktemp /tmp/crew-config.XXXXXX.toml)"
+tmp_config="$(mktemp /tmp/crew-config.edit.XXXXXX.toml)"
+cp .crew/config.toml "$backup_path"
+awk '
+BEGIN { in_complete = 0; inserted = 0 }
+/^\[complete\]/ { in_complete = 1; print; next }
+in_complete && /^\[/ {
+  if (!inserted) { print "min_reviews = 2"; inserted = 1 }
+  in_complete = 0
+}
+in_complete && /^min_reviews[[:space:]]*=/ {
+  print "min_reviews = 2"; inserted = 1; next
+}
+{ print }
+END {
+  if (in_complete && !inserted) { print "min_reviews = 2" }
+  if (!inserted) { print ""; print "[complete]"; print "min_reviews = 2" }
+}
+' .crew/config.toml > "$tmp_config"
+mv "$tmp_config" .crew/config.toml
 
-# 4. Review
+# 4. Review (repeat until min_reviews is satisfied)
+# Note: only successful (exit code 0) reviews increment the count
 crew review <id>
 
-# 5. Merge
+# 5. Complete (should fail until min_reviews is satisfied)
+crew complete <id>
+
+# 6. Repeat review/complete until it succeeds
+crew review <id>
+crew complete <id>
+
+# 7. Merge
 echo "y" | crew merge <id>
 
-# 6. Verify
-crew show <id>  # status: closed
+# 8. Verify
+crew show <id>  # status: merged
+
+# 9. Restore config
+mv "$backup_path" .crew/config.toml
 ```
 
 **Verification Points:**
-- [ ] Transitions todo → in_progress → for_review → closed (via merge)
+- [ ] Transitions todo → in_progress → done → merged
+- [ ] `crew complete` fails until `min_reviews` is satisfied
 - [ ] worktree is deleted
 - [ ] Merged to main
 
@@ -289,10 +304,9 @@ crew show <id>  # status: closed
 ### 3.2 Review & Revision Flow
 
 ```bash
-# 1. Create task, start, complete
+# 1. Create task and start
 crew new --title "E2E: Review revision flow test"
 crew start <id> cc-small
-# ... proceed to for_review
 
 # 2. Review (request changes)
 crew review <id>
@@ -300,19 +314,21 @@ crew review <id>
 # 3. Send comment
 crew comment <id> -R "Please fix: XXX"
 
-# 4. Check status (should return to in_progress)
+# 4. Check status (should remain in_progress)
 crew list | grep <id>
 
-# 5. Proceed to for_review again
-
-# 6. Re-review and merge
+# 5. Re-review after fixes
 crew review <id>
+
+# 6. Complete and merge
+crew complete <id>
 echo "y" | crew merge <id>
 ```
 
 **Verification Points:**
-- [ ] comment -R returns to in_progress
+- [ ] comment -R keeps status as in_progress
 - [ ] Agent reads comment and makes fixes
+- [ ] Review count increments and completion succeeds after requirements are met
 
 ---
 
@@ -372,9 +388,9 @@ crew poll <id> --expect todo --command 'echo "Change detected!"' &
 ## Checklist
 
 ### Status Transitions
-- [ ] Claude: in_progress → needs_input → in_progress → for_review
+- [ ] Claude: todo → in_progress → done → merged
 - [ ] OpenCode: Same as above
-- [ ] Codex: Status change via notify
+- [ ] Codex: Same as above
 
 ### TUI
 - [ ] Basic operations (j/k/Enter/q)
@@ -382,8 +398,9 @@ crew poll <id> --expect todo --command 'echo "Change detected!"' &
 - [ ] send
 
 ### Workflow
-- [ ] Completion flow (todo → closed)
+- [ ] Completion flow (todo → done → merged)
 - [ ] Review revision flow
+- [ ] `crew complete` blocked until `min_reviews` is satisfied
 
 ### Error Cases
 - [ ] Access to non-existent resources

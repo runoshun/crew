@@ -463,7 +463,7 @@ func newStopCommand(c *app.Container) *cobra.Command {
 
 This terminates the tmux session and cleans up generated scripts.
 When stopping a work session, it clears agent info and updates the
-status to 'stopped'.
+status to 'error'.
 
 The worktree is NOT deleted (use 'close' to also delete the worktree).
 

@@ -576,7 +576,7 @@ func TestEditTask_Execute_StatusTransitions(t *testing.T) {
 	}{
 		// Valid transitions
 		{"todo to in_progress", domain.StatusTodo, domain.StatusInProgress, false},
-		{"in_progress to for_review", domain.StatusInProgress, domain.StatusDone, false},
+		{"in_progress to done", domain.StatusInProgress, domain.StatusDone, false},
 		{"done to closed", domain.StatusDone, domain.StatusClosed, false},
 		{"any to closed", domain.StatusTodo, domain.StatusClosed, false},
 		// Same status (no change)

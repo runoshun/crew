@@ -19,6 +19,31 @@ This design enables:
 
 ---
 
+### 1.1 Task Status & Review Flow
+
+Task statuses are normalized to the following lifecycle:
+
+| Status | Meaning |
+|--------|---------|
+| `todo` | Created, awaiting start |
+| `in_progress` | Work in progress (includes input waiting and paused states) |
+| `done` | Implementation complete, awaiting merge or close |
+| `merged` | Merged to base branch (terminal) |
+| `closed` | Closed without merge (terminal) |
+| `error` | Session terminated unexpectedly or manually stopped (restartable) |
+
+Main flow:
+
+```
+todo -> in_progress -> done -> merged
+                 \-> closed
+error -> in_progress
+```
+
+Reviews run synchronously as an external tool and do not change task status. `crew review` increments the review count on success; it does not change status. `crew complete` requires the review count to satisfy `min_reviews` (unless `skip_review` is enabled) and then transitions the task to `done`.
+
+---
+
 ## 2. Core Technologies
 
 ### 2.1 Git Worktree
