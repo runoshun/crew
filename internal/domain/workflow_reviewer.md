@@ -17,6 +17,9 @@ crew show <id>
 
 # Show task diff
 crew diff <id>
+
+# Add a review comment
+crew comment <id> "<message>"
 ```
 
 ---

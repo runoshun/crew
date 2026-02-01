@@ -2,9 +2,11 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,7 +118,7 @@ func TestACPRunStopResetsSubstate(t *testing.T) {
 		},
 	}
 
-	uc, repo, stateStore, task := newACPRunTest(t, "hold", ipc)
+	uc, repo, stateStore, task := newACPRunTest(t, "hold", ipc, stubACPEventWriterFactory{})
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -126,6 +128,39 @@ func TestACPRunStopResetsSubstate(t *testing.T) {
 	require.Len(t, stateStore.calls, 2)
 	require.Equal(t, domain.ACPExecutionRunning, stateStore.calls[0])
 	require.Equal(t, domain.ACPExecutionIdle, stateStore.calls[1])
+}
+
+func TestACPRunStopEmitsSessionEndEvent(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	ipc := &stubACPIPC{
+		next: func(ctx context.Context) (domain.ACPCommand, error) {
+			if called {
+				<-ctx.Done()
+				return domain.ACPCommand{}, ctx.Err()
+			}
+			called = true
+			return domain.ACPCommand{Type: domain.ACPCommandStop}, nil
+		},
+	}
+
+	writer := &captureACPEventWriter{}
+	uc, _, _, task := newACPRunTest(t, "hold", ipc, captureACPEventWriterFactory{writer: writer})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := uc.Execute(ctx, ACPRunInput{Agent: "helper", TaskID: task.ID})
+	require.NoError(t, err)
+
+	events := writer.Events()
+	require.NotEmpty(t, events)
+	last := events[len(events)-1]
+	require.Equal(t, domain.ACPEventSessionEnd, last.Type)
+
+	var payload sessionEndPayload
+	require.NoError(t, json.Unmarshal(last.Payload, &payload))
+	require.Equal(t, "stop", payload.Reason)
 }
 
 func TestACPRunNormalExitResetsSubstate(t *testing.T) {
@@ -138,7 +173,7 @@ func TestACPRunNormalExitResetsSubstate(t *testing.T) {
 		},
 	}
 
-	uc, repo, stateStore, task := newACPRunTest(t, "exit_success", ipc)
+	uc, repo, stateStore, task := newACPRunTest(t, "exit_success", ipc, stubACPEventWriterFactory{})
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -160,7 +195,7 @@ func TestACPRunProcessErrorMarksErrorAndIdle(t *testing.T) {
 		},
 	}
 
-	uc, repo, stateStore, task := newACPRunTest(t, "exit_error", ipc)
+	uc, repo, stateStore, task := newACPRunTest(t, "exit_error", ipc, stubACPEventWriterFactory{})
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -180,7 +215,7 @@ func TestACPRunRouterErrorMarksErrorAndIdle(t *testing.T) {
 		},
 	}
 
-	uc, repo, stateStore, task := newACPRunTest(t, "hold", ipc)
+	uc, repo, stateStore, task := newACPRunTest(t, "hold", ipc, stubACPEventWriterFactory{})
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -191,8 +226,11 @@ func TestACPRunRouterErrorMarksErrorAndIdle(t *testing.T) {
 	require.Equal(t, domain.ACPExecutionIdle, stateStore.calls[len(stateStore.calls)-1])
 }
 
-func newACPRunTest(t *testing.T, mode string, ipc domain.ACPIPC) (*ACPRun, *testutil.MockTaskRepository, *acpRunStateStore, *domain.Task) {
+func newACPRunTest(t *testing.T, mode string, ipc domain.ACPIPC, eventWriterFactory domain.ACPEventWriterFactory) (*ACPRun, *testutil.MockTaskRepository, *acpRunStateStore, *domain.Task) {
 	t.Helper()
+	if eventWriterFactory == nil {
+		eventWriterFactory = stubACPEventWriterFactory{}
+	}
 
 	repo := testutil.NewMockTaskRepository()
 	task := &domain.Task{
@@ -238,7 +276,7 @@ func newACPRunTest(t *testing.T, mode string, ipc domain.ACPIPC) (*ACPRun, *test
 		testutil.NewMockScriptRunner(),
 		stubACPIPCFactory{ipc: ipc},
 		stateStore,
-		stubACPEventWriterFactory{},
+		eventWriterFactory,
 		clock,
 		t.TempDir(),
 		io.Discard,
@@ -282,6 +320,38 @@ func (w stubACPEventWriter) Write(context.Context, domain.ACPEvent) error {
 
 func (w stubACPEventWriter) Close() error {
 	return nil
+}
+
+type captureACPEventWriterFactory struct {
+	writer *captureACPEventWriter
+}
+
+func (f captureACPEventWriterFactory) ForTask(string, int) (domain.ACPEventWriter, error) {
+	return f.writer, nil
+}
+
+type captureACPEventWriter struct {
+	mu     sync.Mutex
+	events []domain.ACPEvent
+}
+
+func (w *captureACPEventWriter) Write(_ context.Context, event domain.ACPEvent) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.events = append(w.events, event)
+	return nil
+}
+
+func (w *captureACPEventWriter) Close() error {
+	return nil
+}
+
+func (w *captureACPEventWriter) Events() []domain.ACPEvent {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	out := make([]domain.ACPEvent, len(w.events))
+	copy(out, w.events)
+	return out
 }
 
 type acpTestAgent struct {
