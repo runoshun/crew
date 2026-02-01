@@ -315,6 +315,30 @@ func (c *Container) ACPRunUseCase(stdout, stderr io.Writer) *usecase.ACPRun {
 	)
 }
 
+// ACPStartUseCase returns a new ACPStart use case.
+func (c *Container) ACPStartUseCase() *usecase.ACPStart {
+	return usecase.NewACPStart(
+		c.Tasks,
+		c.Sessions,
+		c.Worktrees,
+		c.ConfigLoader,
+		c.Git,
+		c.Runner,
+		c.Config.CrewDir,
+		c.Config.RepoRoot,
+	)
+}
+
+// ACPAttachUseCase returns a new ACPAttach use case.
+func (c *Container) ACPAttachUseCase() *usecase.ACPAttach {
+	return usecase.NewACPAttach(c.Tasks, c.Sessions)
+}
+
+// ACPPeekUseCase returns a new ACPPeek use case.
+func (c *Container) ACPPeekUseCase() *usecase.ACPPeek {
+	return usecase.NewACPPeek(c.Tasks, c.Sessions)
+}
+
 // ACPLogUseCase returns a new ACPLog use case.
 func (c *Container) ACPLogUseCase() *usecase.ACPLog {
 	return usecase.NewACPLog(

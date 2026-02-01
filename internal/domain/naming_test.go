@@ -132,6 +132,26 @@ func TestSessionName(t *testing.T) {
 	}
 }
 
+func TestACPSessionName(t *testing.T) {
+	tests := []struct {
+		want   string
+		taskID int
+	}{
+		{taskID: 1, want: "crew-acp-1"},
+		{taskID: 42, want: "crew-acp-42"},
+		{taskID: 999, want: "crew-acp-999"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			got := ACPSessionName(tt.taskID)
+			if got != tt.want {
+				t.Errorf("ACPSessionName(%d) = %q, want %q", tt.taskID, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPathFunctions(t *testing.T) {
 	crewDir := "/repo/.crew"
 
@@ -140,6 +160,14 @@ func TestPathFunctions(t *testing.T) {
 		want := "/repo/.crew/scripts/task-1.sh"
 		if got != want {
 			t.Errorf("ScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("ACPScriptPath", func(t *testing.T) {
+		got := ACPScriptPath(crewDir, 2)
+		want := "/repo/.crew/scripts/acp-task-2.sh"
+		if got != want {
+			t.Errorf("ACPScriptPath(%q, 2) = %q, want %q", crewDir, got, want)
 		}
 	})
 
