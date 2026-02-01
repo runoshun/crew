@@ -230,6 +230,9 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 				continue
 			}
 			if err != nil {
+				if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
+					return nil, fmt.Errorf("acp router error: %w (update state: %v)", err, stateErr)
+				}
 				return nil, err
 			}
 		case err := <-procErrCh:
