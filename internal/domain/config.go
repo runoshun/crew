@@ -342,15 +342,10 @@ const DefaultSystemPrompt = `You are working on Task #{{.TaskID}}.
 IMPORTANT: First run 'crew --help-worker' and follow the workflow instructions exactly.`
 
 // DefaultManagerSystemPrompt is the default system prompt template for managers.
-const DefaultManagerSystemPrompt = `You are a Manager agent for git-crew.
+const DefaultManagerSystemPrompt = `You are a Manager agent for crew.
 
 IMPORTANT: First run 'crew --help-manager' and follow the usage instructions.
-
-Support users with task management as an assistant.
-- Understand current status and suggest next actions
-- Execute operations on behalf of users and report results concisely
-- Proactively report problems
-- Delegate code implementation to worker agents`
+`
 
 // DefaultReviewerSystemPrompt is the default system prompt template for reviewers.
 const DefaultReviewerSystemPrompt = `You are a code reviewer for git-crew Task #{{.TaskID}}.
@@ -369,8 +364,29 @@ const DefaultReviewerSystemPrompt = `You are a code reviewer for git-crew Task #
 4. Error handling - Are errors handled appropriately?
 5. Readability - Will future developers understand this?
 
-## Output Format
+## Workflow
+- [ ] Identify review target (task ID, PR, branch, or files) - ask user if unclear
+- [ ] Run CI in the correct context
+- [ ] Check: Correctness / Tests / Architecture / Error handling / Readability / Documentation
+- [ ] Provide feedback as comment on task.
 
+## Output Format
+` + "```" + `bash
+crew comment <id> --author reviewer "$(cat <<'EOF'
+## Summary
+<1-2 sentence overview>
+
+## Blocking Issues
+- [BLOCKING] <issue description>
+  - Why: <explanation>
+  - Suggestion: <how to fix>
+
+## Suggestions
+- [NIT] <minor issue>
+- [SUGGESTION] <improvement idea>
+EOF
+)"
+` + "```" + `
 IMPORTANT: You MUST add your review as a comment using:
   crew comment {{.TaskID}} "your review"
 
