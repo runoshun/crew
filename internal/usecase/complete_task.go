@@ -14,7 +14,10 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
-const reviewPeekLines = 2000
+const (
+	reviewPeekLines    = 2000
+	reviewLogTailLines = 20
+)
 
 // CompleteTaskInput contains the parameters for completing a task.
 type CompleteTaskInput struct {
@@ -279,7 +282,7 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 	}
 	uc.writeReviewMessage(fmt.Sprintf("Review finished for task #%d.", task.ID))
 
-	if err := uc.updateReviewMetadata(task, preReviewerCount); err != nil {
+	if err := uc.updateReviewMetadata(task, preReviewerCount, reviewSessionName); err != nil {
 		return err
 	}
 
@@ -379,18 +382,18 @@ func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *stri
 	return nil
 }
 
-func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, preReviewerCount int) error {
+func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, preReviewerCount int, sessionName string) error {
 	postComments, err := uc.tasks.GetComments(task.ID)
 	if err != nil {
 		return fmt.Errorf("get comments: %w", err)
 	}
 	postReviewerCount := countReviewerComments(postComments)
 	if postReviewerCount <= preReviewerCount {
-		return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+		return uc.noReviewCommentError(sessionName)
 	}
 	lastReviewerComment, ok := lastReviewerComment(postComments)
 	if !ok {
-		return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+		return uc.noReviewCommentError(sessionName)
 	}
 
 	shared.UpdateReviewMetadata(uc.clock, task, lastReviewerComment.Text)
@@ -406,6 +409,31 @@ func (uc *CompleteTask) writeReviewMessage(message string) {
 		return
 	}
 	_, _ = fmt.Fprintln(uc.stderr, message)
+}
+
+func (uc *CompleteTask) noReviewCommentError(sessionName string) error {
+	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+	logTail := tailFileLines(logPath, reviewLogTailLines)
+	if logTail == "" {
+		return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+	}
+
+	return fmt.Errorf("reviewer did not add a comment: %w\n\nreview log (tail):\n%s", domain.ErrNoReviewComment, logTail)
+}
+
+func tailFileLines(path string, maxLines int) string {
+	if maxLines <= 0 {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if len(lines) > maxLines {
+		lines = lines[len(lines)-maxLines:]
+	}
+	return strings.Join(lines, "\n")
 }
 
 func countReviewerComments(comments []domain.Comment) int {

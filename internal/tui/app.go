@@ -1150,8 +1150,8 @@ func renderTemplate(tmpl string, data any) (string, error) {
 	return buf.String(), nil
 }
 
-// reviewTask returns a command that completes a task (runs review if needed).
-func (m *Model) reviewTask(taskID int, agent string) tea.Cmd {
+// completeTask returns a command that completes a task (runs review if needed).
+func (m *Model) completeTask(taskID int, agent string) tea.Cmd {
 	return func() tea.Msg {
 		uc := m.container.CompleteTaskUseCase(io.Discard, io.Discard)
 		_, err := uc.Execute(context.Background(), usecase.CompleteTaskInput{

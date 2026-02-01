@@ -283,18 +283,18 @@ func (c *Client) IsRunning(sessionName string) (bool, error) {
 		"-t", sessionName,
 	)
 
-	err := cmd.Run()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// Check if it's an exit error
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			// Exit code 1 means session doesn't exist
 			if exitErr.ExitCode() == 1 {
 				return false, nil
 			}
 		}
-		// Other errors might mean tmux isn't running at all (socket doesn't exist)
-		// which is fine - the session doesn't exist
-		return false, nil
+		trimmed := strings.TrimSpace(string(out))
+		if trimmed == "" {
+			return false, fmt.Errorf("check session: %w", err)
+		}
+		return false, fmt.Errorf("check session: %w: %s", err, trimmed)
 	}
 
 	return true, nil

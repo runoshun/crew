@@ -163,14 +163,6 @@ func TestPathFunctions(t *testing.T) {
 		}
 	})
 
-	t.Run("ReviewScriptPath", func(t *testing.T) {
-		got := ReviewScriptPath(crewDir, 1)
-		want := "/repo/.crew/scripts/review-1.sh"
-		if got != want {
-			t.Errorf("ReviewScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
-		}
-	})
-
 	t.Run("PromptPath", func(t *testing.T) {
 		got := PromptPath(crewDir, 42)
 		want := "/repo/.crew/scripts/task-42-prompt.txt"

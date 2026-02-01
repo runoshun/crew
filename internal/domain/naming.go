@@ -40,11 +40,6 @@ func ScriptPath(crewDir string, taskID int) string {
 	return filepath.Join(crewDir, "scripts", fmt.Sprintf("task-%d.sh", taskID))
 }
 
-// ReviewScriptPath returns the path to the review script.
-func ReviewScriptPath(crewDir string, taskID int) string {
-	return filepath.Join(crewDir, "scripts", fmt.Sprintf("review-%d.sh", taskID))
-}
-
 // PromptPath returns the path to the task prompt file.
 func PromptPath(crewDir string, taskID int) string {
 	return filepath.Join(crewDir, "scripts", fmt.Sprintf("task-%d-prompt.txt", taskID))
