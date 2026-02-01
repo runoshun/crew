@@ -3,7 +3,6 @@ package shared
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -126,41 +125,20 @@ type ReviewOutput struct {
 	IsLGTM bool
 }
 
-// RecordReviewResult updates review metadata and stores the review comment.
-func RecordReviewResult(deps ReviewDeps, task *domain.Task, output string) (*ReviewOutput, error) {
-	if task == nil {
-		return nil, errors.New("task is nil")
-	}
-
-	review := strings.TrimSpace(extractReviewResult(output))
-	isLGTM := strings.HasPrefix(review, domain.ReviewLGTMPrefix)
-
-	now := deps.Clock.Now()
-	if review != "" {
-		comment := domain.Comment{
-			Text:   review,
-			Time:   now,
-			Author: "reviewer",
-		}
-		if err := deps.Tasks.AddComment(task.ID, comment); err != nil {
-			if deps.Stderr != nil {
-				_, _ = fmt.Fprintf(deps.Stderr, "warning: failed to add review comment: %v\n", err)
-			}
-		}
-	}
+// UpdateReviewMetadata updates task review metadata based on the review result.
+// This should be called after the reviewer has added a comment via crew comment.
+func UpdateReviewMetadata(clock domain.Clock, task *domain.Task, reviewText string) {
+	isLGTM := strings.HasPrefix(strings.TrimSpace(reviewText), domain.ReviewLGTMPrefix)
+	now := clock.Now()
 
 	task.ReviewCount++
 	task.LastReviewAt = now
-	lastReviewIsLGTM := isLGTM
-	task.LastReviewIsLGTM = &lastReviewIsLGTM
-
-	return &ReviewOutput{
-		Review: review,
-		IsLGTM: isLGTM,
-	}, nil
+	task.LastReviewIsLGTM = &isLGTM
 }
 
-// ExecuteReview runs the review command and records its result.
+// ExecuteReview runs the review command.
+// The reviewer is expected to add a comment using 'crew comment'.
+// This function only executes the command and does not record any results.
 func ExecuteReview(ctx context.Context, deps ReviewDeps, in ReviewInput) (*ReviewOutput, error) {
 	if !in.SkipStatusCheck {
 		// Review can only be executed on in_progress or done tasks
@@ -200,15 +178,6 @@ END_OF_PROMPT
 		return nil, fmt.Errorf("run reviewer: %w", err)
 	}
 
-	return RecordReviewResult(deps, in.Task, stdoutBuf.String())
-}
-
-// extractReviewResult extracts the final review result from the full output.
-// It looks for domain.ReviewResultMarker and returns everything after it.
-// If the marker is not found, it returns the full output as a fallback.
-func extractReviewResult(output string) string {
-	if idx := strings.Index(output, domain.ReviewResultMarker); idx != -1 {
-		return output[idx+len(domain.ReviewResultMarker):]
-	}
-	return output
+	// Return empty result - the actual review will be obtained from comments
+	return &ReviewOutput{}, nil
 }

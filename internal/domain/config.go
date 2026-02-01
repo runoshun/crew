@@ -332,9 +332,6 @@ const (
 	DefaultLogLevel = "info"
 )
 
-// ReviewResultMarker is the marker line that separates verbose output from the final review result.
-const ReviewResultMarker = "---REVIEW_RESULT---"
-
 // ReviewLGTMPrefix is the prefix indicating the review passed (LGTM).
 const ReviewLGTMPrefix = "✅ LGTM"
 
@@ -362,6 +359,7 @@ const DefaultReviewerSystemPrompt = `You are a code reviewer for git-crew Task #
 
 - crew show {{.TaskID}} - View task details
 - crew diff {{.TaskID}} - View changes
+- crew comment {{.TaskID}} "your review" - Add review as comment
 
 ## Review Checklist
 
@@ -373,8 +371,8 @@ const DefaultReviewerSystemPrompt = `You are a code reviewer for git-crew Task #
 
 ## Output Format
 
-IMPORTANT: Output your final review after the marker line:
-` + ReviewResultMarker + `
+IMPORTANT: You MUST add your review as a comment using:
+  crew comment {{.TaskID}} "your review"
 
 Start with: ` + "`✅ LGTM`" + `, ` + "`⚠️ Minor issues`" + `, or ` + "`❌ Needs changes`" + `
 Then list specific issues with file:line references.`

@@ -15,7 +15,7 @@ import (
 func TestExecuteReview_StatusCheck(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	executor := testutil.NewMockCommandExecutor()
-	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
+	executor.ExecuteOutput = []byte("Review output")
 	now := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
 	clock := &testutil.MockClock{NowTime: now}
 
@@ -61,11 +61,7 @@ func TestExecuteReview_StatusCheck(t *testing.T) {
 		reviewOut, err := ExecuteReview(context.Background(), deps, input)
 		require.NoError(t, err)
 		require.NotNil(t, reviewOut)
-		assert.True(t, reviewOut.IsLGTM)
-		assert.Equal(t, 1, task.ReviewCount)
-		assert.Equal(t, now, task.LastReviewAt)
-		require.NotNil(t, task.LastReviewIsLGTM)
-		assert.True(t, *task.LastReviewIsLGTM)
+		// ExecuteReview no longer updates task metadata - that's done by caller
 	})
 
 	t.Run("skip status check", func(t *testing.T) {
@@ -83,11 +79,7 @@ func TestExecuteReview_StatusCheck(t *testing.T) {
 		reviewOut, err := ExecuteReview(context.Background(), deps, input)
 		require.NoError(t, err)
 		require.NotNil(t, reviewOut)
-		assert.True(t, reviewOut.IsLGTM)
-		assert.Equal(t, 1, task.ReviewCount)
-		assert.Equal(t, now, task.LastReviewAt)
-		require.NotNil(t, task.LastReviewIsLGTM)
-		assert.True(t, *task.LastReviewIsLGTM)
+		// ExecuteReview no longer updates task metadata - that's done by caller
 	})
 }
 
@@ -98,7 +90,7 @@ func TestExecuteReview_Verbose(t *testing.T) {
 
 	t.Run("verbose mode streams both stdout and stderr to deps.Stderr", func(t *testing.T) {
 		executor := testutil.NewMockCommandExecutor()
-		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
+		executor.ExecuteOutput = []byte("Review output\n")
 		executor.StderrOutput = []byte("stderr output\n")
 
 		var stderrBuf bytes.Buffer
@@ -128,13 +120,13 @@ func TestExecuteReview_Verbose(t *testing.T) {
 		// In verbose mode, both stdout and stderr should be written to deps.Stderr
 		// stdout contains the reviewer output, stderr contains any error/debug output
 		output := stderrBuf.String()
-		assert.Contains(t, output, domain.ReviewResultMarker)
+		assert.Contains(t, output, "Review output")
 		assert.Contains(t, output, "stderr output")
 	})
 
 	t.Run("non-verbose mode does not stream to deps.Stderr", func(t *testing.T) {
 		executor := testutil.NewMockCommandExecutor()
-		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.")
+		executor.ExecuteOutput = []byte("Review output\n")
 		executor.StderrOutput = []byte("stderr output\n")
 
 		var stderrBuf bytes.Buffer
@@ -163,5 +155,37 @@ func TestExecuteReview_Verbose(t *testing.T) {
 
 		// In non-verbose mode, nothing should be written to deps.Stderr
 		assert.Empty(t, stderrBuf.String())
+	})
+}
+
+func TestUpdateReviewMetadata(t *testing.T) {
+	now := time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)
+	clock := &testutil.MockClock{NowTime: now}
+
+	t.Run("LGTM review", func(t *testing.T) {
+		task := &domain.Task{ID: 1}
+		UpdateReviewMetadata(clock, task, domain.ReviewLGTMPrefix+" Looks good!")
+
+		assert.Equal(t, 1, task.ReviewCount)
+		assert.Equal(t, now, task.LastReviewAt)
+		require.NotNil(t, task.LastReviewIsLGTM)
+		assert.True(t, *task.LastReviewIsLGTM)
+	})
+
+	t.Run("non-LGTM review", func(t *testing.T) {
+		task := &domain.Task{ID: 2}
+		UpdateReviewMetadata(clock, task, "❌ Needs changes")
+
+		assert.Equal(t, 1, task.ReviewCount)
+		assert.Equal(t, now, task.LastReviewAt)
+		require.NotNil(t, task.LastReviewIsLGTM)
+		assert.False(t, *task.LastReviewIsLGTM)
+	})
+
+	t.Run("increments review count", func(t *testing.T) {
+		task := &domain.Task{ID: 3, ReviewCount: 2}
+		UpdateReviewMetadata(clock, task, domain.ReviewLGTMPrefix)
+
+		assert.Equal(t, 3, task.ReviewCount)
 	})
 }
