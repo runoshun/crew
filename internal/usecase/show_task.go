@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -24,22 +25,27 @@ type ShowTaskOutput struct {
 
 // ShowTask is the use case for displaying task details.
 type ShowTask struct {
-	tasks domain.TaskRepository
+	tasks     domain.TaskRepository
+	acpStates domain.ACPStateStore
 }
 
 // NewShowTask creates a new ShowTask use case.
-func NewShowTask(tasks domain.TaskRepository) *ShowTask {
+func NewShowTask(tasks domain.TaskRepository, acpStates domain.ACPStateStore) *ShowTask {
 	return &ShowTask{
-		tasks: tasks,
+		tasks:     tasks,
+		acpStates: acpStates,
 	}
 }
 
 // Execute retrieves and returns the task details.
-func (uc *ShowTask) Execute(_ context.Context, in ShowTaskInput) (*ShowTaskOutput, error) {
+func (uc *ShowTask) Execute(ctx context.Context, in ShowTaskInput) (*ShowTaskOutput, error) {
 	// Get task
 	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
 		return nil, err
+	}
+	if attachErr := uc.attachExecutionSubstate(ctx, task); attachErr != nil {
+		return nil, attachErr
 	}
 
 	// Get children
@@ -87,4 +93,23 @@ func (uc *ShowTask) Execute(_ context.Context, in ShowTaskInput) (*ShowTaskOutpu
 		Children: children,
 		Comments: comments,
 	}, nil
+}
+
+func (uc *ShowTask) attachExecutionSubstate(ctx context.Context, task *domain.Task) error {
+	if uc.acpStates == nil || task == nil {
+		return nil
+	}
+	namespace := task.Namespace
+	if namespace == "" {
+		namespace = "default"
+	}
+	state, err := uc.acpStates.Load(ctx, namespace, task.ID)
+	if err != nil {
+		if errors.Is(err, domain.ErrACPStateNotFound) {
+			return nil
+		}
+		return fmt.Errorf("load acp state for %s#%d: %w", namespace, task.ID, err)
+	}
+	task.ExecutionSubstate = state.ExecutionSubstate
+	return nil
 }

@@ -24,7 +24,7 @@ func TestShowTask_Execute_Success(t *testing.T) {
 		Labels:      []string{"bug"},
 		BaseBranch:  "main",
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -62,7 +62,7 @@ func TestShowTask_Execute_WithChildren(t *testing.T) {
 		Title:    "Child task 2",
 		Status:   domain.StatusClosed,
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -86,7 +86,7 @@ func TestShowTask_Execute_WithComments(t *testing.T) {
 		{Text: "First comment", Time: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
 		{Text: "Second comment", Time: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC)},
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -119,7 +119,7 @@ func TestShowTask_Execute_FullDetails(t *testing.T) {
 		BaseBranch:  "main",
 		Labels:      []string{"feature", "oauth"},
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -144,7 +144,7 @@ func TestShowTask_Execute_FullDetails(t *testing.T) {
 func TestShowTask_Execute_TaskNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -159,7 +159,7 @@ func TestShowTask_Execute_GetError(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
 	repo.GetErr = errors.New("database error")
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -182,7 +182,7 @@ func TestShowTask_Execute_GetChildrenError(t *testing.T) {
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -205,7 +205,7 @@ func TestShowTask_Execute_GetCommentsError(t *testing.T) {
 		Title:  "Test task",
 		Status: domain.StatusTodo,
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -229,7 +229,7 @@ func TestShowTask_Execute_WithCommentsBy(t *testing.T) {
 		{Text: "Worker comment", Author: "worker"},
 		{Text: "Another manager comment", Author: "manager"},
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -257,7 +257,7 @@ func TestShowTask_Execute_WithLastReview(t *testing.T) {
 		{Text: "Review 2", Author: "reviewer", Time: time.Date(2024, 1, 3, 0, 0, 0, 0, time.UTC)},
 		{Text: "Worker fix", Author: "worker", Time: time.Date(2024, 1, 4, 0, 0, 0, 0, time.UTC)},
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ShowTaskInput{
@@ -281,7 +281,7 @@ func TestShowTask_Execute_WithLastReview_NoReview(t *testing.T) {
 	repo.Comments[1] = []domain.Comment{
 		{Text: "Worker comment", Author: "worker"},
 	}
-	uc := NewShowTask(repo)
+	uc := NewShowTask(repo, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ShowTaskInput{
