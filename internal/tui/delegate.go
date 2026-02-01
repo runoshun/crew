@@ -194,7 +194,16 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		})
 	}
 
-	// 6. Comments (if any)
+	// 6. ACP execution substate (if available)
+	if task.ExecutionSubstate != "" {
+		substateStr := "acp:" + task.ExecutionSubstate.Display()
+		metaParts = append(metaParts, metaPart{
+			plain:  substateStr,
+			styled: grayStyle.Render(substateStr),
+		})
+	}
+
+	// 7. Comments (if any)
 	if ti.commentCount > 0 {
 		commentStr := fmt.Sprintf("%d comment", ti.commentCount)
 		if ti.commentCount > 1 {
@@ -206,7 +215,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		})
 	}
 
-	// 7. GitHub (if linked)
+	// 8. GitHub (if linked)
 	ghParts := []string{}
 	if task.Issue > 0 {
 		ghParts = append(ghParts, fmt.Sprintf("GH#%d", task.Issue))

@@ -312,12 +312,19 @@ Examples:
 // formatTaskStatus formats status with optional elapsed time for in_progress.
 func formatTaskStatus(task *domain.Task, clock domain.Clock) string {
 	statusStr := task.Status.Display()
+	parts := []string{}
 	if task.Status == domain.StatusInProgress && !task.Started.IsZero() {
 		elapsed := clock.Now().Sub(task.Started)
 		if elapsed < 0 {
 			elapsed = 0
 		}
-		statusStr = fmt.Sprintf("%s (%s)", statusStr, formatDuration(elapsed))
+		parts = append(parts, formatDuration(elapsed))
+	}
+	if task.ExecutionSubstate != "" {
+		parts = append(parts, task.ExecutionSubstate.Display())
+	}
+	if len(parts) > 0 {
+		statusStr = fmt.Sprintf("%s (%s)", statusStr, strings.Join(parts, ", "))
 	}
 	return statusStr
 }
@@ -556,39 +563,41 @@ Examples:
 				Author string    `json:"author,omitempty"`
 			}
 			type jsonTask struct {
-				Created          time.Time     `json:"created"`
-				Started          *time.Time    `json:"started,omitempty"`
-				LastReviewAt     *time.Time    `json:"lastReviewAt,omitempty"`
-				ParentID         *int          `json:"parent_id"`
-				LastReviewIsLGTM *bool         `json:"lastReviewIsLGTM,omitempty"`
-				Branch           string        `json:"branch"`
-				Agent            string        `json:"agent"`
-				Status           domain.Status `json:"status"`
-				StatusDisplay    string        `json:"statusDisplay"`
-				Title            string        `json:"title"`
-				Description      string        `json:"description"`
-				Labels           []string      `json:"labels"`
-				Comments         []jsonComment `json:"comments"`
-				ID               int           `json:"id"`
-				Issue            int           `json:"issue"`
-				ReviewCount      int           `json:"reviewCount"`
+				Created           time.Time                   `json:"created"`
+				Started           *time.Time                  `json:"started,omitempty"`
+				LastReviewAt      *time.Time                  `json:"lastReviewAt,omitempty"`
+				ParentID          *int                        `json:"parent_id"`
+				LastReviewIsLGTM  *bool                       `json:"lastReviewIsLGTM,omitempty"`
+				Branch            string                      `json:"branch"`
+				Agent             string                      `json:"agent"`
+				Status            domain.Status               `json:"status"`
+				StatusDisplay     string                      `json:"statusDisplay"`
+				ExecutionSubstate domain.ACPExecutionSubstate `json:"execution_substate,omitempty"`
+				Title             string                      `json:"title"`
+				Description       string                      `json:"description"`
+				Labels            []string                    `json:"labels"`
+				Comments          []jsonComment               `json:"comments"`
+				ID                int                         `json:"id"`
+				Issue             int                         `json:"issue"`
+				ReviewCount       int                         `json:"reviewCount"`
 			}
 
 			jt := jsonTask{
-				Created:          out.Task.Created,
-				ParentID:         out.Task.ParentID,
-				Description:      out.Task.Description,
-				Agent:            out.Task.Agent,
-				Branch:           domain.BranchName(out.Task.ID, out.Task.Issue),
-				Status:           out.Task.Status,
-				StatusDisplay:    out.Task.Status.Display(),
-				Title:            out.Task.Title,
-				Labels:           out.Task.Labels,
-				ID:               out.Task.ID,
-				Issue:            out.Task.Issue,
-				ReviewCount:      out.Task.ReviewCount,
-				LastReviewIsLGTM: out.Task.LastReviewIsLGTM,
-				Comments:         make([]jsonComment, len(out.Comments)),
+				Created:           out.Task.Created,
+				ParentID:          out.Task.ParentID,
+				Description:       out.Task.Description,
+				Agent:             out.Task.Agent,
+				Branch:            domain.BranchName(out.Task.ID, out.Task.Issue),
+				Status:            out.Task.Status,
+				StatusDisplay:     out.Task.Status.Display(),
+				ExecutionSubstate: out.Task.ExecutionSubstate,
+				Title:             out.Task.Title,
+				Labels:            out.Task.Labels,
+				ID:                out.Task.ID,
+				Issue:             out.Task.Issue,
+				ReviewCount:       out.Task.ReviewCount,
+				LastReviewIsLGTM:  out.Task.LastReviewIsLGTM,
+				Comments:          make([]jsonComment, len(out.Comments)),
 			}
 			if !out.Task.Started.IsZero() {
 				jt.Started = &out.Task.Started

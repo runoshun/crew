@@ -39,6 +39,8 @@ type ACPRun struct {
 	git          domain.Git
 	runner       domain.ScriptRunner
 	ipcFactory   domain.ACPIPCFactory
+	acpStates    domain.ACPStateStore
+	clock        domain.Clock
 	stdout       io.Writer
 	stderr       io.Writer
 	repoRoot     string
@@ -52,6 +54,8 @@ func NewACPRun(
 	git domain.Git,
 	runner domain.ScriptRunner,
 	ipcFactory domain.ACPIPCFactory,
+	acpStates domain.ACPStateStore,
+	clock domain.Clock,
 	repoRoot string,
 	stdout io.Writer,
 	stderr io.Writer,
@@ -63,6 +67,8 @@ func NewACPRun(
 		git:          git,
 		runner:       runner,
 		ipcFactory:   ipcFactory,
+		acpStates:    acpStates,
+		clock:        clock,
 		repoRoot:     repoRoot,
 		stdout:       stdout,
 		stderr:       stderr,
@@ -79,6 +85,9 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 	if err != nil {
 		return nil, err
 	}
+	if !task.Status.CanStart() {
+		return nil, fmt.Errorf("cannot start task with status %q: %w", task.Status, domain.ErrInvalidTransition)
+	}
 	if task.IsBlocked() {
 		return nil, fmt.Errorf("%w: %q", domain.ErrTaskBlocked, task.BlockReason)
 	}
@@ -87,6 +96,8 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
+
+	namespace := shared.ResolveACPNamespace(cfg, uc.git)
 
 	agent, ok := cfg.EnabledAgents()[in.Agent]
 	if !ok {
@@ -163,6 +174,9 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		stopCh:       stopCh,
 		stdout:       uc.stdout,
 		stderr:       uc.stderr,
+		stateStore:   uc.acpStates,
+		stateNS:      namespace,
+		taskID:       task.ID,
 	}
 	conn := acpsdk.NewClientSideConnection(client, stdin, stdout)
 
@@ -185,15 +199,19 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		cancel()
 		return nil, fmt.Errorf("acp new session: %w", err)
 	}
+	if err := uc.markACPRunning(ctx, task, namespace, in.Agent); err != nil {
+		cancel()
+		return nil, err
+	}
 
-	ipc := uc.ipcFactory.ForTask(shared.ResolveACPNamespace(cfg, uc.git), task.ID)
+	ipc := uc.ipcFactory.ForTask(namespace, task.ID)
 	router := newACPCommandRouter(ipc, permissionCh, promptCh, cancelCh, stopCh)
 	routerErrCh := router.Start(cmdCtx)
 
 	for {
 		select {
 		case cmd := <-promptCh:
-			if err := uc.handlePrompt(cmdCtx, conn, session.SessionId, cmd); err != nil {
+			if err := uc.handlePrompt(cmdCtx, conn, session.SessionId, cmd, namespace, task.ID); err != nil {
 				uc.writeError("prompt", err)
 			}
 		case <-cancelCh:
@@ -214,10 +232,16 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			if err == nil || errors.Is(cmdCtx.Err(), context.Canceled) {
 				return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 			}
+			if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
+				return nil, fmt.Errorf("agent process exited: %w (update state: %v)", err, stateErr)
+			}
 			return nil, fmt.Errorf("agent process exited: %w", err)
 		case <-conn.Done():
 			cancel()
 			if err := <-procErrCh; err != nil && !errors.Is(cmdCtx.Err(), context.Canceled) {
+				if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
+					return nil, fmt.Errorf("agent process exited: %w (update state: %v)", err, stateErr)
+				}
 				return nil, fmt.Errorf("agent process exited: %w", err)
 			}
 			return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
@@ -324,12 +348,45 @@ func (uc *ACPRun) buildAgentCommand(task *domain.Task, worktreePath string, agen
 	return command, nil
 }
 
-func (uc *ACPRun) handlePrompt(ctx context.Context, conn *acpsdk.ClientSideConnection, sessionID acpsdk.SessionId, cmd domain.ACPCommand) error {
-	_, err := conn.Prompt(ctx, acpsdk.PromptRequest{
+func (uc *ACPRun) handlePrompt(ctx context.Context, conn *acpsdk.ClientSideConnection, sessionID acpsdk.SessionId, cmd domain.ACPCommand, namespace string, taskID int) error {
+	resp, err := conn.Prompt(ctx, acpsdk.PromptRequest{
 		SessionId: sessionID,
 		Prompt:    []acpsdk.ContentBlock{acpsdk.TextBlock(cmd.Text)},
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if resp.StopReason == acpsdk.StopReasonEndTurn {
+		return uc.setExecutionSubstate(ctx, namespace, taskID, domain.ACPExecutionAwaitingUser)
+	}
+	return nil
+}
+
+func (uc *ACPRun) markACPRunning(ctx context.Context, task *domain.Task, namespace string, agentName string) error {
+	task.Status = domain.StatusInProgress
+	task.Agent = agentName
+	if uc.clock != nil {
+		task.Started = uc.clock.Now()
+	}
+	if err := uc.tasks.Save(task); err != nil {
+		return fmt.Errorf("save task: %w", err)
+	}
+	return uc.setExecutionSubstate(ctx, namespace, task.ID, domain.ACPExecutionRunning)
+}
+
+func (uc *ACPRun) markACPError(ctx context.Context, task *domain.Task, namespace string) error {
+	task.Status = domain.StatusError
+	if err := uc.tasks.Save(task); err != nil {
+		return fmt.Errorf("save task: %w", err)
+	}
+	return uc.setExecutionSubstate(ctx, namespace, task.ID, domain.ACPExecutionIdle)
+}
+
+func (uc *ACPRun) setExecutionSubstate(ctx context.Context, namespace string, taskID int, substate domain.ACPExecutionSubstate) error {
+	if uc.acpStates == nil {
+		return nil
+	}
+	return uc.acpStates.Save(ctx, namespace, taskID, domain.ACPExecutionState{ExecutionSubstate: substate})
 }
 
 func (uc *ACPRun) writeError(stage string, err error) {
@@ -398,11 +455,15 @@ type acpRunClient struct {
 	stopCh       <-chan struct{}
 	stdout       io.Writer
 	stderr       io.Writer
+	stateStore   domain.ACPStateStore
+	stateNS      string
+	taskID       int
 }
 
 var _ acpsdk.Client = (*acpRunClient)(nil)
 
 func (c *acpRunClient) RequestPermission(ctx context.Context, params acpsdk.RequestPermissionRequest) (acpsdk.RequestPermissionResponse, error) {
+	c.setExecutionSubstate(ctx, domain.ACPExecutionAwaitingPermission)
 	c.writePermissionRequest(params)
 	options := make(map[string]struct{}, len(params.Options))
 	for _, opt := range params.Options {
@@ -416,6 +477,7 @@ func (c *acpRunClient) RequestPermission(ctx context.Context, params acpsdk.Requ
 				c.writeWarning(fmt.Sprintf("unknown permission option_id: %s", cmd.OptionID))
 				continue
 			}
+			c.setExecutionSubstate(ctx, domain.ACPExecutionRunning)
 			return acpsdk.RequestPermissionResponse{
 				Outcome: acpsdk.RequestPermissionOutcome{
 					Selected: &acpsdk.RequestPermissionOutcomeSelected{
@@ -429,6 +491,15 @@ func (c *acpRunClient) RequestPermission(ctx context.Context, params acpsdk.Requ
 		case <-ctx.Done():
 			return cancelPermissionResponse(), nil
 		}
+	}
+}
+
+func (c *acpRunClient) setExecutionSubstate(ctx context.Context, substate domain.ACPExecutionSubstate) {
+	if c.stateStore == nil {
+		return
+	}
+	if err := c.stateStore.Save(ctx, c.stateNS, c.taskID, domain.ACPExecutionState{ExecutionSubstate: substate}); err != nil {
+		c.writeWarning(fmt.Sprintf("update execution substate: %v", err))
 	}
 }
 

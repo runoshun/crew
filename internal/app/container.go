@@ -62,6 +62,7 @@ type Container struct {
 	Runner           domain.ScriptRunner
 	Executor         domain.CommandExecutor
 	ACPIPCFactory    domain.ACPIPCFactory
+	ACPStateStore    domain.ACPStateStore
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 
 	// Configuration
@@ -115,6 +116,7 @@ func New(dir string) (*Container, error) {
 
 	// Create ACP IPC factory
 	acpIPCFactory := acpinfra.NewFileIPCFactory(cfg.CrewDir, logger)
+	acpStateStore := acpinfra.NewFileStateStore(cfg.CrewDir)
 
 	return &Container{
 		Tasks:            taskRepo,
@@ -129,6 +131,7 @@ func New(dir string) (*Container, error) {
 		Runner:           scriptRunner,
 		Executor:         commandExecutor,
 		ACPIPCFactory:    acpIPCFactory,
+		ACPStateStore:    acpStateStore,
 		Config:           cfg,
 	}, nil
 }
@@ -164,12 +167,12 @@ func (c *Container) CreateTasksFromFileUseCase() *usecase.CreateTasksFromFile {
 
 // ListTasksUseCase returns a new ListTasks use case.
 func (c *Container) ListTasksUseCase() *usecase.ListTasks {
-	return usecase.NewListTasks(c.Tasks, c.Sessions)
+	return usecase.NewListTasks(c.Tasks, c.Sessions, c.ACPStateStore)
 }
 
 // ShowTaskUseCase returns a new ShowTask use case.
 func (c *Container) ShowTaskUseCase() *usecase.ShowTask {
-	return usecase.NewShowTask(c.Tasks)
+	return usecase.NewShowTask(c.Tasks, c.ACPStateStore)
 }
 
 // EditTaskUseCase returns a new EditTask use case.
@@ -291,6 +294,7 @@ func (c *Container) ACPControlUseCase() *usecase.ACPControl {
 		c.ConfigLoader,
 		c.Git,
 		c.ACPIPCFactory,
+		c.ACPStateStore,
 	)
 }
 
@@ -303,6 +307,8 @@ func (c *Container) ACPRunUseCase(stdout, stderr io.Writer) *usecase.ACPRun {
 		c.Git,
 		c.Runner,
 		c.ACPIPCFactory,
+		c.ACPStateStore,
+		c.Clock,
 		c.Config.RepoRoot,
 		stdout,
 		stderr,

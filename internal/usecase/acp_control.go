@@ -27,6 +27,7 @@ type ACPControl struct {
 	configLoader domain.ConfigLoader
 	git          domain.Git
 	ipcFactory   domain.ACPIPCFactory
+	acpStates    domain.ACPStateStore
 }
 
 // NewACPControl creates a new ACPControl use case.
@@ -35,12 +36,14 @@ func NewACPControl(
 	configLoader domain.ConfigLoader,
 	git domain.Git,
 	ipcFactory domain.ACPIPCFactory,
+	acpStates domain.ACPStateStore,
 ) *ACPControl {
 	return &ACPControl{
 		tasks:        tasks,
 		configLoader: configLoader,
 		git:          git,
 		ipcFactory:   ipcFactory,
+		acpStates:    acpStates,
 	}
 }
 
@@ -60,7 +63,8 @@ func (uc *ACPControl) Execute(ctx context.Context, in ACPControlInput) (*ACPCont
 		return nil, fmt.Errorf("load config: %w", err)
 	}
 
-	ipc := uc.ipcFactory.ForTask(shared.ResolveACPNamespace(cfg, uc.git), in.TaskID)
+	namespace := shared.ResolveACPNamespace(cfg, uc.git)
+	ipc := uc.ipcFactory.ForTask(namespace, in.TaskID)
 	cmd := domain.ACPCommand{
 		Type:     in.CommandType,
 		Text:     in.Text,
@@ -68,6 +72,15 @@ func (uc *ACPControl) Execute(ctx context.Context, in ACPControlInput) (*ACPCont
 	}
 	if err := ipc.Send(ctx, cmd); err != nil {
 		return nil, err
+	}
+	if uc.acpStates != nil {
+		switch in.CommandType {
+		case domain.ACPCommandPermission, domain.ACPCommandPrompt:
+			if err := uc.acpStates.Save(ctx, namespace, in.TaskID, domain.ACPExecutionState{ExecutionSubstate: domain.ACPExecutionRunning}); err != nil {
+				return nil, fmt.Errorf("save acp state: %w", err)
+			}
+		case domain.ACPCommandCancel, domain.ACPCommandStop:
+		}
 	}
 
 	return &ACPControlOutput{}, nil

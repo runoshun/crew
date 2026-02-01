@@ -10,6 +10,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type acpRunStateStore struct {
+	namespace string
+	taskID    int
+	calls     []domain.ACPExecutionSubstate
+}
+
+func (s *acpRunStateStore) Load(context.Context, string, int) (domain.ACPExecutionState, error) {
+	return domain.ACPExecutionState{}, domain.ErrACPStateNotFound
+}
+
+func (s *acpRunStateStore) Save(_ context.Context, namespace string, taskID int, state domain.ACPExecutionState) error {
+	s.namespace = namespace
+	s.taskID = taskID
+	s.calls = append(s.calls, state.ExecutionSubstate)
+	return nil
+}
+
 func TestACPRunClientRequestPermissionSelected(t *testing.T) {
 	t.Parallel()
 
@@ -18,10 +35,14 @@ func TestACPRunClientRequestPermissionSelected(t *testing.T) {
 
 	permissionCh := make(chan domain.ACPCommand, 1)
 	stopCh := make(chan struct{})
+	stateStore := &acpRunStateStore{}
 
 	client := &acpRunClient{
 		permissionCh: permissionCh,
 		stopCh:       stopCh,
+		stateStore:   stateStore,
+		stateNS:      "default",
+		taskID:       1,
 	}
 
 	params := permissionRequestParams()
@@ -32,6 +53,11 @@ func TestACPRunClientRequestPermissionSelected(t *testing.T) {
 	require.NotNil(t, resp.Outcome.Selected)
 	require.Equal(t, "opt-1", string(resp.Outcome.Selected.OptionId))
 	require.Equal(t, "selected", resp.Outcome.Selected.Outcome)
+	require.Equal(t, "default", stateStore.namespace)
+	require.Equal(t, 1, stateStore.taskID)
+	require.Len(t, stateStore.calls, 2)
+	require.Equal(t, domain.ACPExecutionAwaitingPermission, stateStore.calls[0])
+	require.Equal(t, domain.ACPExecutionRunning, stateStore.calls[1])
 }
 
 func TestACPRunClientRequestPermissionStop(t *testing.T) {

@@ -24,6 +24,24 @@ func (m *mockNamespaceLister) ListAll(filter domain.TaskFilter) ([]*domain.Task,
 	return m.listAllTasks, m.listAllErr
 }
 
+type stubACPStateStore struct {
+	state      domain.ACPExecutionState
+	namespace  string
+	taskID     int
+	loadCalled bool
+}
+
+func (s *stubACPStateStore) Load(_ context.Context, namespace string, taskID int) (domain.ACPExecutionState, error) {
+	s.loadCalled = true
+	s.namespace = namespace
+	s.taskID = taskID
+	return s.state, nil
+}
+
+func (s *stubACPStateStore) Save(context.Context, string, int, domain.ACPExecutionState) error {
+	return nil
+}
+
 func TestListTasks_Execute_AllTasks(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
@@ -43,7 +61,7 @@ func TestListTasks_Execute_AllTasks(t *testing.T) {
 		Status: domain.StatusClosed,
 	}
 
-	uc := NewListTasks(repo, nil)
+	uc := NewListTasks(repo, nil, nil)
 
 	// Execute with IncludeTerminal = true
 	out, err := uc.Execute(context.Background(), ListTasksInput{
@@ -55,6 +73,27 @@ func TestListTasks_Execute_AllTasks(t *testing.T) {
 	require.Len(t, out.Tasks, 3)
 }
 
+func TestListTasks_AttachesExecutionSubstate(t *testing.T) {
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:        1,
+		Title:     "Task 1",
+		Status:    domain.StatusInProgress,
+		Namespace: "default",
+	}
+	stateStore := &stubACPStateStore{state: domain.ACPExecutionState{ExecutionSubstate: domain.ACPExecutionRunning}}
+
+	uc := NewListTasks(repo, nil, stateStore)
+	out, err := uc.Execute(context.Background(), ListTasksInput{IncludeTerminal: true})
+
+	require.NoError(t, err)
+	require.Len(t, out.Tasks, 1)
+	require.Equal(t, domain.ACPExecutionRunning, out.Tasks[0].ExecutionSubstate)
+	require.True(t, stateStore.loadCalled)
+	require.Equal(t, "default", stateStore.namespace)
+	require.Equal(t, 1, stateStore.taskID)
+}
+
 func TestListTasks_Execute_AllNamespaces(t *testing.T) {
 	repo := &mockNamespaceLister{MockTaskRepository: testutil.NewMockTaskRepository()}
 	repo.listAllTasks = []*domain.Task{
@@ -62,7 +101,7 @@ func TestListTasks_Execute_AllNamespaces(t *testing.T) {
 		{ID: 2, Title: "Beta", Status: domain.StatusTodo, Namespace: "beta"},
 	}
 
-	uc := NewListTasks(repo, nil)
+	uc := NewListTasks(repo, nil, nil)
 	out, err := uc.Execute(context.Background(), ListTasksInput{AllNamespaces: true})
 
 	require.NoError(t, err)
@@ -89,7 +128,7 @@ func TestListTasks_Execute_ExcludeTerminal(t *testing.T) {
 		Status: domain.StatusClosed,
 	}
 
-	uc := NewListTasks(repo, nil)
+	uc := NewListTasks(repo, nil, nil)
 
 	// Execute with IncludeTerminal = false (default)
 	out, err := uc.Execute(context.Background(), ListTasksInput{
@@ -105,7 +144,7 @@ func TestListTasks_Execute_ExcludeTerminal(t *testing.T) {
 func TestListTasks_Execute_Empty(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
-	uc := NewListTasks(repo, nil)
+	uc := NewListTasks(repo, nil, nil)
 
 	// Execute
 	out, err := uc.Execute(context.Background(), ListTasksInput{})
@@ -142,7 +181,7 @@ func TestListTasks_Execute_WithParentFilter(t *testing.T) {
 		Status: domain.StatusTodo,
 	}
 
-	uc := NewListTasks(repo, nil)
+	uc := NewListTasks(repo, nil, nil)
 
 	// Execute with parent filter
 	out, err := uc.Execute(context.Background(), ListTasksInput{
@@ -178,7 +217,7 @@ func TestListTasks_Execute_WithLabelFilter(t *testing.T) {
 		Labels: []string{"bug", "feature"},
 	}
 
-	uc := NewListTasks(repo, nil)
+	uc := NewListTasks(repo, nil, nil)
 
 	// Execute with label filter
 	out, err := uc.Execute(context.Background(), ListTasksInput{
@@ -196,7 +235,7 @@ func TestListTasks_Execute_RepositoryError(t *testing.T) {
 		MockTaskRepository: testutil.NewMockTaskRepository(),
 		ListErr:            errors.New("database error"),
 	}
-	uc := NewListTasks(repo, nil)
+	uc := NewListTasks(repo, nil, nil)
 
 	// Execute
 	_, err := uc.Execute(context.Background(), ListTasksInput{})
@@ -235,7 +274,7 @@ func TestListTasks_Execute_PreservesTaskData(t *testing.T) {
 		Labels:     []string{"bug"},
 	}
 
-	uc := NewListTasks(repo, nil)
+	uc := NewListTasks(repo, nil, nil)
 
 	// Execute with IncludeTerminal = true to get all tasks
 	out, err := uc.Execute(context.Background(), ListTasksInput{

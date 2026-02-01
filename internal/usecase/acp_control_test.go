@@ -97,6 +97,25 @@ func (f *acpControlIPCFactory) ForTask(namespace string, taskID int) domain.ACPI
 	return f.ipc
 }
 
+type acpControlStateStore struct {
+	namespace  string
+	taskID     int
+	last       domain.ACPExecutionState
+	saveCalled bool
+}
+
+func (s *acpControlStateStore) Load(context.Context, string, int) (domain.ACPExecutionState, error) {
+	return domain.ACPExecutionState{}, domain.ErrACPStateNotFound
+}
+
+func (s *acpControlStateStore) Save(_ context.Context, namespace string, taskID int, state domain.ACPExecutionState) error {
+	s.namespace = namespace
+	s.taskID = taskID
+	s.last = state
+	s.saveCalled = true
+	return nil
+}
+
 func TestACPControlExecutePrompt(t *testing.T) {
 	repo := &acpControlTaskRepo{tasks: map[int]*domain.Task{}}
 	repo.tasks[1] = &domain.Task{
@@ -108,8 +127,9 @@ func TestACPControlExecutePrompt(t *testing.T) {
 	loader := acpControlConfigLoader{cfg: cfg}
 	ipc := &acpControlIPC{}
 	factory := &acpControlIPCFactory{ipc: ipc}
+	stateStore := &acpControlStateStore{}
 
-	uc := NewACPControl(repo, loader, acpControlGit{}, factory)
+	uc := NewACPControl(repo, loader, acpControlGit{}, factory, stateStore)
 
 	_, err := uc.Execute(context.Background(), ACPControlInput{
 		TaskID:      1,
@@ -122,4 +142,8 @@ func TestACPControlExecutePrompt(t *testing.T) {
 	require.Equal(t, 1, factory.taskID)
 	require.Equal(t, domain.ACPCommandPrompt, ipc.last.Type)
 	require.Equal(t, "hello", ipc.last.Text)
+	require.True(t, stateStore.saveCalled)
+	require.Equal(t, "team-alpha", stateStore.namespace)
+	require.Equal(t, 1, stateStore.taskID)
+	require.Equal(t, domain.ACPExecutionRunning, stateStore.last.ExecutionSubstate)
 }
