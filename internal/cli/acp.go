@@ -136,7 +136,8 @@ func newACPSendCommand(c *app.Container) *cobra.Command {
 		Short: "Send a prompt to an ACP session",
 		Long: `Send a prompt to an ACP session.
 
-You can pass task ID and text as positional arguments or use --task/--text flags (do not mix).`,
+You can pass task ID and text as positional arguments or use --task/--text flags (do not mix).
+When using positional arguments, remaining tokens are joined as the text payload.`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return nil
@@ -199,6 +200,7 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 		Long: `Respond to a permission request.
 
 You can pass task ID and option as positional arguments or use --task/--option flags (do not mix).
+Positional option values are treated as a single token; use --option to avoid shell splitting.
 Prefix the option with "#" to select by index from the latest permission request.`,
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -227,7 +229,7 @@ Prefix the option with "#" to select by index from the latest permission request
 				}
 			}
 			if len(args) > 1 {
-				opts.optionID = strings.Join(args[1:], " ")
+				opts.optionID = args[1]
 			}
 			if opts.taskID <= 0 {
 				return fmt.Errorf("task is required")
