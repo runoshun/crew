@@ -251,7 +251,9 @@ crew new --title "E2E: Completion flow test" --body "Please run echo hello"
 crew start <id> cc-small
 
 # 3. Set min_reviews=2 for this test (restore after test)
-cp .crew/config.toml /tmp/crew-config.toml
+# If [complete] already exists, edit that section instead of appending.
+backup_path="/tmp/crew-config.$(date +%s).toml"
+cp .crew/config.toml "$backup_path"
 cat >> .crew/config.toml << 'EOF'
 [complete]
 min_reviews = 2
@@ -275,7 +277,7 @@ echo "y" | crew merge <id>
 crew show <id>  # status: merged
 
 # 9. Restore config
-mv /tmp/crew-config.toml .crew/config.toml
+mv "$backup_path" .crew/config.toml
 ```
 
 **Verification Points:**

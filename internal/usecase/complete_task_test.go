@@ -72,7 +72,7 @@ func TestCompleteTask_Execute_Success(t *testing.T) {
 			// Assert
 			require.NoError(t, err)
 			require.NotNil(t, out)
-			assert.Equal(t, domain.StatusDone, out.Task.Status) // skip_review=true goes to reviewed
+			assert.Equal(t, domain.StatusDone, out.Task.Status) // skip_review=true goes to done
 			assert.False(t, out.ShouldStartReview)
 
 			// Verify task is updated in repository
@@ -499,7 +499,7 @@ func TestCompleteTask_Execute_SkipReview_TaskLevel(t *testing.T) {
 }
 
 func TestCompleteTask_Execute_SkipReview_ConfigLevel(t *testing.T) {
-	// Test: task.SkipReview = nil (not set), config.Tasks.SkipReview = true -> goes directly to reviewed
+	// Test: task.SkipReview = nil (not set), config.Tasks.SkipReview = true -> goes directly to done
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:         1,
