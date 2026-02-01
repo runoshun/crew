@@ -23,6 +23,12 @@ func SessionName(taskID int) string {
 	return fmt.Sprintf("crew-%d", taskID)
 }
 
+// ACPSessionName returns the tmux session name for an ACP task session.
+// Format: crew-acp-<id>
+func ACPSessionName(taskID int) string {
+	return fmt.Sprintf("crew-acp-%d", taskID)
+}
+
 // ManagerSessionName returns the tmux session name for the manager.
 // Format: crew-manager (fixed, only one manager session)
 func ManagerSessionName() string {
@@ -32,6 +38,11 @@ func ManagerSessionName() string {
 // ScriptPath returns the path to the task script.
 func ScriptPath(crewDir string, taskID int) string {
 	return filepath.Join(crewDir, "scripts", fmt.Sprintf("task-%d.sh", taskID))
+}
+
+// ACPScriptPath returns the path to the ACP task script.
+func ACPScriptPath(crewDir string, taskID int) string {
+	return filepath.Join(crewDir, "scripts", fmt.Sprintf("acp-task-%d.sh", taskID))
 }
 
 // PromptPath returns the path to the task prompt file.
@@ -50,7 +61,7 @@ func GlobalLogPath(crewDir string) string {
 }
 
 // SessionLogPath returns the path to the session log file.
-// The session log captures stderr from the tmux session.
+// The session log captures session output (stderr by default; some sessions tee stdout).
 func SessionLogPath(crewDir string, sessionName string) string {
 	return filepath.Join(crewDir, "logs", sessionName+".log")
 }

@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	acpsdk "github.com/coder/acp-go-sdk"
@@ -117,7 +116,7 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		model = agent.DefaultModel
 	}
 
-	wtPath, err := uc.ensureWorktree(task, cfg, agent)
+	wtPath, _, err := ensureACPWorktree(task, cfg, agent, uc.worktrees, uc.git, uc.runner, uc.repoRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -284,78 +283,6 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			return nil, ctx.Err()
 		}
 	}
-}
-
-func (uc *ACPRun) ensureWorktree(task *domain.Task, cfg *domain.Config, agent domain.Agent) (string, error) {
-	branch := domain.BranchName(task.ID, task.Issue)
-	exists, err := uc.worktrees.Exists(branch)
-	if err != nil {
-		return "", fmt.Errorf("check worktree: %w", err)
-	}
-	if exists {
-		wtPath, resolveErr := uc.worktrees.Resolve(branch)
-		if resolveErr != nil {
-			return "", fmt.Errorf("resolve worktree: %w", resolveErr)
-		}
-		return wtPath, nil
-	}
-
-	baseBranch, err := resolveBaseBranch(task, uc.git)
-	if err != nil {
-		return "", err
-	}
-
-	wtPath, err := uc.worktrees.Create(branch, baseBranch)
-	if err != nil {
-		return "", fmt.Errorf("create worktree: %w", err)
-	}
-
-	if setupErr := uc.worktrees.SetupWorktree(wtPath, &cfg.Worktree); setupErr != nil {
-		_ = uc.worktrees.Remove(branch)
-		return "", fmt.Errorf("setup worktree: %w", setupErr)
-	}
-
-	if setupErr := uc.setupAgent(task, wtPath, agent); setupErr != nil {
-		_ = uc.worktrees.Remove(branch)
-		return "", fmt.Errorf("setup agent: %w", setupErr)
-	}
-
-	return wtPath, nil
-}
-
-func (uc *ACPRun) setupAgent(task *domain.Task, wtPath string, agent domain.Agent) error {
-	if agent.SetupScript == "" {
-		return nil
-	}
-
-	gitDir := filepath.Join(uc.repoRoot, ".git")
-	data := struct {
-		GitDir   string
-		RepoRoot string
-		Worktree string
-		TaskID   int
-	}{
-		GitDir:   gitDir,
-		RepoRoot: uc.repoRoot,
-		Worktree: wtPath,
-		TaskID:   task.ID,
-	}
-
-	tmpl, err := template.New("acp-setup").Parse(agent.SetupScript)
-	if err != nil {
-		return fmt.Errorf("parse setup script template: %w", err)
-	}
-
-	var script strings.Builder
-	if err := tmpl.Execute(&script, data); err != nil {
-		return fmt.Errorf("expand setup script template: %w", err)
-	}
-
-	if err := uc.runner.Run(wtPath, script.String()); err != nil {
-		return fmt.Errorf("run setup script: %w", err)
-	}
-
-	return nil
 }
 
 func (uc *ACPRun) buildAgentCommand(task *domain.Task, worktreePath string, agent domain.Agent, model string) (string, error) {
