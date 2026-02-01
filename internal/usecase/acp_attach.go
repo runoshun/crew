@@ -49,7 +49,7 @@ func (uc *ACPAttach) Execute(_ context.Context, in ACPAttachInput) (*ACPAttachOu
 		return nil, fmt.Errorf("check session: %w", err)
 	}
 	if !running {
-		return nil, fmt.Errorf("%w: acp session stopped or missing. Recover: crew acp start %d, crew acp peek %d", domain.ErrNoSession, in.TaskID, in.TaskID)
+		return nil, fmt.Errorf("%w: acp session stopped or missing. Recover: crew acp start %d (then retry this command)", domain.ErrNoSession, in.TaskID)
 	}
 
 	if err := uc.sessions.Attach(sessionName); err != nil {

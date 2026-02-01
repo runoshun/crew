@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -24,13 +25,13 @@ func TestResolvePermissionOptionID_Index(t *testing.T) {
 		{Type: domain.ACPEventRequestPermission, Payload: payload},
 	}
 
-	optionID, err := resolvePermissionOptionID("#2", events)
+	optionID, err := resolvePermissionOptionID("#2", events, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "opt-2", optionID)
 }
 
 func TestResolvePermissionOptionID_NonNumeric(t *testing.T) {
-	optionID, err := resolvePermissionOptionID("opt-1", nil)
+	optionID, err := resolvePermissionOptionID("opt-1", nil, nil)
 	require.NoError(t, err)
 	assert.Equal(t, "opt-1", optionID)
 }
@@ -48,13 +49,13 @@ func TestResolvePermissionOptionID_OutOfRange(t *testing.T) {
 		{Type: domain.ACPEventRequestPermission, Payload: payload},
 	}
 
-	_, err = resolvePermissionOptionID("#2", events)
+	_, err = resolvePermissionOptionID("#2", events, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "out of range")
 }
 
 func TestResolvePermissionOptionID_NoEvents(t *testing.T) {
-	_, err := resolvePermissionOptionID("#1", nil)
+	_, err := resolvePermissionOptionID("#1", nil, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no permission requests")
 }
@@ -64,13 +65,34 @@ func TestResolvePermissionOptionID_InvalidPayload(t *testing.T) {
 		{Type: domain.ACPEventRequestPermission, Payload: json.RawMessage("{invalid")},
 	}
 
-	_, err := resolvePermissionOptionID("#1", events)
+	_, err := resolvePermissionOptionID("#1", events, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "decode permission request")
 }
 
+func TestResolvePermissionOptionID_InvalidPayloadFallback(t *testing.T) {
+	validReq := acpsdk.RequestPermissionRequest{
+		Options: []acpsdk.PermissionOption{
+			{OptionId: acpsdk.PermissionOptionId("opt-1"), Name: "Allow"},
+		},
+	}
+	validPayload, err := json.Marshal(validReq)
+	require.NoError(t, err)
+
+	var warn bytes.Buffer
+	events := []domain.ACPEvent{
+		{Type: domain.ACPEventRequestPermission, Payload: validPayload},
+		{Type: domain.ACPEventRequestPermission, Payload: json.RawMessage("{invalid")},
+	}
+
+	optionID, err := resolvePermissionOptionID("#1", events, &warn)
+	require.NoError(t, err)
+	assert.Equal(t, "opt-1", optionID)
+	assert.Contains(t, warn.String(), "warning")
+}
+
 func TestResolvePermissionOptionID_NonNumericIndex(t *testing.T) {
-	_, err := resolvePermissionOptionID("#x", nil)
+	_, err := resolvePermissionOptionID("#x", nil, nil)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "numeric")
 }

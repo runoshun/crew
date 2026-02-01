@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -242,7 +243,7 @@ Prefix the option with "#" to select by index from the latest permission request
 				if err != nil {
 					return err
 				}
-				optionID, err = resolvePermissionOptionID(optionID, out.Events)
+				optionID, err = resolvePermissionOptionID(optionID, out.Events, cmd.ErrOrStderr())
 				if err != nil {
 					return err
 				}
@@ -372,7 +373,7 @@ func newACPAttachCommand(c *app.Container) *cobra.Command {
 		Long: `Attach to a running tmux session for an ACP task.
 
 This replaces the current process with the tmux session.
-Use your configured tmux detach key to leave the session (see .crew/tmux.conf if available).
+Use your configured tmux detach key to leave the session.
 
 Examples:
   crew acp attach 1`,
@@ -515,7 +516,7 @@ Examples:
 	return cmd
 }
 
-func resolvePermissionOptionID(option string, events []domain.ACPEvent) (string, error) {
+func resolvePermissionOptionID(option string, events []domain.ACPEvent, warn io.Writer) (string, error) {
 	option = strings.TrimSpace(option)
 	if !strings.HasPrefix(option, "#") {
 		return option, nil
@@ -532,17 +533,27 @@ func resolvePermissionOptionID(option string, events []domain.ACPEvent) (string,
 		return "", fmt.Errorf("option index must be >= 1")
 	}
 
+	var invalidPayloadErr error
 	for i := len(events) - 1; i >= 0; i-- {
 		event := events[i]
 		if event.Type != domain.ACPEventRequestPermission {
 			continue
 		}
 		if len(event.Payload) == 0 {
-			return "", fmt.Errorf("permission request payload is empty")
+			if invalidPayloadErr == nil {
+				invalidPayloadErr = fmt.Errorf("permission request payload is empty")
+			}
+			continue
 		}
 		var req acpsdk.RequestPermissionRequest
 		if err := json.Unmarshal(event.Payload, &req); err != nil {
-			return "", fmt.Errorf("decode permission request: %w", err)
+			if invalidPayloadErr == nil {
+				invalidPayloadErr = fmt.Errorf("decode permission request: %w", err)
+			}
+			continue
+		}
+		if invalidPayloadErr != nil && warn != nil {
+			_, _ = fmt.Fprintf(warn, "warning: latest permission request payload is invalid; using previous request: %v\n", invalidPayloadErr)
 		}
 		if idx > len(req.Options) {
 			return "", fmt.Errorf("permission option index out of range: %d", idx)
@@ -550,6 +561,9 @@ func resolvePermissionOptionID(option string, events []domain.ACPEvent) (string,
 		return string(req.Options[idx-1].OptionId), nil
 	}
 
+	if invalidPayloadErr != nil {
+		return "", invalidPayloadErr
+	}
 	return "", fmt.Errorf("no permission requests found")
 }
 
