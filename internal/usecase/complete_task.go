@@ -296,7 +296,7 @@ func (uc *CompleteTask) writeReviewScript(sessionName string, taskID int, review
 	script := fmt.Sprintf(`#!/bin/bash
 set -o pipefail
 
-exec 2>>%q
+exec 2> >(tee -a %q >&2)
 
 read -r -d '' PROMPT << 'END_OF_PROMPT'
 %s
@@ -305,9 +305,22 @@ END_OF_PROMPT
 %s
 `, logPath, reviewCmd.Result.Prompt, reviewCmd.Result.Command)
 
-	scriptPath := domain.ReviewScriptPath(uc.crewDir, taskID)
-	if err := os.WriteFile(scriptPath, []byte(script), 0700); err != nil { //nolint:gosec // executable script requires execute permission
+	file, err := os.CreateTemp(scriptsDir, fmt.Sprintf("review-%d-*.sh", taskID))
+	if err != nil {
+		return "", fmt.Errorf("create review script: %w", err)
+	}
+
+	scriptPath := file.Name()
+	if _, err := file.WriteString(script); err != nil {
+		_ = file.Close()
 		return "", fmt.Errorf("write review script: %w", err)
+	}
+	if err := file.Chmod(0700); err != nil {
+		_ = file.Close()
+		return "", fmt.Errorf("chmod review script: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return "", fmt.Errorf("close review script: %w", err)
 	}
 
 	return scriptPath, nil
@@ -372,14 +385,12 @@ func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, preReviewerCount
 		return fmt.Errorf("get comments: %w", err)
 	}
 	postReviewerCount := countReviewerComments(postComments)
+	if postReviewerCount <= preReviewerCount {
+		return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+	}
 	lastReviewerComment, ok := lastReviewerComment(postComments)
 	if !ok {
 		return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
-	}
-	if postReviewerCount <= preReviewerCount {
-		if !task.LastReviewAt.IsZero() && !lastReviewerComment.Time.After(task.LastReviewAt) {
-			return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
-		}
 	}
 
 	shared.UpdateReviewMetadata(uc.clock, task, lastReviewerComment.Text)
