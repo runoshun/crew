@@ -560,6 +560,22 @@ func extractReviewResult(logText string) (string, bool) {
 	if strings.TrimSpace(logText) == "" {
 		return "", false
 	}
+
+	// If the log contains multiple review runs (e.g. file was appended), only consider
+	// the latest run to avoid accidentally picking an old marker.
+	if idx := strings.LastIndex(logText, reviewRunStartPrefix); idx >= 0 {
+		logText = logText[idx+len(reviewRunStartPrefix):]
+		if nl := strings.IndexByte(logText, '\n'); nl >= 0 {
+			logText = logText[nl+1:]
+		} else {
+			logText = ""
+		}
+		logText = strings.TrimSpace(logText)
+		if logText == "" {
+			return "", false
+		}
+	}
+
 	lines := strings.Split(logText, "\n")
 	markerIdx := -1
 	for i := len(lines) - 1; i >= 0; i-- {
