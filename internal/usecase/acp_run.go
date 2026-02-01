@@ -218,6 +218,10 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			_ = conn.Cancel(context.Background(), acpsdk.CancelNotification{SessionId: session.SessionId})
 		case <-stopCh:
 			_ = conn.Cancel(context.Background(), acpsdk.CancelNotification{SessionId: session.SessionId})
+			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
+				cancel()
+				return nil, fmt.Errorf("update state: %w", idleErr)
+			}
 			cancel()
 			return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 		case err, ok := <-routerErrCh:
@@ -230,6 +234,9 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			}
 		case err := <-procErrCh:
 			if err == nil || errors.Is(cmdCtx.Err(), context.Canceled) {
+				if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
+					return nil, fmt.Errorf("update state: %w", idleErr)
+				}
 				return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 			}
 			if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
@@ -244,8 +251,14 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 				}
 				return nil, fmt.Errorf("agent process exited: %w", err)
 			}
+			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
+				return nil, fmt.Errorf("update state: %w", idleErr)
+			}
 			return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 		case <-ctx.Done():
+			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
+				return nil, fmt.Errorf("context canceled: %w (update state: %v)", ctx.Err(), idleErr)
+			}
 			return nil, ctx.Err()
 		}
 	}
