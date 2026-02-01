@@ -43,8 +43,9 @@ var Colors = struct {
 	StatusError lipgloss.Color
 	Closed      lipgloss.Color
 
-	// Group header
-	GroupLine lipgloss.Color
+	// Group header / UI Elements
+	GroupLine   lipgloss.Color
+	SelectionBg lipgloss.Color // Background for selected items
 
 	// Blocked state
 	Blocked lipgloss.Color
@@ -80,7 +81,8 @@ var Colors = struct {
 	Closed:      lipgloss.Color("#6C7086"), // Overlay0
 
 	// Group header / UI Elements
-	GroupLine: lipgloss.Color("#313244"), // Surface0
+	GroupLine:   lipgloss.Color("#313244"), // Surface0
+	SelectionBg: lipgloss.Color("#262637"), // Very subtle highlight for selected items
 
 	// Blocked state
 	Blocked: lipgloss.Color("#585B70"), // Surface2 - dim gray for blocked tasks
@@ -195,7 +197,7 @@ func DefaultStyles() Styles {
 			Foreground(Colors.TitleNormal),
 
 		TaskSelected: lipgloss.NewStyle().
-			Background(lipgloss.Color("#262637")), // Very subtle highlight, no foreground override
+			Background(Colors.SelectionBg),
 
 		SelectionIndicator: lipgloss.NewStyle().
 			Foreground(Colors.Primary),

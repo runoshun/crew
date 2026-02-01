@@ -11,7 +11,6 @@ type KeyMap struct {
 	Delete   key.Binding
 	Refresh  key.Binding
 	Quit     key.Binding
-	Help     key.Binding
 	PageUp   key.Binding
 	PageDown key.Binding
 }
@@ -47,31 +46,13 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("q", "ctrl+c"),
 			key.WithHelp("q", "quit"),
 		),
-		Help: key.NewBinding(
-			key.WithKeys("?"),
-			key.WithHelp("?", "help"),
-		),
 		PageUp: key.NewBinding(
 			key.WithKeys("pgup", "ctrl+u"),
 			key.WithHelp("pgup", "page up"),
 		),
 		PageDown: key.NewBinding(
-			key.WithKeys("pgdown", "ctrl+d"),
+			key.WithKeys("pgdown", "ctrl+f"),
 			key.WithHelp("pgdown", "page down"),
 		),
-	}
-}
-
-// ShortHelp returns the short help text.
-func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Enter, k.Add, k.Delete, k.Refresh, k.Quit}
-}
-
-// FullHelp returns the full help text.
-func (k KeyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Up, k.Down, k.PageUp, k.PageDown},
-		{k.Enter, k.Add, k.Delete},
-		{k.Refresh, k.Quit, k.Help},
 	}
 }
