@@ -420,10 +420,10 @@ func (uc *CompleteTask) noReviewCommentError(sessionName string) error {
 	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
 	logTail := tailFileLines(logPath, reviewLogTailLines)
 	if logTail == "" {
-		return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+		return fmt.Errorf("reviewer did not add a comment: %w (log: %s)", domain.ErrNoReviewComment, logPath)
 	}
 
-	return fmt.Errorf("reviewer did not add a comment: %w\n\nreview log (tail):\n%s", domain.ErrNoReviewComment, logTail)
+	return fmt.Errorf("reviewer did not add a comment: %w\n\nreview log (tail from %s):\n%s", domain.ErrNoReviewComment, logPath, logTail)
 }
 
 func tailFileLines(path string, maxLines int) string {
