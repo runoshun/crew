@@ -59,23 +59,14 @@ func TestResolvePermissionOptionID_NoEvents(t *testing.T) {
 	assert.Contains(t, err.Error(), "no permission requests")
 }
 
-func TestResolvePermissionOptionID_SkipsInvalidPayload(t *testing.T) {
-	validReq := acpsdk.RequestPermissionRequest{
-		Options: []acpsdk.PermissionOption{
-			{OptionId: acpsdk.PermissionOptionId("opt-1"), Name: "Allow"},
-		},
-	}
-	validPayload, err := json.Marshal(validReq)
-	require.NoError(t, err)
-
+func TestResolvePermissionOptionID_InvalidPayload(t *testing.T) {
 	events := []domain.ACPEvent{
 		{Type: domain.ACPEventRequestPermission, Payload: json.RawMessage("{invalid")},
-		{Type: domain.ACPEventRequestPermission, Payload: validPayload},
 	}
 
-	optionID, err := resolvePermissionOptionID("#1", events)
-	require.NoError(t, err)
-	assert.Equal(t, "opt-1", optionID)
+	_, err := resolvePermissionOptionID("#1", events)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "decode permission request")
 }
 
 func TestResolvePermissionOptionID_NonNumericIndex(t *testing.T) {

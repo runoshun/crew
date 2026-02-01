@@ -131,7 +131,7 @@ func newACPSendCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "send <task-id> <text>",
+		Use:   "send [task-id] [text]",
 		Short: "Send a prompt to an ACP session",
 		Long: `Send a prompt to an ACP session.
 
@@ -193,7 +193,7 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "permission <task-id> <option-id|#index>",
+		Use:   "permission [task-id] [option-id|#index]",
 		Short: "Respond to a permission request",
 		Long: `Respond to a permission request.
 
@@ -271,7 +271,7 @@ func newACPCancelCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "cancel <task-id>",
+		Use:   "cancel [task-id]",
 		Short: "Cancel the current ACP session",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -321,7 +321,7 @@ func newACPStopCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "stop <task-id>",
+		Use:   "stop [task-id]",
 		Short: "Stop the ACP session cleanly",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -538,11 +538,11 @@ func resolvePermissionOptionID(option string, events []domain.ACPEvent) (string,
 			continue
 		}
 		if len(event.Payload) == 0 {
-			continue
+			return "", fmt.Errorf("permission request payload is empty")
 		}
 		var req acpsdk.RequestPermissionRequest
 		if err := json.Unmarshal(event.Payload, &req); err != nil {
-			continue
+			return "", fmt.Errorf("decode permission request: %w", err)
 		}
 		if idx > len(req.Options) {
 			return "", fmt.Errorf("permission option index out of range: %d", idx)
