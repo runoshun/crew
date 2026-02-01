@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/reflow/truncate"
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	infraWorkspace "github.com/runoshun/git-crew/v2/internal/infra/workspace"
+	"github.com/runoshun/git-crew/v2/internal/tui"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
 
@@ -24,6 +26,10 @@ const (
 	ModeNormal Mode = iota
 	ModeAddRepo
 	ModeConfirmDelete
+)
+
+const (
+	appPadding = 4
 )
 
 // Model is the workspace TUI model.
@@ -40,7 +46,6 @@ type Model struct {
 	// Components
 	keys     KeyMap
 	styles   Styles
-	help     help.Model
 	addInput textinput.Model
 
 	// Numeric state
@@ -51,8 +56,7 @@ type Model struct {
 	mode        Mode
 
 	// Boolean state
-	showHelp bool
-	loading  bool
+	loading bool
 }
 
 // New creates a new workspace TUI model.
@@ -72,7 +76,6 @@ func New() *Model {
 		mode:      ModeNormal,
 		keys:      DefaultKeyMap(),
 		styles:    DefaultStyles(),
-		help:      help.New(),
 		addInput:  ai,
 		loading:   storeErr == nil, // Don't show loading if we already have an error
 	}
@@ -172,7 +175,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.help.Width = msg.Width
 		return m, nil
 
 	case MsgReposLoaded:
@@ -229,9 +231,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKey handles key events.
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Clear error on any key
-	m.err = nil
-
 	switch m.mode { //nolint:exhaustive // ModeNormal handled in default
 	case ModeAddRepo:
 		return m.handleAddMode(msg)
@@ -267,7 +266,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case msg.String() == "pgdown" || msg.String() == "ctrl+d":
+	case msg.String() == "pgdown" || msg.String() == "ctrl+f":
 		m.cursor += 5
 		if m.cursor >= len(m.repos) {
 			m.cursor = len(m.repos) - 1
@@ -306,10 +305,6 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "r":
 		m.loading = true
 		return m, m.loadRepos()
-
-	case msg.String() == "?":
-		m.showHelp = !m.showHelp
-		return m, nil
 	}
 
 	return m, nil
@@ -399,47 +394,93 @@ func (m *Model) loadAllSummaries() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// contentWidth returns the available content width.
+func (m *Model) contentWidth() int {
+	w := m.width - appPadding
+	if w < 0 {
+		w = 0
+	}
+	return w
+}
+
 // View renders the TUI.
 func (m *Model) View() string {
 	if m.width == 0 {
-		return ""
+		return "Loading..."
+	}
+
+	var base string
+	switch m.mode { //nolint:exhaustive // ModeNormal handled in default
+	case ModeAddRepo:
+		base = m.viewAddDialog()
+	case ModeConfirmDelete:
+		base = m.viewDeleteDialog()
+	default:
+		base = m.viewMain()
+	}
+
+	return m.styles.App.Render(base)
+}
+
+// viewMain renders the main view with header, list, and footer.
+func (m *Model) viewMain() string {
+	// Show empty state only if no error and no repos
+	if len(m.repos) == 0 && !m.loading && m.err == nil {
+		return m.viewEmptyState()
 	}
 
 	var b strings.Builder
 
-	// Title
-	b.WriteString(m.styles.Title.Render("crew workspace"))
+	b.WriteString(m.viewHeader())
 	b.WriteString("\n")
-	b.WriteString(m.styles.Subtitle.Render(fmt.Sprintf("%d repositories", len(m.repos))))
-	b.WriteString("\n\n")
 
-	// Content based on mode
-	switch m.mode { //nolint:exhaustive // ModeNormal handled in default
-	case ModeAddRepo:
-		b.WriteString(m.viewAddDialog())
-	case ModeConfirmDelete:
-		b.WriteString(m.viewDeleteDialog())
-	default:
-		b.WriteString(m.viewRepoList())
-	}
-
-	// Error message
 	if m.err != nil {
-		b.WriteString("\n")
-		b.WriteString(m.styles.Error.Render(fmt.Sprintf("Error: %v", m.err)))
-		b.WriteString("\n")
+		b.WriteString(m.styles.Error.Render("Error: "+m.err.Error()) + "\n\n")
 	}
 
-	// Help
-	if m.showHelp {
-		b.WriteString("\n")
-		b.WriteString(m.help.View(m.keys))
-	} else {
-		b.WriteString("\n")
-		b.WriteString(m.styles.Help.Render("Press ? for help"))
-	}
+	b.WriteString(m.viewRepoList())
+	b.WriteString("\n")
+	b.WriteString(m.viewFooter())
 
 	return b.String()
+}
+
+// viewHeader renders the header with title left-aligned and count right-aligned.
+func (m *Model) viewHeader() string {
+	headerStyle := m.styles.Header
+	textStyle := m.styles.HeaderText
+	mutedStyle := lipgloss.NewStyle().Foreground(tui.Colors.Muted)
+
+	titleText := "Workspace"
+	title := textStyle.Render(titleText)
+
+	contentWidth := m.contentWidth()
+	countText := fmt.Sprintf("%d repos", len(m.repos))
+
+	leftLen := lipgloss.Width(title)
+	rightLen := len(countText) // Plain text length before rendering
+	// Header style has Padding(0, 1), so inner content width is contentWidth - 2
+	innerWidth := contentWidth - 2
+	spacing := innerWidth - leftLen - rightLen
+
+	// Truncate right text if too wide (truncate plain text before rendering)
+	if spacing < 1 {
+		maxRightWidth := innerWidth - leftLen - 1 // 1 for minimum spacing
+		if maxRightWidth <= 3 {
+			countText = ""
+		} else if len(countText) > maxRightWidth-3 {
+			countText = countText[:maxRightWidth-3] + "..."
+		}
+		rightLen = len(countText)
+		spacing = innerWidth - leftLen - rightLen
+		if spacing < 1 {
+			spacing = 1
+		}
+	}
+
+	rightText := mutedStyle.Render(countText)
+	content := title + strings.Repeat(" ", spacing) + rightText
+	return headerStyle.Width(contentWidth).Render(content)
 }
 
 // viewRepoList renders the repo list.
@@ -448,8 +489,13 @@ func (m *Model) viewRepoList() string {
 		return m.styles.Loading.Render("Loading repositories...")
 	}
 
+	// Don't show "No repositories" message if there's an error
+	// (error is already displayed above)
 	if len(m.repos) == 0 {
-		return m.styles.Subtitle.Render("No repositories. Press 'a' to add one.")
+		if m.err != nil {
+			return ""
+		}
+		return m.styles.Muted.Render("No repositories. Press 'a' to add one.")
 	}
 
 	var b strings.Builder
@@ -461,52 +507,202 @@ func (m *Model) viewRepoList() string {
 	return b.String()
 }
 
-// renderRepoLine renders a single repo line.
+// renderRepoLine renders a single repo line matching the task tree TUI style.
 func (m *Model) renderRepoLine(repo domain.WorkspaceRepo, selected bool) string {
 	info, hasInfo := m.repoInfos[repo.Path]
 
-	// Build the line content
-	var parts []string
+	// Cursor indicator (▸ for selected, space for normal)
+	var cursor string
+	if selected {
+		cursor = m.styles.CursorSelected.Render("▸")
+	} else {
+		cursor = m.styles.CursorNormal.Render(" ")
+	}
 
 	// Name
 	name := repo.DisplayName()
+	var nameStr string
 	if selected {
-		parts = append(parts, m.styles.Selected.Render(name))
+		nameStr = m.styles.RepoNameSelected.Render(name)
 	} else {
-		parts = append(parts, m.styles.RepoName.Render(name))
+		nameStr = m.styles.RepoName.Render(name)
 	}
 
 	// Path (truncated)
 	pathStr := truncatePath(repo.Path, 40)
-	parts = append(parts, m.styles.RepoPath.Render(pathStr))
-
-	// State and summary
-	if hasInfo {
-		if info.State == domain.RepoStateOK {
-			parts = append(parts, m.styles.StateOK.Render("OK"))
-			// Task summary
-			summary := formatSummary(info.Summary)
-			parts = append(parts, m.styles.Summary.Render(summary))
-		} else {
-			parts = append(parts, m.styles.StateError.Render(info.State.String()))
-		}
+	var pathRendered string
+	if selected {
+		pathRendered = m.styles.RepoPathSelected.Render(pathStr)
 	} else {
-		parts = append(parts, m.styles.Loading.Render("loading..."))
+		pathRendered = m.styles.RepoPath.Render(pathStr)
 	}
 
-	return strings.Join(parts, "  ")
+	// State and summary
+	var statusStr string
+	if hasInfo {
+		if info.State == domain.RepoStateOK {
+			statusStr = m.formatSummaryColored(info.Summary)
+		} else {
+			statusStr = m.styles.StateError.Render(info.State.String())
+		}
+	} else {
+		statusStr = m.styles.Loading.Render("loading...")
+	}
+
+	// Build line with consistent spacing: "▸ name    path    status"
+	line := fmt.Sprintf("%s %s  %s  %s", cursor, nameStr, pathRendered, statusStr)
+
+	contentWidth := m.contentWidth()
+	lineWidth := lipgloss.Width(line)
+
+	// Truncate line if it exceeds content width (ANSI-aware truncation)
+	if lineWidth > contentWidth && contentWidth > 0 {
+		line = truncate.StringWithTail(line, uint(contentWidth), "")
+		lineWidth = lipgloss.Width(line)
+	}
+
+	// Apply row background for selected items
+	if selected {
+		if lineWidth < contentWidth {
+			// Pad to full width with background
+			padding := strings.Repeat(" ", contentWidth-lineWidth)
+			line = m.styles.ItemSelected.Render(line + padding)
+		} else {
+			line = m.styles.ItemSelected.Render(line)
+		}
+	}
+
+	return line
+}
+
+// formatSummaryColored formats task summary with status-specific colors.
+func (m *Model) formatSummaryColored(s domain.TaskSummary) string {
+	if s.TotalActive == 0 {
+		return m.styles.Summary.Render("no active tasks")
+	}
+
+	var parts []string
+	if s.InProgress > 0 {
+		parts = append(parts, m.styles.SummaryInProg.Render(fmt.Sprintf("prog:%d", s.InProgress)))
+	}
+	if s.Todo > 0 {
+		parts = append(parts, m.styles.SummaryTodo.Render(fmt.Sprintf("todo:%d", s.Todo)))
+	}
+	if s.Done > 0 {
+		parts = append(parts, m.styles.SummaryDone.Render(fmt.Sprintf("done:%d", s.Done)))
+	}
+	if s.Error > 0 {
+		parts = append(parts, m.styles.SummaryError.Render(fmt.Sprintf("err:%d", s.Error)))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+// viewFooter renders the footer with key hints.
+func (m *Model) viewFooter() string {
+	keyStyle := m.styles.FooterKey
+	contentWidth := m.contentWidth()
+
+	content := keyStyle.Render("j/k") + " nav  " +
+		keyStyle.Render("enter") + " open  " +
+		keyStyle.Render("a") + " add  " +
+		keyStyle.Render("d") + " remove  " +
+		keyStyle.Render("r") + " refresh  " +
+		keyStyle.Render("q") + " quit"
+
+	return m.styles.Footer.Width(contentWidth).Render(content)
+}
+
+// viewEmptyState renders a friendly empty state message.
+func (m *Model) viewEmptyState() string {
+	contentWidth := m.contentWidth()
+	contentHeight := m.height - 2
+	if contentWidth < 0 {
+		contentWidth = 0
+	}
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+
+	titleStyle := m.styles.EmptyTitle
+	bodyStyle := m.styles.EmptyBody
+	keyStyle := m.styles.EmptyKey
+	cmdStyle := m.styles.EmptyCmd
+
+	title := titleStyle.Render("No repositories")
+	subtitle := bodyStyle.Render("Add a repository to get started")
+
+	hint1 := lipgloss.JoinHorizontal(lipgloss.Left,
+		bodyStyle.Render("Press "),
+		keyStyle.Render("a"),
+		bodyStyle.Render(" to add a repository"),
+	)
+	hint2 := lipgloss.JoinHorizontal(lipgloss.Left,
+		bodyStyle.Render("Or run: "),
+		cmdStyle.Render("crew workspace add /path/to/repo"),
+	)
+
+	content := lipgloss.JoinVertical(lipgloss.Center,
+		title,
+		subtitle,
+		"",
+		hint1,
+		hint2,
+	)
+
+	return lipgloss.Place(contentWidth, contentHeight, lipgloss.Center, lipgloss.Center, content)
 }
 
 // viewAddDialog renders the add repo dialog.
 func (m *Model) viewAddDialog() string {
-	var b strings.Builder
-	b.WriteString(m.styles.DialogTitle.Render("Add Repository"))
-	b.WriteString("\n\n")
-	b.WriteString("Enter the path to a git repository:\n\n")
-	b.WriteString(m.styles.Input.Render(m.addInput.View()))
-	b.WriteString("\n\n")
-	b.WriteString(m.styles.Help.Render("Press Enter to add, Esc to cancel"))
-	return m.styles.Dialog.Render(b.String())
+	dialogWidth := m.dialogWidth()
+	bg := tui.Colors.Background
+	lineWidth := dialogWidth - 4
+	if lineWidth < 0 {
+		lineWidth = 0
+	}
+	lineStyle := lipgloss.NewStyle().Background(bg).Width(lineWidth)
+
+	title := lineStyle.Render(m.styles.DialogTitle.Render("Add Repository"))
+	emptyLine := lineStyle.Render("")
+	label := lineStyle.Render(m.styles.DialogText.Render("Enter the path to a git repository:"))
+	input := lineStyle.Render(m.styles.Input.Render(m.addInput.View()))
+	hint := lineStyle.Render(
+		m.styles.DialogKey.Render("enter") + m.styles.DialogText.Render(" add  ") +
+			m.styles.DialogKey.Render("esc") + m.styles.DialogText.Render(" cancel"))
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		emptyLine,
+		label,
+		input,
+		emptyLine,
+		hint,
+	)
+
+	return m.styles.Dialog.Width(dialogWidth).Render(content)
+}
+
+// dialogWidth returns the width for dialogs.
+func (m *Model) dialogWidth() int {
+	contentWidth := m.contentWidth()
+	width := contentWidth - 10
+	if width > 80 {
+		width = 80
+	}
+	// Minimum width for usability, but never exceed content width
+	minWidth := 20
+	if minWidth > contentWidth {
+		minWidth = contentWidth
+	}
+	if width < minWidth {
+		width = minWidth
+	}
+	// Final clamp to content width
+	if width > contentWidth {
+		width = contentWidth
+	}
+	return width
 }
 
 // viewDeleteDialog renders the delete confirmation dialog.
@@ -516,14 +712,35 @@ func (m *Model) viewDeleteDialog() string {
 	}
 	repo := m.repos[m.deleteIndex]
 
-	var b strings.Builder
-	b.WriteString(m.styles.DialogTitle.Render("Remove Repository"))
-	b.WriteString("\n\n")
-	b.WriteString(fmt.Sprintf("Remove %s from workspace?\n", m.styles.RepoName.Render(repo.DisplayName())))
-	b.WriteString(m.styles.RepoPath.Render(repo.Path))
-	b.WriteString("\n\n")
-	b.WriteString(m.styles.Help.Render("Press Y to confirm, N or Esc to cancel"))
-	return m.styles.Dialog.Render(b.String())
+	dialogWidth := m.dialogWidth()
+	bg := tui.Colors.Background
+	lineWidth := dialogWidth - 4
+	if lineWidth < 0 {
+		lineWidth = 0
+	}
+	lineStyle := lipgloss.NewStyle().Background(bg).Width(lineWidth)
+	titleColor := lipgloss.NewStyle().Background(bg).Foreground(tui.Colors.Error).Bold(true)
+
+	title := lineStyle.Render(titleColor.Render("Remove Repository?"))
+	emptyLine := lineStyle.Render("")
+	repoLine := lineStyle.Render(m.styles.DialogText.Render(repo.DisplayName()))
+	pathLine := lineStyle.Render(m.styles.DialogMuted.Render(repo.Path))
+	warnLine := lineStyle.Render(m.styles.DialogText.Render("This will remove the repository from the workspace list."))
+	hint := lineStyle.Render(
+		m.styles.DialogKey.Render("[ y ]") + m.styles.DialogText.Render(" Confirm  ") +
+			m.styles.DialogMuted.Render("[ n ]") + m.styles.DialogMuted.Render(" Cancel"))
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		title,
+		repoLine,
+		pathLine,
+		emptyLine,
+		warnLine,
+		emptyLine,
+		hint,
+	)
+
+	return m.styles.Dialog.Width(dialogWidth).Render(content)
 }
 
 // truncatePath truncates a path, keeping the end.
@@ -532,27 +749,4 @@ func truncatePath(path string, maxLen int) string {
 		return path
 	}
 	return "..." + path[len(path)-maxLen+3:]
-}
-
-// formatSummary formats a task summary for display.
-func formatSummary(s domain.TaskSummary) string {
-	if s.TotalActive == 0 {
-		return "no active tasks"
-	}
-
-	var parts []string
-	if s.InProgress > 0 {
-		parts = append(parts, fmt.Sprintf("prog:%d", s.InProgress))
-	}
-	if s.Todo > 0 {
-		parts = append(parts, fmt.Sprintf("todo:%d", s.Todo))
-	}
-	if s.Done > 0 {
-		parts = append(parts, fmt.Sprintf("done:%d", s.Done))
-	}
-	if s.Error > 0 {
-		parts = append(parts, fmt.Sprintf("err:%d", s.Error))
-	}
-
-	return strings.Join(parts, " ")
 }
