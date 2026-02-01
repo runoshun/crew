@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	acpsdk "github.com/coder/acp-go-sdk"
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -33,15 +35,16 @@ type ACPRunOutput struct {
 
 // ACPRun is the use case for running an ACP client session.
 type ACPRun struct {
-	tasks        domain.TaskRepository
-	worktrees    domain.WorktreeManager
-	configLoader domain.ConfigLoader
-	git          domain.Git
-	runner       domain.ScriptRunner
-	ipcFactory   domain.ACPIPCFactory
-	stdout       io.Writer
-	stderr       io.Writer
-	repoRoot     string
+	tasks              domain.TaskRepository
+	worktrees          domain.WorktreeManager
+	configLoader       domain.ConfigLoader
+	git                domain.Git
+	runner             domain.ScriptRunner
+	ipcFactory         domain.ACPIPCFactory
+	eventWriterFactory domain.ACPEventWriterFactory
+	stdout             io.Writer
+	stderr             io.Writer
+	repoRoot           string
 }
 
 // NewACPRun creates a new ACPRun use case.
@@ -52,20 +55,22 @@ func NewACPRun(
 	git domain.Git,
 	runner domain.ScriptRunner,
 	ipcFactory domain.ACPIPCFactory,
+	eventWriterFactory domain.ACPEventWriterFactory,
 	repoRoot string,
 	stdout io.Writer,
 	stderr io.Writer,
 ) *ACPRun {
 	return &ACPRun{
-		tasks:        tasks,
-		worktrees:    worktrees,
-		configLoader: configLoader,
-		git:          git,
-		runner:       runner,
-		ipcFactory:   ipcFactory,
-		repoRoot:     repoRoot,
-		stdout:       stdout,
-		stderr:       stderr,
+		tasks:              tasks,
+		worktrees:          worktrees,
+		configLoader:       configLoader,
+		git:                git,
+		runner:             runner,
+		ipcFactory:         ipcFactory,
+		eventWriterFactory: eventWriterFactory,
+		repoRoot:           repoRoot,
+		stdout:             stdout,
+		stderr:             stderr,
 	}
 }
 
@@ -186,9 +191,20 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		return nil, fmt.Errorf("acp new session: %w", err)
 	}
 
-	ipc := uc.ipcFactory.ForTask(shared.ResolveACPNamespace(cfg, uc.git), task.ID)
+	namespace := shared.ResolveACPNamespace(cfg, uc.git)
+	ipc := uc.ipcFactory.ForTask(namespace, task.ID)
 	router := newACPCommandRouter(ipc, permissionCh, promptCh, cancelCh, stopCh)
 	routerErrCh := router.Start(cmdCtx)
+
+	// Create event writer for logging
+	eventWriter, err := uc.eventWriterFactory.ForTask(namespace, task.ID)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("create event writer: %w", err)
+	}
+	defer func() { _ = eventWriter.Close() }()
+	client.eventWriter = eventWriter
+	client.sessionID = string(session.SessionId)
 
 	for {
 		select {
@@ -396,14 +412,18 @@ func (r *acpCommandRouter) Start(ctx context.Context) <-chan error {
 type acpRunClient struct {
 	permissionCh <-chan domain.ACPCommand
 	stopCh       <-chan struct{}
+	eventWriter  domain.ACPEventWriter
 	stdout       io.Writer
 	stderr       io.Writer
+	sessionID    string
 }
 
 var _ acpsdk.Client = (*acpRunClient)(nil)
 
 func (c *acpRunClient) RequestPermission(ctx context.Context, params acpsdk.RequestPermissionRequest) (acpsdk.RequestPermissionResponse, error) {
 	c.writePermissionRequest(params)
+	c.writeEvent(ctx, domain.ACPEventRequestPermission, params)
+
 	options := make(map[string]struct{}, len(params.Options))
 	for _, opt := range params.Options {
 		options[string(opt.OptionId)] = struct{}{}
@@ -416,23 +436,32 @@ func (c *acpRunClient) RequestPermission(ctx context.Context, params acpsdk.Requ
 				c.writeWarning(fmt.Sprintf("unknown permission option_id: %s", cmd.OptionID))
 				continue
 			}
-			return acpsdk.RequestPermissionResponse{
+			resp := acpsdk.RequestPermissionResponse{
 				Outcome: acpsdk.RequestPermissionOutcome{
 					Selected: &acpsdk.RequestPermissionOutcomeSelected{
 						OptionId: acpsdk.PermissionOptionId(cmd.OptionID),
 						Outcome:  "selected",
 					},
 				},
-			}, nil
+			}
+			c.writeEvent(ctx, domain.ACPEventPermissionResponse, resp)
+			return resp, nil
 		case <-c.stopCh:
-			return cancelPermissionResponse(), nil
+			resp := cancelPermissionResponse()
+			c.writeEvent(ctx, domain.ACPEventPermissionResponse, resp)
+			return resp, nil
 		case <-ctx.Done():
-			return cancelPermissionResponse(), nil
+			resp := cancelPermissionResponse()
+			c.writeEvent(ctx, domain.ACPEventPermissionResponse, resp)
+			return resp, nil
 		}
 	}
 }
 
-func (c *acpRunClient) SessionUpdate(_ context.Context, params acpsdk.SessionNotification) error {
+func (c *acpRunClient) SessionUpdate(ctx context.Context, params acpsdk.SessionNotification) error {
+	// Write event based on update type
+	c.writeSessionUpdateEvent(ctx, params)
+
 	if c.stdout == nil {
 		return nil
 	}
@@ -441,6 +470,35 @@ func (c *acpRunClient) SessionUpdate(_ context.Context, params acpsdk.SessionNot
 		_, _ = fmt.Fprint(c.stdout, update.AgentMessageChunk.Content.Text.Text)
 	}
 	return nil
+}
+
+func (c *acpRunClient) writeSessionUpdateEvent(ctx context.Context, params acpsdk.SessionNotification) {
+	update := params.Update
+
+	// Determine event type based on update content
+	var eventType domain.ACPEventType
+	switch {
+	case update.AgentMessageChunk != nil:
+		eventType = domain.ACPEventAgentMessageChunk
+	case update.AgentThoughtChunk != nil:
+		eventType = domain.ACPEventAgentThoughtChunk
+	case update.ToolCall != nil:
+		eventType = domain.ACPEventToolCall
+	case update.ToolCallUpdate != nil:
+		eventType = domain.ACPEventToolCallUpdate
+	case update.UserMessageChunk != nil:
+		eventType = domain.ACPEventUserMessageChunk
+	case update.Plan != nil:
+		eventType = domain.ACPEventPlan
+	case update.CurrentModeUpdate != nil:
+		eventType = domain.ACPEventCurrentModeUpdate
+	case update.AvailableCommandsUpdate != nil:
+		eventType = domain.ACPEventAvailableCommands
+	default:
+		eventType = domain.ACPEventSessionUpdate
+	}
+
+	c.writeEvent(ctx, eventType, params)
 }
 
 func (c *acpRunClient) WriteTextFile(_ context.Context, _ acpsdk.WriteTextFileRequest) (acpsdk.WriteTextFileResponse, error) {
@@ -490,6 +548,26 @@ func (c *acpRunClient) writeWarning(msg string) {
 		return
 	}
 	_, _ = fmt.Fprintf(c.stderr, "[acp] %s\n", msg)
+}
+
+func (c *acpRunClient) writeEvent(ctx context.Context, eventType domain.ACPEventType, payload any) {
+	if c.eventWriter == nil {
+		return
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	event := domain.ACPEvent{
+		Timestamp: time.Now().UTC(),
+		Type:      eventType,
+		SessionID: c.sessionID,
+		Payload:   payloadBytes,
+	}
+
+	_ = c.eventWriter.Write(ctx, event)
 }
 
 func cancelPermissionResponse() acpsdk.RequestPermissionResponse {
