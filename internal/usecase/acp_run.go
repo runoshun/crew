@@ -224,6 +224,13 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		client.eventWriter = eventWriter
 	}
 
+	var endOnce sync.Once
+	emitSessionEnd := func(reason string, err error) {
+		endOnce.Do(func() {
+			client.writeSessionEndEvent(context.Background(), reason, err)
+		})
+	}
+
 	for {
 		select {
 		case cmd := <-promptCh:
@@ -235,6 +242,7 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			_ = conn.Cancel(context.Background(), acpsdk.CancelNotification{SessionId: session.SessionId})
 		case <-stopCh:
 			_ = conn.Cancel(context.Background(), acpsdk.CancelNotification{SessionId: session.SessionId})
+			emitSessionEnd("stop", nil)
 			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
 				cancel()
 				return nil, fmt.Errorf("update state: %w", idleErr)
@@ -247,6 +255,7 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 				continue
 			}
 			if err != nil {
+				emitSessionEnd("router_error", err)
 				if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
 					return nil, fmt.Errorf("acp router error: %w (update state: %v)", err, stateErr)
 				}
@@ -254,11 +263,13 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			}
 		case err := <-procErrCh:
 			if err == nil || errors.Is(cmdCtx.Err(), context.Canceled) {
+				emitSessionEnd("process_exit", nil)
 				if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
 					return nil, fmt.Errorf("update state: %w", idleErr)
 				}
 				return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 			}
+			emitSessionEnd("process_error", err)
 			if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
 				return nil, fmt.Errorf("agent process exited: %w (update state: %v)", err, stateErr)
 			}
@@ -267,16 +278,19 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			wasCanceled := cmdCtx.Err() != nil
 			cancel()
 			if err := <-procErrCh; err != nil && !wasCanceled {
+				emitSessionEnd("process_error", err)
 				if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
 					return nil, fmt.Errorf("agent process exited: %w (update state: %v)", err, stateErr)
 				}
 				return nil, fmt.Errorf("agent process exited: %w", err)
 			}
+			emitSessionEnd("connection_closed", nil)
 			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
 				return nil, fmt.Errorf("update state: %w", idleErr)
 			}
 			return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 		case <-ctx.Done():
+			emitSessionEnd("context_canceled", ctx.Err())
 			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
 				return nil, fmt.Errorf("context canceled: %w (update state: %v)", ctx.Err(), idleErr)
 			}
@@ -613,6 +627,19 @@ type promptSentPayload struct {
 
 func (c *acpRunClient) writePromptSentEvent(ctx context.Context, cmd domain.ACPCommand) {
 	c.writeEvent(ctx, domain.ACPEventPromptSent, promptSentPayload{Text: cmd.Text})
+}
+
+type sessionEndPayload struct {
+	Reason string `json:"reason"`
+	Error  string `json:"error,omitempty"`
+}
+
+func (c *acpRunClient) writeSessionEndEvent(ctx context.Context, reason string, err error) {
+	payload := sessionEndPayload{Reason: reason}
+	if err != nil {
+		payload.Error = err.Error()
+	}
+	c.writeEvent(ctx, domain.ACPEventSessionEnd, payload)
 }
 
 func cancelPermissionResponse() acpsdk.RequestPermissionResponse {
