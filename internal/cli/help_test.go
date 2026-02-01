@@ -28,6 +28,21 @@ func TestShowWorkerHelp(t *testing.T) {
 	assert.Contains(t, content, "git push") // in prohibited actions section
 }
 
+func TestShowReviewerHelp(t *testing.T) {
+	var buf bytes.Buffer
+	var errBuf bytes.Buffer
+
+	err := showReviewerHelp(&buf, &errBuf, &domain.Config{})
+
+	require.NoError(t, err)
+	content := buf.String()
+
+	assert.Contains(t, content, "# git-crew Reviewer Guide")
+	assert.Contains(t, content, "crew show")
+	assert.Contains(t, content, "crew diff")
+	assert.Contains(t, content, "crew comment")
+}
+
 func TestShowManagerHelp(t *testing.T) {
 	var buf bytes.Buffer
 	var errBuf bytes.Buffer

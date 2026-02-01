@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -714,11 +715,22 @@ func resolveTaskID(args []string, git domain.Git) (int, error) {
 }
 
 // parseTaskID parses a task ID string to int.
+// Only accepts exact numeric strings (optionally prefixed with #).
+// Examples: "123", "#123" are valid; "123abc", "4o-reviewer" are invalid.
 func parseTaskID(s string) (int, error) {
 	// Remove leading # if present
 	s = strings.TrimPrefix(s, "#")
-	var id int
-	_, err := fmt.Sscanf(s, "%d", &id)
+	if len(s) == 0 {
+		return 0, fmt.Errorf("empty task ID")
+	}
+	// Verify all characters are digits
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return 0, fmt.Errorf("invalid character in task ID")
+		}
+	}
+	// Parse the number
+	id, err := strconv.Atoi(s)
 	if err != nil {
 		return 0, err
 	}
