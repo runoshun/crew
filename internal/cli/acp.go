@@ -135,7 +135,22 @@ func newACPSendCommand(c *app.Container) *cobra.Command {
 		Short: "Send a prompt to an ACP session",
 		Long: `Send a prompt to an ACP session.
 
-You can pass task ID and text as positional arguments or use --task/--text flags.`,
+You can pass task ID and text as positional arguments or use --task/--text flags (do not mix).`,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") || cmd.Flags().Changed("text") {
+				return fmt.Errorf("cannot mix positional arguments with --task/--text")
+			}
+			if len(args) < 2 {
+				return fmt.Errorf("text is required")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				var err error
@@ -182,8 +197,26 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 		Short: "Respond to a permission request",
 		Long: `Respond to a permission request.
 
-You can pass task ID and option as positional arguments or use --task/--option flags.
+You can pass task ID and option as positional arguments or use --task/--option flags (do not mix).
 Prefix the option with "#" to select by index from the latest permission request.`,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") || cmd.Flags().Changed("option") {
+				return fmt.Errorf("cannot mix positional arguments with --task/--option")
+			}
+			if len(args) < 2 {
+				return fmt.Errorf("option is required")
+			}
+			if len(args) > 2 {
+				return fmt.Errorf("too many arguments")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				var err error

@@ -248,8 +248,8 @@ const acpScriptTemplate = `#!/bin/bash
 set -o pipefail
 
 # Redirect stdout/stderr to session log (while keeping tmux output)
-exec > >(tee -a "{{.LogPath}}")
-exec 2> >(tee -a "{{.LogPath}}" >&2)
+exec > >(tee -a {{.LogPath}})
+exec 2> >(tee -a {{.LogPath}} >&2)
 
 # Run ACP session
 {{.Command}}
@@ -268,7 +268,7 @@ func (uc *ACPStart) generateScript(taskID int, command string, worktreePath stri
 	}
 
 	tmpl := template.Must(template.New("acp-script").Parse(acpScriptTemplate))
-	data := acpScriptData{Command: command, LogPath: logPath}
+	data := acpScriptData{Command: command, LogPath: shellQuote(logPath)}
 	var script strings.Builder
 	if err := tmpl.Execute(&script, data); err != nil {
 		return "", fmt.Errorf("execute template: %w", err)
