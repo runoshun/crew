@@ -113,10 +113,10 @@ func TestStopTask_Execute_AlreadyInReview(t *testing.T) {
 		TaskID: 1,
 	})
 
-	// Assert - should succeed and move to stopped
+	// Assert - should succeed and move to error
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusError, out.Task.Status, "status should change to stopped when session exists")
+	assert.Equal(t, domain.StatusError, out.Task.Status, "status should change to error when session exists")
 }
 
 func TestStopTask_Execute_ErrorStatus(t *testing.T) {
@@ -138,10 +138,10 @@ func TestStopTask_Execute_ErrorStatus(t *testing.T) {
 		TaskID: 1,
 	})
 
-	// Assert - should succeed and move to stopped
+	// Assert - should succeed and move to error
 	require.NoError(t, err)
 	require.NotNil(t, out)
-	assert.Equal(t, domain.StatusError, out.Task.Status, "status should change to stopped when session exists")
+	assert.Equal(t, domain.StatusError, out.Task.Status, "status should change to error when session exists")
 }
 
 func TestStopTask_Execute_TaskNotFound(t *testing.T) {

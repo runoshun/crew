@@ -37,7 +37,7 @@ func TestCompleteTask_Execute_Success(t *testing.T) {
 		status domain.Status
 	}{
 		{"from in_progress", domain.StatusInProgress},
-		{"from needs_input", domain.StatusInProgress},
+		{"from in_progress (legacy needs_input)", domain.StatusInProgress},
 	}
 
 	for _, tt := range tests {
