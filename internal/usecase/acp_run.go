@@ -247,8 +247,9 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			}
 			return nil, fmt.Errorf("agent process exited: %w", err)
 		case <-conn.Done():
+			wasCanceled := cmdCtx.Err() != nil
 			cancel()
-			if err := <-procErrCh; err != nil && !errors.Is(cmdCtx.Err(), context.Canceled) {
+			if err := <-procErrCh; err != nil && !wasCanceled {
 				if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
 					return nil, fmt.Errorf("agent process exited: %w (update state: %v)", err, stateErr)
 				}
@@ -379,15 +380,29 @@ func (uc *ACPRun) handlePrompt(ctx context.Context, conn *acpsdk.ClientSideConne
 }
 
 func (uc *ACPRun) markACPRunning(ctx context.Context, task *domain.Task, namespace string, agentName string) error {
+	if err := uc.setExecutionSubstate(ctx, namespace, task.ID, domain.ACPExecutionRunning); err != nil {
+		return err
+	}
+
+	prevStatus := task.Status
+	prevAgent := task.Agent
+	prevStarted := task.Started
+
 	task.Status = domain.StatusInProgress
 	task.Agent = agentName
 	if uc.clock != nil {
 		task.Started = uc.clock.Now()
 	}
 	if err := uc.tasks.Save(task); err != nil {
+		task.Status = prevStatus
+		task.Agent = prevAgent
+		task.Started = prevStarted
+		if stateErr := uc.setExecutionSubstate(ctx, namespace, task.ID, domain.ACPExecutionIdle); stateErr != nil {
+			return fmt.Errorf("save task: %w (reset state: %v)", err, stateErr)
+		}
 		return fmt.Errorf("save task: %w", err)
 	}
-	return uc.setExecutionSubstate(ctx, namespace, task.ID, domain.ACPExecutionRunning)
+	return nil
 }
 
 func (uc *ACPRun) markACPError(ctx context.Context, task *domain.Task, namespace string) error {
