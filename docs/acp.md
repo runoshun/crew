@@ -4,6 +4,10 @@ ACP is a separate execution path from the legacy tmux-based runner. Use the
 `crew acp ...` command group for ACP sessions and do not mix it with legacy
 commands (`crew start/send/attach/peek`).
 
+Note: The subcommands below match `go run ./cmd/crew acp --help` in this repo.
+If your installed `crew` binary does not list `start/attach/peek`, rebuild from
+source or use `crew acp run` directly.
+
 ## Key differences from legacy
 
 - ACP sessions are started and controlled via `crew acp ...` commands.
@@ -50,7 +54,7 @@ crew acp send --task <task-id> --text "Prompt text"
 ### permission
 
 Respond to a permission request. Use `#<index>` to select from the latest
-permission request options.
+permission request options (positional or `--option`).
 
 ```bash
 crew acp permission <task-id> <option-id>
