@@ -61,7 +61,7 @@ func GlobalLogPath(crewDir string) string {
 }
 
 // SessionLogPath returns the path to the session log file.
-// The session log captures stderr from the tmux session.
+// The session log captures session output (stderr by default; some sessions tee stdout).
 func SessionLogPath(crewDir string, sessionName string) string {
 	return filepath.Join(crewDir, "logs", sessionName+".log")
 }

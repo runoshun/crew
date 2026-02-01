@@ -273,7 +273,21 @@ func newACPCancelCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cancel <task-id>",
 		Short: "Cancel the current ACP session",
-		Args:  cobra.MaximumNArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") {
+				return fmt.Errorf("cannot mix positional arguments with --task")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("too many arguments")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				var err error
@@ -309,7 +323,21 @@ func newACPStopCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "stop <task-id>",
 		Short: "Stop the ACP session cleanly",
-		Args:  cobra.MaximumNArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") {
+				return fmt.Errorf("cannot mix positional arguments with --task")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("too many arguments")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				var err error
@@ -433,7 +461,21 @@ Examples:
   crew acp log 1
   crew acp log 1 --raw
   crew acp log --task 1`,
-		Args: cobra.MaximumNArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") {
+				return fmt.Errorf("cannot mix positional arguments with --task")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("too many arguments")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Accept task ID as positional argument or flag
 			if len(args) > 0 {
