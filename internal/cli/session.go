@@ -292,8 +292,9 @@ Examples:
 // newCompleteCommand creates the complete command for marking a task as complete.
 func newCompleteCommand(c *app.Container) *cobra.Command {
 	var opts struct {
-		comment string
-		verbose bool
+		comment  string
+		reviewer string
+		verbose  bool
 	}
 
 	cmd := &cobra.Command{
@@ -322,6 +323,9 @@ Examples:
   # Complete with a comment
   crew complete 1 --comment "Implementation complete"
 
+  # Complete with reviewer override
+  crew complete 1 --reviewer claude-reviewer
+
   # Auto-detect task from current branch (when working in a worktree)
   crew complete`,
 		Args: cobra.MaximumNArgs(1),
@@ -335,9 +339,10 @@ Examples:
 			// Execute use case
 			uc := c.CompleteTaskUseCase(cmd.OutOrStdout(), cmd.ErrOrStderr())
 			out, err := uc.Execute(cmd.Context(), usecase.CompleteTaskInput{
-				TaskID:  taskID,
-				Comment: opts.comment,
-				Verbose: opts.verbose,
+				TaskID:      taskID,
+				Comment:     opts.comment,
+				ReviewAgent: opts.reviewer,
+				Verbose:     opts.verbose,
 			})
 			if err != nil {
 				// Print conflict message to stdout if present
@@ -354,6 +359,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.comment, "comment", "m", "", "Add a completion comment")
+	cmd.Flags().StringVarP(&opts.reviewer, "reviewer", "r", "", "Reviewer agent override")
 	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "Show reviewer output in real-time")
 
 	return cmd

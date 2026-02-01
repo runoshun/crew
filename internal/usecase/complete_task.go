@@ -160,7 +160,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	}
 
 	if !skipReview && task.ReviewCount < minReviews {
-		reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent)
+		reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent, cfg)
 		if reviewErr != nil {
 			return nil, reviewErr
 		}
@@ -227,7 +227,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	}, nil
 }
 
-func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbose bool, agent string) error {
+func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbose bool, agent string, cfg *domain.Config) error {
 	preComments, err := uc.tasks.GetComments(task.ID)
 	if err != nil {
 		return fmt.Errorf("get comments: %w", err)
@@ -247,6 +247,7 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 		uc.writeReviewMessage(fmt.Sprintf("Starting review for task #%d...", task.ID))
 		reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
 			ConfigLoader: uc.config,
+			Config:       cfg,
 			Worktrees:    uc.worktrees,
 			RepoRoot:     uc.repoRoot,
 		}, shared.ReviewCommandInput{
@@ -303,7 +304,7 @@ func (uc *CompleteTask) writeReviewScript(sessionName string, taskID int, review
 	script := fmt.Sprintf(`#!/bin/bash
 set -o pipefail
 
-exec 2> >(tee -a %q >&2)
+exec > >(tee -a %q) 2>&1
 
 read -r -d '' PROMPT << 'END_OF_PROMPT'
 %s
