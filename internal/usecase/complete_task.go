@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	reviewPeekLines    = 2000
-	reviewLogTailLines = 20
+	reviewPeekLines       = 2000
+	reviewLogTailLines    = 20
+	reviewLogTailMaxBytes = 64 * 1024
 )
 
 // CompleteTaskInput contains the parameters for completing a task.
@@ -296,6 +297,9 @@ func (uc *CompleteTask) writeReviewScript(sessionName string, taskID int, review
 	}
 
 	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+	if err := os.MkdirAll(filepath.Dir(logPath), 0750); err != nil {
+		return "", fmt.Errorf("create log directory: %w", err)
+	}
 	script := fmt.Sprintf(`#!/bin/bash
 set -o pipefail
 
@@ -331,7 +335,11 @@ END_OF_PROMPT
 
 func (uc *CompleteTask) waitForReview(ctx context.Context, sessionName string, verbose bool) error {
 	if !verbose || uc.stderr == nil {
-		return uc.sessions.Wait(ctx, sessionName)
+		err := uc.sessions.Wait(ctx, sessionName)
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			_ = uc.sessions.Stop(sessionName)
+		}
+		return err
 	}
 
 	resultCh := make(chan error, 1)
@@ -347,10 +355,14 @@ func (uc *CompleteTask) waitForReview(ctx context.Context, sessionName string, v
 		select {
 		case err := <-resultCh:
 			_ = uc.streamSessionOutput(sessionName, &lastOutput)
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				_ = uc.sessions.Stop(sessionName)
+			}
 			return err
 		case <-ticker.C:
 			_ = uc.streamSessionOutput(sessionName, &lastOutput)
 		case <-ctx.Done():
+			_ = uc.sessions.Stop(sessionName)
 			return ctx.Err()
 		}
 	}
@@ -364,18 +376,10 @@ func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *stri
 		}
 		return err
 	}
-	if output == *lastOutput {
-		return nil
-	}
-
-	if *lastOutput != "" && strings.HasPrefix(output, *lastOutput) {
-		newOutput := strings.TrimPrefix(output, *lastOutput)
-		newOutput = strings.TrimPrefix(newOutput, "\n")
-		if strings.TrimSpace(newOutput) != "" {
-			_, _ = fmt.Fprintln(uc.stderr, newOutput)
-		}
-	} else if output != "" {
-		_, _ = fmt.Fprintln(uc.stderr, output)
+	newOutput := diffOutput(*lastOutput, output)
+	newOutput = strings.TrimPrefix(newOutput, "\n")
+	if strings.TrimSpace(newOutput) != "" {
+		_, _ = fmt.Fprintln(uc.stderr, newOutput)
 	}
 
 	*lastOutput = output
@@ -425,15 +429,65 @@ func tailFileLines(path string, maxLines int) string {
 	if maxLines <= 0 {
 		return ""
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
+	file, openErr := os.Open(path)
+	if openErr != nil {
 		return ""
 	}
-	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	defer func() {
+		_ = file.Close()
+	}()
+
+	info, statErr := file.Stat()
+	if statErr != nil {
+		return ""
+	}
+	if info.Size() == 0 {
+		return ""
+	}
+
+	offset := int64(0)
+	if info.Size() > reviewLogTailMaxBytes {
+		offset = info.Size() - reviewLogTailMaxBytes
+	}
+	if offset > 0 {
+		if _, seekErr := file.Seek(offset, io.SeekStart); seekErr != nil {
+			return ""
+		}
+	}
+	data, readErr := io.ReadAll(file)
+	if readErr != nil {
+		return ""
+	}
+	text := string(data)
+	if offset > 0 {
+		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
+			text = text[idx+1:]
+		}
+	}
+	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
 	if len(lines) > maxLines {
 		lines = lines[len(lines)-maxLines:]
 	}
 	return strings.Join(lines, "\n")
+}
+
+func diffOutput(prev, curr string) string {
+	if curr == "" || curr == prev {
+		return ""
+	}
+	if prev == "" {
+		return curr
+	}
+	if strings.HasPrefix(curr, prev) {
+		return strings.TrimPrefix(curr, prev)
+	}
+	for i := 0; i < len(prev); i++ {
+		suffix := prev[i:]
+		if strings.HasPrefix(curr, suffix) {
+			return strings.TrimPrefix(curr, suffix)
+		}
+	}
+	return curr
 }
 
 func countReviewerComments(comments []domain.Comment) int {

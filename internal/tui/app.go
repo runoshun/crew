@@ -723,7 +723,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			},
 		},
 		{
-			ActionID: "review",
+			ActionID: "complete",
 			Label:    "Complete",
 			Desc:     "Run review and complete task",
 			Key:      "R",
