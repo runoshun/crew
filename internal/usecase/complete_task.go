@@ -19,6 +19,8 @@ const (
 	reviewLogTailLines    = 20
 	reviewLogTailMaxBytes = 64 * 1024
 	reviewLogReadMaxBytes = 256 * 1024
+	reviewProgressEvery   = 2 * time.Minute
+	reviewRunStartPrefix  = "---CREW_REVIEW_RUN_START--- "
 )
 
 // CompleteTaskInput contains the parameters for completing a task.
@@ -235,11 +237,27 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 		return fmt.Errorf("check review session: %w", err)
 	}
 
+	startedAt := uc.clock.Now()
+	logOffset := int64(0)
+	if running {
+		// If the session is already running, try to avoid accidentally parsing an older review
+		// result by only considering log content written after we start waiting.
+		logPath := domain.SessionLogPath(uc.crewDir, reviewSessionName)
+		if t, ok := readReviewRunStartedAtFromLog(logPath); ok {
+			startedAt = t
+		}
+		if info, err := os.Stat(logPath); err == nil {
+			logOffset = info.Size()
+		}
+	}
+
 	var reviewScriptPath string
 	if running {
 		uc.writeReviewMessage(fmt.Sprintf("Review session already running for task #%d. Waiting...", task.ID))
+		uc.writeReviewMessage(fmt.Sprintf("Note: review may take a while. If it takes too long, re-run 'crew complete %d'.", task.ID))
 	} else {
 		uc.writeReviewMessage(fmt.Sprintf("Starting review for task #%d...", task.ID))
+		uc.writeReviewMessage(fmt.Sprintf("Note: review may take a while. If it takes too long, re-run 'crew complete %d'.", task.ID))
 		reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
 			ConfigLoader: uc.config,
 			Config:       cfg,
@@ -253,7 +271,7 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 			return err
 		}
 
-		reviewScriptPath, err = uc.writeReviewScript(reviewSessionName, task.ID, reviewCmd)
+		reviewScriptPath, err = uc.writeReviewScript(reviewSessionName, task.ID, reviewCmd, startedAt)
 		if err != nil {
 			return err
 		}
@@ -274,19 +292,19 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 		}
 	}
 
-	if err := uc.waitForReview(ctx, reviewSessionName, verbose); err != nil {
+	if err := uc.waitForReview(ctx, reviewSessionName, verbose, startedAt); err != nil {
 		return err
 	}
 	uc.writeReviewMessage(fmt.Sprintf("Review finished for task #%d.", task.ID))
 
-	if err := uc.updateReviewMetadata(task, reviewSessionName); err != nil {
+	if err := uc.updateReviewMetadata(task, reviewSessionName, logOffset); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (uc *CompleteTask) writeReviewScript(sessionName string, taskID int, reviewCmd *shared.ReviewCommandOutput) (string, error) {
+func (uc *CompleteTask) writeReviewScript(sessionName string, taskID int, reviewCmd *shared.ReviewCommandOutput, startedAt time.Time) (string, error) {
 	scriptsDir := filepath.Join(uc.crewDir, "scripts")
 	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
 		return "", fmt.Errorf("create scripts directory: %w", err)
@@ -296,17 +314,20 @@ func (uc *CompleteTask) writeReviewScript(sessionName string, taskID int, review
 	if err := os.MkdirAll(filepath.Dir(logPath), 0750); err != nil {
 		return "", fmt.Errorf("create log directory: %w", err)
 	}
+	startStr := startedAt.UTC().Format(time.RFC3339)
 	script := fmt.Sprintf(`#!/bin/bash
 set -o pipefail
 
-exec > >(tee -a %q) 2>&1
+exec > >(tee %q) 2>&1
+
+echo "---CREW_REVIEW_RUN_START--- %s"
 
 read -r -d '' PROMPT << 'END_OF_PROMPT'
 %s
 END_OF_PROMPT
 
 %s
-`, logPath, reviewCmd.Result.Prompt, reviewCmd.Result.Command)
+`, logPath, startStr, reviewCmd.Result.Prompt, reviewCmd.Result.Command)
 
 	file, err := os.CreateTemp(scriptsDir, fmt.Sprintf("review-%d-*.sh", taskID))
 	if err != nil {
@@ -329,39 +350,90 @@ END_OF_PROMPT
 	return scriptPath, nil
 }
 
-func (uc *CompleteTask) waitForReview(ctx context.Context, sessionName string, verbose bool) error {
-	if !verbose || uc.stderr == nil {
-		err := uc.sessions.Wait(ctx, sessionName)
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			_ = uc.sessions.Stop(sessionName)
-		}
-		return err
-	}
-
+func (uc *CompleteTask) waitForReview(ctx context.Context, sessionName string, verbose bool, startedAt time.Time) error {
 	resultCh := make(chan error, 1)
 	go func() {
 		resultCh <- uc.sessions.Wait(ctx, sessionName)
 	}()
 
 	lastOutput := ""
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	var streamCh <-chan time.Time
+	var progressCh <-chan time.Time
+	if verbose && uc.stderr != nil {
+		t := time.NewTicker(1 * time.Second)
+		defer t.Stop()
+		streamCh = t.C
+	}
+	if uc.stderr != nil {
+		t := time.NewTicker(reviewProgressEvery)
+		defer t.Stop()
+		progressCh = t.C
+	}
+
+	if startedAt.IsZero() {
+		startedAt = uc.clock.Now()
+	}
 
 	for {
 		select {
 		case err := <-resultCh:
-			_ = uc.streamSessionOutput(sessionName, &lastOutput)
+			if streamCh != nil {
+				_ = uc.streamSessionOutput(sessionName, &lastOutput)
+			}
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				_ = uc.sessions.Stop(sessionName)
 			}
 			return err
-		case <-ticker.C:
-			_ = uc.streamSessionOutput(sessionName, &lastOutput)
+
 		case <-ctx.Done():
 			_ = uc.sessions.Stop(sessionName)
 			return ctx.Err()
+
+		case <-streamCh:
+			_ = uc.streamSessionOutput(sessionName, &lastOutput)
+
+		case <-progressCh:
+			elapsed := uc.clock.Now().Sub(startedAt)
+			mins := int(elapsed / time.Minute)
+			if mins < 0 {
+				mins = 0
+			}
+			uc.writeReviewMessage(fmt.Sprintf("Review still running... elapsed %dm", mins))
 		}
 	}
+}
+
+func readReviewRunStartedAtFromLog(logPath string) (time.Time, bool) {
+	file, err := os.Open(logPath)
+	if err != nil {
+		return time.Time{}, false
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	data, err := io.ReadAll(io.LimitReader(file, 4096))
+	if err != nil {
+		return time.Time{}, false
+	}
+	text := string(data)
+	idx := strings.Index(text, reviewRunStartPrefix)
+	if idx < 0 {
+		return time.Time{}, false
+	}
+	line := text[idx:]
+	if nl := strings.IndexByte(line, '\n'); nl >= 0 {
+		line = line[:nl]
+	}
+	ts := strings.TrimSpace(strings.TrimPrefix(line, reviewRunStartPrefix))
+	if ts == "" {
+		return time.Time{}, false
+	}
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return t, true
 }
 
 func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *string) error {
@@ -382,9 +454,9 @@ func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *stri
 	return nil
 }
 
-func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, sessionName string) error {
+func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, sessionName string, logOffset int64) error {
 	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
-	logTail := readFileTailBytes(logPath, reviewLogReadMaxBytes)
+	logTail := readFileTailBytes(logPath, logOffset, reviewLogReadMaxBytes)
 	result, ok := extractReviewResult(logTail)
 	if !ok {
 		return uc.noReviewCommentError(sessionName)
@@ -428,7 +500,7 @@ func (uc *CompleteTask) noReviewCommentError(sessionName string) error {
 	return fmt.Errorf("reviewer did not output a review result: %w\n\nreview log (tail from %s):\n%s", domain.ErrNoReviewComment, logPath, logTail)
 }
 
-func readFileTailBytes(path string, maxBytes int64) string {
+func readFileTailBytes(path string, offset int64, maxBytes int64) string {
 	if maxBytes <= 0 {
 		return ""
 	}
@@ -448,10 +520,23 @@ func readFileTailBytes(path string, maxBytes int64) string {
 		return ""
 	}
 
-	offset := int64(0)
-	if info.Size() > maxBytes {
-		offset = info.Size() - maxBytes
+	if offset < 0 {
+		offset = 0
 	}
+	if offset > info.Size() {
+		// File was rotated/truncated.
+		offset = 0
+	}
+
+	// Cap reads to the last maxBytes.
+	capOffset := int64(0)
+	if info.Size() > maxBytes {
+		capOffset = info.Size() - maxBytes
+	}
+	if offset < capOffset {
+		offset = capOffset
+	}
+
 	if offset > 0 {
 		if _, seekErr := file.Seek(offset, io.SeekStart); seekErr != nil {
 			return ""
