@@ -65,6 +65,10 @@ func NewACPStart(
 
 // Execute starts an ACP session in tmux for the given task.
 func (uc *ACPStart) Execute(ctx context.Context, in ACPStartInput) (*ACPStartOutput, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	task, err := shared.GetTask(uc.tasks, in.TaskID)
 	if err != nil {
 		return nil, err
@@ -75,6 +79,13 @@ func (uc *ACPStart) Execute(ctx context.Context, in ACPStartInput) (*ACPStartOut
 	}
 	if task.IsBlocked() {
 		return nil, fmt.Errorf("%w: %q", domain.ErrTaskBlocked, task.BlockReason)
+	}
+
+	sessionName := domain.ACPSessionName(task.ID)
+	if running, isRunningErr := uc.sessions.IsRunning(sessionName); isRunningErr != nil {
+		return nil, fmt.Errorf("check session: %w", isRunningErr)
+	} else if running {
+		return nil, fmt.Errorf("acp session %q: %w", sessionName, domain.ErrSessionRunning)
 	}
 
 	cfg, err := uc.configLoader.Load()
@@ -106,13 +117,6 @@ func (uc *ACPStart) Execute(ctx context.Context, in ACPStartInput) (*ACPStartOut
 	wtPath, worktreeCreated, err := ensureACPWorktree(task, cfg, agent, uc.worktrees, uc.git, uc.runner, uc.repoRoot)
 	if err != nil {
 		return nil, err
-	}
-
-	sessionName := domain.ACPSessionName(task.ID)
-	if running, isRunningErr := uc.sessions.IsRunning(sessionName); isRunningErr != nil {
-		return nil, fmt.Errorf("check session: %w", isRunningErr)
-	} else if running {
-		return nil, fmt.Errorf("acp session %q: %w", sessionName, domain.ErrSessionRunning)
 	}
 
 	command := uc.buildACPRunCommand(task.ID, agentName, model)
@@ -195,7 +199,10 @@ func (uc *ACPStart) generateScript(taskID int, command string, worktreePath stri
 		return "", fmt.Errorf("write session log header: %w", err)
 	}
 
-	tmpl := template.Must(template.New("acp-script").Parse(acpScriptTemplate))
+	tmpl, err := template.New("acp-script").Parse(acpScriptTemplate)
+	if err != nil {
+		return "", fmt.Errorf("parse script template: %w", err)
+	}
 	data := acpScriptData{Command: command, LogPath: shellQuote(logPath)}
 	var script strings.Builder
 	if err := tmpl.Execute(&script, data); err != nil {

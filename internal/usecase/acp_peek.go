@@ -39,7 +39,10 @@ func NewACPPeek(
 }
 
 // Execute captures and returns the last N lines from a running ACP session.
-func (uc *ACPPeek) Execute(_ context.Context, in ACPPeekInput) (*ACPPeekOutput, error) {
+func (uc *ACPPeek) Execute(ctx context.Context, in ACPPeekInput) (*ACPPeekOutput, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	// Get task
 	if _, err := shared.GetTask(uc.tasks, in.TaskID); err != nil {
 		return nil, err

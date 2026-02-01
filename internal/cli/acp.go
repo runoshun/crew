@@ -439,7 +439,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().IntVarP(&opts.lines, "lines", "n", 0, fmt.Sprintf("Number of lines to display (default: %d)", usecase.DefaultPeekLines))
+	cmd.Flags().IntVarP(&opts.lines, "lines", "n", usecase.DefaultPeekLines, "Number of lines to display")
 	cmd.Flags().BoolVarP(&opts.escape, "escape", "e", false, "Include ANSI escape sequences (colors)")
 
 	return cmd

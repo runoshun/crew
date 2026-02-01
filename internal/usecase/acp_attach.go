@@ -37,7 +37,10 @@ func NewACPAttach(
 
 // Execute attaches to a running ACP session for the given task.
 // This replaces the current process and does not return on success.
-func (uc *ACPAttach) Execute(_ context.Context, in ACPAttachInput) (*ACPAttachOutput, error) {
+func (uc *ACPAttach) Execute(ctx context.Context, in ACPAttachInput) (*ACPAttachOutput, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	// Get task
 	if _, err := shared.GetTask(uc.tasks, in.TaskID); err != nil {
 		return nil, err
