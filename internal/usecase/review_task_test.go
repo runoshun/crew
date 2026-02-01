@@ -26,12 +26,6 @@ func newTestReviewTask(
 	return NewReviewTask(repo, worktrees, configLoader, executor, clock, repoRoot, stderr)
 }
 
-// addReviewerCommentOnExecute sets up the executor to simulate adding a reviewer comment.
-// The callback is called during ExecuteWithContext to simulate the reviewer agent running `crew comment`.
-func addReviewerCommentOnExecute(executor *testutil.MockCommandExecutor, addComment func()) {
-	executor.OnExecuteWithContext = addComment
-}
-
 func TestReviewTask_Execute_TaskNotFound(t *testing.T) {
 	// Setup
 	repo := testutil.NewMockTaskRepository()
@@ -209,14 +203,7 @@ func TestReviewTask_Execute_UsesDefaultReviewer(t *testing.T) {
 	now := time.Now()
 	clock := &testutil.MockClock{NowTime: now}
 
-	// Setup reviewer to add a comment during execution
-	addReviewerCommentOnExecute(executor, func() {
-		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-			Author: "reviewer",
-			Text:   domain.ReviewLGTMPrefix + " Looks good!",
-			Time:   now,
-		})
-	})
+	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good!\n")
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -232,6 +219,7 @@ func TestReviewTask_Execute_UsesDefaultReviewer(t *testing.T) {
 	assert.True(t, executor.ExecuteWithContextCalled, "ExecuteWithContext should have been called")
 	assert.NotNil(t, executor.ExecutedCmd, "Command should have been executed")
 	assert.Equal(t, domain.StatusDone, out.Task.Status)
+	assert.Equal(t, domain.ReviewLGTMPrefix+" Looks good!", out.Review)
 }
 
 func TestReviewTask_Execute_EmptyDefaultReviewer(t *testing.T) {
@@ -321,15 +309,8 @@ func TestReviewTask_Execute_ReviewerAddsComment(t *testing.T) {
 	now := time.Now()
 	clock := &testutil.MockClock{NowTime: now}
 
-	// Simulate reviewer adding a comment during execution
 	reviewText := domain.ReviewLGTMPrefix + " All checks passed!"
-	addReviewerCommentOnExecute(executor, func() {
-		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-			Author: "reviewer",
-			Text:   reviewText,
-			Time:   now,
-		})
-	})
+	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + reviewText + "\n")
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -347,10 +328,14 @@ func TestReviewTask_Execute_ReviewerAddsComment(t *testing.T) {
 	assert.Equal(t, 1, out.Task.ReviewCount)
 	require.NotNil(t, out.Task.LastReviewIsLGTM)
 	assert.True(t, *out.Task.LastReviewIsLGTM)
+	// ReviewTask should record the review as a task comment programmatically
+	assert.Len(t, repo.Comments[1], 1)
+	assert.Equal(t, "reviewer", repo.Comments[1][0].Author)
+	assert.Equal(t, reviewText, repo.Comments[1][0].Text)
 }
 
 func TestReviewTask_Execute_NoReviewComment(t *testing.T) {
-	// Setup - reviewer does NOT add a comment
+	// Setup - reviewer does NOT output marker
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
@@ -368,7 +353,7 @@ func TestReviewTask_Execute_NoReviewComment(t *testing.T) {
 	}
 
 	executor := testutil.NewMockCommandExecutor()
-	// No OnExecuteWithContext - reviewer doesn't add a comment
+	executor.ExecuteOutput = []byte("some output without marker\n")
 	clock := &testutil.MockClock{NowTime: time.Now()}
 
 	var stderr bytes.Buffer
@@ -380,9 +365,10 @@ func TestReviewTask_Execute_NoReviewComment(t *testing.T) {
 		Agent:  "test-reviewer",
 	})
 
-	// Assert - should fail because reviewer didn't add a comment
+	// Assert - should fail because marker is missing
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, domain.ErrNoReviewComment)
+	assert.Empty(t, repo.Comments[1])
 }
 
 func TestReviewTask_Execute_WithDisabledAgent(t *testing.T) {
@@ -445,14 +431,7 @@ func TestReviewTask_Execute_StatusReviewing(t *testing.T) {
 	now := time.Now()
 	clock := &testutil.MockClock{NowTime: now}
 
-	// Setup reviewer to add a comment during execution
-	addReviewerCommentOnExecute(executor, func() {
-		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-			Author: "reviewer",
-			Text:   domain.ReviewLGTMPrefix + " Looks good!",
-			Time:   now,
-		})
-	})
+	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good!\n")
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -485,14 +464,7 @@ func TestReviewTask_Execute_SaveMetadataFails(t *testing.T) {
 	now := time.Now()
 	clock := &testutil.MockClock{NowTime: now}
 
-	// Setup reviewer to add a comment during execution
-	addReviewerCommentOnExecute(executor, func() {
-		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-			Author: "reviewer",
-			Text:   domain.ReviewLGTMPrefix + "\nLooks good.",
-			Time:   now,
-		})
-	})
+	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + "\nLooks good.\n")
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -504,7 +476,7 @@ func TestReviewTask_Execute_SaveMetadataFails(t *testing.T) {
 
 	// Assert
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "save review metadata")
+	assert.Contains(t, err.Error(), "save review")
 }
 
 func TestReviewTask_Execute_Verbose(t *testing.T) {
@@ -526,14 +498,7 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		now := time.Now()
 		clock := &testutil.MockClock{NowTime: now}
 
-		// Setup reviewer to add a comment during execution
-		addReviewerCommentOnExecute(executor, func() {
-			repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-				Author: "reviewer",
-				Text:   domain.ReviewLGTMPrefix + " Looks good!",
-				Time:   now,
-			})
-		})
+		executor.ExecuteOutput = []byte("intermediate\n" + domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good!\n")
 
 		var stderr bytes.Buffer
 		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -549,8 +514,12 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		require.NotNil(t, out)
 		// In verbose mode, both stdout and stderr are streamed to stderr
 		output := stderr.String()
-		assert.Contains(t, output, "Review output")
+		assert.Contains(t, output, "intermediate")
 		assert.Contains(t, output, "stderr output")
+		assert.Contains(t, out.Review, domain.ReviewResultMarker)
+		assert.Len(t, repo.Comments[1], 1)
+		assert.Equal(t, "reviewer", repo.Comments[1][0].Author)
+		assert.Equal(t, domain.ReviewLGTMPrefix+" Looks good!", repo.Comments[1][0].Text)
 	})
 
 	t.Run("non-verbose mode does not stream output", func(t *testing.T) {
@@ -571,14 +540,7 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		now := time.Now()
 		clock := &testutil.MockClock{NowTime: now}
 
-		// Setup reviewer to add a comment during execution
-		addReviewerCommentOnExecute(executor, func() {
-			repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-				Author: "reviewer",
-				Text:   domain.ReviewLGTMPrefix + " Looks good!",
-				Time:   now,
-			})
-		})
+		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good!\n")
 
 		var stderr bytes.Buffer
 		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -593,6 +555,8 @@ func TestReviewTask_Execute_Verbose(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, out)
 		assert.Empty(t, stderr.String())
+		assert.Equal(t, domain.ReviewLGTMPrefix+" Looks good!", out.Review)
+		assert.Len(t, repo.Comments[1], 1)
 	})
 }
 
@@ -613,14 +577,7 @@ func TestReviewTask_Execute_LGTMDetection(t *testing.T) {
 		now := time.Now()
 		clock := &testutil.MockClock{NowTime: now}
 
-		// Setup reviewer to add an LGTM comment
-		addReviewerCommentOnExecute(executor, func() {
-			repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-				Author: "reviewer",
-				Text:   domain.ReviewLGTMPrefix + " All good!",
-				Time:   now,
-			})
-		})
+		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " All good!\n")
 
 		var stderr bytes.Buffer
 		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -652,14 +609,7 @@ func TestReviewTask_Execute_LGTMDetection(t *testing.T) {
 		now := time.Now()
 		clock := &testutil.MockClock{NowTime: now}
 
-		// Setup reviewer to add a non-LGTM comment
-		addReviewerCommentOnExecute(executor, func() {
-			repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-				Author: "reviewer",
-				Text:   "❌ Needs changes",
-				Time:   now,
-			})
-		})
+		executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + "❌ Needs changes\n")
 
 		var stderr bytes.Buffer
 		uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)
@@ -677,14 +627,14 @@ func TestReviewTask_Execute_LGTMDetection(t *testing.T) {
 }
 
 func TestReviewTask_Execute_MultipleReviewerComments(t *testing.T) {
-	// Setup - there are existing comments, and reviewer adds a new one
+	// Setup - there are existing comments; review output is recorded programmatically
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{
 		ID:     1,
 		Title:  "Test task",
 		Status: domain.StatusInProgress,
 	}
-	// Pre-existing comments
+	// Pre-existing comments (should not affect marker-based parsing)
 	repo.Comments[1] = []domain.Comment{
 		{Author: "worker", Text: "Work done", Time: time.Now().Add(-time.Hour)},
 		{Author: "reviewer", Text: "First review: needs changes", Time: time.Now().Add(-30 * time.Minute)},
@@ -697,15 +647,8 @@ func TestReviewTask_Execute_MultipleReviewerComments(t *testing.T) {
 	now := time.Now()
 	clock := &testutil.MockClock{NowTime: now}
 
-	// Setup reviewer to add a new LGTM comment
 	newReviewText := domain.ReviewLGTMPrefix + " Fixed now!"
-	addReviewerCommentOnExecute(executor, func() {
-		repo.Comments[1] = append(repo.Comments[1], domain.Comment{
-			Author: "reviewer",
-			Text:   newReviewText,
-			Time:   now,
-		})
-	})
+	executor.ExecuteOutput = []byte(domain.ReviewResultMarker + "\n" + newReviewText + "\n")
 
 	var stderr bytes.Buffer
 	uc := newTestReviewTask(repo, sessions, worktrees, configLoader, executor, clock, "/repo", &stderr)

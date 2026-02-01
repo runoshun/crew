@@ -335,6 +335,10 @@ const (
 // ReviewLGTMPrefix is the prefix indicating the review passed (LGTM).
 const ReviewLGTMPrefix = "✅ LGTM"
 
+// ReviewResultMarker is the marker line that separates verbose output from the final review result.
+// The reviewer must print this line, then print the final review content after it.
+const ReviewResultMarker = "---REVIEW_RESULT---"
+
 // DefaultSystemPrompt is the default system prompt template for workers.
 // It uses Go template syntax with CommandData fields.
 const DefaultSystemPrompt = `You are working on Task #{{.TaskID}}.
@@ -351,6 +355,16 @@ IMPORTANT: First run 'crew --help-manager' and follow the usage instructions.
 const DefaultReviewerSystemPrompt = `You are a code reviewer for crew Task #{{.TaskID}}.
 
 IMPORTANT: First run 'crew --help-reviwer' and follow the workflow instructions.
+
+## Output Format
+
+IMPORTANT: Do NOT run 'crew comment'. The CLI will record your review.
+
+Output your final review after the marker line:
+` + "`" + `---REVIEW_RESULT---` + "`" + `
+
+Start with: ` + "`" + `✅ LGTM` + "`" + `, ` + "`" + `⚠️ Minor issues` + "`" + `, or ` + "`" + `❌ Needs changes` + "`" + `
+Then list specific issues with file:line references.
 `
 
 // Directory and file names for git-crew.

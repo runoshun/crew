@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -24,6 +25,20 @@ type ReviewTaskInput struct {
 type ReviewTaskOutput struct {
 	Task   *domain.Task // The reviewed task
 	Review string       // Review result from the agent
+}
+
+// extractReviewResult extracts the final review result from the full output.
+// It looks for domain.ReviewResultMarker and returns everything after it.
+// If the marker is not found, it returns the full output as a fallback.
+func extractReviewResult(output string) string {
+	if idx := strings.Index(output, domain.ReviewResultMarker); idx != -1 {
+		return output[idx+len(domain.ReviewResultMarker):]
+	}
+	return output
+}
+
+func hasReviewResultMarker(output string) bool {
+	return strings.Contains(output, domain.ReviewResultMarker)
 }
 
 // ReviewTask is the use case for reviewing a task with an AI agent.
@@ -73,13 +88,6 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, fmt.Errorf("cannot review task in %s status (must be in_progress or done): %w", task.Status, domain.ErrInvalidTransition)
 	}
 
-	// Count reviewer comments before running review
-	preComments, err := uc.tasks.GetComments(in.TaskID)
-	if err != nil {
-		return nil, fmt.Errorf("get comments: %w", err)
-	}
-	preReviewerCount := countReviewerComments(preComments)
-
 	reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
 		ConfigLoader: uc.configLoader,
 		Worktrees:    uc.worktrees,
@@ -94,23 +102,13 @@ func (uc *ReviewTask) Execute(ctx context.Context, in ReviewTaskInput) (*ReviewT
 		return nil, err
 	}
 
-	return uc.executeSync(ctx, task, reviewCmd, in.Verbose, preReviewerCount)
-}
-
-// countReviewerComments counts comments with Author == "reviewer".
-func countReviewerComments(comments []domain.Comment) int {
-	count := 0
-	for _, c := range comments {
-		if c.Author == "reviewer" {
-			count++
-		}
-	}
-	return count
+	return uc.executeSync(ctx, task, reviewCmd, in.Verbose)
 }
 
 // executeSync runs the review synchronously and returns the result.
-func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput, verbose bool, preReviewerCount int) (*ReviewTaskOutput, error) {
-	_, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
+
+func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, reviewCmd *shared.ReviewCommandOutput, verbose bool) (*ReviewTaskOutput, error) {
+	reviewOut, err := shared.ExecuteReview(ctx, shared.ReviewDeps{
 		Tasks:    uc.tasks,
 		Executor: uc.executor,
 		Clock:    uc.clock,
@@ -125,35 +123,38 @@ func (uc *ReviewTask) executeSync(ctx context.Context, task *domain.Task, review
 	if err != nil {
 		return nil, err
 	}
+	if !hasReviewResultMarker(reviewOut.Review) {
+		return nil, fmt.Errorf("review result marker not found: %w", domain.ErrNoReviewComment)
+	}
 
-	// Check if reviewer added a comment
-	postComments, err := uc.tasks.GetComments(task.ID)
+	fullOutput := reviewOut.Review
+	parsedReview := strings.TrimSpace(extractReviewResult(fullOutput))
+	if parsedReview == "" {
+		return nil, fmt.Errorf("empty review result: %w", domain.ErrNoReviewComment)
+	}
+
+	comments, err := uc.tasks.GetComments(task.ID)
 	if err != nil {
 		return nil, fmt.Errorf("get comments: %w", err)
 	}
-	postReviewerCount := countReviewerComments(postComments)
+	comments = append(comments, domain.Comment{
+		Author: "reviewer",
+		Text:   parsedReview,
+		Time:   uc.clock.Now(),
+	})
 
-	if postReviewerCount <= preReviewerCount {
-		return nil, fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+	shared.UpdateReviewMetadata(uc.clock, task, parsedReview)
+	if err := uc.tasks.SaveTaskWithComments(task, comments); err != nil {
+		return nil, fmt.Errorf("save review: %w", err)
 	}
 
-	// Get the last reviewer comment as the review result
-	var lastReviewerComment domain.Comment
-	for i := len(postComments) - 1; i >= 0; i-- {
-		if postComments[i].Author == "reviewer" {
-			lastReviewerComment = postComments[i]
-			break
-		}
-	}
-
-	// Update review metadata
-	shared.UpdateReviewMetadata(uc.clock, task, lastReviewerComment.Text)
-	if err := uc.tasks.Save(task); err != nil {
-		return nil, fmt.Errorf("save review metadata: %w", err)
+	reviewForOutput := parsedReview
+	if verbose {
+		reviewForOutput = strings.TrimSpace(fullOutput)
 	}
 
 	return &ReviewTaskOutput{
-		Review: lastReviewerComment.Text,
+		Review: reviewForOutput,
 		Task:   task,
 	}, nil
 }

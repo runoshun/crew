@@ -150,6 +150,9 @@ func (s *Store) GetComments(taskID int) ([]domain.Comment, error) {
 func (s *Store) AddComment(taskID int, comment domain.Comment) error {
 	return s.withLockWrite(func(data *storeData) error {
 		key := strconv.Itoa(taskID)
+		if _, ok := data.Tasks[key]; !ok {
+			return domain.ErrTaskNotFound
+		}
 		data.Comments[key] = append(data.Comments[key], comment)
 		return nil
 	})

@@ -5,11 +5,11 @@
 1. **Identify target**: Decide what you are reviewing (task ID, PR, branch, or files)
 2. **Inspect changes**: Use `crew show` / `crew diff` to understand the full context
 3. **Run CI**: Verify tests/lint/build in the correct context
-4. **Write review**: Add feedback as a task comment (author="reviewer")
+4. **Write review**: Write feedback with the required format after the marker line
 
 ---
 
-## Basic Operations
+## Basic Operations for understanding the context
 
 ```bash
 # Show task details
@@ -17,9 +17,6 @@ crew show <id>
 
 # Show task diff
 crew diff <id>
-
-# Add review as a comment
-crew comment <id> --author reviewer "your review"
 ```
 
 ---
@@ -40,8 +37,10 @@ crew comment <id> --author reviewer "your review"
 Start with: `✅ LGTM`, `⚠️ Minor issues`, or `❌ Needs changes`.
 Then list specific issues with file:line references.
 
-```bash
-crew comment <id> --author reviewer "$(cat <<'EOF'
+IMPORTANT: your final review output must be after the marker line: `---REVIEW_RESULT---`, And DO NOT output other text after that.
+
+```markdown
+---REVIEW_RESULT---
 ## Summary
 <1-2 sentence overview>
 
@@ -53,6 +52,4 @@ crew comment <id> --author reviewer "$(cat <<'EOF'
 ## Suggestions
 - [NIT] <minor issue>
 - [SUGGESTION] <improvement idea>
-EOF
-)"
 ```
