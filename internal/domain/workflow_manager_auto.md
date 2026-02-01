@@ -19,12 +19,12 @@ Advance all in-progress tasks automatically with minimal human intervention. Con
 ## Task Flow (Expected)
 
 ```
-in_progress → run `crew review`
-           → if LGTM: `crew complete` → done
+in_progress → run `crew complete` (auto review)
+           → if LGTM: done
 done → ready to merge
 ```
 
-Managers run `crew review` and `crew complete` when a task is ready. Review does not change status.
+Managers run `crew complete` when a task is ready. Review runs inside `crew complete` and does not change status unless completion succeeds.
 
 ## Target Statuses
 
@@ -112,12 +112,7 @@ crew send <id> Enter
 - Add to problem list and exit loop
 - Delegate decision to user
 
-**Review step (sync):**
-```bash
-crew review <id>
-```
-
-**If LGTM:**
+**Review + completion (sync):**
 ```bash
 crew complete <id>
 ```

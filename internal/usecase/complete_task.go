@@ -2,17 +2,26 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
+const reviewPeekLines = 2000
+
 // CompleteTaskInput contains the parameters for completing a task.
 type CompleteTaskInput struct {
-	Comment string // Optional completion comment
-	TaskID  int    // Task ID to complete
+	Comment     string // Optional completion comment
+	ReviewAgent string // Reviewer agent override (optional)
+	TaskID      int    // Task ID to complete
+	Verbose     bool   // Stream reviewer output while waiting
 }
 
 // CompleteTaskOutput contains the result of completing a task.
@@ -146,10 +155,14 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		}
 	}
 
-	if !skipReview {
-		if task.ReviewCount < minReviews {
-			return nil, fmt.Errorf("review required: have %d, need %d (run \"crew review %d\")", task.ReviewCount, minReviews, task.ID)
+	if !skipReview && task.ReviewCount < minReviews {
+		reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent)
+		if reviewErr != nil {
+			return nil, reviewErr
 		}
+	}
+	if !skipReview && task.ReviewCount < minReviews {
+		return nil, fmt.Errorf("review required: have %d, need %d", task.ReviewCount, minReviews)
 	}
 
 	// Resolve base branch for conflict check
@@ -208,4 +221,197 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 		ShouldStartReview: false,
 		ReviewMode:        domain.ReviewModeAuto,
 	}, nil
+}
+
+func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbose bool, agent string) error {
+	preComments, err := uc.tasks.GetComments(task.ID)
+	if err != nil {
+		return fmt.Errorf("get comments: %w", err)
+	}
+	preReviewerCount := countReviewerComments(preComments)
+
+	reviewSessionName := domain.ReviewSessionName(task.ID)
+	running, err := uc.sessions.IsRunning(reviewSessionName)
+	if err != nil {
+		return fmt.Errorf("check review session: %w", err)
+	}
+
+	var reviewScriptPath string
+	if running {
+		uc.writeReviewMessage(fmt.Sprintf("Review session already running for task #%d. Waiting...", task.ID))
+	} else {
+		uc.writeReviewMessage(fmt.Sprintf("Starting review for task #%d...", task.ID))
+		reviewCmd, err := shared.PrepareReviewCommand(shared.ReviewCommandDeps{
+			ConfigLoader: uc.config,
+			Worktrees:    uc.worktrees,
+			RepoRoot:     uc.repoRoot,
+		}, shared.ReviewCommandInput{
+			Task:  task,
+			Agent: agent,
+		})
+		if err != nil {
+			return err
+		}
+
+		reviewScriptPath, err = uc.writeReviewScript(reviewSessionName, task.ID, reviewCmd)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = os.Remove(reviewScriptPath)
+		}()
+
+		if err := uc.sessions.Start(ctx, domain.StartSessionOptions{
+			Name:      reviewSessionName,
+			Dir:       reviewCmd.WorktreePath,
+			Command:   reviewScriptPath,
+			TaskID:    task.ID,
+			TaskTitle: task.Title,
+			TaskAgent: reviewCmd.AgentName,
+			Type:      domain.SessionTypeReviewer,
+		}); err != nil {
+			return fmt.Errorf("start review session: %w", err)
+		}
+	}
+
+	if err := uc.waitForReview(ctx, reviewSessionName, verbose); err != nil {
+		return err
+	}
+	uc.writeReviewMessage(fmt.Sprintf("Review finished for task #%d.", task.ID))
+
+	if err := uc.updateReviewMetadata(task, preReviewerCount); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (uc *CompleteTask) writeReviewScript(sessionName string, taskID int, reviewCmd *shared.ReviewCommandOutput) (string, error) {
+	scriptsDir := filepath.Join(uc.crewDir, "scripts")
+	if err := os.MkdirAll(scriptsDir, 0750); err != nil {
+		return "", fmt.Errorf("create scripts directory: %w", err)
+	}
+
+	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
+	script := fmt.Sprintf(`#!/bin/bash
+set -o pipefail
+
+exec 2>>%q
+
+read -r -d '' PROMPT << 'END_OF_PROMPT'
+%s
+END_OF_PROMPT
+
+%s
+`, logPath, reviewCmd.Result.Prompt, reviewCmd.Result.Command)
+
+	scriptPath := domain.ReviewScriptPath(uc.crewDir, taskID)
+	if err := os.WriteFile(scriptPath, []byte(script), 0700); err != nil { //nolint:gosec // executable script requires execute permission
+		return "", fmt.Errorf("write review script: %w", err)
+	}
+
+	return scriptPath, nil
+}
+
+func (uc *CompleteTask) waitForReview(ctx context.Context, sessionName string, verbose bool) error {
+	if !verbose || uc.stderr == nil {
+		return uc.sessions.Wait(ctx, sessionName)
+	}
+
+	resultCh := make(chan error, 1)
+	go func() {
+		resultCh <- uc.sessions.Wait(ctx, sessionName)
+	}()
+
+	lastOutput := ""
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case err := <-resultCh:
+			_ = uc.streamSessionOutput(sessionName, &lastOutput)
+			return err
+		case <-ticker.C:
+			_ = uc.streamSessionOutput(sessionName, &lastOutput)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *string) error {
+	output, err := uc.sessions.Peek(sessionName, reviewPeekLines, true)
+	if err != nil {
+		if errors.Is(err, domain.ErrNoSession) {
+			return nil
+		}
+		return err
+	}
+	if output == *lastOutput {
+		return nil
+	}
+
+	if *lastOutput != "" && strings.HasPrefix(output, *lastOutput) {
+		newOutput := strings.TrimPrefix(output, *lastOutput)
+		newOutput = strings.TrimPrefix(newOutput, "\n")
+		if strings.TrimSpace(newOutput) != "" {
+			_, _ = fmt.Fprintln(uc.stderr, newOutput)
+		}
+	} else if output != "" {
+		_, _ = fmt.Fprintln(uc.stderr, output)
+	}
+
+	*lastOutput = output
+	return nil
+}
+
+func (uc *CompleteTask) updateReviewMetadata(task *domain.Task, preReviewerCount int) error {
+	postComments, err := uc.tasks.GetComments(task.ID)
+	if err != nil {
+		return fmt.Errorf("get comments: %w", err)
+	}
+	postReviewerCount := countReviewerComments(postComments)
+	lastReviewerComment, ok := lastReviewerComment(postComments)
+	if !ok {
+		return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+	}
+	if postReviewerCount <= preReviewerCount {
+		if !task.LastReviewAt.IsZero() && !lastReviewerComment.Time.After(task.LastReviewAt) {
+			return fmt.Errorf("reviewer did not add a comment: %w", domain.ErrNoReviewComment)
+		}
+	}
+
+	shared.UpdateReviewMetadata(uc.clock, task, lastReviewerComment.Text)
+	if err := uc.tasks.Save(task); err != nil {
+		return fmt.Errorf("save review metadata: %w", err)
+	}
+
+	return nil
+}
+
+func (uc *CompleteTask) writeReviewMessage(message string) {
+	if uc.stderr == nil {
+		return
+	}
+	_, _ = fmt.Fprintln(uc.stderr, message)
+}
+
+func countReviewerComments(comments []domain.Comment) int {
+	count := 0
+	for _, c := range comments {
+		if c.Author == "reviewer" {
+			count++
+		}
+	}
+	return count
+}
+
+func lastReviewerComment(comments []domain.Comment) (domain.Comment, bool) {
+	for i := len(comments) - 1; i >= 0; i-- {
+		if comments[i].Author == "reviewer" {
+			return comments[i], true
+		}
+	}
+	return domain.Comment{}, false
 }

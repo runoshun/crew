@@ -42,8 +42,8 @@ crew complete          # Mark task as complete
 
 - Default: 1
 - `skip_review = true` bypasses the review requirement
-- Review count increments only when `crew review` exits with code 0
-- `crew review` runs the external tool synchronously and does not change task status
+- Review count increments only when the reviewer adds a comment
+- Review runs synchronously inside `crew complete` and does not change task status unless completion succeeds
 
 ### Configuration
 
@@ -136,24 +136,12 @@ crew complete
 | `crew complete` | Mark task as complete |
 | `crew comment` | Add a comment |
 | `crew diff` | Show diff |
-| `crew review` | Run AI code review |
 
 ---
 
 ## Running Reviews
 
-`crew review` runs synchronously and waits for the AI reviewer to complete. This can take a significant amount of time.
-
-**Important**: Always set a 20-minute timeout when running reviews to avoid hanging indefinitely.
-
-```bash
-# Using shell timeout command
-timeout 1200 crew review <id>
-
-# Or with Bash tool timeout parameter (1200000ms = 20 minutes)
-```
-
----
+Reviews run synchronously inside `crew complete`. Use `--verbose` when you need to stream reviewer output.
 
 ## Agent Configuration Tips
 

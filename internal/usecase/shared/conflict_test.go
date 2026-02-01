@@ -91,6 +91,7 @@ func (m *mockSessionManager) Start(_ context.Context, _ domain.StartSessionOptio
 func (m *mockSessionManager) Stop(_ string) error                          { return nil }
 func (m *mockSessionManager) Attach(_ string) error                        { return nil }
 func (m *mockSessionManager) Peek(_ string, _ int, _ bool) (string, error) { return "", nil }
+func (m *mockSessionManager) Wait(_ context.Context, _ string) error       { return nil }
 func (m *mockSessionManager) GetPaneProcesses(_ string) ([]domain.ProcessInfo, error) {
 	return nil, nil
 }

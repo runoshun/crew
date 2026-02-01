@@ -74,7 +74,7 @@ func RequireRunningSession(sessions domain.SessionManager, taskID int) (string, 
 
 // EnsureNoRunningSession checks that no session is running for the given task.
 // Returns ErrSessionRunning if session is already running.
-// This is used by usecases that need to start a new session (start_task, review_task).
+// This is used by usecases that need to start a new session (start_task).
 func EnsureNoRunningSession(sessions domain.SessionManager, taskID int) error {
 	sessionName := domain.SessionName(taskID)
 	running, err := sessions.IsRunning(sessionName)

@@ -132,6 +132,26 @@ func TestSessionName(t *testing.T) {
 	}
 }
 
+func TestReviewSessionName(t *testing.T) {
+	tests := []struct {
+		want   string
+		taskID int
+	}{
+		{taskID: 1, want: "crew-1-review"},
+		{taskID: 42, want: "crew-42-review"},
+		{taskID: 999, want: "crew-999-review"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			got := ReviewSessionName(tt.taskID)
+			if got != tt.want {
+				t.Errorf("ReviewSessionName(%d) = %q, want %q", tt.taskID, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPathFunctions(t *testing.T) {
 	crewDir := "/repo/.crew"
 
@@ -140,6 +160,14 @@ func TestPathFunctions(t *testing.T) {
 		want := "/repo/.crew/scripts/task-1.sh"
 		if got != want {
 			t.Errorf("ScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
+		}
+	})
+
+	t.Run("ReviewScriptPath", func(t *testing.T) {
+		got := ReviewScriptPath(crewDir, 1)
+		want := "/repo/.crew/scripts/review-1.sh"
+		if got != want {
+			t.Errorf("ReviewScriptPath(%q, 1) = %q, want %q", crewDir, got, want)
 		}
 	})
 

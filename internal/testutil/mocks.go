@@ -377,6 +377,7 @@ func (m *MockGit) GetDefaultBranch() (string, error) {
 // MockSessionManager is a test double for domain.SessionManager.
 // Fields are ordered to minimize memory padding.
 type MockSessionManager struct {
+	WaitErr       error
 	IsRunningErr  error
 	StartErr      error
 	StopErr       error
@@ -386,6 +387,7 @@ type MockSessionManager struct {
 	PeekOutput    string
 	SentKeys      string
 	IsRunningFunc func(string) (bool, error)
+	WaitFunc      func(context.Context, string) error
 	SendFunc      func(string, string) error // Custom Send function for complex test scenarios
 	StartOpts     domain.StartSessionOptions
 	PeekLines     int
@@ -396,6 +398,7 @@ type MockSessionManager struct {
 	AttachCalled  bool
 	SendCalled    bool
 	PeekCalled    bool
+	WaitCalled    bool
 }
 
 // NewMockSessionManager creates a new MockSessionManager.
@@ -455,6 +458,15 @@ func (m *MockSessionManager) IsRunning(name string) (bool, error) {
 		return false, m.IsRunningErr
 	}
 	return m.IsRunningVal, nil
+}
+
+// Wait records the call and returns configured error.
+func (m *MockSessionManager) Wait(ctx context.Context, sessionName string) error {
+	m.WaitCalled = true
+	if m.WaitFunc != nil {
+		return m.WaitFunc(ctx, sessionName)
+	}
+	return m.WaitErr
 }
 
 // GetPaneProcesses returns an empty list (mock implementation).

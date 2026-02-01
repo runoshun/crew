@@ -293,6 +293,7 @@ Examples:
 func newCompleteCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		comment string
+		verbose bool
 	}
 
 	cmd := &cobra.Command{
@@ -311,8 +312,8 @@ the status. If the command fails, the completion is aborted.
 
 Review requirement:
 	  - skip_review enabled: bypasses review count requirement
-	  - otherwise: requires ReviewCount >= [complete].min_reviews (default: 1)
-	  - review count increases only when 'crew review' exits with code 0
+	  - otherwise: runs review automatically when ReviewCount < [complete].min_reviews (default: 1)
+	  - review count increases only when the reviewer adds a comment
 
 Examples:
 	  # Complete task by ID
@@ -336,6 +337,7 @@ Examples:
 			out, err := uc.Execute(cmd.Context(), usecase.CompleteTaskInput{
 				TaskID:  taskID,
 				Comment: opts.comment,
+				Verbose: opts.verbose,
 			})
 			if err != nil {
 				// Print conflict message to stdout if present
@@ -352,6 +354,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&opts.comment, "comment", "m", "", "Add a completion comment")
+	cmd.Flags().BoolVarP(&opts.verbose, "verbose", "v", false, "Show reviewer output in real-time")
 
 	return cmd
 }

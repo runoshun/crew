@@ -300,6 +300,28 @@ func (c *Client) IsRunning(sessionName string) (bool, error) {
 	return true, nil
 }
 
+// Wait waits for a session to stop running.
+// It polls every 3 seconds and can be cancelled via context.
+func (c *Client) Wait(ctx context.Context, sessionName string) error {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			running, err := c.IsRunning(sessionName)
+			if err != nil {
+				return err
+			}
+			if !running {
+				return nil
+			}
+		}
+	}
+}
+
 // configureStatusBar configures the status bar for a tmux session.
 func (c *Client) configureStatusBar(sessionName string, taskID int, taskTitle, taskAgent string, sessionType domain.SessionType) error {
 	// Colors by session type

@@ -338,12 +338,6 @@ func (c *Container) StartManagerUseCase() *usecase.StartManager {
 	return usecase.NewStartManager(c.Sessions, c.ConfigLoader, c.Config.RepoRoot, c.Config.GitDir, c.Config.CrewDir)
 }
 
-// ReviewTaskUseCase returns a new ReviewTask use case.
-// stderr is the writer for warning messages.
-func (c *Container) ReviewTaskUseCase(stderr io.Writer) *usecase.ReviewTask {
-	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Executor, c.Clock, c.Config.RepoRoot, stderr)
-}
-
 // PollTaskUseCase returns a new PollTask use case.
 // stdout and stderr are the writers for command output.
 func (c *Container) PollTaskUseCase(stdout, stderr io.Writer) *usecase.PollTask {
