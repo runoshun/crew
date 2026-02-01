@@ -158,5 +158,8 @@ invalid json
 	ctx := context.Background()
 	events, err := reader.ReadAll(ctx)
 	require.NoError(t, err)
-	assert.Len(t, events, 2) // Should skip malformed line
+	// 2 valid events + 1 warning event about skipped lines
+	assert.Len(t, events, 3)
+	// Last event should be warning about skipped lines
+	assert.Equal(t, domain.ACPEventType("_warning"), events[2].Type)
 }

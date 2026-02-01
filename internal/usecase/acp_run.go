@@ -209,6 +209,7 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 	for {
 		select {
 		case cmd := <-promptCh:
+			client.writePromptSentEvent(cmdCtx, cmd)
 			if err := uc.handlePrompt(cmdCtx, conn, session.SessionId, cmd); err != nil {
 				uc.writeError("prompt", err)
 			}
@@ -557,6 +558,9 @@ func (c *acpRunClient) writeEvent(ctx context.Context, eventType domain.ACPEvent
 
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
+		if c.stderr != nil {
+			_, _ = fmt.Fprintf(c.stderr, "[acp:event] marshal error: %v\n", err)
+		}
 		return
 	}
 
@@ -567,7 +571,20 @@ func (c *acpRunClient) writeEvent(ctx context.Context, eventType domain.ACPEvent
 		Payload:   payloadBytes,
 	}
 
-	_ = c.eventWriter.Write(ctx, event)
+	if err := c.eventWriter.Write(ctx, event); err != nil {
+		if c.stderr != nil {
+			_, _ = fmt.Fprintf(c.stderr, "[acp:event] write error: %v\n", err)
+		}
+	}
+}
+
+// promptSentPayload is the payload for ACPEventPromptSent events.
+type promptSentPayload struct {
+	Text string `json:"text"`
+}
+
+func (c *acpRunClient) writePromptSentEvent(ctx context.Context, cmd domain.ACPCommand) {
+	c.writeEvent(ctx, domain.ACPEventPromptSent, promptSentPayload{Text: cmd.Text})
 }
 
 func cancelPermissionResponse() acpsdk.RequestPermissionResponse {

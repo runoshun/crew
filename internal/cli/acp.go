@@ -212,7 +212,7 @@ func newACPLogCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "log",
+		Use:   "log [task-id]",
 		Short: "View ACP session event log",
 		Long: `View the event log for an ACP session.
 
@@ -220,9 +220,19 @@ Events are stored in .crew/acp/<namespace>/<task-id>/events.jsonl and include
 session updates, tool calls, permission requests, and more.
 
 Examples:
-  crew acp log --task 1
-  crew acp log --task 1 --raw`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+  crew acp log 1
+  crew acp log 1 --raw
+  crew acp log --task 1`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Accept task ID as positional argument or flag
+			if len(args) > 0 {
+				var err error
+				opts.taskID, err = parseTaskID(args[0])
+				if err != nil {
+					return fmt.Errorf("invalid task ID: %w", err)
+				}
+			}
 			if opts.taskID <= 0 {
 				return fmt.Errorf("task is required")
 			}

@@ -100,12 +100,15 @@ func (r *FileEventReader) ReadAll(_ context.Context) ([]domain.ACPEvent, error) 
 	defer func() { _ = file.Close() }()
 
 	var events []domain.ACPEvent
+	var skippedLines int
 	scanner := bufio.NewScanner(file)
 
-	// Increase buffer size for large JSON lines
-	const maxLineSize = 1024 * 1024 // 1MB
-	buf := make([]byte, maxLineSize)
-	scanner.Buffer(buf, maxLineSize)
+	// Start with default buffer, allow up to 1MB for large JSON lines
+	const (
+		initialBufSize = 64 * 1024   // 64KB
+		maxLineSize    = 1024 * 1024 // 1MB
+	)
+	scanner.Buffer(make([]byte, initialBufSize), maxLineSize)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -115,10 +118,21 @@ func (r *FileEventReader) ReadAll(_ context.Context) ([]domain.ACPEvent, error) 
 
 		var event domain.ACPEvent
 		if err := json.Unmarshal(line, &event); err != nil {
-			// Skip malformed lines
+			// Count malformed lines but continue
+			skippedLines++
 			continue
 		}
 		events = append(events, event)
+	}
+
+	// Log skipped lines count if any
+	if skippedLines > 0 {
+		// Append warning to events as a pseudo-event
+		// This is informational; the caller can filter it out
+		events = append(events, domain.ACPEvent{
+			Type:    domain.ACPEventType("_warning"),
+			Payload: json.RawMessage(fmt.Sprintf(`{"message":"skipped %d malformed lines"}`, skippedLines)),
+		})
 	}
 
 	if err := scanner.Err(); err != nil {
