@@ -127,7 +127,6 @@ type ReviewInput struct {
 // Fields are ordered to minimize memory padding.
 type ReviewOutput struct {
 	Review string
-	IsLGTM bool
 }
 
 // UpdateReviewMetadata updates task review metadata based on the review result.
@@ -183,6 +182,5 @@ END_OF_PROMPT
 		return nil, fmt.Errorf("run reviewer: %w", err)
 	}
 
-	// Return empty result - the actual review will be obtained from comments
-	return &ReviewOutput{}, nil
+	return &ReviewOutput{Review: stdoutBuf.String()}, nil
 }
