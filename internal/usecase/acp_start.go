@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"time"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -248,8 +247,9 @@ type acpScriptData struct {
 const acpScriptTemplate = `#!/bin/bash
 set -o pipefail
 
-# Redirect stderr to session log
-exec 2>>"{{.LogPath}}"
+# Redirect stdout/stderr to session log (while keeping tmux output)
+exec > >(tee -a "{{.LogPath}}")
+exec 2> >(tee -a "{{.LogPath}}" >&2)
 
 # Run ACP session
 {{.Command}}
@@ -263,7 +263,7 @@ func (uc *ACPStart) generateScript(taskID int, command string, worktreePath stri
 
 	sessionName := domain.ACPSessionName(taskID)
 	logPath := domain.SessionLogPath(uc.crewDir, sessionName)
-	if err := writeACPSessionLogHeader(logPath, sessionName, worktreePath, command); err != nil {
+	if err := writeSessionLogHeader(logPath, sessionName, worktreePath, command); err != nil {
 		return "", fmt.Errorf("write session log header: %w", err)
 	}
 
@@ -281,28 +281,6 @@ func (uc *ACPStart) generateScript(taskID int, command string, worktreePath stri
 	}
 
 	return scriptPath, nil
-}
-
-func writeACPSessionLogHeader(logPath, sessionName, workDir, command string) error {
-	logsDir := filepath.Dir(logPath)
-	if err := os.MkdirAll(logsDir, 0750); err != nil {
-		return fmt.Errorf("create logs directory: %w", err)
-	}
-
-	header := fmt.Sprintf(`================================================================================
-Session: %s
-Started: %s
-Directory: %s
-Command: %s
-================================================================================
-
-`, sessionName, time.Now().UTC().Format(time.RFC3339), workDir, command)
-
-	if err := os.WriteFile(logPath, []byte(header), 0600); err != nil {
-		return fmt.Errorf("write header: %w", err)
-	}
-
-	return nil
 }
 
 func shellJoin(parts []string) string {

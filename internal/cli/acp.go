@@ -133,6 +133,9 @@ func newACPSendCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "send <task-id> <text>",
 		Short: "Send a prompt to an ACP session",
+		Long: `Send a prompt to an ACP session.
+
+You can pass task ID and text as positional arguments or use --task/--text flags.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				var err error
@@ -177,6 +180,10 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "permission <task-id> <option-id|#index>",
 		Short: "Respond to a permission request",
+		Long: `Respond to a permission request.
+
+You can pass task ID and option as positional arguments or use --task/--option flags.
+Prefix the option with "#" to select by index from the latest permission request.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				var err error
