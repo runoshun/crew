@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -29,7 +28,10 @@ const (
 )
 
 const (
-	appPadding = 4
+	appPadding    = 4
+	minSplitWidth = 120
+	minPaneWidth  = 24
+	leftPaneRatio = 0.3
 )
 
 // Model is the workspace TUI model.
@@ -37,6 +39,11 @@ const (
 type Model struct {
 	// Dependencies
 	store *infraWorkspace.Store
+
+	// Repo models
+	models     map[string]*tui.Model
+	containers map[string]*app.Container
+	activeRepo string
 
 	// State
 	repos     []domain.WorkspaceRepo
@@ -54,9 +61,12 @@ type Model struct {
 	height      int
 	deleteIndex int // Index of repo being deleted
 	mode        Mode
+	leftWidth   int
+	rightWidth  int
 
 	// Boolean state
-	loading bool
+	leftFocused bool
+	loading     bool
 }
 
 // New creates a new workspace TUI model.
@@ -68,16 +78,20 @@ func New() *Model {
 	store, storeErr := NewStoreFromDefault()
 
 	return &Model{
-		store:     store,
-		repos:     nil,
-		repoInfos: make(map[string]domain.WorkspaceRepoInfo),
-		err:       storeErr, // Will be displayed on first render if store creation failed
-		cursor:    0,
-		mode:      ModeNormal,
-		keys:      DefaultKeyMap(),
-		styles:    DefaultStyles(),
-		addInput:  ai,
-		loading:   storeErr == nil, // Don't show loading if we already have an error
+		store:       store,
+		models:      make(map[string]*tui.Model),
+		containers:  make(map[string]*app.Container),
+		activeRepo:  "",
+		repos:       nil,
+		repoInfos:   make(map[string]domain.WorkspaceRepoInfo),
+		err:         storeErr, // Will be displayed on first render if store creation failed
+		cursor:      0,
+		mode:        ModeNormal,
+		keys:        DefaultKeyMap(),
+		styles:      DefaultStyles(),
+		addInput:    ai,
+		leftFocused: true,
+		loading:     storeErr == nil, // Don't show loading if we already have an error
 	}
 }
 
@@ -175,7 +189,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		return m, nil
+		m.updateLayout()
+		return m, m.propagateWindowSize()
 
 	case MsgReposLoaded:
 		m.loading = false
@@ -184,11 +199,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.repos = msg.Repos
-		// Start loading summaries for all repos
-		return m, m.loadAllSummaries()
+		m.pruneRepoState()
+		m.clampCursor()
+		m.syncActiveRepo()
+		cmds := []tea.Cmd{m.loadAllSummaries()}
+		if cmd := m.ensureActiveModel(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return m, tea.Batch(cmds...)
 
 	case MsgSummaryLoaded:
 		m.repoInfos[msg.Path] = msg.Info
+		if msg.Path == m.activeRepo {
+			return m, m.ensureActiveModel()
+		}
 		return m, nil
 
 	case MsgRepoAdded:
@@ -202,6 +226,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgRepoRemoved:
 		if msg.Err != nil {
 			m.err = msg.Err
+		} else {
+			delete(m.models, msg.Path)
+			delete(m.containers, msg.Path)
+			delete(m.repoInfos, msg.Path)
 		}
 		m.mode = ModeNormal
 		if m.cursor >= len(m.repos)-1 && m.cursor > 0 {
@@ -212,6 +240,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgError:
 		m.err = msg.Err
 		return m, nil
+
+	case tui.MsgTick:
+		return m.forwardToActiveModel(msg)
 
 	case MsgRepoExited:
 		// Returned from repo TUI, show error if any and reload repos
@@ -226,11 +257,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	return m, nil
+	return m.forwardToActiveModel(msg)
 }
 
 // handleKey handles key events.
 func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.mode == ModeNormal {
+		if handled, cmd := m.handleFocusSwitch(msg); handled {
+			return m, cmd
+		}
+	}
 	switch m.mode { //nolint:exhaustive // ModeNormal handled in default
 	case ModeAddRepo:
 		return m.handleAddMode(msg)
@@ -243,6 +279,9 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleNormalMode handles keys in normal mode.
 func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if !m.leftFocused {
+		return m.forwardToActiveModel(msg)
+	}
 	switch {
 	case msg.String() == "q" || msg.String() == "ctrl+c":
 		return m, tea.Quit
@@ -251,20 +290,20 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor > 0 {
 			m.cursor--
 		}
-		return m, nil
+		return m, m.setActiveRepoByCursor()
 
 	case msg.String() == "down" || msg.String() == "j":
 		if m.cursor < len(m.repos)-1 {
 			m.cursor++
 		}
-		return m, nil
+		return m, m.setActiveRepoByCursor()
 
 	case msg.String() == "pgup" || msg.String() == "ctrl+u":
 		m.cursor -= 5
 		if m.cursor < 0 {
 			m.cursor = 0
 		}
-		return m, nil
+		return m, m.setActiveRepoByCursor()
 
 	case msg.String() == "pgdown" || msg.String() == "ctrl+f":
 		m.cursor += 5
@@ -274,7 +313,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < 0 {
 			m.cursor = 0
 		}
-		return m, nil
+		return m, m.setActiveRepoByCursor()
 
 	case msg.String() == "enter":
 		if len(m.repos) > 0 && m.cursor < len(m.repos) {
@@ -284,9 +323,11 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.err = fmt.Errorf("cannot open: %s", info.State.String())
 				return m, nil
 			}
-			// Update last opened and launch repo TUI
+			// Update last opened and focus right pane
 			_ = m.store.UpdateLastOpened(repo.Path)
-			return m, m.openRepo(repo.Path)
+			m.activeRepo = repo.Path
+			m.leftFocused = false
+			return m, m.ensureActiveModelAndSize()
 		}
 		return m, nil
 
@@ -352,6 +393,174 @@ func (m *Model) handleDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) handleFocusSwitch(msg tea.KeyMsg) (bool, tea.Cmd) {
+	switch msg.String() {
+	case "left":
+		m.leftFocused = true
+		return true, nil
+	case "right":
+		m.leftFocused = false
+		return true, m.ensureActiveModelAndSize()
+	case "tab":
+		m.leftFocused = !m.leftFocused
+		if !m.leftFocused {
+			return true, m.ensureActiveModelAndSize()
+		}
+		return true, nil
+	default:
+		return false, nil
+	}
+}
+
+func (m *Model) ensureActiveModelAndSize() tea.Cmd {
+	if m.activeRepo == "" {
+		m.syncActiveRepo()
+	}
+	return m.ensureActiveModel()
+}
+
+func (m *Model) setActiveRepoByCursor() tea.Cmd {
+	if len(m.repos) == 0 || m.cursor < 0 || m.cursor >= len(m.repos) {
+		m.activeRepo = ""
+		return nil
+	}
+	path := m.repos[m.cursor].Path
+	if m.activeRepo == path {
+		return nil
+	}
+	m.activeRepo = path
+	return m.ensureActiveModel()
+}
+
+func (m *Model) clampCursor() {
+	if len(m.repos) == 0 {
+		m.cursor = 0
+		return
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+	if m.cursor >= len(m.repos) {
+		m.cursor = len(m.repos) - 1
+	}
+}
+
+func (m *Model) syncActiveRepo() {
+	if len(m.repos) == 0 {
+		m.activeRepo = ""
+		return
+	}
+	m.clampCursor()
+	m.activeRepo = m.repos[m.cursor].Path
+}
+
+func (m *Model) pruneRepoState() {
+	if len(m.repos) == 0 {
+		m.repoInfos = make(map[string]domain.WorkspaceRepoInfo)
+		m.models = make(map[string]*tui.Model)
+		m.containers = make(map[string]*app.Container)
+		return
+	}
+	valid := make(map[string]struct{}, len(m.repos))
+	for _, repo := range m.repos {
+		valid[repo.Path] = struct{}{}
+	}
+	for path := range m.repoInfos {
+		if _, ok := valid[path]; !ok {
+			delete(m.repoInfos, path)
+		}
+	}
+	for path := range m.models {
+		if _, ok := valid[path]; !ok {
+			delete(m.models, path)
+		}
+	}
+	for path := range m.containers {
+		if _, ok := valid[path]; !ok {
+			delete(m.containers, path)
+		}
+	}
+}
+
+func (m *Model) ensureActiveModel() tea.Cmd {
+	if m.activeRepo == "" {
+		return nil
+	}
+	info, ok := m.repoInfos[m.activeRepo]
+	if !ok {
+		return nil
+	}
+	if info.State != domain.RepoStateOK {
+		return nil
+	}
+	if _, ok := m.models[m.activeRepo]; !ok {
+		container, err := app.New(m.activeRepo)
+		if err != nil {
+			m.err = err
+			return nil
+		}
+		model := tui.New(container)
+		m.models[m.activeRepo] = model
+		m.containers[m.activeRepo] = container
+		initCmd := model.Init()
+		sizeCmd := m.updateModelSize(m.activeRepo)
+		return tea.Batch(initCmd, sizeCmd)
+	}
+	return m.updateModelSize(m.activeRepo)
+}
+
+func (m *Model) updateModelSize(path string) tea.Cmd {
+	if path == "" {
+		return nil
+	}
+	msg := tea.WindowSizeMsg{Width: m.rightContentWidth(), Height: m.contentHeight()}
+	return m.updateModel(path, msg)
+}
+
+func (m *Model) propagateWindowSize() tea.Cmd {
+	if len(m.models) == 0 {
+		return nil
+	}
+	msg := tea.WindowSizeMsg{Width: m.rightContentWidth(), Height: m.contentHeight()}
+	cmds := make([]tea.Cmd, 0, len(m.models))
+	for path := range m.models {
+		if cmd := m.updateModel(path, msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *Model) updateModel(path string, msg tea.Msg) tea.Cmd {
+	model, ok := m.models[path]
+	if !ok || model == nil {
+		return nil
+	}
+	updated, cmd := model.Update(msg)
+	if updatedModel, ok := updated.(*tui.Model); ok {
+		m.models[path] = updatedModel
+	}
+	return cmd
+}
+
+func (m *Model) forwardToActiveModel(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.activeRepo == "" {
+		return m, nil
+	}
+	model, ok := m.models[m.activeRepo]
+	if !ok || model == nil {
+		return m, nil
+	}
+	updated, cmd := model.Update(msg)
+	if updatedModel, ok := updated.(*tui.Model); ok {
+		m.models[m.activeRepo] = updatedModel
+	}
+	return m, cmd
+}
+
 // addRepo returns a command that adds a repo.
 func (m *Model) addRepo(path string) tea.Cmd {
 	return func() tea.Msg {
@@ -366,22 +575,6 @@ func (m *Model) removeRepo(path string) tea.Cmd {
 		err := m.store.RemoveRepo(path)
 		return MsgRepoRemoved{Path: path, Err: err}
 	}
-}
-
-// openRepo returns a command that opens a repo TUI.
-func (m *Model) openRepo(path string) tea.Cmd {
-	// Find the crew binary
-	crewPath, err := os.Executable()
-	if err != nil {
-		crewPath = "crew"
-	}
-
-	cmd := exec.Command(crewPath, "tui")
-	cmd.Dir = path
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		// After the repo TUI exits, signal to reload (pass error if any)
-		return MsgRepoExited{Err: err}
-	})
 }
 
 // loadAllSummaries returns commands to load all repo summaries.
@@ -401,6 +594,61 @@ func (m *Model) contentWidth() int {
 		w = 0
 	}
 	return w
+}
+
+func (m *Model) contentHeight() int {
+	h := m.height - 2
+	if h < 0 {
+		h = 0
+	}
+	return h
+}
+
+func (m *Model) updateLayout() {
+	contentWidth := m.contentWidth()
+	if m.width < minSplitWidth {
+		m.leftWidth = contentWidth
+		m.rightWidth = contentWidth
+		return
+	}
+	leftWidth := int(float64(contentWidth) * leftPaneRatio)
+	if leftWidth < minPaneWidth {
+		leftWidth = minPaneWidth
+	}
+	rightWidth := contentWidth - leftWidth
+	if rightWidth < minPaneWidth {
+		rightWidth = minPaneWidth
+		leftWidth = contentWidth - rightWidth
+		if leftWidth < minPaneWidth {
+			leftWidth = minPaneWidth
+		}
+	}
+	if leftWidth < 0 {
+		leftWidth = 0
+	}
+	if rightWidth < 0 {
+		rightWidth = 0
+	}
+	m.leftWidth = leftWidth
+	m.rightWidth = rightWidth
+}
+
+func (m *Model) leftContentWidth() int {
+	if m.width >= minSplitWidth && m.leftWidth > 0 {
+		return m.leftWidth
+	}
+	return m.contentWidth()
+}
+
+func (m *Model) rightContentWidth() int {
+	if m.width >= minSplitWidth && m.rightWidth > 0 {
+		return m.rightWidth
+	}
+	return m.contentWidth()
+}
+
+func (m *Model) isSplitView() bool {
+	return m.width >= minSplitWidth
 }
 
 // View renders the TUI.
@@ -429,6 +677,19 @@ func (m *Model) viewMain() string {
 		return m.viewEmptyState()
 	}
 
+	leftPane := m.viewLeftPane()
+	if !m.isSplitView() {
+		if m.leftFocused {
+			return leftPane
+		}
+		return m.viewRightPane()
+	}
+
+	rightPane := m.viewRightPane()
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
+}
+
+func (m *Model) viewLeftPane() string {
 	var b strings.Builder
 
 	b.WriteString(m.viewHeader())
@@ -442,7 +703,49 @@ func (m *Model) viewMain() string {
 	b.WriteString("\n")
 	b.WriteString(m.viewFooter())
 
-	return b.String()
+	return lipgloss.NewStyle().Width(m.leftContentWidth()).Render(b.String())
+}
+
+func (m *Model) viewRightPane() string {
+	width := m.rightContentWidth()
+	height := m.contentHeight()
+	content := m.viewRightPaneContent()
+
+	paneStyle := lipgloss.NewStyle().Width(width).Height(height)
+	if m.isSplitView() {
+		borderColor := tui.Colors.GroupLine
+		if !m.leftFocused {
+			borderColor = tui.Colors.Primary
+		}
+		paneStyle = paneStyle.
+			BorderLeft(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(borderColor)
+	}
+
+	return paneStyle.Render(content)
+}
+
+func (m *Model) viewRightPaneContent() string {
+	if m.activeRepo == "" {
+		return m.styles.Muted.Render("Select a repository to view tasks.")
+	}
+	info, ok := m.repoInfos[m.activeRepo]
+	if !ok {
+		return m.styles.Loading.Render("Loading repository...")
+	}
+	if info.State != domain.RepoStateOK {
+		message := fmt.Sprintf("Cannot open: %s", info.State.String())
+		if info.ErrorMsg != "" {
+			message = message + "\n" + info.ErrorMsg
+		}
+		return m.styles.Error.Render(message)
+	}
+	model, ok := m.models[m.activeRepo]
+	if !ok || model == nil {
+		return m.styles.Loading.Render("Loading repository tasks...")
+	}
+	return model.View()
 }
 
 // viewHeader renders the header with title left-aligned and count right-aligned.
@@ -454,7 +757,7 @@ func (m *Model) viewHeader() string {
 	titleText := "Workspace"
 	title := textStyle.Render(titleText)
 
-	contentWidth := m.contentWidth()
+	contentWidth := m.leftContentWidth()
 	countText := fmt.Sprintf("%d repos", len(m.repos))
 
 	leftLen := lipgloss.Width(title)
@@ -552,7 +855,7 @@ func (m *Model) renderRepoLine(repo domain.WorkspaceRepo, selected bool) string 
 	// Build line with consistent spacing: "▸ name    path    status"
 	line := fmt.Sprintf("%s %s  %s  %s", cursor, nameStr, pathRendered, statusStr)
 
-	contentWidth := m.contentWidth()
+	contentWidth := m.leftContentWidth()
 	lineWidth := lipgloss.Width(line)
 
 	// Truncate line if it exceeds content width (ANSI-aware truncation)
@@ -601,14 +904,22 @@ func (m *Model) formatSummaryColored(s domain.TaskSummary) string {
 // viewFooter renders the footer with key hints.
 func (m *Model) viewFooter() string {
 	keyStyle := m.styles.FooterKey
-	contentWidth := m.contentWidth()
+	contentWidth := m.leftContentWidth()
 
 	content := keyStyle.Render("j/k") + " nav  " +
-		keyStyle.Render("enter") + " open  " +
+		keyStyle.Render("enter") + " focus  " +
+		keyStyle.Render("tab") + " pane  " +
+		keyStyle.Render("left/right") + " pane  " +
 		keyStyle.Render("a") + " add  " +
 		keyStyle.Render("d") + " remove  " +
 		keyStyle.Render("r") + " refresh  " +
 		keyStyle.Render("q") + " quit"
+
+	focusLabel := "tasks"
+	if m.leftFocused {
+		focusLabel = "list"
+	}
+	content = content + "  " + m.styles.Muted.Render("focus:"+focusLabel)
 
 	return m.styles.Footer.Width(contentWidth).Render(content)
 }
