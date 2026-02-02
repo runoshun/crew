@@ -954,6 +954,46 @@ File format for --from:
 	return cmd
 }
 
+// newSubstateCommand creates the substate command for updating execution substate.
+func newSubstateCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "substate <id> <substate>",
+		Short: "Update task execution substate",
+		Long: `Update ACP execution substate for a task.
+
+Examples:
+  crew substate 42 awaiting_permission
+  crew substate 42 awaiting_user
+  crew substate 42 running
+  crew substate 42 idle`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			substate := domain.ACPExecutionSubstate(args[1])
+			if !substate.IsValid() {
+				return domain.ErrInvalidACPExecutionSubstate
+			}
+
+			uc := c.SetSubstateUseCase()
+			_, err = uc.Execute(cmd.Context(), usecase.SetSubstateInput{
+				TaskID:   taskID,
+				Substate: substate,
+			})
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
 // editTaskWithEditor opens the task in an editor for editing.
 func editTaskWithEditor(cmd *cobra.Command, c *app.Container, taskID int) error {
 	// Get current task with comments

@@ -33,11 +33,32 @@ cat > ${PLUGIN_FILE} << 'EOF'
 import type { Plugin } from "@opencode-ai/plugin"
 
 export const CrewHooksPlugin: Plugin = async ({ $ }) => {
+	const updateSubstate = async (substate: string) => {
+		const command = "crew substate {{.TaskID}} " + substate;
+		try {
+			if (typeof $.exec === "function") {
+				await $.exec(command);
+				return;
+			}
+			if (typeof $.shell === "function") {
+				await $.shell(command);
+				return;
+			}
+			if ($.client && typeof $.client.exec === "function") {
+				await $.client.exec({ command });
+				return;
+			}
+		} catch {
+			// Ignore failures to avoid breaking hook execution
+		}
+	};
+
   return {
 		event: async ({ event }) => {
 			// Permission asked: auto-approve safe git operations in worktree
 			if (event.type === "permission.asked") {
 				const { id, metadata } = event.properties;
+				await updateSubstate("awaiting_permission");
 			
 			// Auto-approve safe git operations in worktree
 			if (metadata && typeof metadata.command === 'string') {
@@ -55,6 +76,7 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 					// Allow: git status, diff, log, add, commit
 					if (/^git\s+(status|diff|log|add|commit)(\s+|$)/.test(command)) {
 						await $.client.permission.reply({ requestID: id, reply: "once" });
+						await updateSubstate("running");
 						return;
 					}
 				}
