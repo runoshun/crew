@@ -35,13 +35,12 @@ type KeyMap struct {
 	Manager key.Binding // Start/attach manager session
 
 	// View
-	Refresh          key.Binding // Refresh task list
-	Filter           key.Binding // Enter filter mode
-	Sort             key.Binding // Toggle sort mode
-	Help             key.Binding // Show help
-	Detail           key.Binding // Toggle detail view
-	ToggleShowAll    key.Binding // Toggle show all (including closed)
-	ToggleReviewMode key.Binding // Cycle review mode (auto -> manual -> auto_fix)
+	Refresh       key.Binding // Refresh task list
+	Filter        key.Binding // Enter filter mode
+	Sort          key.Binding // Toggle sort mode
+	Help          key.Binding // Show help
+	Detail        key.Binding // Toggle detail view
+	ToggleShowAll key.Binding // Toggle show all (including closed)
 
 	// General
 	Quit    key.Binding // Quit application
@@ -164,10 +163,6 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("A"),
 			key.WithHelp("A", "toggle all"),
 		),
-		ToggleReviewMode: key.NewBinding(
-			key.WithKeys("t"),
-			key.WithHelp("t", "review mode"),
-		),
 		Quit: key.NewBinding(
 			key.WithKeys("q", "ctrl+c"),
 			key.WithHelp("q", "quit"),
@@ -241,7 +236,6 @@ func (k KeyMap) GetBuiltinKeys() map[string]bool {
 	addKeys(k.Help)
 	addKeys(k.Detail)
 	addKeys(k.ToggleShowAll)
-	addKeys(k.ToggleReviewMode)
 	addKeys(k.Quit)
 	addKeys(k.Escape)
 	addKeys(k.Confirm)

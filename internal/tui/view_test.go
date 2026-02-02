@@ -101,13 +101,16 @@ func TestViewDetailPanel_RespectsPanelHeight(t *testing.T) {
 			renderedHeight := lipgloss.Height(result)
 
 			// The panel height should match what we specified
+			// Note: Header is rendered outside viewport, taking 2 lines (title + border)
 			expectedHeight := tt.height
 			if expectedHeight < 10 {
 				expectedHeight = 10
 			}
 
+			// Panel height is set via lipgloss Height(), which constrains the output
 			assert.LessOrEqual(t, renderedHeight, expectedHeight,
-				"Rendered panel height should not exceed specified panel height")
+				"Rendered panel height should not exceed specified panel height (got %d, want <= %d)",
+				renderedHeight, expectedHeight)
 
 			// Note: Since we now use viewport for scrolling, long content is handled
 			// by the viewport's built-in scrolling rather than explicit truncation markers.

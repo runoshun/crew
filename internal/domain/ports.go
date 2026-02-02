@@ -315,11 +315,6 @@ type ConfigManager interface {
 	// The cfg parameter should have builtin agents registered (via builtin.Register).
 	// Returns error if file already exists.
 	InitOverrideConfig(cfg *Config) error
-
-	// SetReviewMode updates the review_mode setting in the runtime config file (config.runtime.toml).
-	// Creates the [complete] section if it doesn't exist.
-	// Preserves other existing settings in the file.
-	SetReviewMode(mode ReviewMode) error
 }
 
 // Clock provides time operations for testability.

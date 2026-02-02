@@ -438,9 +438,14 @@ func (m *Model) updateDetailPanelViewport() {
 		return
 	}
 	panelWidth := m.detailPanelWidth() - 4 // account for border and padding
-	panelHeight := m.height - 6            // account for header/footer and hint
-	if panelHeight < 10 {
-		panelHeight = 10
+	// Height calculation:
+	// - m.height - 2 = panelHeight in viewDetailPanel
+	// - minus 2 for header (Task #N + border line, rendered outside viewport)
+	// - minus 2 for footer hint (when focused) + padding
+	// - minus 2 for additional spacing
+	panelHeight := m.height - 8
+	if panelHeight < 5 {
+		panelHeight = 5
 	}
 	m.detailPanelViewport.Width = panelWidth
 	m.detailPanelViewport.Height = panelHeight
@@ -1625,30 +1630,5 @@ func (m *Model) checkAndAttachOrSelectManager() tea.Cmd {
 
 		// Session not running, show agent selection UI
 		return MsgShowManagerSelect{}
-	}
-}
-
-// cycleReviewMode returns a command that cycles through review modes.
-func (m *Model) cycleReviewMode() tea.Cmd {
-	return func() tea.Msg {
-		// Get current mode
-		currentMode := domain.ReviewModeAuto
-		if m.config != nil && m.config.Complete.ReviewModeSet {
-			currentMode = m.config.Complete.ReviewMode
-		} else if m.config != nil && m.config.Complete.AutoFixSet && m.config.Complete.AutoFix { //nolint:staticcheck // Legacy compatibility
-			// Legacy: auto_fix=true maps to auto_fix mode
-			currentMode = domain.ReviewModeAutoFix
-		}
-
-		// Cycle to next mode
-		newMode := currentMode.NextMode()
-
-		// Save to config file
-		err := m.container.ConfigManager.SetReviewMode(newMode)
-		if err != nil {
-			return MsgError{Err: fmt.Errorf("change review mode: %w", err)}
-		}
-
-		return MsgReviewModeChanged{Mode: newMode}
 	}
 }

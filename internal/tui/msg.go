@@ -163,13 +163,6 @@ type MsgReviewResultLoaded struct {
 
 func (MsgReviewResultLoaded) sealed() {}
 
-// MsgReviewModeChanged is sent when review mode is changed.
-type MsgReviewModeChanged struct {
-	Mode domain.ReviewMode
-}
-
-func (MsgReviewModeChanged) sealed() {}
-
 // MsgManagerSessionStarted is sent when manager session is started.
 type MsgManagerSessionStarted struct {
 	SessionName string

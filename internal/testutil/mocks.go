@@ -620,20 +620,17 @@ func (m *MockConfigLoader) LoadWithOptions(opts domain.LoadConfigOptions) (*doma
 // MockConfigManager is a test double for domain.ConfigManager.
 // Fields are ordered to minimize memory padding.
 type MockConfigManager struct {
-	InitRepoErr         error
-	SetReviewModeErr    error
-	InitOverrideErr     error
-	InitGlobalErr       error
-	SetReviewModeValue  domain.ReviewMode
-	RuntimeConfigInfo   domain.ConfigInfo
-	OverrideConfigInfo  domain.ConfigInfo
-	RootRepoConfigInfo  domain.ConfigInfo
-	GlobalConfigInfo    domain.ConfigInfo
-	RepoConfigInfo      domain.ConfigInfo
-	InitRepoCalled      bool
-	InitGlobalCalled    bool
-	InitOverrideCalled  bool
-	SetReviewModeCalled bool
+	InitRepoErr        error
+	InitOverrideErr    error
+	InitGlobalErr      error
+	RuntimeConfigInfo  domain.ConfigInfo
+	OverrideConfigInfo domain.ConfigInfo
+	RootRepoConfigInfo domain.ConfigInfo
+	GlobalConfigInfo   domain.ConfigInfo
+	RepoConfigInfo     domain.ConfigInfo
+	InitRepoCalled     bool
+	InitGlobalCalled   bool
+	InitOverrideCalled bool
 }
 
 // NewMockConfigManager creates a new MockConfigManager.
@@ -706,13 +703,6 @@ func (m *MockConfigManager) InitGlobalConfig(_ *domain.Config) error {
 func (m *MockConfigManager) InitOverrideConfig(_ *domain.Config) error {
 	m.InitOverrideCalled = true
 	return m.InitOverrideErr
-}
-
-// SetReviewMode records the call and returns configured error.
-func (m *MockConfigManager) SetReviewMode(mode domain.ReviewMode) error {
-	m.SetReviewModeCalled = true
-	m.SetReviewModeValue = mode
-	return m.SetReviewModeErr
 }
 
 // === Snapshot methods (no-op for mock) ===

@@ -257,11 +257,21 @@ func (m *Model) headerFooterContentWidth() int {
 
 // viewHeader renders the header section.
 func (m *Model) viewHeader() string {
-	// Change border color based on focus (when embedded in workspace)
-	// Non-embedded TUI is always "focused"
+	// Change border color based on focus:
+	// - Task list header is blue when task list has focus
+	// - When embedded: must have focus AND detail panel must not be focused
+	// - When not embedded: detail panel must not be focused
 	borderColor := Colors.GroupLine
-	if !m.embedded || m.focused {
-		borderColor = Colors.Primary
+	if m.embedded {
+		// Embedded mode: blue only if this TUI has focus AND task list (not detail) is focused
+		if m.focused && !m.detailFocused {
+			borderColor = Colors.Primary
+		}
+	} else {
+		// Not embedded: blue unless detail panel has focus
+		if !m.detailFocused {
+			borderColor = Colors.Primary
+		}
 	}
 	headerStyle := m.styles.Header.BorderForeground(borderColor)
 	textStyle := m.styles.HeaderText
@@ -272,27 +282,6 @@ func (m *Model) viewHeader() string {
 	visibleCount := len(m.taskList.Items())
 	totalCount := len(m.tasks)
 
-	// Add review mode indicator (show current mode)
-	reviewModeLabel := ""
-	if m.config != nil {
-		mode := domain.ReviewModeAuto
-		if m.config.Complete.ReviewModeSet {
-			mode = m.config.Complete.ReviewMode
-		} else if m.config.Complete.AutoFixSet && m.config.Complete.AutoFix { //nolint:staticcheck // Legacy compatibility
-			mode = domain.ReviewModeAutoFix
-		}
-		switch mode {
-		case domain.ReviewModeAutoFix:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Primary).Render("[review:fix]") + " · "
-		case domain.ReviewModeManual:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Warning).Render("[review:man]") + " · "
-		case domain.ReviewModeAuto:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[review:auto]") + " · "
-		}
-	} else {
-		reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[review:auto]") + " · "
-	}
-
 	// Add filter indicator
 	filterLabel := ""
 	if m.showAll {
@@ -302,7 +291,7 @@ func (m *Model) viewHeader() string {
 	}
 
 	sortLabel := "by " + m.sortMode.String()
-	countText := fmt.Sprintf("%s%s%s · %d/%d", reviewModeLabel, filterLabel, sortLabel, visibleCount, totalCount)
+	countText := fmt.Sprintf("%s%s · %d/%d", filterLabel, sortLabel, visibleCount, totalCount)
 	rightText := lipgloss.NewStyle().Foreground(Colors.Muted).Render(countText)
 
 	leftLen := lipgloss.Width(title)
@@ -774,7 +763,6 @@ func (m *Model) viewHelp() string {
 				{"o", "Sort"},
 				{"v", "Details"},
 				{"A", "Toggle all"},
-				{"t", "Toggle review mode"},
 			},
 		},
 		{
@@ -1039,6 +1027,7 @@ func (m *Model) listWidth() int {
 }
 
 // detailPanelContent builds the content string for the detail panel viewport.
+// Note: Header is rendered separately in viewDetailPanel for dynamic focus styling.
 func (m *Model) detailPanelContent(contentWidth int) string {
 	task := m.SelectedTask()
 	if task == nil {
@@ -1046,15 +1035,6 @@ func (m *Model) detailPanelContent(contentWidth int) string {
 	}
 
 	var lines []string
-
-	// Header: "Task #N"
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(Colors.Primary).
-		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(Colors.GroupLine).
-		Width(contentWidth)
-	lines = append(lines, headerStyle.Render(fmt.Sprintf("Task #%d", task.ID)), "")
 
 	// Title (may wrap to multiple lines)
 	titleStyle := lipgloss.NewStyle().
@@ -1157,21 +1137,18 @@ func (m *Model) viewDetailPanel() string {
 	// On narrow screen (full width mode), no left border needed
 	fullWidthMode := !m.showListPane()
 
+	// Note: Don't set Height on panelStyle - let content determine height,
+	// then wrap with a fixed-height style at the end
 	panelStyle := lipgloss.NewStyle().
-		Width(panelWidth).
-		Height(panelHeight)
+		Width(panelWidth)
 
 	if !fullWidthMode {
-		// Change border color based on focus state
-		borderColor := Colors.GroupLine
-		if m.detailFocused {
-			borderColor = Colors.Primary
-		}
+		// Vertical separator line is always gray (focus indicated by header underline)
 		panelStyle = panelStyle.
 			PaddingLeft(GutterWidth).
 			BorderLeft(true).
 			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(borderColor)
+			BorderForeground(Colors.GroupLine)
 	}
 
 	task := m.SelectedTask()
@@ -1179,11 +1156,28 @@ func (m *Model) viewDetailPanel() string {
 		emptyStyle := lipgloss.NewStyle().
 			Foreground(Colors.Muted).
 			Padding(2, 1)
-		return panelStyle.Render(emptyStyle.Render("Select a task\nto view details"))
+		return panelStyle.Height(panelHeight).Render(emptyStyle.Render("Select a task\nto view details"))
 	}
 
-	// Use viewport for scrollable content
-	content := m.detailPanelViewport.View()
+	// Header: "Task #N" - rendered outside viewport for dynamic focus styling
+	contentWidth := panelWidth - 4 // account for border and padding
+	borderColor := Colors.GroupLine
+	if m.detailFocused {
+		borderColor = Colors.Primary
+	}
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(Colors.Primary).
+		Border(lipgloss.NormalBorder(), false, false, true, false).
+		BorderForeground(borderColor).
+		Width(contentWidth)
+	header := headerStyle.Render(fmt.Sprintf("Task #%d", task.ID))
+
+	// Use viewport for scrollable content (without header)
+	viewportContent := m.detailPanelViewport.View()
+
+	// Combine header and viewport content
+	content := header + "\n" + viewportContent
 
 	// Add footer hint when focused
 	if m.detailFocused {
@@ -1195,7 +1189,7 @@ func (m *Model) viewDetailPanel() string {
 		content = content + "\n" + footer
 	}
 
-	return panelStyle.Render(content)
+	return panelStyle.Height(panelHeight).Render(content)
 }
 
 func (m *Model) viewActionMenuDialog() string {
