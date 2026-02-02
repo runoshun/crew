@@ -3,7 +3,7 @@ package config
 import "github.com/runoshun/git-crew/v2/internal/domain"
 
 const (
-	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete:*) Bash(crew show:*) Bash(crew list:*) Bash(crew --help-worker)'`
+	claudeAllowedToolsForWorker  = `--allowedTools='Bash(git add:*) Bash(git commit:*) Bash(crew complete:*) Bash(crew show:*) Bash(crew list:*) Bash(crew substate:*) Bash(crew --help-worker)'`
 	claudeAllowedToolsForManager = `--allowedTools='Bash(crew:*)'`
 )
 
@@ -62,6 +62,56 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew substate {{.TaskID}} awaiting_permission"
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew substate {{.TaskID}} awaiting_user"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew substate {{.TaskID}} running"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew substate {{.TaskID}} running"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew substate {{.TaskID}} idle"
+          }
+        ]
+      }
     ]
   }
 }
@@ -69,7 +119,7 @@ EOF
 
 # Add exclude pattern to git (use git rev-parse for worktree support)
 GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null) && \
-  echo ".claude/crew-plugin/" >> "${GIT_COMMON_DIR}/info/exclude" || true
+  (grep -qxF ".claude/crew-plugin/" "${GIT_COMMON_DIR}/info/exclude" || echo ".claude/crew-plugin/") >> "${GIT_COMMON_DIR}/info/exclude" || true
 
 # Trust worktree in Claude
 CLAUDE_JSON=~/.claude.json

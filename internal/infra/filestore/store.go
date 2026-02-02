@@ -32,7 +32,7 @@ type Store struct {
 // New creates a new Store rooted at .crew/tasks.
 func New(crewDir, namespace string) *Store {
 	if namespace == "" {
-		namespace = "default"
+		namespace = domain.DefaultNamespace
 	}
 	rootDir := filepath.Join(crewDir, "tasks")
 	lockPath := filepath.Join(rootDir, namespace, ".lock")

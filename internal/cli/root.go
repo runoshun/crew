@@ -164,6 +164,9 @@ Use --help-manager-auto to see the auto mode guide.`,
 	editCmd := newEditCommand(c)
 	editCmd.GroupID = groupTask
 
+	substateCmd := newSubstateCommand(c)
+	substateCmd.GroupID = groupTask
+
 	rmCmd := newRmCommand(c)
 	rmCmd.GroupID = groupTask
 
@@ -246,6 +249,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 		listCmd,
 		showCmd,
 		editCmd,
+		substateCmd,
 		rmCmd,
 		cpCmd,
 		commentCmd,

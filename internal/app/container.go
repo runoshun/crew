@@ -196,6 +196,11 @@ func (c *Container) EditTaskUseCase() *usecase.EditTask {
 	return usecase.NewEditTask(c.Tasks)
 }
 
+// SetSubstateUseCase returns a new SetSubstate use case.
+func (c *Container) SetSubstateUseCase() *usecase.SetSubstate {
+	return usecase.NewSetSubstate(c.Tasks, c.ACPStateStore)
+}
+
 // DeleteTaskUseCase returns a new DeleteTask use case.
 func (c *Container) DeleteTaskUseCase() *usecase.DeleteTask {
 	return usecase.NewDeleteTask(c.Tasks)
@@ -487,5 +492,5 @@ func resolveNamespace(cfg *domain.Config, gitClient domain.Git) string {
 			}
 		}
 	}
-	return "default"
+	return domain.DefaultNamespace
 }

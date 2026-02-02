@@ -101,6 +101,9 @@ func ManagerScriptPath(crewDir string) string {
 // WorkspacesFileName is the name of the workspaces file.
 const WorkspacesFileName = "workspaces.toml"
 
+// DefaultNamespace is used when a task namespace is unset.
+const DefaultNamespace = "default"
+
 // WorkspacesFilePath returns the path to the workspaces.toml file.
 // globalCrewDir is typically ~/.config/crew (resolved by caller).
 func WorkspacesFilePath(globalCrewDir string) string {

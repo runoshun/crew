@@ -1,6 +1,7 @@
 # Reviewer Template Variables
 
-Available in reviewer system_prompt/prompt templates:
+Available in reviewer system_prompt/prompt templates.
+These are separate from command_template variables.
 
 - `{{.TaskID}}` - Task ID
 - `{{.Title}}` - Task title
