@@ -400,11 +400,20 @@ func (m *Model) handleDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleFocusSwitch(msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
-		m.leftFocused = !m.leftFocused
 		if !m.leftFocused {
-			return true, m.ensureActiveModelAndSize()
+			return false, nil
 		}
-		return true, nil
+		m.leftFocused = false
+		return true, m.ensureActiveModelAndSize()
+	case "left":
+		if !m.leftFocused {
+			if m.activeModelUsesCursorKeys() {
+				return false, nil
+			}
+			m.leftFocused = true
+			return true, nil
+		}
+		return false, nil
 	case "right":
 		if m.leftFocused {
 			m.leftFocused = false
@@ -565,6 +574,14 @@ func (m *Model) forwardToActiveModel(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.models[m.activeRepo] = updatedModel
 	}
 	return m, m.wrapRepoCmd(m.activeRepo, cmd)
+}
+
+func (m *Model) activeModelUsesCursorKeys() bool {
+	model, ok := m.models[m.activeRepo]
+	if !ok || model == nil {
+		return false
+	}
+	return model.UsesCursorKeys()
 }
 
 func (m *Model) routeRepoMsg(msg RepoMsg) (tea.Model, tea.Cmd) {

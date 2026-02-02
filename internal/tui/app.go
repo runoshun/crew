@@ -216,6 +216,14 @@ func (m *Model) DisableAutoRefresh() {
 	m.autoRefresh = false
 }
 
+// UsesCursorKeys reports whether left/right should be forwarded to inputs.
+func (m *Model) UsesCursorKeys() bool {
+	if m.mode.IsInputMode() {
+		return true
+	}
+	return m.mode == ModeStart && m.startFocusCustom
+}
+
 // tick returns a command that sends a tick message after the refresh interval.
 func (m *Model) tick() tea.Cmd {
 	return tea.Tick(AutoRefreshInterval, func(t time.Time) tea.Msg {
