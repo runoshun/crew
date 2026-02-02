@@ -98,25 +98,26 @@ type Model struct {
 	blockInput textinput.Model
 
 	// Numeric state (smaller types last)
-	mode               Mode
-	confirmAction      ConfirmAction
-	sortMode           SortMode
-	newTaskField       NewTaskField
-	width              int
-	height             int
-	confirmTaskID      int
-	agentCursor        int
-	managerAgentCursor int
-	reviewerCursor     int
-	statusCursor       int
-	actionMenuCursor   int
-	reviewTaskID       int // Task being reviewed
-	reviewActionCursor int // Cursor for action selection
-	editCommentIndex   int // Index of comment being edited
-	startFocusCustom   bool
-	showAll            bool
-	detailFocused      bool // Right pane is focused for scrolling
-	blockFocusUnblock  bool // True when Unblock button is focused in Block dialog
+	mode                    Mode
+	confirmAction           ConfirmAction
+	sortMode                SortMode
+	newTaskField            NewTaskField
+	width                   int
+	height                  int
+	confirmTaskID           int
+	agentCursor             int
+	managerAgentCursor      int
+	reviewerCursor          int
+	statusCursor            int
+	actionMenuCursor        int
+	reviewTaskID            int // Task being reviewed
+	reviewActionCursor      int // Cursor for action selection
+	reviewMessageReturnMode Mode
+	editCommentIndex        int // Index of comment being edited
+	startFocusCustom        bool
+	showAll                 bool
+	detailFocused           bool // Right pane is focused for scrolling
+	blockFocusUnblock       bool // True when Unblock button is focused in Block dialog
 }
 
 // New creates a new TUI Model with the given container.
@@ -723,22 +724,18 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			},
 		},
 		{
-			ActionID: "complete",
-			Label:    "Complete",
-			Desc:     "Run review and complete task",
+			ActionID: "request_changes",
+			Label:    "Request Changes",
+			Desc:     "Send request changes message",
 			Key:      "R",
 			Action: func() (tea.Model, tea.Cmd) {
-				m.mode = ModeSelectReviewer
-				m.reviewerCursor = 0
-				// Set default cursor position if default reviewer is found
-				if m.config != nil {
-					for i, r := range m.reviewerAgents {
-						if r == m.config.AgentsConfig.DefaultReviewer {
-							m.reviewerCursor = i
-							break
-						}
-					}
-				}
+				m.reviewTaskID = task.ID
+				m.reviewResult = ""
+				m.reviewActionCursor = 0
+				m.reviewMessageReturnMode = ModeNormal
+				m.mode = ModeReviewMessage
+				m.reviewMessageInput.Reset()
+				m.reviewMessageInput.Focus()
 				return m, nil
 			},
 			IsAvailable: func() bool {

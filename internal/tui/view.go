@@ -823,7 +823,7 @@ func (m *Model) viewHelp() string {
 				{"S", "Stop (work/review)"},
 				{"a", "Attach"},
 				{"x", "Execute"},
-				{"R", "Complete"},
+				{"R", "Request Changes"},
 				{"n", "New Task"},
 				{"e", "Change Status"},
 				{"E", "Edit Task"},

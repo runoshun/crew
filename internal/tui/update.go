@@ -159,6 +159,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reviewTaskID = 0
 		m.reviewResult = ""
 		m.reviewActionCursor = 0
+		m.reviewMessageReturnMode = ModeNormal
 		return m, m.loadTasks()
 
 	case MsgPrepareEditComment:
@@ -333,17 +334,13 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.hasWorktree(task) {
 			return m, nil
 		}
-		// Start review selection
-		m.mode = ModeSelectReviewer
-		m.reviewerCursor = 0
-		if m.config != nil {
-			for i, r := range m.reviewerAgents {
-				if r == m.config.AgentsConfig.DefaultReviewer {
-					m.reviewerCursor = i
-					break
-				}
-			}
-		}
+		m.reviewTaskID = task.ID
+		m.reviewResult = ""
+		m.reviewActionCursor = 0
+		m.reviewMessageReturnMode = ModeNormal
+		m.mode = ModeReviewMessage
+		m.reviewMessageInput.Reset()
+		m.reviewMessageInput.Focus()
 		return m, nil
 
 	case key.Matches(msg, m.keys.New):
@@ -1095,6 +1092,7 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Execute selected action
 		switch m.reviewActionCursor {
 		case 0: // Request Changes - enter message input mode
+			m.reviewMessageReturnMode = ModeReviewAction
 			m.mode = ModeReviewMessage
 			m.reviewMessageInput.Reset()
 			m.reviewMessageInput.Focus()
@@ -1126,9 +1124,18 @@ const defaultReviewMessage = "Please address the review comments above."
 func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Escape):
-		// Go back to review action selection
-		m.mode = ModeReviewAction
 		m.reviewMessageInput.Blur()
+		returnMode := m.reviewMessageReturnMode
+		if returnMode == 0 {
+			returnMode = ModeNormal
+		}
+		m.mode = returnMode
+		m.reviewMessageReturnMode = ModeNormal
+		if returnMode == ModeNormal {
+			m.reviewTaskID = 0
+			m.reviewResult = ""
+			m.reviewActionCursor = 0
+		}
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
