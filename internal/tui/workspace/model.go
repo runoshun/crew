@@ -509,7 +509,7 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 		return nil
 	}
 	if _, ok := m.models[m.activeRepo]; !ok {
-		container, err := app.New(m.activeRepo)
+		container, err := app.NewWithWarningWriter(m.activeRepo, nil)
 		if err != nil {
 			m.err = err
 			return nil
@@ -989,7 +989,7 @@ func (m *Model) viewFooter() string {
 
 	content := keyStyle.Render("j/k") + " nav  " +
 		keyStyle.Render("enter") + " focus  " +
-		keyStyle.Render("tab") + "->pane  " +
+		keyStyle.Render("tab") + " (left)  " +
 		keyStyle.Render("left/right") + " pane  " +
 		keyStyle.Render("a") + " add  " +
 		keyStyle.Render("d") + " remove  " +
@@ -1001,6 +1001,9 @@ func (m *Model) viewFooter() string {
 		focusLabel = "list"
 	}
 	content = content + "  " + m.styles.Muted.Render("focus:"+focusLabel)
+	if !m.leftFocused && m.activeModelUsesCursorKeys() {
+		content = content + "  " + m.styles.Muted.Render("input: esc then left")
+	}
 
 	return m.styles.Footer.Width(contentWidth).Render(content)
 }

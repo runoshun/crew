@@ -18,7 +18,16 @@ crew show <id>
 # Show task diff
 crew diff <id>
 
-# Add a review comment (manual only; do NOT use with crew complete)
+```
+
+---
+
+## Manual Review Only
+
+Use this only when you are not running `crew complete`.
+
+```bash
+# Add a review comment
 crew comment <id> "<message>"
 ```
 
