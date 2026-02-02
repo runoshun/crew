@@ -109,6 +109,7 @@ type Model struct {
 	managerAgentCursor      int
 	statusCursor            int
 	actionMenuCursor        int
+	actionMenuLastTaskID    int
 	reviewTaskID            int // Task being reviewed
 	reviewActionCursor      int // Cursor for action selection
 	reviewMessageReturnMode Mode
@@ -683,6 +684,8 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 		return nil
 	}
 
+	hasWorktree := m.hasWorktreeQuiet(task)
+
 	actions := []actionMenuItem{
 		{
 			ActionID: "start",
@@ -799,7 +802,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return m.hasWorktreeQuiet(task)
+				return hasWorktree
 			},
 		},
 		{
@@ -812,7 +815,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return task.Status == domain.StatusDone && m.hasWorktreeQuiet(task)
+				return task.Status == domain.StatusDone && hasWorktree
 			},
 		},
 		{

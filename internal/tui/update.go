@@ -487,7 +487,8 @@ func (m *Model) handleDefaultAction() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
-	items := m.actionMenuItemsForTask(m.SelectedTask())
+	task := m.SelectedTask()
+	items := m.actionMenuItemsForTask(task)
 	if len(items) == 0 {
 		return m, nil
 	}
@@ -499,7 +500,7 @@ func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
 			break
 		}
 	}
-	if m.actionMenuLastID != "" {
+	if m.actionMenuLastID != "" && task != nil && task.ID == m.actionMenuLastTaskID {
 		for i, item := range items {
 			if item.ActionID == m.actionMenuLastID {
 				m.actionMenuCursor = i
@@ -516,6 +517,9 @@ func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Escape):
 		if len(m.actionMenuItems) > 0 && m.actionMenuCursor < len(m.actionMenuItems) {
 			m.actionMenuLastID = m.actionMenuItems[m.actionMenuCursor].ActionID
+			if task := m.SelectedTask(); task != nil {
+				m.actionMenuLastTaskID = task.ID
+			}
 		}
 		m.mode = ModeNormal
 		m.actionMenuItems = nil
@@ -540,6 +544,9 @@ func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		selected := m.actionMenuItems[m.actionMenuCursor]
 		m.actionMenuLastID = selected.ActionID
+		if task := m.SelectedTask(); task != nil {
+			m.actionMenuLastTaskID = task.ID
+		}
 		m.mode = ModeNormal
 		m.actionMenuItems = nil
 		if selected.Action == nil {
@@ -555,6 +562,9 @@ func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		for _, action := range m.actionMenuItems {
 			if action.Key == runeKey {
 				m.actionMenuLastID = action.ActionID
+				if task := m.SelectedTask(); task != nil {
+					m.actionMenuLastTaskID = task.ID
+				}
 				m.mode = ModeNormal
 				m.actionMenuItems = nil
 				if action.Action == nil {
