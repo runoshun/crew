@@ -263,8 +263,8 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 	startedAt := uc.clock.Now()
 	logOffset := int64(0)
 	if running {
-		// If the session is already running, try to avoid accidentally parsing an older review
-		// result by only considering log content written after we start waiting.
+		// If the session is already running, avoid accidentally parsing an older review
+		// result by only considering log content written after the last review run start.
 		logPath := domain.SessionLogPath(uc.crewDir, reviewSessionName)
 		if offset, t, ok := findLastReviewRunStart(logPath, int64(reviewLogReadMaxBytes)); ok {
 			logOffset = offset
@@ -454,7 +454,9 @@ func findLastReviewRunStart(logPath string, maxBytes int64) (int64, time.Time, b
 	if info.Size() > maxBytes {
 		baseOffset = info.Size() - maxBytes
 	}
+	isLineStart := true
 	if baseOffset > 0 {
+		isLineStart = isOffsetLineStart(file, baseOffset)
 		if _, seekErr := file.Seek(baseOffset, io.SeekStart); seekErr != nil {
 			return 0, time.Time{}, false
 		}
@@ -464,7 +466,7 @@ func findLastReviewRunStart(logPath string, maxBytes int64) (int64, time.Time, b
 		return 0, time.Time{}, false
 	}
 	text := string(data)
-	if baseOffset > 0 {
+	if baseOffset > 0 && !isLineStart {
 		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
 			baseOffset += int64(idx + 1)
 			text = text[idx+1:]
@@ -472,19 +474,11 @@ func findLastReviewRunStart(logPath string, maxBytes int64) (int64, time.Time, b
 			return 0, time.Time{}, false
 		}
 	}
-	searchText := text
-	idx := -1
-	for {
-		idx = strings.LastIndex(searchText, reviewRunStartPrefix)
-		if idx < 0 {
-			return 0, time.Time{}, false
-		}
-		if idx == 0 || searchText[idx-1] == '\n' {
-			break
-		}
-		searchText = searchText[:idx]
+	idx := lastLinePrefixIndex(text, reviewRunStartPrefix)
+	if idx < 0 {
+		return 0, time.Time{}, false
 	}
-	line := searchText[idx:]
+	line := text[idx:]
 	if nl := strings.IndexByte(line, '\n'); nl >= 0 {
 		line = line[:nl]
 	}
@@ -611,7 +605,7 @@ func readFileTailBytes(path string, offset int64, maxBytes int64) string {
 	}
 
 	text := string(data)
-	if offset > 0 {
+	if offset > 0 && !isOffsetLineStart(file, offset) {
 		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
 			text = text[idx+1:]
 		}
@@ -626,18 +620,7 @@ func extractReviewResult(logText string) (string, bool) {
 
 	// If the log contains multiple review runs (e.g. file was appended), only consider
 	// the latest run to avoid accidentally picking an old marker.
-	searchText := logText
-	idx := -1
-	for {
-		idx = strings.LastIndex(searchText, reviewRunStartPrefix)
-		if idx < 0 {
-			break
-		}
-		if idx == 0 || searchText[idx-1] == '\n' {
-			break
-		}
-		searchText = searchText[:idx]
-	}
+	idx := lastLinePrefixIndex(logText, reviewRunStartPrefix)
 	if idx >= 0 {
 		logText = logText[idx+len(reviewRunStartPrefix):]
 		if nl := strings.IndexByte(logText, '\n'); nl >= 0 {
@@ -736,4 +719,29 @@ func diffOutput(prev, curr string) string {
 		}
 	}
 	return curr
+}
+
+func lastLinePrefixIndex(text, prefix string) int {
+	searchText := text
+	for {
+		idx := strings.LastIndex(searchText, prefix)
+		if idx < 0 {
+			return -1
+		}
+		if idx == 0 || searchText[idx-1] == '\n' {
+			return idx
+		}
+		searchText = searchText[:idx]
+	}
+}
+
+func isOffsetLineStart(file *os.File, offset int64) bool {
+	if offset <= 0 {
+		return true
+	}
+	buf := []byte{0}
+	if _, err := file.ReadAt(buf, offset-1); err != nil {
+		return false
+	}
+	return buf[0] == '\n'
 }
