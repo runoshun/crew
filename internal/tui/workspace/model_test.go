@@ -75,17 +75,15 @@ func TestModelLayoutSplitWidths(t *testing.T) {
 	}
 
 	contentWidth := 160 - appPadding
-	expectedLeft := int(float64(contentWidth) * leftPaneRatio)
-	if expectedLeft < minPaneWidth {
-		expectedLeft = minPaneWidth
+	// Left pane has fixed max width
+	expectedLeft := maxLeftWidth
+	if expectedLeft > contentWidth {
+		expectedLeft = contentWidth
 	}
 	expectedRight := contentWidth - expectedLeft
 	if expectedRight < minPaneWidth {
 		expectedRight = minPaneWidth
 		expectedLeft = contentWidth - expectedRight
-		if expectedLeft < minPaneWidth {
-			expectedLeft = minPaneWidth
-		}
 	}
 
 	if model.leftWidth != expectedLeft {

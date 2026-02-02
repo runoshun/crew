@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/truncate"
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	infraWorkspace "github.com/runoshun/git-crew/v2/internal/infra/workspace"
@@ -33,7 +32,7 @@ const (
 	appPadding    = 4
 	minSplitWidth = 120
 	minPaneWidth  = 24
-	leftPaneRatio = 0.3
+	maxLeftWidth  = 30
 )
 
 // Model is the workspace TUI model.
@@ -700,17 +699,15 @@ func (m *Model) updateLayout() {
 		m.rightWidth = contentWidth
 		return
 	}
-	leftWidth := int(float64(contentWidth) * leftPaneRatio)
-	if leftWidth < minPaneWidth {
-		leftWidth = minPaneWidth
+	// Left pane has fixed max width, right pane gets the rest
+	leftWidth := maxLeftWidth
+	if leftWidth > contentWidth {
+		leftWidth = contentWidth
 	}
 	rightWidth := contentWidth - leftWidth
 	if rightWidth < minPaneWidth {
 		rightWidth = minPaneWidth
 		leftWidth = contentWidth - rightWidth
-		if leftWidth < minPaneWidth {
-			leftWidth = minPaneWidth
-		}
 	}
 	if leftWidth < 0 {
 		leftWidth = 0
@@ -923,36 +920,52 @@ func (m *Model) viewRepoList() string {
 
 	var b strings.Builder
 	for i, repo := range m.repos {
-		line := m.renderRepoLine(repo, i == m.cursor)
-		b.WriteString(line)
-		b.WriteString("\n")
+		lines := m.renderRepoItem(repo, i == m.cursor)
+		b.WriteString(lines)
+		b.WriteString("\n") // end of line 2
+		if i < len(m.repos)-1 {
+			b.WriteString("\n") // empty line 3 (spacing between items)
+		}
 	}
 	return b.String()
 }
 
-// renderRepoLine renders a single repo line matching the task tree TUI style.
-func (m *Model) renderRepoLine(repo domain.WorkspaceRepo, selected bool) string {
+// renderRepoItem renders a single repo item in 3 lines:
+// Line 1: "  > name path" (path truncated from front)
+// Line 2: "      status summary"
+// Line 3: (empty, spacing handled by caller)
+func (m *Model) renderRepoItem(repo domain.WorkspaceRepo, selected bool) string {
 	info, hasInfo := m.repoInfos[repo.Path]
+	contentWidth := m.leftContentWidth()
 
-	// Cursor indicator (▸ for selected, space for normal)
-	var cursor string
+	// Cursor indicator (> for selected, space for normal)
+	indicatorChar := " "
 	if selected {
-		cursor = m.styles.CursorSelected.Render("▸")
-	} else {
-		cursor = m.styles.CursorNormal.Render(" ")
+		indicatorChar = ">"
 	}
+	indicator := m.styles.CursorSelected.Render(indicatorChar)
 
-	// Name
+	// Name (no fixed width)
 	name := repo.DisplayName()
 	var nameStr string
 	if selected {
-		nameStr = m.styles.RepoNameSelected.Render(name)
+		nameStr = m.styles.RepoNameSelected.Bold(true).Render(name)
 	} else {
 		nameStr = m.styles.RepoName.Render(name)
 	}
 
-	// Path (truncated)
-	pathStr := truncatePath(repo.Path, 40)
+	// Calculate available width for path: contentWidth - "  > " (4) - name - " " (1)
+	prefixWidth := 4 + len(name) + 1
+	pathMaxWidth := contentWidth - prefixWidth
+	if pathMaxWidth < 5 {
+		pathMaxWidth = 5
+	}
+
+	// Path (truncated from front, keeping the end)
+	pathStr := repo.Path
+	if len(pathStr) > pathMaxWidth {
+		pathStr = "…" + pathStr[len(pathStr)-pathMaxWidth+1:]
+	}
 	var pathRendered string
 	if selected {
 		pathRendered = m.styles.RepoPathSelected.Render(pathStr)
@@ -960,7 +973,16 @@ func (m *Model) renderRepoLine(repo domain.WorkspaceRepo, selected bool) string 
 		pathRendered = m.styles.RepoPath.Render(pathStr)
 	}
 
-	// State and summary
+	// Build line 1: "  > name path"
+	line1 := "  " + indicator + " " + nameStr + " " + pathRendered
+	line1Width := lipgloss.Width(line1)
+
+	// Pad to full width
+	if line1Width < contentWidth {
+		line1 += strings.Repeat(" ", contentWidth-line1Width)
+	}
+
+	// Build line 2: status summary
 	var statusStr string
 	if hasInfo {
 		if info.State == domain.RepoStateOK {
@@ -972,30 +994,17 @@ func (m *Model) renderRepoLine(repo domain.WorkspaceRepo, selected bool) string 
 		statusStr = m.styles.Loading.Render("loading...")
 	}
 
-	// Build line with consistent spacing: "▸ name    path    status"
-	line := fmt.Sprintf("%s %s  %s  %s", cursor, nameStr, pathRendered, statusStr)
-
-	contentWidth := m.leftContentWidth()
-	lineWidth := lipgloss.Width(line)
-
-	// Truncate line if it exceeds content width (ANSI-aware truncation)
-	if lineWidth > contentWidth && contentWidth > 0 {
-		line = truncate.StringWithTail(line, uint(contentWidth), "")
-		lineWidth = lipgloss.Width(line)
+	// Fixed indent of 4 spaces for status line
+	line2 := "    " + statusStr
+	line2Width := lipgloss.Width(line2)
+	if line2Width < contentWidth {
+		line2 += strings.Repeat(" ", contentWidth-line2Width)
 	}
 
-	// Apply row background for selected items
-	if selected {
-		if lineWidth < contentWidth {
-			// Pad to full width with background
-			padding := strings.Repeat(" ", contentWidth-lineWidth)
-			line = m.styles.ItemSelected.Render(line + padding)
-		} else {
-			line = m.styles.ItemSelected.Render(line)
-		}
-	}
+	// Combine lines
+	result := line1 + "\n" + line2
 
-	return line
+	return result
 }
 
 // formatSummaryColored formats task summary with status-specific colors.
@@ -1196,12 +1205,4 @@ func (m *Model) viewDeleteDialog() string {
 	)
 
 	return m.styles.Dialog.Width(dialogWidth).Render(content)
-}
-
-// truncatePath truncates a path, keeping the end.
-func truncatePath(path string, maxLen int) string {
-	if len(path) <= maxLen {
-		return path
-	}
-	return "..." + path[len(path)-maxLen+3:]
 }
