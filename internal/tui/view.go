@@ -1326,7 +1326,7 @@ func (m *Model) viewReviewActionDialog() string {
 	}
 
 	options := []actionOption{
-		{"Request Changes", "Send message and restart task (back to in_progress)"},
+		{"Request Changes", "Send message and restart task (back to in_progress, notify if available)"},
 		{"Comment Only", "Send review as comment without restarting"},
 		{"Merge", "Merge the task (requires done)"},
 		{"Close", "Close the task without merging"},

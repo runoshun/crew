@@ -1170,19 +1170,20 @@ func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.reviewMessageInput.Blur()
 		returnMode := m.reviewMessageReturnMode
 		m.reviewMessageReturnMode = ModeNormal
-		if returnMode != ModeReviewAction {
-			m.resetReviewState()
-		}
-		if returnMode == ModeActionMenu {
-			m.mode = ModeNormal
-			return m.openActionMenu()
-		}
-		if returnMode == ModeReviewAction {
+		//nolint:exhaustive
+		switch returnMode {
+		case ModeReviewAction:
 			m.mode = ModeReviewAction
 			return m, nil
+		case ModeActionMenu:
+			m.resetReviewState()
+			m.mode = ModeNormal
+			return m.openActionMenu()
+		default:
+			m.resetReviewState()
+			m.mode = ModeNormal
+			return m, nil
 		}
-		m.mode = ModeNormal
-		return m, nil
 
 	case msg.Type == tea.KeyEnter:
 		// Submit the message (or use default if empty)
