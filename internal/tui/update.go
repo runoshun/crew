@@ -1111,8 +1111,10 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) enterRequestChanges(taskID int, returnMode Mode) {
 	m.reviewTaskID = taskID
-	m.reviewResult = ""
-	m.reviewActionCursor = 0
+	if returnMode == ModeNormal {
+		m.reviewResult = ""
+		m.reviewActionCursor = 0
+	}
 	m.reviewMessageReturnMode = returnMode
 	m.mode = ModeReviewMessage
 	m.reviewMessageInput.Reset()

@@ -1254,7 +1254,7 @@ func (m *Model) viewActionMenuDialog() string {
 func (m *Model) viewReviewResultDialog() string {
 	ds := m.newDialogStyles()
 
-	title := ds.renderLine(ds.label.Render("Review Complete"))
+	title := ds.renderLine(ds.label.Render("Review Result"))
 
 	// Find task title
 	var taskTitle string

@@ -334,6 +334,24 @@ func TestUpdate_MsgReviewResultLoaded(t *testing.T) {
 	assert.Equal(t, "Review content here", result.reviewResult)
 }
 
+func TestHandleReviewActionMode_RequestChanges_KeepsReviewResult(t *testing.T) {
+	m := &Model{
+		keys:               DefaultKeyMap(),
+		mode:               ModeReviewAction,
+		reviewTaskID:       42,
+		reviewResult:       "Review content here",
+		reviewActionCursor: 0,
+		reviewMessageInput: textinput.New(),
+	}
+
+	updatedModel, cmd := m.handleReviewActionMode(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeReviewMessage, result.mode)
+	assert.Equal(t, "Review content here", result.reviewResult)
+}
+
 func TestUpdate_ActionMenuEnter(t *testing.T) {
 	actionCalled := false
 
