@@ -361,6 +361,12 @@ Examples:
 
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Completed task #%d: %s\n", out.Task.ID, out.Task.Title)
 
+			if out.ReviewResult != "" {
+				_, _ = fmt.Fprintln(cmd.OutOrStdout())
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Review result:")
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.ReviewResult)
+			}
+
 			return nil
 		},
 	}

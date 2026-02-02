@@ -38,6 +38,7 @@ type CompleteTaskInput struct {
 type CompleteTaskOutput struct {
 	Task              *domain.Task      // The completed task
 	ConflictMessage   string            // Conflict message to display (only set when ErrMergeConflict is returned)
+	ReviewResult      string            // Review result text (if review was run)
 	AutoFixReview     string            // Deprecated: auto_fix output (ignored)
 	ReviewMode        domain.ReviewMode // Deprecated: review_mode (ignored)
 	AutoFixMaxRetries int               // Deprecated: auto_fix setting (ignored)
@@ -198,6 +199,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 
 	shouldRunReview := in.ForceReview || !skipReview
 	requireReviewSuccess := !skipReview
+	var lastReviewResult string
 	if shouldRunReview {
 		pattern := domain.AnchorReviewSuccessRegex(reviewSuccessRegex)
 		reviewMatcher, err := regexp.Compile(pattern)
@@ -211,6 +213,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 			if reviewErr != nil {
 				return nil, reviewErr
 			}
+			lastReviewResult = reviewResult
 			if reviewMatcher.MatchString(reviewResult) {
 				reviewSucceeded = true
 				break
@@ -248,6 +251,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 
 	return &CompleteTaskOutput{
 		Task:              task,
+		ReviewResult:      lastReviewResult,
 		ShouldStartReview: false,
 		ReviewMode:        domain.ReviewModeAuto,
 	}, nil
