@@ -21,6 +21,22 @@ func TestFileStateStore_SaveLoad(t *testing.T) {
 	require.Equal(t, state.ExecutionSubstate, got.ExecutionSubstate)
 }
 
+func TestFileStateStore_SaveLoadWithSessionID(t *testing.T) {
+	t.Parallel()
+
+	store := acpinfra.NewFileStateStore(t.TempDir())
+	state := domain.ACPExecutionState{
+		ExecutionSubstate: domain.ACPExecutionRunning,
+		SessionID:         "session-abc-123",
+	}
+
+	require.NoError(t, store.Save(context.Background(), "default", 1, state))
+	got, err := store.Load(context.Background(), "default", 1)
+	require.NoError(t, err)
+	require.Equal(t, state.ExecutionSubstate, got.ExecutionSubstate)
+	require.Equal(t, state.SessionID, got.SessionID)
+}
+
 func TestFileStateStore_LoadNotFound(t *testing.T) {
 	t.Parallel()
 

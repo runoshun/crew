@@ -31,6 +31,7 @@ func newACPCommand(c *app.Container) *cobra.Command {
 	cmd.AddCommand(newACPAttachCommand(c))
 	cmd.AddCommand(newACPPeekCommand(c))
 	cmd.AddCommand(newACPLogCommand(c))
+	cmd.AddCommand(newACPConsoleCommand(c))
 	return cmd
 }
 
@@ -768,4 +769,39 @@ func extractAgentMessageText(payload json.RawMessage) string {
 		return chunk.Content.Text.Text
 	}
 	return ""
+}
+
+// newACPConsoleCommand creates the ACP console command.
+func newACPConsoleCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "console <task-id>",
+		Short: "Interactive ACP console",
+		Long: `Open an interactive console for an ACP session.
+
+The console provides:
+- Real-time log viewing
+- Prompt input
+- Permission request handling
+
+Keys:
+  Enter    Send prompt
+  1-9      Select permission option
+  Esc      Cancel current operation
+  Ctrl+D   Stop session
+  Ctrl+C   Quit console
+
+Examples:
+  crew acp console 1`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			return c.RunACPConsole(cmd.Context(), taskID)
+		},
+	}
+
+	return cmd
 }

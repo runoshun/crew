@@ -28,6 +28,7 @@ func (s ACPExecutionSubstate) Display() string {
 // ACPExecutionState holds persisted ACP execution state.
 type ACPExecutionState struct {
 	ExecutionSubstate ACPExecutionSubstate `json:"execution_substate"`
+	SessionID         string               `json:"session_id,omitempty"`
 }
 
 // ACPStateStore persists ACP execution state.

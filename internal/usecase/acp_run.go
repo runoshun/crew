@@ -203,7 +203,9 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		cancel()
 		return nil, fmt.Errorf("acp new session: %w", err)
 	}
-	if err := uc.markACPRunning(ctx, task, namespace, in.Agent); err != nil {
+	sessionID := string(session.SessionId)
+	client.sessionID = sessionID
+	if err := uc.markACPRunning(ctx, task, namespace, in.Agent, sessionID); err != nil {
 		cancel()
 		return nil, err
 	}
@@ -213,7 +215,6 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 	routerErrCh := router.Start(cmdCtx)
 
 	// Create event writer for logging
-	client.sessionID = string(session.SessionId)
 	if uc.eventWriterFactory != nil {
 		eventWriter, err := uc.eventWriterFactory.ForTask(namespace, task.ID)
 		if err != nil {
@@ -338,8 +339,8 @@ func (uc *ACPRun) handlePrompt(ctx context.Context, conn *acpsdk.ClientSideConne
 	return nil
 }
 
-func (uc *ACPRun) markACPRunning(ctx context.Context, task *domain.Task, namespace string, agentName string) error {
-	if err := uc.setExecutionSubstate(ctx, namespace, task.ID, domain.ACPExecutionRunning); err != nil {
+func (uc *ACPRun) markACPRunning(ctx context.Context, task *domain.Task, namespace string, agentName string, sessionID string) error {
+	if err := uc.saveACPState(ctx, namespace, task.ID, domain.ACPExecutionRunning, sessionID); err != nil {
 		return err
 	}
 
@@ -376,7 +377,24 @@ func (uc *ACPRun) setExecutionSubstate(ctx context.Context, namespace string, ta
 	if uc.acpStates == nil {
 		return nil
 	}
-	return uc.acpStates.Save(ctx, namespace, taskID, domain.ACPExecutionState{ExecutionSubstate: substate})
+	// Load existing state to preserve session ID
+	state, err := uc.acpStates.Load(ctx, namespace, taskID)
+	if err != nil && !errors.Is(err, domain.ErrACPStateNotFound) {
+		return err
+	}
+	state.ExecutionSubstate = substate
+	return uc.acpStates.Save(ctx, namespace, taskID, state)
+}
+
+func (uc *ACPRun) saveACPState(ctx context.Context, namespace string, taskID int, substate domain.ACPExecutionSubstate, sessionID string) error {
+	if uc.acpStates == nil {
+		return nil
+	}
+	state := domain.ACPExecutionState{
+		ExecutionSubstate: substate,
+		SessionID:         sessionID,
+	}
+	return uc.acpStates.Save(ctx, namespace, taskID, state)
 }
 
 func (uc *ACPRun) writeError(stage string, err error) {
@@ -497,7 +515,11 @@ func (c *acpRunClient) setExecutionSubstate(ctx context.Context, substate domain
 	if c.stateStore == nil {
 		return
 	}
-	if err := c.stateStore.Save(ctx, c.stateNS, c.taskID, domain.ACPExecutionState{ExecutionSubstate: substate}); err != nil {
+	state := domain.ACPExecutionState{
+		ExecutionSubstate: substate,
+		SessionID:         c.sessionID,
+	}
+	if err := c.stateStore.Save(ctx, c.stateNS, c.taskID, state); err != nil {
 		c.writeWarning(fmt.Sprintf("update execution substate: %v", err))
 	}
 }

@@ -2,6 +2,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -19,7 +20,9 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/infra/runner"
 	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
 	"github.com/runoshun/git-crew/v2/internal/infra/worktree"
+	"github.com/runoshun/git-crew/v2/internal/tui/acpconsole"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
+	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // Config holds the application configuration paths.
@@ -355,6 +358,61 @@ func (c *Container) ACPLogUseCase() *usecase.ACPLog {
 			return acpinfra.NewFileEventReader(c.Config.CrewDir, namespace, taskID)
 		},
 	)
+}
+
+// RunACPConsole starts the ACP console TUI for a task.
+func (c *Container) RunACPConsole(ctx context.Context, taskID int) error {
+	// Get namespace from config
+	cfg, err := c.ConfigLoader.Load()
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	namespace := shared.ResolveACPNamespace(cfg, c.Git)
+
+	consoleCfg := acpconsole.Config{
+		TaskID:      taskID,
+		Namespace:   namespace,
+		EventReader: acpinfra.NewFileEventReader(c.Config.CrewDir, namespace, taskID),
+		StateLoader: func() (domain.ACPExecutionState, error) {
+			return c.ACPStateStore.Load(ctx, namespace, taskID)
+		},
+		SendPrompt: func(text string) error {
+			uc := c.ACPControlUseCase()
+			_, err := uc.Execute(ctx, usecase.ACPControlInput{
+				TaskID:      taskID,
+				CommandType: domain.ACPCommandPrompt,
+				Text:        text,
+			})
+			return err
+		},
+		SendPerm: func(optionID string) error {
+			uc := c.ACPControlUseCase()
+			_, err := uc.Execute(ctx, usecase.ACPControlInput{
+				TaskID:      taskID,
+				CommandType: domain.ACPCommandPermission,
+				OptionID:    optionID,
+			})
+			return err
+		},
+		SendCancel: func() error {
+			uc := c.ACPControlUseCase()
+			_, err := uc.Execute(ctx, usecase.ACPControlInput{
+				TaskID:      taskID,
+				CommandType: domain.ACPCommandCancel,
+			})
+			return err
+		},
+		SendStop: func() error {
+			uc := c.ACPControlUseCase()
+			_, err := uc.Execute(ctx, usecase.ACPControlInput{
+				TaskID:      taskID,
+				CommandType: domain.ACPCommandStop,
+			})
+			return err
+		},
+	}
+
+	return acpconsole.Run(consoleCfg)
 }
 
 // StartManagerUseCase returns a new StartManager use case.
