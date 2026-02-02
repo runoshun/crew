@@ -266,11 +266,11 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 		// If the session is already running, try to avoid accidentally parsing an older review
 		// result by only considering log content written after we start waiting.
 		logPath := domain.SessionLogPath(uc.crewDir, reviewSessionName)
-		if t, ok := readReviewRunStartedAtFromLog(logPath); ok {
-			startedAt = t
-		}
-		if info, statErr := os.Stat(logPath); statErr == nil {
-			logOffset = info.Size()
+		if offset, t, ok := findLastReviewRunStart(logPath, int64(reviewLogReadMaxBytes)); ok {
+			logOffset = offset
+			if !t.IsZero() {
+				startedAt = t
+			}
 		}
 	}
 
@@ -430,23 +430,51 @@ func (uc *CompleteTask) waitForReview(ctx context.Context, sessionName string, v
 	}
 }
 
-func readReviewRunStartedAtFromLog(logPath string) (time.Time, bool) {
+func findLastReviewRunStart(logPath string, maxBytes int64) (int64, time.Time, bool) {
+	if maxBytes <= 0 {
+		return 0, time.Time{}, false
+	}
 	file, err := os.Open(logPath)
 	if err != nil {
-		return time.Time{}, false
+		return 0, time.Time{}, false
 	}
 	defer func() {
 		_ = file.Close()
 	}()
 
-	data, err := io.ReadAll(io.LimitReader(file, 4096))
+	info, err := file.Stat()
 	if err != nil {
-		return time.Time{}, false
+		return 0, time.Time{}, false
+	}
+	if info.Size() == 0 {
+		return 0, time.Time{}, false
+	}
+
+	baseOffset := int64(0)
+	if info.Size() > maxBytes {
+		baseOffset = info.Size() - maxBytes
+	}
+	if baseOffset > 0 {
+		if _, seekErr := file.Seek(baseOffset, io.SeekStart); seekErr != nil {
+			return 0, time.Time{}, false
+		}
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return 0, time.Time{}, false
 	}
 	text := string(data)
-	idx := strings.Index(text, reviewRunStartPrefix)
+	if baseOffset > 0 {
+		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
+			baseOffset += int64(idx + 1)
+			text = text[idx+1:]
+		} else {
+			return 0, time.Time{}, false
+		}
+	}
+	idx := strings.LastIndex(text, reviewRunStartPrefix)
 	if idx < 0 {
-		return time.Time{}, false
+		return 0, time.Time{}, false
 	}
 	line := text[idx:]
 	if nl := strings.IndexByte(line, '\n'); nl >= 0 {
@@ -454,13 +482,13 @@ func readReviewRunStartedAtFromLog(logPath string) (time.Time, bool) {
 	}
 	ts := strings.TrimSpace(strings.TrimPrefix(line, reviewRunStartPrefix))
 	if ts == "" {
-		return time.Time{}, false
+		return baseOffset + int64(idx), time.Time{}, true
 	}
 	t, err := time.Parse(time.RFC3339, ts)
 	if err != nil {
-		return time.Time{}, false
+		return baseOffset + int64(idx), time.Time{}, true
 	}
-	return t, true
+	return baseOffset + int64(idx), t, true
 }
 
 func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *string) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -884,14 +885,23 @@ func TestCompleteTask_Execute_ReviewSessionAlreadyRunning(t *testing.T) {
 	sessions.IsRunningVal = true
 
 	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
-	sessions.WaitFunc = func(_ context.Context, sessionName string) error {
-		logPath := domain.SessionLogPath(uc.crewDir, sessionName)
-		if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
-			return err
-		}
-		content := "some output\n" + domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good\n"
-		return os.WriteFile(logPath, []byte(content), 0o644)
+	logPath := domain.SessionLogPath(uc.crewDir, domain.ReviewSessionName(1))
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
+		require.NoError(t, err)
 	}
+	content := strings.Join([]string{
+		"old output",
+		reviewRunStartPrefix + "2026-02-01T00:00:00Z",
+		"old review output",
+		domain.ReviewResultMarker,
+		"❌ Needs changes",
+		reviewRunStartPrefix + "2026-02-01T01:00:00Z",
+		"new review output",
+		domain.ReviewResultMarker,
+		domain.ReviewLGTMPrefix + " Looks good",
+		"",
+	}, "\n")
+	require.NoError(t, os.WriteFile(logPath, []byte(content), 0o644))
 
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
 		TaskID: 1,
