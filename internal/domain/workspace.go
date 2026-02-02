@@ -98,10 +98,11 @@ func NewTaskSummary(tasks []*Task) TaskSummary {
 // WorkspaceRepoInfo holds all information about a repo in the workspace view.
 // Fields are ordered to minimize memory padding.
 type WorkspaceRepoInfo struct {
-	Repo     WorkspaceRepo // The repo configuration
-	ErrorMsg string        // Error message if State indicates an error
-	Summary  TaskSummary   // Task counts (only valid if State == RepoStateOK)
-	State    RepoState     // Current state of the repo
+	Repo       WorkspaceRepo // The repo configuration
+	ErrorMsg   string        // Error message if State indicates an error
+	WarningMsg string        // Warning message for non-fatal issues
+	Summary    TaskSummary   // Task counts (only valid if State == RepoStateOK)
+	State      RepoState     // Current state of the repo
 }
 
 // DisplayName returns the name to display for this repo.

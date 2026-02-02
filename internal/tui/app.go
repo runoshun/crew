@@ -22,6 +22,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
 
+// AutoRefreshInterval is the default refresh cadence for the TUI.
 const AutoRefreshInterval = 5 * time.Second
 
 // Model is the main bubbletea model for the TUI.

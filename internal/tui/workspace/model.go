@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -118,6 +119,13 @@ func (m *Model) loadRepos() tea.Cmd {
 }
 
 func (m *Model) tick() tea.Cmd {
+	if m.activeRepo == "" {
+		return nil
+	}
+	model, ok := m.models[m.activeRepo]
+	if !ok || model == nil {
+		return nil
+	}
 	return tea.Tick(tui.AutoRefreshInterval, func(t time.Time) tea.Msg {
 		return MsgTick{}
 	})
@@ -164,11 +172,15 @@ func loadRepoInfo(repo domain.WorkspaceRepo) domain.WorkspaceRepoInfo {
 	}
 
 	// Try to load tasks
-	container, err := app.NewWithWarningWriter(repo.Path, nil)
+	var warnBuf bytes.Buffer
+	container, err := app.NewWithWarningWriter(repo.Path, &warnBuf)
 	if err != nil {
 		info.State = domain.RepoStateConfigError
 		info.ErrorMsg = fmt.Sprintf("Config error: %v", err)
 		return info
+	}
+	if warnBuf.Len() > 0 {
+		info.WarningMsg = strings.TrimSpace(warnBuf.String())
 	}
 
 	// List tasks (exclude terminal statuses for faster loading per spec)
@@ -399,6 +411,12 @@ func (m *Model) handleDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleFocusSwitch(msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch msg.String() {
+	case "ctrl+left":
+		m.leftFocused = true
+		return true, nil
+	case "ctrl+right":
+		m.leftFocused = false
+		return true, m.ensureActiveModelAndSize()
 	case "tab":
 		if !m.leftFocused {
 			return false, nil
@@ -520,7 +538,7 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 		m.models[m.activeRepo] = model
 		initCmd := m.wrapRepoCmd(m.activeRepo, model.Init())
 		sizeCmd := m.updateModelSize(m.activeRepo)
-		return tea.Batch(initCmd, sizeCmd)
+		return tea.Batch(initCmd, sizeCmd, m.tick())
 	}
 	return m.updateModelSize(m.activeRepo)
 }
@@ -809,24 +827,37 @@ func (m *Model) viewRightPane() string {
 
 func (m *Model) viewRightPaneContent() string {
 	if m.activeRepo == "" {
-		return m.styles.Muted.Render("Select a repository to view tasks.")
+		return m.withRightPaneHint(m.styles.Muted.Render("Select a repository to view tasks."))
 	}
 	info, ok := m.repoInfos[m.activeRepo]
 	if !ok {
-		return m.styles.Loading.Render("Loading repository...")
+		return m.withRightPaneHint(m.styles.Loading.Render("Loading repository..."))
 	}
 	if info.State != domain.RepoStateOK {
 		message := fmt.Sprintf("Cannot open: %s", info.State.String())
 		if info.ErrorMsg != "" {
 			message = message + "\n" + info.ErrorMsg
 		}
-		return m.styles.Error.Render(message)
+		return m.withRightPaneHint(m.styles.Error.Render(message))
 	}
 	model, ok := m.models[m.activeRepo]
 	if !ok || model == nil {
-		return m.styles.Loading.Render("Loading repository tasks...")
+		return m.withRightPaneHint(m.styles.Loading.Render("Loading repository tasks..."))
 	}
-	return model.View()
+	content := model.View()
+	if info.WarningMsg != "" {
+		warning := lipgloss.NewStyle().Foreground(tui.Colors.Warning).Render("Warning: " + info.WarningMsg)
+		return m.withRightPaneHint(warning + "\n" + content)
+	}
+	return m.withRightPaneHint(content)
+}
+
+func (m *Model) withRightPaneHint(content string) string {
+	if !m.isSplitView() && !m.leftFocused {
+		hint := m.styles.Muted.Render("left: back to list")
+		return hint + "\n" + content
+	}
+	return content
 }
 
 // viewHeader renders the header with title left-aligned and count right-aligned.
@@ -991,6 +1022,7 @@ func (m *Model) viewFooter() string {
 		keyStyle.Render("enter") + " focus  " +
 		keyStyle.Render("tab") + " (left)  " +
 		keyStyle.Render("left/right") + " pane  " +
+		keyStyle.Render("ctrl+left/right") + " pane  " +
 		keyStyle.Render("a") + " add  " +
 		keyStyle.Render("d") + " remove  " +
 		keyStyle.Render("r") + " refresh  " +
@@ -1002,7 +1034,7 @@ func (m *Model) viewFooter() string {
 	}
 	content = content + "  " + m.styles.Muted.Render("focus:"+focusLabel)
 	if !m.leftFocused && m.activeModelUsesCursorKeys() {
-		content = content + "  " + m.styles.Muted.Render("input: esc then left")
+		content = content + "  " + m.styles.Muted.Render("input: ctrl+left")
 	}
 
 	return m.styles.Footer.Width(contentWidth).Render(content)
