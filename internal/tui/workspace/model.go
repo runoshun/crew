@@ -638,6 +638,8 @@ func (m *Model) wrapRepoCmd(path string, cmd tea.Cmd) tea.Cmd {
 		case RepoMsg:
 			return typed
 		default:
+			// Route internal TUI messages through RepoMsg; program-level messages
+			// (exec/alt-screen/etc.) must pass through unwrapped.
 			if _, ok := msg.(tui.Msg); ok {
 				return RepoMsg{Path: path, Msg: msg}
 			}
