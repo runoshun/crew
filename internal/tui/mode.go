@@ -92,11 +92,12 @@ func (m Mode) IsInputMode() bool {
 type ReviewAction int
 
 const (
-	ReviewActionNone         ReviewAction = iota
-	ReviewActionNotifyWorker              // Send review result as comment to worker
-	ReviewActionMerge                     // Merge the task (LGTM)
-	ReviewActionClose                     // Close the task
-	ReviewActionEditComment               // Edit the review comment
+	ReviewActionNone           ReviewAction = iota
+	ReviewActionNotifyWorker                // Send review result as comment to worker
+	ReviewActionRequestChanges              // Send request changes message
+	ReviewActionMerge                       // Merge the task (LGTM)
+	ReviewActionClose                       // Close the task
+	ReviewActionEditComment                 // Edit the review comment
 )
 
 // NewTaskField represents the currently focused field in the new task form.

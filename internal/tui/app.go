@@ -805,7 +805,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 		{
 			ActionID: "request_changes",
 			Label:    "Request Changes",
-			Desc:     "Send request changes (back to in_progress)",
+			Desc:     "Send request changes (back to in_progress, notify session)",
 			Key:      "R",
 			Action: func() (tea.Model, tea.Cmd) {
 				m.enterRequestChanges(task.ID, ModeNormal, true)
@@ -1283,7 +1283,11 @@ func (m *Model) notifyWorker(taskID int, message string, requestChanges bool) te
 		if err != nil {
 			return MsgError{Err: err}
 		}
-		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionNotifyWorker}
+		action := ReviewActionNotifyWorker
+		if requestChanges {
+			action = ReviewActionRequestChanges
+		}
+		return MsgReviewActionCompleted{TaskID: taskID, Action: action}
 	}
 }
 
