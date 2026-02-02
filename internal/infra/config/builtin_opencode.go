@@ -53,16 +53,6 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 		}
 	};
 
-	// Best-effort: permission response event names can vary by runtime.
-	const permissionResolvedEvents = new Set([
-		"permission.responded",
-		"permission.response",
-		"permission.resolved",
-		"permission.granted",
-		"permission.denied",
-		"permission.approved",
-	]);
-
   return {
 		event: async ({ event }) => {
 			const canReplyPermission = $.client && $.client.permission && typeof $.client.permission.reply === "function";
@@ -101,7 +91,8 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 					return;
 				}
 			}
-			if (permissionResolvedEvents.has(event.type)) {
+			// Best-effort: treat any permission.* event other than "permission.asked" as resolved.
+			if (typeof event.type === "string" && event.type.startsWith("permission.") && event.type !== "permission.asked") {
 				await updateSubstate("running");
 			}
 		}
