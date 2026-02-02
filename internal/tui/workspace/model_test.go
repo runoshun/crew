@@ -1,6 +1,8 @@
 package workspace
 
 import (
+	"io"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -110,3 +112,33 @@ func TestViewRightPaneContentShowsError(t *testing.T) {
 		t.Fatalf("expected error message to include repo error details")
 	}
 }
+
+func TestWrapRepoCmdPassesThroughExecMsg(t *testing.T) {
+	m := New()
+	cmd := tea.Exec(noopExecCmd{}, func(error) tea.Msg { return nil })
+	wrapped := m.wrapRepoCmd("/repo/a", cmd)
+	if wrapped == nil {
+		t.Fatalf("expected wrapped cmd to be non-nil")
+	}
+	msg := wrapped()
+	if msg == nil {
+		t.Fatalf("expected wrapped cmd to return a message")
+	}
+	typeOf := reflect.TypeOf(msg)
+	if typeOf.Kind() == reflect.Ptr {
+		typeOf = typeOf.Elem()
+	}
+	if typeOf.PkgPath() != "github.com/charmbracelet/bubbletea" || typeOf.Name() != "execMsg" {
+		t.Fatalf("expected execMsg from bubbletea, got %s.%s", typeOf.PkgPath(), typeOf.Name())
+	}
+}
+
+type noopExecCmd struct{}
+
+func (noopExecCmd) Run() error { return nil }
+
+func (noopExecCmd) SetStdin(io.Reader) {}
+
+func (noopExecCmd) SetStdout(io.Writer) {}
+
+func (noopExecCmd) SetStderr(io.Writer) {}
