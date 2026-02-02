@@ -397,15 +397,49 @@ func (m *Model) handleDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleFocusSwitch(msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+left":
-		m.leftFocused = true
+	case "tab":
+		if !m.leftFocused && m.activeModelUsesTab() {
+			return false, nil
+		}
+		m.leftFocused = !m.leftFocused
+		if !m.leftFocused {
+			return true, m.ensureActiveModelAndSize()
+		}
 		return true, nil
-	case "ctrl+right":
-		m.leftFocused = false
-		return true, m.ensureActiveModelAndSize()
+	case "left":
+		if !m.leftFocused {
+			if m.activeModelUsesCursorKeys() {
+				return false, nil
+			}
+			m.leftFocused = true
+			return true, nil
+		}
+		return false, nil
+	case "right":
+		if m.leftFocused {
+			m.leftFocused = false
+			return true, m.ensureActiveModelAndSize()
+		}
+		return false, nil
 	default:
 		return false, nil
 	}
+}
+
+func (m *Model) activeModelUsesTab() bool {
+	model, ok := m.models[m.activeRepo]
+	if !ok || model == nil {
+		return false
+	}
+	return model.UsesTab()
+}
+
+func (m *Model) activeModelUsesCursorKeys() bool {
+	model, ok := m.models[m.activeRepo]
+	if !ok || model == nil {
+		return false
+	}
+	return model.UsesCursorKeys()
 }
 
 func (m *Model) ensureActiveModelAndSize() tea.Cmd {
@@ -917,7 +951,8 @@ func (m *Model) viewFooter() string {
 
 	content := keyStyle.Render("j/k") + " nav  " +
 		keyStyle.Render("enter") + " focus  " +
-		keyStyle.Render("ctrl+left/right") + " pane  " +
+		keyStyle.Render("tab") + " pane  " +
+		keyStyle.Render("left/right") + " pane  " +
 		keyStyle.Render("a") + " add  " +
 		keyStyle.Render("d") + " remove  " +
 		keyStyle.Render("r") + " refresh  " +

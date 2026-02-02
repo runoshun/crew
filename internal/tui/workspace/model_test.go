@@ -29,13 +29,13 @@ func TestModelSetsActiveRepoOnLoad(t *testing.T) {
 	}
 }
 
-func TestModelFocusSwitchWithCtrlRight(t *testing.T) {
+func TestModelFocusSwitchWithTab(t *testing.T) {
 	m := New()
 	if !m.leftFocused {
 		t.Fatalf("expected left pane to be focused")
 	}
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlRight})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	model, ok := updated.(*Model)
 	if !ok {
 		t.Fatalf("expected *Model from Update")
