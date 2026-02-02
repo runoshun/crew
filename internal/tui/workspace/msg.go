@@ -1,6 +1,9 @@
 package workspace
 
-import "github.com/runoshun/git-crew/v2/internal/domain"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/runoshun/git-crew/v2/internal/domain"
+)
 
 // Msg is the interface for all workspace TUI messages.
 // All message types implement this sealed interface.
@@ -57,3 +60,13 @@ func (MsgError) sealed() {}
 type MsgTick struct{}
 
 func (MsgTick) sealed() {}
+
+// RepoMsg wraps a message with a repo path for routing.
+//
+//nolint:govet // Logical field order preferred
+type RepoMsg struct {
+	Path string
+	Msg  tea.Msg
+}
+
+func (RepoMsg) sealed() {}

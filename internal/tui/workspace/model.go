@@ -250,6 +250,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.Err
 		return m, nil
 
+	case RepoMsg:
+		return m.routeRepoMsg(msg)
+
 	case tui.MsgTick:
 		return m.forwardToActiveModel(msg)
 
@@ -539,7 +542,7 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 		model := tui.New(container)
 		model.DisableAutoRefresh()
 		m.models[m.activeRepo] = model
-		initCmd := model.Init()
+		initCmd := m.wrapRepoCmd(m.activeRepo, model.Init())
 		sizeCmd := m.updateModelSize(m.activeRepo)
 		return tea.Batch(initCmd, sizeCmd)
 	}
@@ -580,7 +583,7 @@ func (m *Model) updateModel(path string, msg tea.Msg) tea.Cmd {
 	if updatedModel, ok := updated.(*tui.Model); ok {
 		m.models[path] = updatedModel
 	}
-	return cmd
+	return m.wrapRepoCmd(path, cmd)
 }
 
 func (m *Model) forwardToActiveModel(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -595,7 +598,53 @@ func (m *Model) forwardToActiveModel(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if updatedModel, ok := updated.(*tui.Model); ok {
 		m.models[m.activeRepo] = updatedModel
 	}
-	return m, cmd
+	return m, m.wrapRepoCmd(m.activeRepo, cmd)
+}
+
+func (m *Model) routeRepoMsg(msg RepoMsg) (tea.Model, tea.Cmd) {
+	if msg.Path == "" {
+		return m, nil
+	}
+	model, ok := m.models[msg.Path]
+	if !ok || model == nil {
+		return m, nil
+	}
+	updated, cmd := model.Update(msg.Msg)
+	if updatedModel, ok := updated.(*tui.Model); ok {
+		m.models[msg.Path] = updatedModel
+	}
+	return m, m.wrapRepoCmd(msg.Path, cmd)
+}
+
+func (m *Model) wrapRepoCmd(path string, cmd tea.Cmd) tea.Cmd {
+	if cmd == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		msg := cmd()
+		if msg == nil {
+			return nil
+		}
+		switch typed := msg.(type) {
+		case tea.BatchMsg:
+			wrapped := make(tea.BatchMsg, 0, len(typed))
+			for _, c := range typed {
+				if wrappedCmd := m.wrapRepoCmd(path, c); wrappedCmd != nil {
+					wrapped = append(wrapped, wrappedCmd)
+				}
+			}
+			if len(wrapped) == 0 {
+				return nil
+			}
+			return wrapped
+		case tea.QuitMsg:
+			return typed
+		case RepoMsg:
+			return typed
+		default:
+			return RepoMsg{Path: path, Msg: msg}
+		}
+	}
 }
 
 // addRepo returns a command that adds a repo.
