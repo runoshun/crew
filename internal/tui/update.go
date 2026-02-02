@@ -243,8 +243,6 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEditReviewCommentMode(msg)
 	case ModeBlock:
 		return m.handleBlockMode(msg)
-	case ModeSelectReviewer:
-		return m.handleSelectReviewerMode(msg)
 	}
 
 	return m, nil
@@ -331,6 +329,9 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Review):
 		task := m.SelectedTask()
+		if task == nil || task.Status != domain.StatusDone {
+			return m, nil
+		}
 		if !m.hasWorktree(task) {
 			return m, nil
 		}
@@ -1125,17 +1126,15 @@ func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Escape):
 		m.reviewMessageInput.Blur()
-		returnMode := m.reviewMessageReturnMode
-		if returnMode == 0 {
-			returnMode = ModeNormal
-		}
-		m.mode = returnMode
-		m.reviewMessageReturnMode = ModeNormal
-		if returnMode == ModeNormal {
+		if m.reviewMessageReturnMode == ModeReviewAction {
+			m.mode = ModeReviewAction
+		} else {
+			m.mode = ModeNormal
 			m.reviewTaskID = 0
 			m.reviewResult = ""
 			m.reviewActionCursor = 0
 		}
+		m.reviewMessageReturnMode = ModeNormal
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
@@ -1234,44 +1233,6 @@ func (m *Model) handleBlockMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.blockInput, cmd = m.blockInput.Update(msg)
 		return m, cmd
-	}
-
-	return m, nil
-}
-
-// handleSelectReviewerMode handles keys in reviewer selection mode.
-func (m *Model) handleSelectReviewerMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, m.keys.Escape):
-		m.mode = ModeNormal
-		return m, nil
-
-	case key.Matches(msg, m.keys.Up):
-		if m.reviewerCursor > 0 {
-			m.reviewerCursor--
-		}
-		return m, nil
-
-	case key.Matches(msg, m.keys.Down):
-		if m.reviewerCursor < len(m.reviewerAgents)-1 {
-			m.reviewerCursor++
-		}
-		return m, nil
-
-	case msg.Type == tea.KeyEnter:
-		task := m.SelectedTask()
-		if task == nil {
-			m.mode = ModeNormal
-			return m, nil
-		}
-		if len(m.reviewerAgents) == 0 {
-			// No reviewers available, use default
-			m.mode = ModeNormal
-			return m, m.completeTask(task.ID, "")
-		}
-		agent := m.reviewerAgents[m.reviewerCursor]
-		m.mode = ModeNormal
-		return m, m.completeTask(task.ID, agent)
 	}
 
 	return m, nil

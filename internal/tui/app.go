@@ -67,7 +67,6 @@ type Model struct {
 	builtinAgents   []string
 	customAgents    []string
 	managerAgents   []string
-	reviewerAgents  []string // List of available reviewer agents
 	agentCommands   map[string]string
 	customKeybinds  map[string]domain.TUIKeybinding
 	keybindWarnings []string
@@ -107,7 +106,6 @@ type Model struct {
 	confirmTaskID           int
 	agentCursor             int
 	managerAgentCursor      int
-	reviewerCursor          int
 	statusCursor            int
 	actionMenuCursor        int
 	reviewTaskID            int // Task being reviewed
@@ -147,7 +145,7 @@ func New(c *app.Container) *Model {
 	ei.CharLimit = 500
 
 	ri := textinput.New()
-	ri.Placeholder = "Message to worker (optional, Enter to skip)"
+	ri.Placeholder = "Message to worker (optional, empty uses default)"
 	ri.CharLimit = 500
 
 	eci := textinput.New()
@@ -739,7 +737,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return m.hasWorktree(task)
+				return task.Status == domain.StatusDone && m.hasWorktree(task)
 			},
 		},
 		{
@@ -928,9 +926,6 @@ func (m *Model) updateAgents() {
 	sort.Strings(m.builtinAgents)
 	sort.Strings(m.customAgents)
 	sort.Strings(m.managerAgents)
-
-	// Populate reviewer agents
-	m.reviewerAgents = m.config.GetReviewerAgents()
 
 	// Set cursor to default agent
 	allAgents := m.allAgents()
@@ -1145,21 +1140,6 @@ func renderTemplate(tmpl string, data any) (string, error) {
 	}
 
 	return buf.String(), nil
-}
-
-// completeTask returns a command that completes a task (runs review if needed).
-func (m *Model) completeTask(taskID int, agent string) tea.Cmd {
-	return func() tea.Msg {
-		uc := m.container.CompleteTaskUseCase(io.Discard, io.Discard)
-		_, err := uc.Execute(context.Background(), usecase.CompleteTaskInput{
-			TaskID:      taskID,
-			ReviewAgent: agent,
-		})
-		if err != nil {
-			return MsgError{Err: err}
-		}
-		return MsgReloadTasks{}
-	}
 }
 
 // notifyWorker returns a command that sends a review comment to the worker.
