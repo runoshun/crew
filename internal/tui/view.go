@@ -680,6 +680,11 @@ func (m *Model) viewSelectManagerDialog() string {
 }
 
 func (m *Model) viewFooter() string {
+	// No footer when detail panel is focused
+	if m.detailFocused {
+		return ""
+	}
+
 	keyStyle := m.styles.FooterKey
 
 	var content string
@@ -1249,23 +1254,6 @@ func (m *Model) viewDetailPanel() string {
 
 	// Combine header and viewport content
 	content := header + "\n" + viewportContent
-
-	// Add footer hint when focused
-	if m.detailFocused {
-		footerStyle := lipgloss.NewStyle().
-			Foreground(Colors.Muted).
-			Width(panelWidth - 4)
-		scrollInfo := fmt.Sprintf(" %d%%", int(m.detailPanelViewport.ScrollPercent()*100))
-		var footerText string
-		switch m.panelContent {
-		case PanelContentDetail:
-			footerText = "↑↓ scroll · j/k half · tab next · v/esc back" + scrollInfo
-		case PanelContentDiff, PanelContentPeek:
-			footerText = "↑↓ scroll · j/k half · tab next · v/esc back" + scrollInfo
-		}
-		footer := footerStyle.Render(footerText)
-		content = content + "\n" + footer
-	}
 
 	return panelStyle.Height(panelHeight).Render(content)
 }
