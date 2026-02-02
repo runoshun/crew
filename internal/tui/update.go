@@ -1153,6 +1153,7 @@ func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.reviewResult = ""
 			m.reviewActionCursor = 0
 			m.reviewMessageReturnMode = ModeNormal
+			m.mode = ModeNormal
 			return m.openActionMenu()
 		}
 		m.mode = ModeNormal
