@@ -564,23 +564,23 @@ Examples:
 				Author string    `json:"author,omitempty"`
 			}
 			type jsonTask struct {
-				Created           time.Time                   `json:"created"`
-				Started           *time.Time                  `json:"started,omitempty"`
-				LastReviewAt      *time.Time                  `json:"lastReviewAt,omitempty"`
-				ParentID          *int                        `json:"parent_id"`
-				LastReviewIsLGTM  *bool                       `json:"lastReviewIsLGTM,omitempty"`
-				Branch            string                      `json:"branch"`
-				Agent             string                      `json:"agent"`
-				Status            domain.Status               `json:"status"`
-				StatusDisplay     string                      `json:"statusDisplay"`
-				ExecutionSubstate domain.ACPExecutionSubstate `json:"execution_substate,omitempty"`
-				Title             string                      `json:"title"`
-				Description       string                      `json:"description"`
-				Labels            []string                    `json:"labels"`
-				Comments          []jsonComment               `json:"comments"`
-				ID                int                         `json:"id"`
-				Issue             int                         `json:"issue"`
-				ReviewCount       int                         `json:"reviewCount"`
+				Created           time.Time                `json:"created"`
+				Started           *time.Time               `json:"started,omitempty"`
+				LastReviewAt      *time.Time               `json:"lastReviewAt,omitempty"`
+				ParentID          *int                     `json:"parent_id"`
+				LastReviewIsLGTM  *bool                    `json:"lastReviewIsLGTM,omitempty"`
+				Branch            string                   `json:"branch"`
+				Agent             string                   `json:"agent"`
+				Status            domain.Status            `json:"status"`
+				StatusDisplay     string                   `json:"statusDisplay"`
+				ExecutionSubstate domain.ExecutionSubstate `json:"execution_substate,omitempty"`
+				Title             string                   `json:"title"`
+				Description       string                   `json:"description"`
+				Labels            []string                 `json:"labels"`
+				Comments          []jsonComment            `json:"comments"`
+				ID                int                      `json:"id"`
+				Issue             int                      `json:"issue"`
+				ReviewCount       int                      `json:"reviewCount"`
 			}
 
 			jt := jsonTask{
@@ -959,7 +959,7 @@ func newSubstateCommand(c *app.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "substate <id> <substate>",
 		Short: "Update task execution substate",
-		Long: `Update ACP execution substate for a task.
+		Long: `Update execution substate for a task.
 
 Examples:
   crew substate 42 awaiting_permission
@@ -973,9 +973,9 @@ Examples:
 				return fmt.Errorf("invalid task ID: %w", err)
 			}
 
-			substate := domain.ACPExecutionSubstate(args[1])
+			substate := domain.ExecutionSubstate(args[1])
 			if !substate.IsValid() {
-				return fmt.Errorf("invalid substate: %q: %w", args[1], domain.ErrInvalidACPExecutionSubstate)
+				return fmt.Errorf("invalid substate: %q: %w", args[1], domain.ErrInvalidExecutionSubstate)
 			}
 
 			uc := c.SetSubstateUseCase()

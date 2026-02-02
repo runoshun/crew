@@ -227,7 +227,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	// Layout: "  > 123  ● InPrg  " where substate goes under status area
 	//         "         ^^^^^^" = 6 chars for substate display (icon + space + 4 char label)
 	var prefix string
-	substateLabel := acpSubstateLabel(task.ExecutionSubstate)
+	substateLabel := executionSubstateLabel(task.ExecutionSubstate)
 	if substateLabel != "" {
 		// Show substate under status with orange color for visibility
 		substateStyle := lipgloss.NewStyle().
@@ -277,15 +277,15 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	_, _ = fmt.Fprint(w, metaLine)
 }
 
-// acpSubstateLabel returns a short label for ACP execution substate.
+// executionSubstateLabel returns a short label for execution substate.
 // Returns empty string for running state (normal operation) or empty substate.
-func acpSubstateLabel(substate domain.ACPExecutionSubstate) string {
+func executionSubstateLabel(substate domain.ExecutionSubstate) string {
 	switch substate {
-	case domain.ACPExecutionIdle, domain.ACPExecutionAwaitingUser:
+	case domain.SubstateIdle, domain.SubstateAwaitingUser:
 		return "idle"
-	case domain.ACPExecutionAwaitingPermission:
+	case domain.SubstateAwaitingPermission:
 		return "perm"
-	case domain.ACPExecutionRunning:
+	case domain.SubstateRunning:
 		return "" // Running is the default state, no label needed
 	}
 	return ""
