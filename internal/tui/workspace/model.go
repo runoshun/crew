@@ -545,7 +545,7 @@ func (m *Model) updateModelSize(path string) tea.Cmd {
 	if path == "" {
 		return nil
 	}
-	msg := tea.WindowSizeMsg{Width: m.rightModelWidth(), Height: m.contentHeight()}
+	msg := tea.WindowSizeMsg{Width: m.rightModelWidth(), Height: m.paneContentHeight()}
 	return m.updateModel(path, msg)
 }
 
@@ -553,7 +553,7 @@ func (m *Model) propagateWindowSize() tea.Cmd {
 	if len(m.models) == 0 {
 		return nil
 	}
-	msg := tea.WindowSizeMsg{Width: m.rightModelWidth(), Height: m.contentHeight()}
+	msg := tea.WindowSizeMsg{Width: m.rightModelWidth(), Height: m.paneContentHeight()}
 	cmds := make([]tea.Cmd, 0, len(m.models))
 	for path := range m.models {
 		if cmd := m.updateModel(path, msg); cmd != nil {
@@ -690,14 +690,6 @@ func (m *Model) contentWidth() int {
 		w = 0
 	}
 	return w
-}
-
-func (m *Model) contentHeight() int {
-	h := m.height - 2
-	if h < 0 {
-		h = 0
-	}
-	return h
 }
 
 func (m *Model) updateLayout() {
