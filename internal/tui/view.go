@@ -1191,7 +1191,11 @@ func (m *Model) panelContentString(contentWidth int) string {
 
 func (m *Model) viewDetailPanel() string {
 	panelWidth := m.detailPanelWidth()
+	// Height calculation: m.height minus header (2) and footer (3 when visible)
 	panelHeight := m.height - 2
+	if !m.hideFooter {
+		panelHeight -= 3 // footer border + content + margin
+	}
 	if panelHeight < 10 {
 		panelHeight = 10
 	}

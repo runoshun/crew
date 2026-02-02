@@ -446,11 +446,12 @@ func (m *Model) updateDetailPanelViewport() {
 	}
 	panelWidth := m.detailPanelWidth() - 4 // account for border and padding
 	// Height calculation:
-	// - m.height - 2 = panelHeight in viewDetailPanel
-	// - minus 2 for header (Task #N + border line, rendered outside viewport)
-	// - minus 2 for footer hint (when focused) + padding
-	// - minus 2 for additional spacing
-	panelHeight := m.height - 8
+	// - m.height minus header (2) and footer (3 when visible)
+	// - minus 2 for panel header (Task #N + border line, rendered outside viewport)
+	panelHeight := m.height - 4
+	if !m.hideFooter {
+		panelHeight -= 3 // footer border + content + margin
+	}
 	if panelHeight < 5 {
 		panelHeight = 5
 	}
