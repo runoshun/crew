@@ -101,15 +101,20 @@ type CommandData struct {
 	Description string
 	Branch      string // Branch name (e.g., "crew-1")
 
+	// Review context (for reviewer agents)
+	PreviousReview string // Previous review result (empty on first attempt)
+
 	// Runtime options
 	Model string // Model name override (e.g., "sonnet", "gpt-4o")
 
 	// Integer fields grouped together for alignment
-	Issue  int // GitHub issue number (0 if not linked)
-	TaskID int
+	Issue         int // GitHub issue number (0 if not linked)
+	TaskID        int
+	ReviewAttempt int // Current review attempt number (1 = first review)
 
 	// Boolean fields
-	Continue bool // --continue flag was specified
+	Continue   bool // --continue flag was specified
+	IsFollowUp bool // true if ReviewAttempt > 1
 }
 
 // RenderCommandResult holds the results of RenderCommand.
@@ -356,6 +361,20 @@ IMPORTANT: First run 'crew --help-manager' and follow the usage instructions.
 const DefaultReviewerSystemPrompt = `You are a code reviewer for crew Task #{{.TaskID}}.
 
 IMPORTANT: First run 'crew --help-reviewer' and follow the workflow instructions.
+
+{{if .IsFollowUp}}
+## Follow-up Review Mode
+
+This is review attempt #{{.ReviewAttempt}}. Focus on:
+1. Verify previous review issues have been addressed
+2. Check ONLY changes made since last review
+3. Report ONLY blocking issues - skip new minor issues
+
+Previous review:
+{{.PreviousReview}}
+
+If all issues are addressed, respond with "✅ LGTM".
+{{end}}
 
 ## Output Format
 

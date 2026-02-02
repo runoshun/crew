@@ -22,10 +22,12 @@ type ReviewCommandDeps struct {
 // ReviewCommandInput contains parameters for building a review command.
 // Fields are ordered to minimize memory padding.
 type ReviewCommandInput struct {
-	Task    *domain.Task
-	Agent   string // Agent name (optional, uses default reviewer if empty)
-	Model   string // Model name override (optional, uses agent default if empty)
-	Message string // Additional instructions for the reviewer (optional)
+	Task           *domain.Task
+	Agent          string // Agent name (optional, uses default reviewer if empty)
+	Model          string // Model name override (optional, uses agent default if empty)
+	Message        string // Additional instructions for the reviewer (optional)
+	PreviousReview string // Previous review result (empty on first attempt)
+	ReviewAttempt  int    // Current review attempt number (1 = first review)
 }
 
 // ReviewCommandOutput contains prepared review command data.
@@ -71,16 +73,23 @@ func PrepareReviewCommand(deps ReviewCommandDeps, in ReviewCommandInput) (*Revie
 		return nil, fmt.Errorf("resolve worktree: %w", err)
 	}
 
+	reviewAttempt := in.ReviewAttempt
+	if reviewAttempt <= 0 {
+		reviewAttempt = 1
+	}
 	cmdData := domain.CommandData{
-		GitDir:      deps.RepoRoot + "/.git",
-		RepoRoot:    deps.RepoRoot,
-		Worktree:    wtPath,
-		Title:       in.Task.Title,
-		Description: in.Task.Description,
-		Branch:      branch,
-		Issue:       in.Task.Issue,
-		TaskID:      in.Task.ID,
-		Model:       model,
+		GitDir:         deps.RepoRoot + "/.git",
+		RepoRoot:       deps.RepoRoot,
+		Worktree:       wtPath,
+		Title:          in.Task.Title,
+		Description:    in.Task.Description,
+		Branch:         branch,
+		PreviousReview: in.PreviousReview,
+		Issue:          in.Task.Issue,
+		TaskID:         in.Task.ID,
+		ReviewAttempt:  reviewAttempt,
+		IsFollowUp:     reviewAttempt > 1,
+		Model:          model,
 	}
 
 	userPrompt := in.Message
