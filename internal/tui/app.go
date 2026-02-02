@@ -117,6 +117,7 @@ type Model struct {
 	showAll            bool
 	detailFocused      bool // Right pane is focused for scrolling
 	blockFocusUnblock  bool // True when Unblock button is focused in Block dialog
+	autoRefresh        bool
 }
 
 // New creates a new TUI Model with the given container.
@@ -197,16 +198,22 @@ func New(c *app.Container) *Model {
 		commentCounts:      make(map[int]int),
 		agentCursor:        0,
 		startFocusCustom:   false,
+		autoRefresh:        true,
 	}
 }
 
 // Init initializes the model and returns the initial command.
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.loadTasks(),
-		m.loadConfig(),
-		m.tick(),
-	)
+	cmds := []tea.Cmd{m.loadTasks(), m.loadConfig()}
+	if m.autoRefresh {
+		cmds = append(cmds, m.tick())
+	}
+	return tea.Batch(cmds...)
+}
+
+// DisableAutoRefresh disables periodic task refresh ticks.
+func (m *Model) DisableAutoRefresh() {
+	m.autoRefresh = false
 }
 
 // tick returns a command that sends a tick message after the refresh interval.

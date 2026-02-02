@@ -29,19 +29,38 @@ func TestModelSetsActiveRepoOnLoad(t *testing.T) {
 	}
 }
 
-func TestModelFocusSwitchWithTab(t *testing.T) {
+func TestModelFocusSwitchWithCtrlRight(t *testing.T) {
 	m := New()
 	if !m.leftFocused {
 		t.Fatalf("expected left pane to be focused")
 	}
 
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlRight})
 	model, ok := updated.(*Model)
 	if !ok {
 		t.Fatalf("expected *Model from Update")
 	}
 	if model.leftFocused {
 		t.Fatalf("expected focus to move to right pane")
+	}
+}
+
+func TestModelKeepsActiveRepoOnReload(t *testing.T) {
+	m := New()
+	m.activeRepo = "/repo/b"
+	m.cursor = 0
+	repos := []domain.WorkspaceRepo{{Path: "/repo/a"}, {Path: "/repo/b"}}
+
+	updated, _ := m.Update(MsgReposLoaded{Repos: repos})
+	model, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected *Model from Update")
+	}
+	if model.activeRepo != "/repo/b" {
+		t.Fatalf("expected active repo to stay /repo/b, got %q", model.activeRepo)
+	}
+	if model.cursor != 1 {
+		t.Fatalf("expected cursor to move to active repo index, got %d", model.cursor)
 	}
 }
 

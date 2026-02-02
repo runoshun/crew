@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -28,10 +29,11 @@ const (
 )
 
 const (
-	appPadding    = 4
-	minSplitWidth = 120
-	minPaneWidth  = 24
-	leftPaneRatio = 0.3
+	appPadding               = 4
+	minSplitWidth            = 120
+	minPaneWidth             = 24
+	leftPaneRatio            = 0.3
+	workspaceRefreshInterval = 5 * time.Second
 )
 
 // Model is the workspace TUI model.
@@ -101,6 +103,7 @@ func (m *Model) Init() tea.Cmd {
 	}
 	return tea.Batch(
 		m.loadRepos(),
+		m.tick(),
 	)
 }
 
@@ -113,6 +116,12 @@ func (m *Model) loadRepos() tea.Cmd {
 		}
 		return MsgReposLoaded{Repos: file.Repos}
 	}
+}
+
+func (m *Model) tick() tea.Cmd {
+	return tea.Tick(workspaceRefreshInterval, func(t time.Time) tea.Msg {
+		return MsgTick{}
+	})
 }
 
 // loadSummary loads the task summary for a single repo.
@@ -246,8 +255,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.forwardToActiveModel(msg)
 
 	case MsgTick:
-		// Periodic refresh (could add auto-refresh here)
-		return m, nil
+		updated, cmd := m.forwardToActiveModel(tui.MsgTick{})
+		return updated, tea.Batch(cmd, m.tick())
 	}
 
 	return m.forwardToActiveModel(msg)
@@ -388,18 +397,12 @@ func (m *Model) handleDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleFocusSwitch(msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch msg.String() {
-	case "left":
+	case "ctrl+left":
 		m.leftFocused = true
 		return true, nil
-	case "right":
+	case "ctrl+right":
 		m.leftFocused = false
 		return true, m.ensureActiveModelAndSize()
-	case "tab":
-		m.leftFocused = !m.leftFocused
-		if !m.leftFocused {
-			return true, m.ensureActiveModelAndSize()
-		}
-		return true, nil
 	default:
 		return false, nil
 	}
@@ -442,6 +445,14 @@ func (m *Model) syncActiveRepo() {
 	if len(m.repos) == 0 {
 		m.activeRepo = ""
 		return
+	}
+	if m.activeRepo != "" {
+		for i, repo := range m.repos {
+			if repo.Path == m.activeRepo {
+				m.cursor = i
+				return
+			}
+		}
 	}
 	m.clampCursor()
 	m.activeRepo = m.repos[m.cursor].Path
@@ -487,6 +498,7 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 			return nil
 		}
 		model := tui.New(container)
+		model.DisableAutoRefresh()
 		m.models[m.activeRepo] = model
 		initCmd := model.Init()
 		sizeCmd := m.updateModelSize(m.activeRepo)
@@ -499,7 +511,7 @@ func (m *Model) updateModelSize(path string) tea.Cmd {
 	if path == "" {
 		return nil
 	}
-	msg := tea.WindowSizeMsg{Width: m.rightContentWidth(), Height: m.contentHeight()}
+	msg := tea.WindowSizeMsg{Width: m.rightModelWidth(), Height: m.contentHeight()}
 	return m.updateModel(path, msg)
 }
 
@@ -507,7 +519,7 @@ func (m *Model) propagateWindowSize() tea.Cmd {
 	if len(m.models) == 0 {
 		return nil
 	}
-	msg := tea.WindowSizeMsg{Width: m.rightContentWidth(), Height: m.contentHeight()}
+	msg := tea.WindowSizeMsg{Width: m.rightModelWidth(), Height: m.contentHeight()}
 	cmds := make([]tea.Cmd, 0, len(m.models))
 	for path := range m.models {
 		if cmd := m.updateModel(path, msg); cmd != nil {
@@ -631,6 +643,17 @@ func (m *Model) rightContentWidth() int {
 		return m.rightWidth
 	}
 	return m.contentWidth()
+}
+
+func (m *Model) rightModelWidth() int {
+	width := m.rightContentWidth()
+	if m.isSplitView() && width > 0 {
+		width--
+	}
+	if width < 0 {
+		width = 0
+	}
+	return width
 }
 
 func (m *Model) isSplitView() bool {
@@ -894,8 +917,7 @@ func (m *Model) viewFooter() string {
 
 	content := keyStyle.Render("j/k") + " nav  " +
 		keyStyle.Render("enter") + " focus  " +
-		keyStyle.Render("tab") + " pane  " +
-		keyStyle.Render("left/right") + " pane  " +
+		keyStyle.Render("ctrl+left/right") + " pane  " +
 		keyStyle.Render("a") + " add  " +
 		keyStyle.Render("d") + " remove  " +
 		keyStyle.Render("r") + " refresh  " +
