@@ -194,16 +194,7 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		})
 	}
 
-	// 6. ACP execution substate (if available)
-	if task.ExecutionSubstate != "" {
-		substateStr := "acp:" + task.ExecutionSubstate.Display()
-		metaParts = append(metaParts, metaPart{
-			plain:  substateStr,
-			styled: grayStyle.Render(substateStr),
-		})
-	}
-
-	// 7. Comments (if any)
+	// 6. Comments (if any)
 	if ti.commentCount > 0 {
 		commentStr := fmt.Sprintf("%d comment", ti.commentCount)
 		if ti.commentCount > 1 {
@@ -232,7 +223,21 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 	}
 
 	// Calculate available width
-	prefix := "                   " // 19 spaces to align with title
+	// Build prefix: 19 chars to align with title
+	// Layout: "  > 123  ● InPrg  " where substate goes under status area
+	//         "         ^^^^^^" = 6 chars for substate display (icon + space + 4 char label)
+	var prefix string
+	substateLabel := acpSubstateLabel(task.ExecutionSubstate)
+	if substateLabel != "" {
+		// Show substate under status with orange color for visibility
+		substateStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FAB387")). // Orange
+			Bold(true)
+		substateStyled := substateStyle.Render(fmt.Sprintf("⏸ %-4s", substateLabel))
+		prefix = "          " + substateStyled + "   " // 10 spaces + 6 char styled + 3 spaces = 19
+	} else {
+		prefix = "                   " // 19 spaces to align with title
+	}
 	sep := "  |  "
 	maxMetaLen := listWidth - runewidth.StringWidth(prefix) - 2
 	if maxMetaLen < 10 {
@@ -270,6 +275,20 @@ func (d taskDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 		metaLine += fmt.Sprintf("%*s", listWidth-metaLineWidth, "")
 	}
 	_, _ = fmt.Fprint(w, metaLine)
+}
+
+// acpSubstateLabel returns a short label for ACP execution substate.
+// Returns empty string for running state (normal operation) or empty substate.
+func acpSubstateLabel(substate domain.ACPExecutionSubstate) string {
+	switch substate {
+	case domain.ACPExecutionIdle, domain.ACPExecutionAwaitingUser:
+		return "idle"
+	case domain.ACPExecutionAwaitingPermission:
+		return "perm"
+	case domain.ACPExecutionRunning:
+		return "" // Running is the default state, no label needed
+	}
+	return ""
 }
 
 // formatElapsedTime formats a duration into a human-readable string.

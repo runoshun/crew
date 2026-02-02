@@ -317,6 +317,36 @@ func (m *Model) hasWorktreeQuiet(task *domain.Task) bool {
 	return exists
 }
 
+func sessionNameForLog(taskID int, isReview bool) string {
+	if isReview {
+		return domain.ReviewSessionName(taskID)
+	}
+	return domain.SessionName(taskID)
+}
+
+func (m *Model) sessionLogPath(taskID int, isReview bool) (string, error) {
+	if m.container == nil {
+		return "", fmt.Errorf("container not initialized")
+	}
+	crewDir := m.container.Config.CrewDir
+	if crewDir == "" {
+		return "", fmt.Errorf("crew dir not set")
+	}
+	sessionName := sessionNameForLog(taskID, isReview)
+	return domain.SessionLogPath(crewDir, sessionName), nil
+}
+
+func (m *Model) hasSessionLog(taskID int, isReview bool) bool {
+	logPath, err := m.sessionLogPath(taskID, isReview)
+	if err != nil {
+		return false
+	}
+	if _, err := os.Stat(logPath); err != nil {
+		return false
+	}
+	return true
+}
+
 // updateTaskList updates the task list items from tasks.
 func (m *Model) updateTaskList() {
 	if m.filterInput.Value() != "" {
@@ -693,6 +723,28 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			},
 		},
 		{
+			ActionID: "show_worker_log",
+			Label:    "Show Worker Log",
+			Desc:     "Open worker session log",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, m.showLogInPager(task.ID, false)
+			},
+			IsAvailable: func() bool {
+				return m.hasSessionLog(task.ID, false)
+			},
+		},
+		{
+			ActionID: "show_review_log",
+			Label:    "Show Review Log",
+			Desc:     "Open review session log",
+			Action: func() (tea.Model, tea.Cmd) {
+				return m, m.showLogInPager(task.ID, true)
+			},
+			IsAvailable: func() bool {
+				return m.hasSessionLog(task.ID, true)
+			},
+		},
+		{
 			ActionID: "review_result",
 			Label:    "Review Result",
 			Desc:     "Open review summary",
@@ -1040,6 +1092,60 @@ func (m *Model) showDiff(taskID int) tea.Cmd {
 
 		return execDiffMsg{cmd: execCmd}
 	}
+}
+
+func resolvePagerCommand() (string, []string, error) {
+	pager := strings.TrimSpace(os.Getenv("PAGER"))
+	if pager != "" {
+		fields := strings.Fields(pager)
+		if len(fields) == 0 {
+			return "", nil, fmt.Errorf("PAGER is set but empty")
+		}
+		return fields[0], fields[1:], nil
+	}
+
+	candidates := []struct {
+		program string
+		args    []string
+	}{
+		{program: "less", args: []string{"-R"}},
+		{program: "more"},
+	}
+	for _, candidate := range candidates {
+		if _, err := exec.LookPath(candidate.program); err == nil {
+			return candidate.program, candidate.args, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("no pager found (set PAGER)")
+}
+
+// showLogInPager returns a tea.Cmd that opens a session log in a pager.
+func (m *Model) showLogInPager(taskID int, isReview bool) tea.Cmd {
+	return func() tea.Msg {
+		logPath, err := m.sessionLogPath(taskID, isReview)
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		if _, statErr := os.Stat(logPath); statErr != nil {
+			if os.IsNotExist(statErr) {
+				sessionName := sessionNameForLog(taskID, isReview)
+				return MsgError{Err: fmt.Errorf("no log file found for session %s: %w", sessionName, domain.ErrNoSession)}
+			}
+			return MsgError{Err: fmt.Errorf("check log file: %w", statErr)}
+		}
+		program, args, err := resolvePagerCommand()
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		cmd := domain.NewCommand(program, append(args, logPath), "")
+		return execLogMsg{cmd: cmd}
+	}
+}
+
+// execLogMsg is an internal message to trigger log pager execution.
+type execLogMsg struct {
+	cmd *domain.ExecCommand
 }
 
 // execDiffMsg is an internal message to trigger diff execution.

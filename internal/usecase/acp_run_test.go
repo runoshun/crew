@@ -22,6 +22,13 @@ type acpRunStateStore struct {
 	calls     []domain.ACPExecutionSubstate
 }
 
+type acpRunSignalStateStore struct {
+	namespace      string
+	taskID         int
+	calls          []domain.ACPExecutionSubstate
+	awaitingUserCh chan struct{}
+}
+
 func (s *acpRunStateStore) Load(context.Context, string, int) (domain.ACPExecutionState, error) {
 	return domain.ACPExecutionState{}, domain.ErrACPStateNotFound
 }
@@ -30,6 +37,23 @@ func (s *acpRunStateStore) Save(_ context.Context, namespace string, taskID int,
 	s.namespace = namespace
 	s.taskID = taskID
 	s.calls = append(s.calls, state.ExecutionSubstate)
+	return nil
+}
+
+func (s *acpRunSignalStateStore) Load(context.Context, string, int) (domain.ACPExecutionState, error) {
+	return domain.ACPExecutionState{}, domain.ErrACPStateNotFound
+}
+
+func (s *acpRunSignalStateStore) Save(_ context.Context, namespace string, taskID int, state domain.ACPExecutionState) error {
+	s.namespace = namespace
+	s.taskID = taskID
+	s.calls = append(s.calls, state.ExecutionSubstate)
+	if state.ExecutionSubstate == domain.ACPExecutionAwaitingUser && s.awaitingUserCh != nil {
+		select {
+		case s.awaitingUserCh <- struct{}{}:
+		default:
+		}
+	}
 	return nil
 }
 
@@ -85,6 +109,37 @@ func TestACPRunClientRequestPermissionStop(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp.Outcome.Cancelled)
 	require.Equal(t, "cancelled", resp.Outcome.Cancelled.Outcome)
+}
+
+func TestACPRunClientRequestPermissionWritesEvents(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	permissionCh := make(chan domain.ACPCommand, 1)
+	stopCh := make(chan struct{})
+	writer := &captureACPEventWriter{}
+
+	client := &acpRunClient{
+		permissionCh: permissionCh,
+		stopCh:       stopCh,
+		eventWriter:  writer,
+		stateNS:      "default",
+		taskID:       1,
+		sessionID:    "session-1",
+	}
+
+	params := permissionRequestParams()
+	permissionCh <- domain.ACPCommand{Type: domain.ACPCommandPermission, OptionID: "opt-1"}
+
+	_, err := client.RequestPermission(ctx, params)
+	require.NoError(t, err)
+
+	events := writer.Events()
+	require.Len(t, events, 2)
+	require.Equal(t, domain.ACPEventRequestPermission, events[0].Type)
+	require.Equal(t, domain.ACPEventPermissionResponse, events[1].Type)
 }
 
 func permissionRequestParams() acpsdk.RequestPermissionRequest {
@@ -161,6 +216,50 @@ func TestACPRunStopEmitsSessionEndEvent(t *testing.T) {
 	var payload sessionEndPayload
 	require.NoError(t, json.Unmarshal(last.Payload, &payload))
 	require.Equal(t, "stop", payload.Reason)
+}
+
+func TestACPRunPromptEndTurnSetsAwaitingUser(t *testing.T) {
+	t.Parallel()
+
+	cmdCh := make(chan domain.ACPCommand, 2)
+	ipc := &stubACPIPC{
+		next: func(ctx context.Context) (domain.ACPCommand, error) {
+			select {
+			case cmd := <-cmdCh:
+				return cmd, nil
+			case <-ctx.Done():
+				return domain.ACPCommand{}, ctx.Err()
+			}
+		},
+	}
+
+	stateStore := &acpRunSignalStateStore{awaitingUserCh: make(chan struct{}, 1)}
+	uc, _, task := newACPRunTestWithStateStore(t, "hold", ipc, stubACPEventWriterFactory{}, stateStore)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	doneCh := make(chan error, 1)
+	go func() {
+		_, err := uc.Execute(ctx, ACPRunInput{Agent: "helper", TaskID: task.ID})
+		doneCh <- err
+	}()
+
+	cmdCh <- domain.ACPCommand{Type: domain.ACPCommandPrompt, Text: "hello"}
+
+	select {
+	case <-stateStore.awaitingUserCh:
+		cmdCh <- domain.ACPCommand{Type: domain.ACPCommandStop}
+	case <-ctx.Done():
+		require.FailNow(t, "timed out waiting for awaiting_user")
+	}
+
+	err := <-doneCh
+	require.NoError(t, err)
+	require.Len(t, stateStore.calls, 3)
+	require.Equal(t, domain.ACPExecutionRunning, stateStore.calls[0])
+	require.Equal(t, domain.ACPExecutionAwaitingUser, stateStore.calls[1])
+	require.Equal(t, domain.ACPExecutionIdle, stateStore.calls[2])
 }
 
 func TestACPRunNormalExitResetsSubstate(t *testing.T) {
@@ -284,6 +383,65 @@ func newACPRunTest(t *testing.T, mode string, ipc domain.ACPIPC, eventWriterFact
 	)
 
 	return uc, repo, stateStore, task
+}
+
+func newACPRunTestWithStateStore(t *testing.T, mode string, ipc domain.ACPIPC, eventWriterFactory domain.ACPEventWriterFactory, stateStore domain.ACPStateStore) (*ACPRun, *testutil.MockTaskRepository, *domain.Task) {
+	t.Helper()
+	if eventWriterFactory == nil {
+		eventWriterFactory = stubACPEventWriterFactory{}
+	}
+
+	repo := testutil.NewMockTaskRepository()
+	task := &domain.Task{
+		ID:     1,
+		Title:  "test",
+		Status: domain.StatusTodo,
+	}
+	repo.Tasks[task.ID] = task
+
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ExistsVal = true
+	worktrees.ResolvePath = t.TempDir()
+
+	cfgLoader := testutil.NewMockConfigLoader()
+	cfg := cfgLoader.Config
+	if cfg.Agents == nil {
+		cfg.Agents = make(map[string]domain.Agent)
+	}
+	cfg.Tasks.Namespace = "test-namespace"
+	cfg.Agents["helper"] = domain.Agent{
+		CommandTemplate: "{{.Args}}",
+		Args:            os.Args[0] + " -test.run TestACPHelperProcess",
+		DefaultModel:    "test-model",
+		Env: map[string]string{
+			"GO_WANT_HELPER_PROCESS": "1",
+			"ACP_HELPER_MODE":        mode,
+		},
+	}
+	require.NoError(t, cfg.ResolveInheritance())
+	cfgLoader.Config = cfg
+
+	git := &testutil.MockGit{
+		DefaultBranchName: testutil.StringPtr("main"),
+	}
+
+	clock := &testutil.MockClock{NowTime: time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)}
+	uc := NewACPRun(
+		repo,
+		worktrees,
+		cfgLoader,
+		git,
+		testutil.NewMockScriptRunner(),
+		stubACPIPCFactory{ipc: ipc},
+		stateStore,
+		eventWriterFactory,
+		clock,
+		t.TempDir(),
+		io.Discard,
+		io.Discard,
+	)
+
+	return uc, repo, task
 }
 
 type stubACPIPCFactory struct {
