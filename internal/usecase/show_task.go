@@ -101,7 +101,7 @@ func (uc *ShowTask) attachExecutionSubstate(ctx context.Context, task *domain.Ta
 	}
 	namespace := task.Namespace
 	if namespace == "" {
-		namespace = "default"
+		namespace = domain.DefaultNamespace
 	}
 	state, err := uc.acpStates.Load(ctx, namespace, task.ID)
 	if err != nil {

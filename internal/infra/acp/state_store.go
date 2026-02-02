@@ -89,7 +89,7 @@ func (s *FileStateStore) statePath(namespace string, taskID int) string {
 
 func (s *FileStateStore) normalizeNamespace(namespace string) string {
 	if namespace == "" {
-		return "default"
+		return domain.DefaultNamespace
 	}
 	return namespace
 }

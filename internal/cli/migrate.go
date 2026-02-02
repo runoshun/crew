@@ -142,7 +142,7 @@ func resolveMigrationNamespace(c *app.Container, override string) (string, error
 		}
 	}
 
-	return "default", nil
+	return domain.DefaultNamespace, nil
 }
 
 func resolveSourceNamespace(c *app.Container, override string) (string, error) {
