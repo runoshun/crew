@@ -381,6 +381,24 @@ func TestTask_ToMarkdownWithComments(t *testing.T) {
 			want: "---\ntitle: Test Task\nparent:\nlabels:\nskip_review:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Time: 2026-01-18T10:00:00Z\n\nFirst comment",
 		},
 		{
+			name: "comment with type tags metadata",
+			task: &Task{
+				Title:       "Test Task",
+				Description: "Description",
+			},
+			comments: []Comment{
+				{
+					Text:     "Comment text",
+					Author:   "worker",
+					Time:     now,
+					Type:     CommentTypeFriction,
+					Tags:     []string{"testing", "docs"},
+					Metadata: map[string]string{"source": "cli", "priority": "high"},
+				},
+			},
+			want: "---\ntitle: Test Task\nparent:\nlabels:\nskip_review:\n---\n\nDescription\n\n---\n# Comment: 0\n# Author: worker\n# Type: friction\n# Tags: docs, testing\n# Metadata: priority=high, source=cli\n# Time: 2026-01-18T10:00:00Z\n\nComment text",
+		},
+		{
 			name: "multiple comments",
 			task: &Task{
 				Title:       "Test Task",
@@ -479,6 +497,30 @@ First comment`,
 			wantDesc:  "Description",
 			wantComments: []ParsedComment{
 				{Index: 0, Text: "First comment"},
+			},
+		},
+		{
+			name: "comment with type tags metadata",
+			content: `---
+title: Test Task
+labels:
+---
+
+Description
+
+---
+# Comment: 0
+# Author: worker
+# Type: friction
+# Tags: docs, testing
+# Metadata: source=cli, priority=high
+# Time: 2026-01-18T10:00:00Z
+
+Comment text`,
+			wantTitle: "Test Task",
+			wantDesc:  "Description",
+			wantComments: []ParsedComment{
+				{Index: 0, Text: "Comment text"},
 			},
 		},
 		{

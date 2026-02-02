@@ -29,6 +29,7 @@ var (
 	ErrCircularInheritance      = errors.New("circular inheritance detected in worker configuration")
 	ErrInheritParentNotFound    = errors.New("inherit parent worker not found")
 	ErrCommentNotFound          = errors.New("comment not found")
+	ErrInvalidCommentType       = errors.New("invalid comment type")
 	ErrAgentNotFound            = errors.New("agent not found")
 	ErrAgentDisabled            = errors.New("agent is disabled")
 	ErrAgentRoleMismatch        = errors.New("agent role mismatch")

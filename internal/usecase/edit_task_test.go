@@ -874,7 +874,14 @@ func TestEditTask_Execute_EditorMode_WithComments(t *testing.T) {
 		Status:      domain.StatusTodo,
 	}
 	repo.Comments[1] = []domain.Comment{
-		{Text: "Original comment", Author: "worker", Time: now},
+		{
+			Text:     "Original comment",
+			Author:   "worker",
+			Time:     now,
+			Type:     domain.CommentTypeSuggestion,
+			Tags:     []string{"docs"},
+			Metadata: map[string]string{"source": "cli"},
+		},
 	}
 	uc := NewEditTask(repo)
 
@@ -889,6 +896,9 @@ Updated description
 ---
 # Comment: 0
 # Author: worker
+# Type: suggestion
+# Tags: docs
+# Metadata: source=cli
 # Time: 2026-01-18T10:00:00Z
 
 Edited comment text`
@@ -911,6 +921,9 @@ Edited comment text`
 	// Author and time should be preserved
 	assert.Equal(t, "worker", comments[0].Author)
 	assert.Equal(t, now, comments[0].Time)
+	assert.Equal(t, domain.CommentTypeSuggestion, comments[0].Type)
+	assert.Equal(t, []string{"docs"}, comments[0].Tags)
+	assert.Equal(t, map[string]string{"source": "cli"}, comments[0].Metadata)
 }
 
 func TestEditTask_Execute_EditorMode_MultipleComments(t *testing.T) {

@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -11,10 +13,13 @@ import (
 // AddCommentInput contains the parameters for adding a comment.
 // Fields are ordered to minimize memory padding.
 type AddCommentInput struct {
-	Message        string // Comment text (required)
-	Author         string // Author name (optional)
-	TaskID         int    // Task ID (required)
-	RequestChanges bool   // If true, change status to in_progress, reset auto_fix retry count, and notify session
+	Message        string             // Comment text (required)
+	Author         string             // Author name (optional)
+	Type           domain.CommentType // Comment type (optional)
+	Metadata       map[string]string  // Comment metadata (optional)
+	Tags           []string           // Comment tags (optional)
+	TaskID         int                // Task ID (required)
+	RequestChanges bool               // If true, change status to in_progress, reset auto_fix retry count, and notify session
 }
 
 // AddCommentOutput contains the result of adding a comment.
@@ -69,11 +74,21 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 		return nil, err
 	}
 
+	commentType := in.Type
+	if !commentType.IsValid() {
+		return nil, domain.ErrInvalidCommentType
+	}
+	commentTags := normalizeCommentTags(in.Tags)
+	commentMetadata := normalizeCommentMetadata(in.Metadata)
+
 	// Create comment
 	comment := domain.Comment{
-		Text:   message,
-		Time:   uc.clock.Now(),
-		Author: in.Author,
+		Text:     message,
+		Time:     uc.clock.Now(),
+		Author:   in.Author,
+		Type:     commentType,
+		Tags:     commentTags,
+		Metadata: commentMetadata,
 	}
 
 	// Save comment
@@ -120,6 +135,47 @@ func (uc *AddComment) Execute(ctx context.Context, in AddCommentInput) (*AddComm
 		Comment:        comment,
 		SessionStarted: sessionStarted,
 	}, nil
+}
+
+func normalizeCommentTags(tags []string) []string {
+	if len(tags) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
+			continue
+		}
+		set[trimmed] = true
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(set))
+	for tag := range set {
+		normalized = append(normalized, tag)
+	}
+	slices.Sort(normalized)
+	return normalized
+}
+
+func normalizeCommentMetadata(metadata map[string]string) map[string]string {
+	if len(metadata) == 0 {
+		return nil
+	}
+	normalized := make(map[string]string, len(metadata))
+	for key, value := range metadata {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		normalized[trimmedKey] = strings.TrimSpace(value)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
 }
 
 // StartTaskAdapter adapts StartTask to implement SessionStarter interface.

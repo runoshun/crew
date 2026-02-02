@@ -174,6 +174,9 @@ Use --help-manager-auto to see the auto mode guide.`,
 	commentCmd := newCommentCommand(c)
 	commentCmd.GroupID = groupTask
 
+	commentsCmd := newCommentsCommand(c)
+	commentsCmd.GroupID = groupTask
+
 	closeCmd := newCloseCommand(c)
 	closeCmd.GroupID = groupTask
 
@@ -247,6 +250,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 		rmCmd,
 		cpCmd,
 		commentCmd,
+		commentsCmd,
 		closeCmd,
 		startCmd,
 		stopCmd,

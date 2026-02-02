@@ -83,21 +83,41 @@ func TestStore_Save_Get_Comments(t *testing.T) {
 	require.NotNil(t, loaded.SkipReview)
 	assert.True(t, *loaded.SkipReview)
 
-	comment := domain.Comment{Text: "First", Author: "worker", Time: now}
+	comment := domain.Comment{
+		Text:     "First",
+		Author:   "worker",
+		Time:     now,
+		Type:     domain.CommentTypeReport,
+		Tags:     []string{"docs"},
+		Metadata: map[string]string{"source": "cli"},
+	}
 	require.NoError(t, store.AddComment(1, comment))
 
 	comments, err := store.GetComments(1)
 	require.NoError(t, err)
 	require.Len(t, comments, 1)
 	assert.Equal(t, "First", comments[0].Text)
+	assert.Equal(t, domain.CommentTypeReport, comments[0].Type)
+	assert.Equal(t, []string{"docs"}, comments[0].Tags)
+	assert.Equal(t, map[string]string{"source": "cli"}, comments[0].Metadata)
 
-	updated := domain.Comment{Text: "Updated", Author: "worker", Time: now}
+	updated := domain.Comment{
+		Text:     "Updated",
+		Author:   "worker",
+		Time:     now,
+		Type:     domain.CommentTypeFriction,
+		Tags:     []string{"testing"},
+		Metadata: map[string]string{"priority": "high"},
+	}
 	require.NoError(t, store.UpdateComment(1, 0, updated))
 
 	comments, err = store.GetComments(1)
 	require.NoError(t, err)
 	require.Len(t, comments, 1)
 	assert.Equal(t, "Updated", comments[0].Text)
+	assert.Equal(t, domain.CommentTypeFriction, comments[0].Type)
+	assert.Equal(t, []string{"testing"}, comments[0].Tags)
+	assert.Equal(t, map[string]string{"priority": "high"}, comments[0].Metadata)
 }
 
 func TestStore_StrictValidation(t *testing.T) {

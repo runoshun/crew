@@ -9,6 +9,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // newTestContainer creates an app.Container with mock dependencies.
@@ -375,8 +376,11 @@ func TestNewShowCommand_JSON_WithAllFields(t *testing.T) {
 	}
 	repo.Comments[1] = []domain.Comment{
 		{
-			Time: time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC),
-			Text: "Test comment",
+			Time:     time.Date(2024, 1, 1, 11, 0, 0, 0, time.UTC),
+			Text:     "Test comment",
+			Type:     domain.CommentTypeReport,
+			Tags:     []string{"docs"},
+			Metadata: map[string]string{"source": "cli"},
 		},
 	}
 	container := newTestContainer(repo)
@@ -406,6 +410,10 @@ func TestNewShowCommand_JSON_WithAllFields(t *testing.T) {
 	assert.Contains(t, output, "\"lastReviewAt\": \"2024-01-01T12:00:00Z\"")
 	assert.Contains(t, output, "\"lastReviewIsLGTM\": true")
 	assert.Contains(t, output, "\"text\": \"Test comment\"")
+	assert.Contains(t, output, "\"type\": \"report\"")
+	assert.Contains(t, output, "\"tags\": [")
+	assert.Contains(t, output, "\"docs\"")
+	assert.Contains(t, output, "\"metadata\": {")
 }
 
 // =============================================================================
@@ -1097,6 +1105,54 @@ func TestNewCommentCommand_WithHashPrefix(t *testing.T) {
 	comments := repo.Comments[1]
 	assert.Len(t, comments, 1)
 	assert.Equal(t, "Comment with hash prefix", comments[0].Text)
+}
+
+func TestNewCommentCommand_WithTypeAndTags(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	cmd.SetArgs([]string{"1", "Typed comment", "--type", "report", "--tag", "docs", "--tags", "testing,refactoring"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.NoError(t, err)
+	comments := repo.Comments[1]
+	require.Len(t, comments, 1)
+	assert.Equal(t, domain.CommentTypeReport, comments[0].Type)
+	assert.Equal(t, []string{"docs", "refactoring", "testing"}, comments[0].Tags)
+}
+
+func TestNewCommentCommand_InvalidType(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	container := newTestContainer(repo)
+
+	// Create command
+	cmd := newCommentCommand(container)
+	cmd.SetArgs([]string{"1", "Comment", "--type", "invalid"})
+
+	// Execute
+	err := cmd.Execute()
+
+	// Assert
+	assert.ErrorIs(t, err, domain.ErrInvalidCommentType)
 }
 
 func TestNewCommentCommand_TaskNotFound(t *testing.T) {

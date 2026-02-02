@@ -21,13 +21,30 @@ crew show              # Show current task details
 
 ### Report Progress
 ```bash
-crew comment <id> "<message>"   # Add a comment
+crew comment <id> "<message>"                    # Add a comment
+crew comment <id> "<message>" --type report      # Work report
+crew comment <id> "<message>" --type suggestion  # Improvement suggestion
+crew comment <id> "<message>" --type friction    # Friction/blocker
 ```
 
 Add comments in these situations:
 - When you need user input or clarification on important decisions
 - When you encounter blockers or unexpected issues
-- When the task is complete (summary of what was done)
+- When the task is complete (summary of what was done) → use `--type report`
+
+**Friction reports** (`--type friction`):
+Report friction when you experience obstacles that slow down work:
+- Unclear or outdated documentation
+- Missing test data or fixtures
+- Confusing code structure or naming
+- Tooling issues or environment problems
+
+**Suggestions** (`--type suggestion`):
+Propose improvements noticed during work:
+- Code refactoring opportunities
+- Architecture improvements
+- Documentation updates needed
+- Process improvements
 
 ### Complete Task
 ```bash

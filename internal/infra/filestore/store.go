@@ -888,28 +888,8 @@ func isValidCommentBlockAt(lines []string, start int) bool {
 	if start < 0 || start+4 > len(lines) {
 		return false
 	}
-	if lines[start] != "---" {
-		return false
-	}
-	if len(lines[start+1]) < 12 || lines[start+1][:11] != "# Comment: " {
-		return false
-	}
-	idxStr := strings.TrimSpace(lines[start+1][11:])
-	idx, err := strconv.Atoi(idxStr)
-	if err != nil || idx < 0 {
-		return false
-	}
-	if len(lines[start+2]) < 9 || lines[start+2][:9] != "# Author:" {
-		return false
-	}
-	if len(lines[start+3]) < 8 || lines[start+3][:7] != "# Time:" {
-		return false
-	}
-	timeStr := strings.TrimSpace(lines[start+3][7:])
-	if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
-		return false
-	}
-	return true
+	_, _, err := parseCommentHeader(lines[start:])
+	return err == nil
 }
 
 func parseFrontmatter(lines []string) (taskFrontmatter, error) {
@@ -1046,34 +1026,11 @@ type indexedComment struct {
 
 func parseCommentBlock(block string) (indexedComment, error) {
 	lines := splitLines(block)
-	if len(lines) < 4 {
-		return indexedComment{}, domain.ErrInvalidCommentMeta
-	}
-	if lines[0] != "---" {
-		return indexedComment{}, domain.ErrInvalidCommentMeta
-	}
-	if len(lines[1]) < 12 || lines[1][:11] != "# Comment: " {
-		return indexedComment{}, domain.ErrInvalidCommentMeta
-	}
-	idxStr := strings.TrimSpace(lines[1][11:])
-	idx, err := strconv.Atoi(idxStr)
-	if err != nil || idx < 0 {
-		return indexedComment{}, domain.ErrInvalidCommentMeta
-	}
-	if len(lines[2]) < 9 || lines[2][:9] != "# Author:" {
-		return indexedComment{}, domain.ErrInvalidCommentMeta
-	}
-	author := strings.TrimSpace(lines[2][9:])
-	if len(lines[3]) < 8 || lines[3][:7] != "# Time:" {
-		return indexedComment{}, domain.ErrInvalidCommentMeta
-	}
-	timeStr := strings.TrimSpace(lines[3][7:])
-	commentTime, err := time.Parse(time.RFC3339, timeStr)
+	header, textStart, err := parseCommentHeader(lines)
 	if err != nil {
-		return indexedComment{}, domain.ErrInvalidCommentMeta
+		return indexedComment{}, err
 	}
 
-	textStart := 4
 	for textStart < len(lines) && lines[textStart] == "" {
 		textStart++
 	}
@@ -1086,13 +1043,146 @@ func parseCommentBlock(block string) (indexedComment, error) {
 	}
 
 	return indexedComment{
-		Index: idx,
+		Index: header.Index,
 		Comment: domain.Comment{
-			Text:   text,
-			Time:   commentTime,
-			Author: author,
+			Text:     text,
+			Time:     header.Time,
+			Author:   header.Author,
+			Type:     header.Type,
+			Tags:     header.Tags,
+			Metadata: header.Metadata,
 		},
 	}, nil
+}
+
+type commentHeader struct {
+	Author   string
+	Type     domain.CommentType
+	Metadata map[string]string
+	Time     time.Time
+	Tags     []string
+	Index    int
+}
+
+func parseCommentHeader(lines []string) (commentHeader, int, error) {
+	if len(lines) < 4 {
+		return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+	}
+	if lines[0] != "---" {
+		return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+	}
+	if len(lines[1]) < 12 || lines[1][:11] != "# Comment: " {
+		return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+	}
+	idxStr := strings.TrimSpace(lines[1][11:])
+	idx, err := strconv.Atoi(idxStr)
+	if err != nil || idx < 0 {
+		return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+	}
+	if len(lines[2]) < 9 || lines[2][:9] != "# Author:" {
+		return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+	}
+	author := strings.TrimSpace(lines[2][9:])
+
+	header := commentHeader{Index: idx, Author: author}
+
+	for i := 3; i < len(lines); i++ {
+		line := lines[i]
+		switch {
+		case strings.HasPrefix(line, "# Time:"):
+			timeStr := strings.TrimSpace(line[7:])
+			commentTime, err := time.Parse(time.RFC3339, timeStr)
+			if err != nil {
+				return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+			}
+			header.Time = commentTime
+			return header, i + 1, nil
+		case strings.HasPrefix(line, "# Type:"):
+			commentType, err := parseCommentTypeValue(line[7:])
+			if err != nil {
+				return commentHeader{}, 0, err
+			}
+			header.Type = commentType
+		case strings.HasPrefix(line, "# Tags:"):
+			header.Tags = parseCommentTagsValue(line[7:])
+		case strings.HasPrefix(line, "# Metadata:"):
+			metadata, err := parseCommentMetadataValue(line[11:])
+			if err != nil {
+				return commentHeader{}, 0, err
+			}
+			header.Metadata = metadata
+		case line == "":
+			return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+		default:
+			return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+		}
+	}
+	return commentHeader{}, 0, domain.ErrInvalidCommentMeta
+}
+
+func parseCommentTypeValue(value string) (domain.CommentType, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return domain.CommentTypeGeneral, nil
+	}
+	commentType := domain.CommentType(trimmed)
+	if !commentType.IsValid() {
+		return "", domain.ErrInvalidCommentMeta
+	}
+	return commentType, nil
+}
+
+func parseCommentTagsValue(value string) []string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	parts := strings.Split(trimmed, ",")
+	set := make(map[string]bool, len(parts))
+	for _, part := range parts {
+		item := strings.TrimSpace(part)
+		if item == "" {
+			continue
+		}
+		set[item] = true
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	tags := make([]string, 0, len(set))
+	for tag := range set {
+		tags = append(tags, tag)
+	}
+	slices.Sort(tags)
+	return tags
+}
+
+func parseCommentMetadataValue(value string) (map[string]string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parts := strings.Split(trimmed, ",")
+	metadata := make(map[string]string, len(parts))
+	for _, part := range parts {
+		pair := strings.TrimSpace(part)
+		if pair == "" {
+			continue
+		}
+		kv := strings.SplitN(pair, "=", 2)
+		if len(kv) != 2 {
+			return nil, domain.ErrInvalidCommentMeta
+		}
+		key := strings.TrimSpace(kv[0])
+		if key == "" {
+			return nil, domain.ErrInvalidCommentMeta
+		}
+		metadata[key] = strings.TrimSpace(kv[1])
+	}
+	if len(metadata) == 0 {
+		return nil, nil
+	}
+	return metadata, nil
 }
 
 func splitByCommentSeparator(s string) []string {

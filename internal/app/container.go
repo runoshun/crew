@@ -174,6 +174,11 @@ func (c *Container) ShowTaskUseCase() *usecase.ShowTask {
 	return usecase.NewShowTask(c.Tasks)
 }
 
+// ListCommentsUseCase returns a new ListComments use case.
+func (c *Container) ListCommentsUseCase() *usecase.ListComments {
+	return usecase.NewListComments(c.Tasks)
+}
+
 // EditTaskUseCase returns a new EditTask use case.
 func (c *Container) EditTaskUseCase() *usecase.EditTask {
 	return usecase.NewEditTask(c.Tasks)

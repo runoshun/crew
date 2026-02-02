@@ -20,7 +20,14 @@ func TestEditComment_Execute_Success(t *testing.T) {
 		Status: domain.StatusTodo,
 	}
 	repo.Comments[1] = []domain.Comment{
-		{Text: "Original comment", Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC)},
+		{
+			Text:     "Original comment",
+			Time:     time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC),
+			Author:   "worker",
+			Type:     domain.CommentTypeReport,
+			Tags:     []string{"docs"},
+			Metadata: map[string]string{"source": "cli"},
+		},
 	}
 	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
 	uc := NewEditComment(repo, clock)
@@ -40,6 +47,10 @@ func TestEditComment_Execute_Success(t *testing.T) {
 	require.Len(t, comments, 1)
 	assert.Equal(t, "Updated comment", comments[0].Text)
 	assert.Equal(t, clock.NowTime, comments[0].Time)
+	assert.Equal(t, "worker", comments[0].Author)
+	assert.Equal(t, domain.CommentTypeReport, comments[0].Type)
+	assert.Equal(t, []string{"docs"}, comments[0].Tags)
+	assert.Equal(t, map[string]string{"source": "cli"}, comments[0].Metadata)
 }
 
 func TestEditComment_Execute_EmptyMessage(t *testing.T) {
