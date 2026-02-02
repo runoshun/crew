@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -222,6 +223,18 @@ func (m *Model) UsesCursorKeys() bool {
 		return true
 	}
 	return m.mode == ModeStart && m.startFocusCustom
+}
+
+// UseHLPagingKeys limits page navigation to h/l.
+func (m *Model) UseHLPagingKeys() {
+	m.keys.PrevPage = key.NewBinding(
+		key.WithKeys("h"),
+		key.WithHelp("h", "prev page"),
+	)
+	m.keys.NextPage = key.NewBinding(
+		key.WithKeys("l"),
+		key.WithHelp("l", "next page"),
+	)
 }
 
 // tick returns a command that sends a tick message after the refresh interval.

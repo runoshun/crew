@@ -164,7 +164,7 @@ func loadRepoInfo(repo domain.WorkspaceRepo) domain.WorkspaceRepoInfo {
 	}
 
 	// Try to load tasks
-	container, err := app.New(repo.Path)
+	container, err := app.NewWithWarningWriter(repo.Path, nil)
 	if err != nil {
 		info.State = domain.RepoStateConfigError
 		info.ErrorMsg = fmt.Sprintf("Config error: %v", err)
@@ -516,6 +516,7 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 		}
 		model := tui.New(container)
 		model.DisableAutoRefresh()
+		model.UseHLPagingKeys()
 		m.models[m.activeRepo] = model
 		initCmd := m.wrapRepoCmd(m.activeRepo, model.Init())
 		sizeCmd := m.updateModelSize(m.activeRepo)
@@ -988,7 +989,7 @@ func (m *Model) viewFooter() string {
 
 	content := keyStyle.Render("j/k") + " nav  " +
 		keyStyle.Render("enter") + " focus  " +
-		keyStyle.Render("tab") + " pane  " +
+		keyStyle.Render("tab") + "->pane  " +
 		keyStyle.Render("left/right") + " pane  " +
 		keyStyle.Render("a") + " add  " +
 		keyStyle.Render("d") + " remove  " +
