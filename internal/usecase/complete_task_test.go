@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -884,14 +885,22 @@ func TestCompleteTask_Execute_ReviewSessionAlreadyRunning(t *testing.T) {
 	sessions.IsRunningVal = true
 
 	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
-	sessions.WaitFunc = func(_ context.Context, sessionName string) error {
-		logPath := domain.SessionLogPath(uc.crewDir, sessionName)
-		if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
-			return err
-		}
-		content := "some output\n" + domain.ReviewResultMarker + "\n" + domain.ReviewLGTMPrefix + " Looks good\n"
-		return os.WriteFile(logPath, []byte(content), 0o644)
-	}
+	logPath := domain.SessionLogPath(uc.crewDir, domain.ReviewSessionName(1))
+	require.NoError(t, os.MkdirAll(filepath.Dir(logPath), 0o750))
+	content := strings.Join([]string{
+		"old output",
+		reviewRunStartPrefix + "2026-02-01T00:00:00Z",
+		"old review output",
+		domain.ReviewResultMarker,
+		"❌ Needs changes",
+		reviewRunStartPrefix + "2026-02-01T01:00:00Z",
+		"new review output",
+		domain.ReviewResultMarker,
+		domain.ReviewLGTMPrefix + " Looks good",
+		"note: " + reviewRunStartPrefix + "inline mention should be ignored",
+		"",
+	}, "\n")
+	require.NoError(t, os.WriteFile(logPath, []byte(content), 0o644))
 
 	out, err := uc.Execute(context.Background(), CompleteTaskInput{
 		TaskID: 1,
@@ -1043,4 +1052,44 @@ func TestCompleteTask_Execute_DeprecatedReviewSettingsWarn(t *testing.T) {
 	}
 	assert.True(t, reviewModeWarned)
 	assert.True(t, autoFixWarned)
+}
+
+func TestReadFileTailBytes_LineBoundary(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "log.txt")
+	content := "alpha\nbeta\ngamma\n"
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+
+	offsetAtLineStart := int64(len("alpha\n"))
+	got := readFileTailBytes(path, offsetAtLineStart, 1024)
+	assert.Equal(t, "beta\ngamma\n", got)
+
+	offsetMidLine := int64(len("alpha\nbe"))
+	got = readFileTailBytes(path, offsetMidLine, 1024)
+	assert.Equal(t, "gamma\n", got)
+}
+
+func TestFindLastReviewRunStart_BaseOffsetBoundary(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "review.log")
+	content := strings.Join([]string{
+		"preamble",
+		reviewRunStartPrefix + "2026-02-01T00:00:00Z",
+		"review output",
+		"",
+	}, "\n")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+
+	size := int64(len(content))
+	boundaryOffset := int64(len("preamble\n"))
+	maxBytes := size - boundaryOffset
+	offset, startedAt, ok := findLastReviewRunStart(path, maxBytes)
+	require.True(t, ok)
+	assert.Equal(t, boundaryOffset, offset)
+	assert.Equal(t, time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), startedAt)
+
+	midOffset := int64(len("pre"))
+	maxBytes = size - midOffset
+	offset, startedAt, ok = findLastReviewRunStart(path, maxBytes)
+	require.True(t, ok)
+	assert.Equal(t, boundaryOffset, offset)
+	assert.Equal(t, time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), startedAt)
 }
