@@ -53,6 +53,7 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 		}
 	};
 
+	// Best-effort: permission response event names can vary by runtime.
 	const permissionResolvedEvents = new Set([
 		"permission.responded",
 		"permission.response",
@@ -64,35 +65,41 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 
   return {
 		event: async ({ event }) => {
+			const canReplyPermission = $.client && $.client.permission && typeof $.client.permission.reply === "function";
+
 			// Permission asked: auto-approve safe git operations in worktree
 			if (event.type === "permission.asked") {
 				const { id, metadata } = event.properties;
-				await updateSubstate("awaiting_permission");
-			
-			// Auto-approve safe git operations in worktree
-			if (metadata && typeof metadata.command === 'string') {
-				const command = metadata.command.trim();
-				
-				// Security: Deny chained commands (&, |, ;) to prevent injection
-				const isSafeCommand = !/[\&\|;]/.test(command);
-				
-				// Security: Ensure command is running within the worktree
-				// Note: {{.Worktree}} is injected by the Go template
-				const cwd = metadata.cwd;
-				const isSafeDir = typeof cwd === 'string' && cwd.startsWith("{{.Worktree}}");
+				let autoApproved = false;
 
-				if (isSafeCommand && isSafeDir) {
-					// Allow: git status, diff, log, add, commit
-					if (/^git\s+(status|diff|log|add|commit)(\s+|$)/.test(command)) {
-						if ($.client && $.client.permission && typeof $.client.permission.reply === "function") {
+				// Auto-approve safe git operations in worktree
+				if (metadata && typeof metadata.command === 'string') {
+					const command = metadata.command.trim();
+					
+					// Security: Deny chained commands (&, |, ;) to prevent injection
+					const isSafeCommand = !/[\&\|;]/.test(command);
+					
+					// Security: Ensure command is running within the worktree
+					// Note: {{.Worktree}} is injected by the Go template
+					const cwd = metadata.cwd;
+					const isSafeDir = typeof cwd === 'string' && cwd.startsWith("{{.Worktree}}");
+
+					if (isSafeCommand && isSafeDir) {
+						// Allow: git status, diff, log, add, commit
+						if (/^git\s+(status|diff|log|add|commit)(\s+|$)/.test(command) && canReplyPermission) {
 							await $.client.permission.reply({ requestID: id, reply: "once" });
 							await updateSubstate("running");
-							return;
+							autoApproved = true;
 						}
 					}
 				}
-			}
 
+				if (!autoApproved) {
+					await updateSubstate("awaiting_permission");
+				}
+				if (autoApproved) {
+					return;
+				}
 			}
 			if (permissionResolvedEvents.has(event.type)) {
 				await updateSubstate("running");
@@ -104,5 +111,5 @@ EOF
 
 # Add exclude pattern to git (use git rev-parse for worktree support)
 GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null) && \
-  echo ".opencode/plugin/crew-hooks.ts" >> "${GIT_COMMON_DIR}/info/exclude" || true
+  (grep -qxF ".opencode/plugin/crew-hooks.ts" "${GIT_COMMON_DIR}/info/exclude" || echo ".opencode/plugin/crew-hooks.ts") >> "${GIT_COMMON_DIR}/info/exclude" || true
 `

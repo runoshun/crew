@@ -90,7 +90,7 @@ EOF
 
 # Add exclude pattern to git (use git rev-parse for worktree support)
 GIT_COMMON_DIR=$(git rev-parse --git-common-dir 2>/dev/null) && \
-  echo ".claude/crew-plugin/" >> "${GIT_COMMON_DIR}/info/exclude" || true
+  (grep -qxF ".claude/crew-plugin/" "${GIT_COMMON_DIR}/info/exclude" || echo ".claude/crew-plugin/") >> "${GIT_COMMON_DIR}/info/exclude" || true
 
 # Trust worktree in Claude
 CLAUDE_JSON=~/.claude.json

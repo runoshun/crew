@@ -975,7 +975,7 @@ Examples:
 
 			substate := domain.ACPExecutionSubstate(args[1])
 			if !substate.IsValid() {
-				return domain.ErrInvalidACPExecutionSubstate
+				return fmt.Errorf("invalid substate: %q: %w", args[1], domain.ErrInvalidACPExecutionSubstate)
 			}
 
 			uc := c.SetSubstateUseCase()

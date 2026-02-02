@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type recordingACPStateStore struct {
+type usecaseACPStateStore struct {
 	loadState     domain.ACPExecutionState
 	loadErr       error
 	saveErr       error
@@ -22,14 +22,14 @@ type recordingACPStateStore struct {
 	saveCalled    bool
 }
 
-func (s *recordingACPStateStore) Load(_ context.Context, namespace string, taskID int) (domain.ACPExecutionState, error) {
+func (s *usecaseACPStateStore) Load(_ context.Context, namespace string, taskID int) (domain.ACPExecutionState, error) {
 	s.loadCalled = true
 	s.lastNamespace = namespace
 	s.lastTaskID = taskID
 	return s.loadState, s.loadErr
 }
 
-func (s *recordingACPStateStore) Save(_ context.Context, namespace string, taskID int, state domain.ACPExecutionState) error {
+func (s *usecaseACPStateStore) Save(_ context.Context, namespace string, taskID int, state domain.ACPExecutionState) error {
 	s.saveCalled = true
 	s.lastNamespace = namespace
 	s.lastTaskID = taskID
@@ -40,7 +40,7 @@ func (s *recordingACPStateStore) Save(_ context.Context, namespace string, taskI
 func TestSetSubstate_Execute(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{ID: 1, Namespace: "alpha"}
-	store := &recordingACPStateStore{
+	store := &usecaseACPStateStore{
 		loadState: domain.ACPExecutionState{ExecutionSubstate: domain.ACPExecutionIdle, SessionID: "session-1"},
 	}
 	uc := NewSetSubstate(repo, store)
@@ -61,7 +61,7 @@ func TestSetSubstate_Execute(t *testing.T) {
 
 func TestSetSubstate_InvalidSubstate(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
-	store := &recordingACPStateStore{}
+	store := &usecaseACPStateStore{}
 	uc := NewSetSubstate(repo, store)
 
 	_, err := uc.Execute(context.Background(), SetSubstateInput{
@@ -75,7 +75,7 @@ func TestSetSubstate_InvalidSubstate(t *testing.T) {
 
 func TestSetSubstate_TaskNotFound(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
-	store := &recordingACPStateStore{}
+	store := &usecaseACPStateStore{}
 	uc := NewSetSubstate(repo, store)
 
 	_, err := uc.Execute(context.Background(), SetSubstateInput{
@@ -89,7 +89,7 @@ func TestSetSubstate_TaskNotFound(t *testing.T) {
 func TestSetSubstate_LoadError(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{ID: 1, Namespace: "default"}
-	store := &recordingACPStateStore{loadErr: assert.AnError}
+	store := &usecaseACPStateStore{loadErr: assert.AnError}
 	uc := NewSetSubstate(repo, store)
 
 	_, err := uc.Execute(context.Background(), SetSubstateInput{

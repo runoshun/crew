@@ -29,7 +29,7 @@ func newTestContainer(repo *testutil.MockTaskRepository) *app.Container {
 	return container
 }
 
-type recordingACPStateStore struct {
+type cliACPStateStore struct {
 	loadErr       error
 	lastNamespace string
 	lastTaskID    int
@@ -38,14 +38,14 @@ type recordingACPStateStore struct {
 	saveCalled    bool
 }
 
-func (s *recordingACPStateStore) Load(_ context.Context, namespace string, taskID int) (domain.ACPExecutionState, error) {
+func (s *cliACPStateStore) Load(_ context.Context, namespace string, taskID int) (domain.ACPExecutionState, error) {
 	s.loadCalled = true
 	s.lastNamespace = namespace
 	s.lastTaskID = taskID
 	return domain.ACPExecutionState{}, s.loadErr
 }
 
-func (s *recordingACPStateStore) Save(_ context.Context, namespace string, taskID int, state domain.ACPExecutionState) error {
+func (s *cliACPStateStore) Save(_ context.Context, namespace string, taskID int, state domain.ACPExecutionState) error {
 	s.saveCalled = true
 	s.lastNamespace = namespace
 	s.lastTaskID = taskID
@@ -766,7 +766,7 @@ func TestNewSubstateCommand_Success(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{ID: 1}
 	container := newTestContainer(repo)
-	store := &recordingACPStateStore{loadErr: domain.ErrACPStateNotFound}
+	store := &cliACPStateStore{loadErr: domain.ErrACPStateNotFound}
 	container.ACPStateStore = store
 
 	cmd := newSubstateCommand(container)
@@ -785,7 +785,7 @@ func TestNewSubstateCommand_InvalidSubstate(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{ID: 1}
 	container := newTestContainer(repo)
-	store := &recordingACPStateStore{}
+	store := &cliACPStateStore{}
 	container.ACPStateStore = store
 
 	cmd := newSubstateCommand(container)
