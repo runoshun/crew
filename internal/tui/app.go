@@ -124,6 +124,7 @@ type Model struct {
 	selectedTaskHasWorktree bool
 	hideFooter              bool // Hide footer (used when embedded in workspace)
 	embedded                bool // Embedded mode (skip App padding, used in workspace)
+	focused                 bool // Whether this TUI has focus (used when embedded in workspace)
 }
 
 // New creates a new TUI Model with the given container.
@@ -230,6 +231,11 @@ func (m *Model) SetHideFooter(hide bool) {
 // SetEmbedded sets whether the TUI is embedded in another view (skips App padding).
 func (m *Model) SetEmbedded(embedded bool) {
 	m.embedded = embedded
+}
+
+// SetFocused sets whether this TUI has focus (used when embedded in workspace).
+func (m *Model) SetFocused(focused bool) {
+	m.focused = focused
 }
 
 // UsesCursorKeys reports whether left/right should be forwarded to inputs.

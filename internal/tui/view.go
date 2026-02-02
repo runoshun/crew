@@ -257,7 +257,13 @@ func (m *Model) headerFooterContentWidth() int {
 
 // viewHeader renders the header section.
 func (m *Model) viewHeader() string {
-	headerStyle := m.styles.Header
+	// Change border color based on focus (when embedded in workspace)
+	// Non-embedded TUI is always "focused"
+	borderColor := Colors.GroupLine
+	if !m.embedded || m.focused {
+		borderColor = Colors.Primary
+	}
+	headerStyle := m.styles.Header.BorderForeground(borderColor)
 	textStyle := m.styles.HeaderText
 
 	title := textStyle.Render("Tasks")

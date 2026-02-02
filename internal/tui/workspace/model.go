@@ -813,14 +813,10 @@ func (m *Model) viewRightPane() string {
 
 	paneStyle := lipgloss.NewStyle().Width(width)
 	if m.isSplitView() {
-		borderColor := tui.Colors.GroupLine
-		if !m.leftFocused {
-			borderColor = tui.Colors.Primary
-		}
 		paneStyle = paneStyle.
 			BorderLeft(true).
 			BorderStyle(lipgloss.NormalBorder()).
-			BorderForeground(borderColor)
+			BorderForeground(tui.Colors.GroupLine)
 	}
 
 	return paneStyle.Render(content)
@@ -845,6 +841,8 @@ func (m *Model) viewRightPaneContent() string {
 	if !ok || model == nil {
 		return m.withRightPaneHint(m.styles.Loading.Render("Loading repository tasks..."))
 	}
+	// Update focus state before rendering
+	model.SetFocused(!m.leftFocused)
 	content := model.View()
 	if info.WarningMsg != "" {
 		warning := lipgloss.NewStyle().Foreground(tui.Colors.Warning).Render("Warning: " + info.WarningMsg)
@@ -866,8 +864,14 @@ func (m *Model) withRightPaneHint(content string) string {
 }
 
 // viewHeader renders the header with title left-aligned and count right-aligned.
+// When focused, the border color is highlighted.
 func (m *Model) viewHeader() string {
-	headerStyle := m.styles.Header
+	// Change border color based on focus
+	borderColor := tui.Colors.GroupLine
+	if m.leftFocused {
+		borderColor = tui.Colors.Primary
+	}
+	headerStyle := m.styles.Header.BorderForeground(borderColor)
 	textStyle := m.styles.HeaderText
 	mutedStyle := lipgloss.NewStyle().Foreground(tui.Colors.Muted)
 
