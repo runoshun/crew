@@ -8,7 +8,7 @@ import (
 // Msg is the interface for all workspace TUI messages.
 // All message types implement this sealed interface.
 //
-//sumtype:decl
+// go-sumtype:decl Msg
 type Msg interface {
 	sealed()
 }
