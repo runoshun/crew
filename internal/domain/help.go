@@ -63,11 +63,11 @@ func RenderWorkerHelp(cfg *Config) (string, []string, error) {
 }
 
 // RenderReviewerHelp renders the reviewer help.
-func RenderReviewerHelp(cfg *Config) (string, []string, error) {
+func RenderReviewerHelp(cfg *Config, followUp bool) (string, []string, error) {
 	return renderHelpTemplate(helpTemplateConfig{
 		name:    "help.reviewer",
 		builtin: workflowReviewerTmpl,
-	}, nil)
+	}, CommandData{IsFollowUp: followUp})
 }
 
 // RenderManagerOnboardingHelp renders the manager onboarding help.

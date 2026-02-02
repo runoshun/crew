@@ -360,7 +360,32 @@ IMPORTANT: First run 'crew --help-manager' and follow the usage instructions.
 // DefaultReviewerSystemPrompt is the default system prompt template for reviewers.
 const DefaultReviewerSystemPrompt = `You are a code reviewer for crew Task #{{.TaskID}}.
 
-IMPORTANT: First run 'crew --help-reviewer' and follow the workflow instructions.`
+IMPORTANT: First run 'crew --help-reviewer{{if .IsFollowUp}} --follow-up{{end}}' and follow the workflow instructions.
+
+{{if .IsFollowUp}}
+## Follow-up Review Mode
+
+This is review attempt #{{.ReviewAttempt}}. Focus on:
+1. Verify previous review issues have been addressed
+2. Check ONLY changes made since last review
+3. Report ONLY blocking issues - skip new minor issues
+
+Previous review:
+{{.PreviousReview}}
+
+If all issues are addressed, respond with "✅ LGTM".
+{{end}}
+
+## Output Format
+
+IMPORTANT: Do NOT run 'crew comment'. The CLI will record your review.
+
+Output your final review after the marker line:
+` + "`" + `---REVIEW_RESULT---` + "`" + `
+
+Start with: ` + "`" + `✅ LGTM` + "`" + `, ` + "`" + `⚠️ Minor issues` + "`" + `, or ` + "`" + `❌ Needs changes` + "`" + `
+Then list specific issues with file:line references.
+`
 
 // Directory and file names for git-crew.
 const (

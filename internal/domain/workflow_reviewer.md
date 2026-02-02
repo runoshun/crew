@@ -46,6 +46,7 @@ crew comment <id> "<message>"
 
 ---
 
+{{if .IsFollowUp}}
 ## Follow-up Review Mode
 
 When reviewing a follow-up attempt, focus on:
@@ -57,6 +58,7 @@ When reviewing a follow-up attempt, focus on:
 If all issues are addressed, respond with "✅ LGTM".
 
 ---
+{{end}}
 
 ## Output Format
 
