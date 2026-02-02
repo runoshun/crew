@@ -267,6 +267,10 @@ func (m *Model) viewMain() string {
 }
 
 func (m *Model) headerFooterContentWidth() int {
+	// Embedded 1-pane mode: use full width (workspace handles outer padding)
+	if m.embedded && m.hideDetailPanel {
+		return m.width
+	}
 	// Return the same width as taskList for consistent alignment
 	// taskList width is set in updateLayoutSizes() based on listWidth()
 	// We subtract 4 from listWidth to account for the left margin (4 spaces) used in delegate rendering
@@ -1045,6 +1049,10 @@ func (m *Model) detailPanelWidth() int {
 }
 
 func (m *Model) contentWidth() int {
+	// Embedded mode: width is already content width (workspace handles outer padding)
+	if m.embedded {
+		return m.width
+	}
 	return m.width - appPadding
 }
 
@@ -1247,7 +1255,11 @@ func (m *Model) viewDetailPanel() string {
 		return panelStyle.Height(panelHeight).Render(emptyStyle.Render("Select a task\nto view details"))
 	}
 
-	contentWidth := panelWidth - 4 // account for border and padding
+	// Content width: full width in 1-pane mode, otherwise account for border and padding
+	contentWidth := panelWidth
+	if !fullWidthMode {
+		contentWidth = panelWidth - 4
+	}
 	borderColor := Colors.GroupLine
 	if m.detailFocused {
 		borderColor = Colors.Primary
