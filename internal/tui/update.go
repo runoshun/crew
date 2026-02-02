@@ -113,6 +113,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Trigger diff display for a task
 		return m, m.showDiff(msg.TaskID)
 
+	case execLogMsg:
+		// Execute the log pager command
+		return m, tea.Exec(&domainExecCmd{cmd: msg.cmd}, func(err error) tea.Msg {
+			if err != nil {
+				return MsgError{Err: err}
+			}
+			return MsgReloadTasks{}
+		})
+
 	case execDiffMsg:
 		// Execute the diff command using domainExecCmd wrapper
 		// diff can return non-zero when there are differences, so ignore errors
