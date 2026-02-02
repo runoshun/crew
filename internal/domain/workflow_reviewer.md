@@ -46,6 +46,20 @@ crew comment <id> "<message>"
 
 ---
 
+{{if .IsFollowUp}}
+## Follow-up Review Mode
+
+When reviewing a follow-up attempt, focus on:
+
+1. Verify previous review issues have been addressed
+2. Check ONLY changes made since last review
+3. Report ONLY blocking issues - skip new minor issues
+
+If all issues are addressed, respond with "✅ LGTM".
+
+---
+{{end}}
+
 ## Output Format
 
 IMPORTANT: Do NOT run `crew comment` when using `crew complete`. It records your review result.

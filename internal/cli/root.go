@@ -31,6 +31,7 @@ func NewRootCommand(c *app.Container, version string) *cobra.Command {
 	var fullManager bool
 	var managerOnboarding bool
 	var managerAuto bool
+	var reviewerFollowUp bool
 
 	root := &cobra.Command{
 		Use:   "crew",
@@ -91,6 +92,9 @@ Use --help-manager-auto to see the auto mode guide.`,
 			if flagCount > 1 {
 				return errors.New("cannot use multiple help flags together")
 			}
+			if reviewerFollowUp && !fullReviewer {
+				return errors.New("--follow-up can only be used with --help-reviewer")
+			}
 
 			var cfg *domain.Config
 			if c != nil {
@@ -101,7 +105,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 				return showWorkerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
 			}
 			if fullReviewer {
-				return showReviewerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
+				return showReviewerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg, reviewerFollowUp)
 			}
 			if fullManager {
 				return showManagerHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
@@ -120,6 +124,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 	// Add role-specific help flags
 	root.Flags().BoolVar(&fullWorker, "help-worker", false, "Show detailed help for worker agents")
 	root.Flags().BoolVar(&fullReviewer, "help-reviewer", false, "Show detailed help for reviewer agents")
+	root.Flags().BoolVar(&reviewerFollowUp, "follow-up", false, "Show follow-up guidance in reviewer help")
 	// Backward-compatible alias (typo kept for compatibility)
 	root.Flags().BoolVar(&fullReviewer, "help-reviwer", false, "DEPRECATED: use --help-reviewer")
 	_ = root.Flags().MarkDeprecated("help-reviwer", "use --help-reviewer")

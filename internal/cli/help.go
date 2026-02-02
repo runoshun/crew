@@ -53,8 +53,8 @@ func showWorkerHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
 	return err
 }
 
-func showReviewerHelp(w io.Writer, errW io.Writer, cfg *domain.Config) error {
-	help, warnings, err := domain.RenderReviewerHelp(cfg)
+func showReviewerHelp(w io.Writer, errW io.Writer, cfg *domain.Config, followUp bool) error {
+	help, warnings, err := domain.RenderReviewerHelp(cfg, followUp)
 	if err != nil {
 		return err
 	}

@@ -32,13 +32,14 @@ func TestRootHelpFlags_IncludeReviewer(t *testing.T) {
 	root := NewRootCommand(nil, "test")
 	usage := root.UsageString()
 	assert.Contains(t, usage, "--help-reviewer")
+	assert.Contains(t, usage, "--follow-up")
 }
 
 func TestShowReviewerHelp(t *testing.T) {
 	var buf bytes.Buffer
 	var errBuf bytes.Buffer
 
-	err := showReviewerHelp(&buf, &errBuf, &domain.Config{})
+	err := showReviewerHelp(&buf, &errBuf, &domain.Config{}, false)
 
 	require.NoError(t, err)
 	content := buf.String()
@@ -47,6 +48,20 @@ func TestShowReviewerHelp(t *testing.T) {
 	assert.Contains(t, content, "crew show")
 	assert.Contains(t, content, "crew diff")
 	assert.Contains(t, content, "Do NOT run")
+	assert.NotContains(t, content, "Follow-up Review Mode")
+}
+
+func TestShowReviewerHelp_FollowUp(t *testing.T) {
+	var buf bytes.Buffer
+	var errBuf bytes.Buffer
+
+	err := showReviewerHelp(&buf, &errBuf, &domain.Config{}, true)
+
+	require.NoError(t, err)
+	content := buf.String()
+
+	assert.Contains(t, content, "# git-crew Reviewer Guide")
+	assert.Contains(t, content, "Follow-up Review Mode")
 }
 
 func TestShowManagerHelp(t *testing.T) {
