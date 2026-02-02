@@ -335,7 +335,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.hasWorktree(task) {
 			return m, nil
 		}
-		m.enterRequestChanges(task.ID, ModeNormal)
+		m.enterRequestChanges(task.ID, ModeNormal, true)
 		return m, nil
 
 	case key.Matches(msg, m.keys.New):
@@ -1087,7 +1087,7 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Execute selected action
 		switch m.reviewActionCursor {
 		case 0: // Request Changes - enter message input mode
-			m.enterRequestChanges(m.reviewTaskID, ModeReviewAction)
+			m.enterRequestChanges(m.reviewTaskID, ModeReviewAction, false)
 			return m, nil
 		case 1: // NotifyWorker without restart (just send comment)
 			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, false)
@@ -1109,9 +1109,9 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *Model) enterRequestChanges(taskID int, returnMode Mode) {
+func (m *Model) enterRequestChanges(taskID int, returnMode Mode, resetReviewContext bool) {
 	m.reviewTaskID = taskID
-	if returnMode == ModeNormal {
+	if resetReviewContext {
 		m.reviewResult = ""
 		m.reviewActionCursor = 0
 	}

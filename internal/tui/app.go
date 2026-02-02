@@ -305,6 +305,18 @@ func (m *Model) hasWorktree(task *domain.Task) bool {
 	return true
 }
 
+func (m *Model) hasWorktreeQuiet(task *domain.Task) bool {
+	if task == nil {
+		return false
+	}
+	branch := domain.BranchName(task.ID, task.Issue)
+	exists, err := m.container.Worktrees.Exists(branch)
+	if err != nil {
+		return false
+	}
+	return exists
+}
+
 // updateTaskList updates the task list items from tasks.
 func (m *Model) updateTaskList() {
 	if m.filterInput.Value() != "" {
@@ -717,7 +729,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return m.hasWorktree(task)
+				return m.hasWorktreeQuiet(task)
 			},
 		},
 		{
@@ -726,11 +738,11 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			Desc:     "Send request changes (back to in_progress)",
 			Key:      "R",
 			Action: func() (tea.Model, tea.Cmd) {
-				m.enterRequestChanges(task.ID, ModeNormal)
+				m.enterRequestChanges(task.ID, ModeNormal, true)
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return task.Status == domain.StatusDone && m.hasWorktree(task)
+				return task.Status == domain.StatusDone && m.hasWorktreeQuiet(task)
 			},
 		},
 		{
