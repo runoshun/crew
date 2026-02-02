@@ -804,7 +804,7 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 		{
 			ActionID: "request_changes",
 			Label:    "Request Changes",
-			Desc:     "Send request changes (back to in_progress, notify session)",
+			Desc:     "Send request changes (back to in_progress, notify if available)",
 			Key:      "R",
 			Action: func() (tea.Model, tea.Cmd) {
 				m.enterRequestChanges(task.ID, ModeActionMenu, true)

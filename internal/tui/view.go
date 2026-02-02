@@ -1392,7 +1392,7 @@ func (m *Model) viewReviewMessageDialog() string {
 
 	inputLine := ds.renderLine(m.reviewMessageInput.View())
 
-	defaultHint := ds.renderLine(ds.muted.Render("Leave empty to use: \"Please address the review comments above.\""))
+	defaultHint := ds.renderLine(ds.muted.Render(fmt.Sprintf("Leave empty to use: \"%s\"", defaultReviewMessage)))
 
 	hint := ds.renderLine(
 		ds.key.Render("enter") + ds.text.Render(" send  ") +
