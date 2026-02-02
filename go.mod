@@ -8,7 +8,6 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/glamour v0.10.0
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
-	github.com/coder/acp-go-sdk v0.6.3
 	github.com/go-git/go-git/v5 v5.16.4
 	github.com/mattn/go-runewidth v0.0.19
 	github.com/muesli/reflow v0.3.0

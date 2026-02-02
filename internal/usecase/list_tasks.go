@@ -2,8 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
 	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
@@ -40,22 +38,20 @@ type ListTasksOutput struct {
 
 // ListTasks is the use case for listing tasks.
 type ListTasks struct {
-	tasks     domain.TaskRepository
-	sessions  domain.SessionManager
-	acpStates domain.ACPStateStore
+	tasks    domain.TaskRepository
+	sessions domain.SessionManager
 }
 
 // NewListTasks creates a new ListTasks use case.
-func NewListTasks(tasks domain.TaskRepository, sessions domain.SessionManager, acpStates domain.ACPStateStore) *ListTasks {
+func NewListTasks(tasks domain.TaskRepository, sessions domain.SessionManager) *ListTasks {
 	return &ListTasks{
-		tasks:     tasks,
-		sessions:  sessions,
-		acpStates: acpStates,
+		tasks:    tasks,
+		sessions: sessions,
 	}
 }
 
 // Execute lists tasks matching the given input criteria.
-func (uc *ListTasks) Execute(ctx context.Context, in ListTasksInput) (*ListTasksOutput, error) {
+func (uc *ListTasks) Execute(_ context.Context, in ListTasksInput) (*ListTasksOutput, error) {
 	filter := domain.TaskFilter{
 		ParentID: in.ParentID,
 		Labels:   in.Labels,
@@ -69,10 +65,6 @@ func (uc *ListTasks) Execute(ctx context.Context, in ListTasksInput) (*ListTasks
 	// Filter out terminal status tasks if not requested
 	if !in.IncludeTerminal {
 		tasks = filterActiveOnly(tasks)
-	}
-
-	if err := uc.attachExecutionSubstates(ctx, tasks); err != nil {
-		return nil, err
 	}
 
 	// If sessions or processes not requested, return simple task list
@@ -109,30 +101,6 @@ func (uc *ListTasks) Execute(ctx context.Context, in ListTasksInput) (*ListTasks
 	}
 
 	return &ListTasksOutput{TasksWithInfo: tasksWithInfo}, nil
-}
-
-func (uc *ListTasks) attachExecutionSubstates(ctx context.Context, tasks []*domain.Task) error {
-	if uc.acpStates == nil {
-		return nil
-	}
-	for _, task := range tasks {
-		if task == nil {
-			continue
-		}
-		namespace := task.Namespace
-		if namespace == "" {
-			namespace = domain.DefaultNamespace
-		}
-		state, err := uc.acpStates.Load(ctx, namespace, task.ID)
-		if err != nil {
-			if errors.Is(err, domain.ErrACPStateNotFound) {
-				continue
-			}
-			return fmt.Errorf("load acp state for %s#%d: %w", namespace, task.ID, err)
-		}
-		task.ExecutionSubstate = state.ExecutionSubstate
-	}
-	return nil
 }
 
 func (uc *ListTasks) listTasks(filter domain.TaskFilter, allNamespaces bool) ([]*domain.Task, error) {

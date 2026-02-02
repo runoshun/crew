@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"context"
 	"testing"
 	"time"
 
@@ -27,30 +26,6 @@ func newTestContainer(repo *testutil.MockTaskRepository) *app.Container {
 	container.Git = &testutil.MockGit{}
 	container.Worktrees = testutil.NewMockWorktreeManager()
 	return container
-}
-
-type cliACPStateStore struct {
-	loadErr       error
-	lastNamespace string
-	lastTaskID    int
-	savedState    domain.ACPExecutionState
-	loadCalled    bool
-	saveCalled    bool
-}
-
-func (s *cliACPStateStore) Load(_ context.Context, namespace string, taskID int) (domain.ACPExecutionState, error) {
-	s.loadCalled = true
-	s.lastNamespace = namespace
-	s.lastTaskID = taskID
-	return domain.ACPExecutionState{}, s.loadErr
-}
-
-func (s *cliACPStateStore) Save(_ context.Context, namespace string, taskID int, state domain.ACPExecutionState) error {
-	s.saveCalled = true
-	s.lastNamespace = namespace
-	s.lastTaskID = taskID
-	s.savedState = state
-	return nil
 }
 
 // =============================================================================
@@ -766,8 +741,6 @@ func TestNewSubstateCommand_Success(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{ID: 1}
 	container := newTestContainer(repo)
-	store := &cliACPStateStore{loadErr: domain.ErrACPStateNotFound}
-	container.ACPStateStore = store
 
 	cmd := newSubstateCommand(container)
 	cmd.SetArgs([]string{"1", "awaiting_permission"})
@@ -775,26 +748,20 @@ func TestNewSubstateCommand_Success(t *testing.T) {
 	err := cmd.Execute()
 
 	assert.NoError(t, err)
-	assert.True(t, store.saveCalled)
-	assert.Equal(t, domain.DefaultNamespace, store.lastNamespace)
-	assert.Equal(t, 1, store.lastTaskID)
-	assert.Equal(t, domain.ACPExecutionAwaitingPermission, store.savedState.ExecutionSubstate)
+	assert.Equal(t, domain.SubstateAwaitingPermission, repo.Tasks[1].ExecutionSubstate)
 }
 
 func TestNewSubstateCommand_InvalidSubstate(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
 	repo.Tasks[1] = &domain.Task{ID: 1}
 	container := newTestContainer(repo)
-	store := &cliACPStateStore{}
-	container.ACPStateStore = store
 
 	cmd := newSubstateCommand(container)
 	cmd.SetArgs([]string{"1", "bad"})
 
 	err := cmd.Execute()
 
-	assert.ErrorIs(t, err, domain.ErrInvalidACPExecutionSubstate)
-	assert.False(t, store.saveCalled)
+	assert.ErrorIs(t, err, domain.ErrInvalidExecutionSubstate)
 }
 
 // =============================================================================

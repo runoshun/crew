@@ -2,14 +2,12 @@
 package app
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
-	acpinfra "github.com/runoshun/git-crew/v2/internal/infra/acp"
 	"github.com/runoshun/git-crew/v2/internal/infra/config"
 	"github.com/runoshun/git-crew/v2/internal/infra/executor"
 	"github.com/runoshun/git-crew/v2/internal/infra/filestore"
@@ -20,9 +18,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/infra/runner"
 	"github.com/runoshun/git-crew/v2/internal/infra/tmux"
 	"github.com/runoshun/git-crew/v2/internal/infra/worktree"
-	"github.com/runoshun/git-crew/v2/internal/tui/acpconsole"
 	"github.com/runoshun/git-crew/v2/internal/usecase"
-	"github.com/runoshun/git-crew/v2/internal/usecase/shared"
 )
 
 // Config holds the application configuration paths.
@@ -53,20 +49,17 @@ func newConfig(gitClient *git.Client) Config {
 // It holds all port implementations and provides factory methods for use cases.
 type Container struct {
 	// Ports (interfaces bound to implementations)
-	Tasks                 domain.TaskRepository
-	StoreInitializer      domain.StoreInitializer
-	Clock                 domain.Clock
-	Git                   domain.Git
-	Worktrees             domain.WorktreeManager
-	Sessions              domain.SessionManager
-	ConfigLoader          domain.ConfigLoader
-	ConfigManager         domain.ConfigManager
-	Logger                domain.Logger
-	Runner                domain.ScriptRunner
-	Executor              domain.CommandExecutor
-	ACPIPCFactory         domain.ACPIPCFactory
-	ACPStateStore         domain.ACPStateStore
-	ACPEventWriterFactory domain.ACPEventWriterFactory
+	Tasks            domain.TaskRepository
+	StoreInitializer domain.StoreInitializer
+	Clock            domain.Clock
+	Git              domain.Git
+	Worktrees        domain.WorktreeManager
+	Sessions         domain.SessionManager
+	ConfigLoader     domain.ConfigLoader
+	ConfigManager    domain.ConfigManager
+	Logger           domain.Logger
+	Runner           domain.ScriptRunner
+	Executor         domain.CommandExecutor
 	// GitHub    domain.GitHub          // TODO: implement in later phase
 
 	// Configuration
@@ -126,29 +119,19 @@ func NewWithWarningWriter(dir string, warningWriter io.Writer) (*Container, erro
 	// Create command executor
 	commandExecutor := executor.NewClient()
 
-	// Create ACP IPC factory
-	acpIPCFactory := acpinfra.NewFileIPCFactory(cfg.CrewDir, logger)
-	acpStateStore := acpinfra.NewFileStateStore(cfg.CrewDir)
-
-	// Create ACP event writer factory
-	acpEventWriterFactory := acpinfra.NewFileEventWriterFactory(cfg.CrewDir)
-
 	return &Container{
-		Tasks:                 taskRepo,
-		StoreInitializer:      storeInit,
-		Clock:                 domain.RealClock{},
-		Git:                   gitClient,
-		Worktrees:             worktreeClient,
-		Sessions:              sessionClient,
-		ConfigLoader:          configLoader,
-		ConfigManager:         configManager,
-		Logger:                logger,
-		Runner:                scriptRunner,
-		Executor:              commandExecutor,
-		ACPIPCFactory:         acpIPCFactory,
-		ACPStateStore:         acpStateStore,
-		ACPEventWriterFactory: acpEventWriterFactory,
-		Config:                cfg,
+		Tasks:            taskRepo,
+		StoreInitializer: storeInit,
+		Clock:            domain.RealClock{},
+		Git:              gitClient,
+		Worktrees:        worktreeClient,
+		Sessions:         sessionClient,
+		ConfigLoader:     configLoader,
+		ConfigManager:    configManager,
+		Logger:           logger,
+		Runner:           scriptRunner,
+		Executor:         commandExecutor,
+		Config:           cfg,
 	}, nil
 }
 
@@ -183,12 +166,12 @@ func (c *Container) CreateTasksFromFileUseCase() *usecase.CreateTasksFromFile {
 
 // ListTasksUseCase returns a new ListTasks use case.
 func (c *Container) ListTasksUseCase() *usecase.ListTasks {
-	return usecase.NewListTasks(c.Tasks, c.Sessions, c.ACPStateStore)
+	return usecase.NewListTasks(c.Tasks, c.Sessions)
 }
 
 // ShowTaskUseCase returns a new ShowTask use case.
 func (c *Container) ShowTaskUseCase() *usecase.ShowTask {
-	return usecase.NewShowTask(c.Tasks, c.ACPStateStore)
+	return usecase.NewShowTask(c.Tasks)
 }
 
 // EditTaskUseCase returns a new EditTask use case.
@@ -198,7 +181,7 @@ func (c *Container) EditTaskUseCase() *usecase.EditTask {
 
 // SetSubstateUseCase returns a new SetSubstate use case.
 func (c *Container) SetSubstateUseCase() *usecase.SetSubstate {
-	return usecase.NewSetSubstate(c.Tasks, c.ACPStateStore)
+	return usecase.NewSetSubstate(c.Tasks)
 }
 
 // DeleteTaskUseCase returns a new DeleteTask use case.
@@ -306,126 +289,6 @@ func (c *Container) PruneTasksUseCase() *usecase.PruneTasks {
 // ExecCommandUseCase returns a new ExecCommand use case.
 func (c *Container) ExecCommandUseCase() *usecase.ExecCommand {
 	return usecase.NewExecCommand(c.Tasks, c.Worktrees)
-}
-
-// ACPControlUseCase returns a new ACPControl use case.
-func (c *Container) ACPControlUseCase() *usecase.ACPControl {
-	return usecase.NewACPControl(
-		c.Tasks,
-		c.ConfigLoader,
-		c.Git,
-		c.ACPIPCFactory,
-		c.ACPStateStore,
-	)
-}
-
-// ACPRunUseCase returns a new ACPRun use case.
-func (c *Container) ACPRunUseCase(stdout, stderr io.Writer) *usecase.ACPRun {
-	return usecase.NewACPRun(
-		c.Tasks,
-		c.Worktrees,
-		c.ConfigLoader,
-		c.Git,
-		c.Runner,
-		c.ACPIPCFactory,
-		c.ACPStateStore,
-		c.ACPEventWriterFactory,
-		c.Clock,
-		c.Config.RepoRoot,
-		stdout,
-		stderr,
-	)
-}
-
-// ACPStartUseCase returns a new ACPStart use case.
-func (c *Container) ACPStartUseCase() *usecase.ACPStart {
-	return usecase.NewACPStart(
-		c.Tasks,
-		c.Sessions,
-		c.Worktrees,
-		c.ConfigLoader,
-		c.Git,
-		c.Runner,
-		c.Config.CrewDir,
-		c.Config.RepoRoot,
-	)
-}
-
-// ACPAttachUseCase returns a new ACPAttach use case.
-func (c *Container) ACPAttachUseCase() *usecase.ACPAttach {
-	return usecase.NewACPAttach(c.Tasks, c.Sessions)
-}
-
-// ACPPeekUseCase returns a new ACPPeek use case.
-func (c *Container) ACPPeekUseCase() *usecase.ACPPeek {
-	return usecase.NewACPPeek(c.Tasks, c.Sessions)
-}
-
-// ACPLogUseCase returns a new ACPLog use case.
-func (c *Container) ACPLogUseCase() *usecase.ACPLog {
-	return usecase.NewACPLog(
-		c.Tasks,
-		c.ConfigLoader,
-		c.Git,
-		func(namespace string, taskID int) domain.ACPEventReader {
-			return acpinfra.NewFileEventReader(c.Config.CrewDir, namespace, taskID)
-		},
-	)
-}
-
-// RunACPConsole starts the ACP console TUI for a task.
-func (c *Container) RunACPConsole(ctx context.Context, taskID int) error {
-	// Get namespace from config
-	cfg, err := c.ConfigLoader.Load()
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-	namespace := shared.ResolveACPNamespace(cfg, c.Git)
-
-	consoleCfg := acpconsole.Config{
-		TaskID:      taskID,
-		Namespace:   namespace,
-		EventReader: acpinfra.NewFileEventReader(c.Config.CrewDir, namespace, taskID),
-		StateLoader: func() (domain.ACPExecutionState, error) {
-			return c.ACPStateStore.Load(ctx, namespace, taskID)
-		},
-		SendPrompt: func(text string) error {
-			uc := c.ACPControlUseCase()
-			_, err := uc.Execute(ctx, usecase.ACPControlInput{
-				TaskID:      taskID,
-				CommandType: domain.ACPCommandPrompt,
-				Text:        text,
-			})
-			return err
-		},
-		SendPerm: func(optionID string) error {
-			uc := c.ACPControlUseCase()
-			_, err := uc.Execute(ctx, usecase.ACPControlInput{
-				TaskID:      taskID,
-				CommandType: domain.ACPCommandPermission,
-				OptionID:    optionID,
-			})
-			return err
-		},
-		SendCancel: func() error {
-			uc := c.ACPControlUseCase()
-			_, err := uc.Execute(ctx, usecase.ACPControlInput{
-				TaskID:      taskID,
-				CommandType: domain.ACPCommandCancel,
-			})
-			return err
-		},
-		SendStop: func() error {
-			uc := c.ACPControlUseCase()
-			_, err := uc.Execute(ctx, usecase.ACPControlInput{
-				TaskID:      taskID,
-				CommandType: domain.ACPCommandStop,
-			})
-			return err
-		},
-	}
-
-	return acpconsole.Run(consoleCfg)
 }
 
 // StartManagerUseCase returns a new StartManager use case.
