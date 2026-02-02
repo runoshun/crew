@@ -992,16 +992,6 @@ func (m *Model) handleDetailPanelFocused(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.Type == tea.KeyTab:
 		return m.switchPanelContent(m.panelContent.Next())
 
-	// 1, 2, 3: switch panel content directly
-	case msg.String() == "1":
-		return m.switchPanelContent(PanelContentDetail)
-
-	case msg.String() == "2":
-		return m.switchPanelContent(PanelContentDiff)
-
-	case msg.String() == "3":
-		return m.switchPanelContent(PanelContentPeek)
-
 	// Arrow keys: 1 line scroll
 	case msg.String() == "up":
 		m.detailPanelViewport.ScrollUp(1)

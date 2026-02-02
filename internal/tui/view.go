@@ -1170,13 +1170,12 @@ func (m *Model) viewPanelTabs(_ int) string {
 	activeTabStyle := lipgloss.NewStyle().Foreground(Colors.Primary).Bold(true)
 
 	tabs := []struct {
-		key     string
 		label   string
 		content PanelContent
 	}{
-		{"1", "Detail", PanelContentDetail},
-		{"2", "Diff", PanelContentDiff},
-		{"3", "Peek", PanelContentPeek},
+		{"Detail", PanelContentDetail},
+		{"Diff", PanelContentDiff},
+		{"Peek", PanelContentPeek},
 	}
 
 	var parts []string
@@ -1185,7 +1184,7 @@ func (m *Model) viewPanelTabs(_ int) string {
 		if m.panelContent == tab.content {
 			style = activeTabStyle
 		}
-		part := style.Render(fmt.Sprintf("[%s] %s", tab.key, tab.label))
+		part := style.Render(tab.label)
 		parts = append(parts, part)
 		if i < len(tabs)-1 {
 			parts = append(parts, tabStyle.Render("  "))
