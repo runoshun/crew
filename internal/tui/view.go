@@ -173,10 +173,16 @@ func (m *Model) View() string {
 	}
 
 	if dialog != "" {
-
-		return m.styles.App.Render(m.overlayDialog(base, dialog))
+		result := m.overlayDialog(base, dialog)
+		if m.embedded {
+			return result
+		}
+		return m.styles.App.Render(result)
 	}
 
+	if m.embedded {
+		return base
+	}
 	return m.styles.App.Render(base)
 }
 

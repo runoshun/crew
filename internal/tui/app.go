@@ -123,6 +123,7 @@ type Model struct {
 	autoRefresh             bool
 	selectedTaskHasWorktree bool
 	hideFooter              bool // Hide footer (used when embedded in workspace)
+	embedded                bool // Embedded mode (skip App padding, used in workspace)
 }
 
 // New creates a new TUI Model with the given container.
@@ -224,6 +225,11 @@ func (m *Model) DisableAutoRefresh() {
 // SetHideFooter sets whether to hide the footer (used when embedded in workspace).
 func (m *Model) SetHideFooter(hide bool) {
 	m.hideFooter = hide
+}
+
+// SetEmbedded sets whether the TUI is embedded in another view (skips App padding).
+func (m *Model) SetEmbedded(embedded bool) {
+	m.embedded = embedded
 }
 
 // UsesCursorKeys reports whether left/right should be forwarded to inputs.

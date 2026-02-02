@@ -533,6 +533,7 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 		model.DisableAutoRefresh()
 		model.UseHLPagingKeys()
 		model.SetHideFooter(true)
+		model.SetEmbedded(true)
 		m.models[m.activeRepo] = model
 		initCmd := m.wrapRepoCmd(m.activeRepo, model.Init())
 		sizeCmd := m.updateModelSize(m.activeRepo)
@@ -806,16 +807,14 @@ func (m *Model) viewLeftPane() string {
 
 	b.WriteString(m.viewRepoList())
 
-	height := m.paneContentHeight()
-	return lipgloss.NewStyle().Width(m.leftContentWidth()).Height(height).Render(b.String())
+	return lipgloss.NewStyle().Width(m.leftContentWidth()).Render(b.String())
 }
 
 func (m *Model) viewRightPane() string {
 	width := m.rightContentWidth()
-	height := m.paneContentHeight()
 	content := m.viewRightPaneContent()
 
-	paneStyle := lipgloss.NewStyle().Width(width).Height(height)
+	paneStyle := lipgloss.NewStyle().Width(width)
 	if m.isSplitView() {
 		borderColor := tui.Colors.GroupLine
 		if !m.leftFocused {
@@ -1058,10 +1057,11 @@ func (m *Model) getStatusInfo() tui.StatusLineInfo {
 	return model.GetStatusInfo()
 }
 
-// paneContentHeight returns the height available for pane content (excluding status line).
+// paneContentHeight returns the height available for pane content.
+// This accounts for App style padding (top: 1, bottom: 1) and status line (1).
 func (m *Model) paneContentHeight() int {
-	// height - 1 for status line
-	h := m.height - 1
+	// height - 2 for App padding (top + bottom) - 1 for status line
+	h := m.height - 3
 	if h < 0 {
 		h = 0
 	}
