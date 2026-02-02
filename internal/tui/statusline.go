@@ -117,7 +117,12 @@ func (m *Model) GetStatusInfo() StatusLineInfo {
 
 	if m.detailFocused {
 		info.FocusPane = FocusPaneTaskDetail
-		// No key hints for detail view - shown in the panel itself
+		info.KeyHints = []KeyHint{
+			{Key: "j/k", Desc: "scroll"},
+			{Key: "tab", Desc: "next"},
+			{Key: "esc", Desc: "back"},
+			{Key: "q", Desc: "quit"},
+		}
 		return info
 	}
 
