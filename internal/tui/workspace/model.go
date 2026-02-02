@@ -358,6 +358,12 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "r":
 		m.loading = true
 		return m, m.loadRepos()
+
+	case msg.String() == "M":
+		// Forward to active model to start/attach manager session for selected repo
+		// Temporarily switch focus so the internal model handles dialog keys
+		m.leftFocused = false
+		return m.forwardToActiveModel(msg)
 	}
 
 	return m, nil
