@@ -288,13 +288,13 @@ func (m *Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleNormalMode handles keys in normal mode.
 func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "q" || msg.String() == "ctrl+c" {
+		return m, tea.Quit
+	}
 	if !m.leftFocused {
 		return m.forwardToActiveModel(msg)
 	}
 	switch {
-	case msg.String() == "q" || msg.String() == "ctrl+c":
-		return m, tea.Quit
-
 	case msg.String() == "up" || msg.String() == "k":
 		if m.cursor > 0 {
 			m.cursor--
