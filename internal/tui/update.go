@@ -335,13 +335,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.hasWorktree(task) {
 			return m, nil
 		}
-		m.reviewTaskID = task.ID
-		m.reviewResult = ""
-		m.reviewActionCursor = 0
-		m.reviewMessageReturnMode = ModeNormal
-		m.mode = ModeReviewMessage
-		m.reviewMessageInput.Reset()
-		m.reviewMessageInput.Focus()
+		m.enterRequestChanges(task.ID, ModeNormal)
 		return m, nil
 
 	case key.Matches(msg, m.keys.New):
@@ -1093,10 +1087,7 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Execute selected action
 		switch m.reviewActionCursor {
 		case 0: // Request Changes - enter message input mode
-			m.reviewMessageReturnMode = ModeReviewAction
-			m.mode = ModeReviewMessage
-			m.reviewMessageInput.Reset()
-			m.reviewMessageInput.Focus()
+			m.enterRequestChanges(m.reviewTaskID, ModeReviewAction)
 			return m, nil
 		case 1: // NotifyWorker without restart (just send comment)
 			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, false)
@@ -1116,6 +1107,16 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *Model) enterRequestChanges(taskID int, returnMode Mode) {
+	m.reviewTaskID = taskID
+	m.reviewResult = ""
+	m.reviewActionCursor = 0
+	m.reviewMessageReturnMode = returnMode
+	m.mode = ModeReviewMessage
+	m.reviewMessageInput.Reset()
+	m.reviewMessageInput.Focus()
 }
 
 // defaultReviewMessage is the default message when the user leaves the input empty.

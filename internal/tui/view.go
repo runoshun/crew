@@ -269,14 +269,14 @@ func (m *Model) viewHeader() string {
 		}
 		switch mode {
 		case domain.ReviewModeAutoFix:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Primary).Render("[R:fix]") + " · "
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Primary).Render("[review:fix]") + " · "
 		case domain.ReviewModeManual:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Warning).Render("[R:man]") + " · "
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Warning).Render("[review:man]") + " · "
 		case domain.ReviewModeAuto:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[R:auto]") + " · "
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[review:auto]") + " · "
 		}
 	} else {
-		reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[R:auto]") + " · "
+		reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[review:auto]") + " · "
 	}
 
 	// Add filter indicator
@@ -1393,7 +1393,7 @@ func (m *Model) viewReviewMessageDialog() string {
 
 	hint := ds.renderLine(
 		ds.key.Render("enter") + ds.text.Render(" send  ") +
-			ds.key.Render("esc") + ds.text.Render(" back"))
+			ds.key.Render("esc") + ds.text.Render(" cancel"))
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title, ds.emptyLine(),

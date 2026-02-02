@@ -724,16 +724,10 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 		{
 			ActionID: "request_changes",
 			Label:    "Request Changes",
-			Desc:     "Send request changes message",
+			Desc:     "Send request changes (back to in_progress)",
 			Key:      "R",
 			Action: func() (tea.Model, tea.Cmd) {
-				m.reviewTaskID = task.ID
-				m.reviewResult = ""
-				m.reviewActionCursor = 0
-				m.reviewMessageReturnMode = ModeNormal
-				m.mode = ModeReviewMessage
-				m.reviewMessageInput.Reset()
-				m.reviewMessageInput.Focus()
+				m.enterRequestChanges(task.ID, ModeNormal)
 				return m, nil
 			},
 			IsAvailable: func() bool {
