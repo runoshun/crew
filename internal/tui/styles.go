@@ -179,8 +179,7 @@ func DefaultStyles() Styles {
 			Foreground(Colors.Primary).
 			Border(lipgloss.NormalBorder(), false, false, true, false).
 			BorderForeground(Colors.GroupLine).
-			Padding(0, 1).
-			MarginBottom(1),
+			Padding(0, 1),
 
 		HeaderText: lipgloss.NewStyle().
 			Bold(true).
