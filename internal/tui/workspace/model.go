@@ -639,7 +639,7 @@ func (m *Model) wrapRepoCmd(path string, cmd tea.Cmd) tea.Cmd {
 		case RepoMsg:
 			return typed
 		default:
-			if isExecMsg(msg) {
+			if isBubbleteaInternalMsg(msg) {
 				return msg
 			}
 			return RepoMsg{Path: path, Msg: msg}
@@ -647,7 +647,7 @@ func (m *Model) wrapRepoCmd(path string, cmd tea.Cmd) tea.Cmd {
 	}
 }
 
-func isExecMsg(msg tea.Msg) bool {
+func isBubbleteaInternalMsg(msg tea.Msg) bool {
 	if msg == nil {
 		return false
 	}
@@ -658,7 +658,15 @@ func isExecMsg(msg tea.Msg) bool {
 	if typeOf.Kind() == reflect.Ptr {
 		typeOf = typeOf.Elem()
 	}
-	return typeOf.PkgPath() == "github.com/charmbracelet/bubbletea" && typeOf.Name() == "execMsg"
+	if typeOf.PkgPath() != "github.com/charmbracelet/bubbletea" {
+		return false
+	}
+	name := typeOf.Name()
+	if name == "" {
+		return false
+	}
+	first := name[0]
+	return first >= 'a' && first <= 'z'
 }
 
 // addRepo returns a command that adds a repo.

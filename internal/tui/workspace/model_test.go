@@ -128,8 +128,15 @@ func TestWrapRepoCmdPassesThroughExecMsg(t *testing.T) {
 	if typeOf.Kind() == reflect.Ptr {
 		typeOf = typeOf.Elem()
 	}
-	if typeOf.PkgPath() != "github.com/charmbracelet/bubbletea" || typeOf.Name() != "execMsg" {
-		t.Fatalf("expected execMsg from bubbletea, got %s.%s", typeOf.PkgPath(), typeOf.Name())
+	if typeOf.PkgPath() != "github.com/charmbracelet/bubbletea" {
+		t.Fatalf("expected bubbletea message, got %s.%s", typeOf.PkgPath(), typeOf.Name())
+	}
+	name := typeOf.Name()
+	if name == "" {
+		t.Fatalf("expected named bubbletea message, got empty name")
+	}
+	if name[0] < 'a' || name[0] > 'z' {
+		t.Fatalf("expected unexported bubbletea message, got %s", name)
 	}
 }
 
