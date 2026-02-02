@@ -2,6 +2,8 @@
 
 ## IMPORTANT: Follow This Workflow
 
+NOTE: Default flow is to use `crew complete`. Use `crew comment` only for manual reviews.
+
 1. **Identify target**: Decide what you are reviewing (task ID, PR, branch, or files)
 2. **Inspect changes**: Use `crew show` / `crew diff` to understand the full context
 3. **Run CI**: Verify tests/lint/build in the correct context

@@ -629,6 +629,7 @@ func (m *Model) wrapRepoCmd(path string, cmd tea.Cmd) tea.Cmd {
 		}
 		switch typed := msg.(type) {
 		case tea.BatchMsg:
+			// BatchMsg is the only composite message we expect from tea.Batch.
 			wrapped := make(tea.BatchMsg, 0, len(typed))
 			for _, c := range typed {
 				if wrappedCmd := m.wrapRepoCmd(path, c); wrappedCmd != nil {
@@ -854,7 +855,11 @@ func (m *Model) viewRightPaneContent() string {
 
 func (m *Model) withRightPaneHint(content string) string {
 	if !m.isSplitView() && !m.leftFocused {
-		hint := m.styles.Muted.Render("left: back to list")
+		backKey := "left"
+		if m.activeModelUsesCursorKeys() {
+			backKey = "ctrl+left"
+		}
+		hint := m.styles.Muted.Render(backKey + ": back to list")
 		return hint + "\n" + content
 	}
 	return content
@@ -1018,11 +1023,20 @@ func (m *Model) viewFooter() string {
 	keyStyle := m.styles.FooterKey
 	contentWidth := m.leftContentWidth()
 
+	paneHint := ""
+	if m.leftFocused {
+		paneHint = keyStyle.Render("tab/right") + " pane"
+	} else {
+		backKey := "left"
+		if m.activeModelUsesCursorKeys() {
+			backKey = "ctrl+left"
+		}
+		paneHint = keyStyle.Render(backKey) + " back"
+	}
+
 	content := keyStyle.Render("j/k") + " nav  " +
 		keyStyle.Render("enter") + " focus  " +
-		keyStyle.Render("tab") + " (left)  " +
-		keyStyle.Render("left/right") + " pane  " +
-		keyStyle.Render("ctrl+left/right") + " pane  " +
+		paneHint + "  " +
 		keyStyle.Render("a") + " add  " +
 		keyStyle.Render("d") + " remove  " +
 		keyStyle.Render("r") + " refresh  " +
@@ -1033,9 +1047,6 @@ func (m *Model) viewFooter() string {
 		focusLabel = "list"
 	}
 	content = content + "  " + m.styles.Muted.Render("focus:"+focusLabel)
-	if !m.leftFocused && m.activeModelUsesCursorKeys() {
-		content = content + "  " + m.styles.Muted.Render("input: ctrl+left")
-	}
 
 	return m.styles.Footer.Width(contentWidth).Render(content)
 }
