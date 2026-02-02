@@ -1061,8 +1061,7 @@ func (m *Model) handleReviewResultMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Escape):
 		m.mode = ModeNormal
-		m.reviewResult = ""
-		m.reviewTaskID = 0
+		m.resetReviewState()
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
@@ -1159,18 +1158,20 @@ func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Escape):
 		m.reviewMessageInput.Blur()
-		if m.reviewMessageReturnMode == ModeReviewAction {
-			m.mode = ModeReviewAction
-			m.reviewMessageReturnMode = ModeNormal
-			return m, nil
-		}
-		if m.reviewMessageReturnMode == ModeActionMenu {
+		returnMode := m.reviewMessageReturnMode
+		m.reviewMessageReturnMode = ModeNormal
+		if returnMode != ModeReviewAction {
 			m.resetReviewState()
+		}
+		if returnMode == ModeActionMenu {
 			m.mode = ModeNormal
 			return m.openActionMenu()
 		}
+		if returnMode == ModeReviewAction {
+			m.mode = ModeReviewAction
+			return m, nil
+		}
 		m.mode = ModeNormal
-		m.resetReviewState()
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
