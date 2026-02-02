@@ -129,6 +129,7 @@ type Model struct {
 	autoRefresh             bool
 	selectedTaskHasWorktree bool
 	hideFooter              bool // Hide footer (used when embedded in workspace)
+	hideDetailPanel         bool // Hide detail panel (used when embedded in workspace 1-pane mode)
 	embedded                bool // Embedded mode (skip App padding, used in workspace)
 	focused                 bool // Whether this TUI has focus (used when embedded in workspace)
 	panelContentLoading     bool // Whether panel content is being loaded
@@ -233,6 +234,11 @@ func (m *Model) DisableAutoRefresh() {
 // SetHideFooter sets whether to hide the footer (used when embedded in workspace).
 func (m *Model) SetHideFooter(hide bool) {
 	m.hideFooter = hide
+}
+
+// SetHideDetailPanel sets whether to hide the detail panel (used when embedded in workspace 1-pane mode).
+func (m *Model) SetHideDetailPanel(hide bool) {
+	m.hideDetailPanel = hide
 }
 
 // SetEmbedded sets whether the TUI is embedded in another view (skips App padding).

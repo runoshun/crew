@@ -29,10 +29,9 @@ const (
 )
 
 const (
-	appPadding    = 4
-	minSplitWidth = 120
-	minPaneWidth  = 24
-	maxLeftWidth  = 30
+	appPadding   = 4
+	minPaneWidth = 24
+	maxLeftWidth = 30
 )
 
 // Model is the workspace TUI model.
@@ -551,6 +550,11 @@ func (m *Model) updateModelSize(path string) tea.Cmd {
 	if path == "" {
 		return nil
 	}
+	// Update hideDetailPanel based on current view mode
+	// In 1-pane mode, hide detail panel to show only task list
+	if model, ok := m.models[path]; ok {
+		model.SetHideDetailPanel(!m.isSplitView())
+	}
 	msg := tea.WindowSizeMsg{Width: m.rightModelWidth(), Height: m.paneContentHeight()}
 	return m.updateModel(path, msg)
 }
@@ -700,7 +704,7 @@ func (m *Model) contentWidth() int {
 
 func (m *Model) updateLayout() {
 	contentWidth := m.contentWidth()
-	if m.width < minSplitWidth {
+	if m.width < tui.MinTerminalWidthFor3Pane {
 		m.leftWidth = contentWidth
 		m.rightWidth = contentWidth
 		return
@@ -726,14 +730,14 @@ func (m *Model) updateLayout() {
 }
 
 func (m *Model) leftContentWidth() int {
-	if m.width >= minSplitWidth && m.leftWidth > 0 {
+	if m.isSplitView() && m.leftWidth > 0 {
 		return m.leftWidth
 	}
 	return m.contentWidth()
 }
 
 func (m *Model) rightContentWidth() int {
-	if m.width >= minSplitWidth && m.rightWidth > 0 {
+	if m.isSplitView() && m.rightWidth > 0 {
 		return m.rightWidth
 	}
 	return m.contentWidth()
@@ -751,14 +755,8 @@ func (m *Model) rightModelWidth() int {
 }
 
 func (m *Model) isSplitView() bool {
-	if m.width < minSplitWidth {
-		return false
-	}
-	// Also check if right pane can show detail panel (3-pane view)
-	// If not, use single pane view instead of 2-pane intermediate state
-	// Use rightContentWidth() - 1 to account for border (same as rightModelWidth logic)
-	rightWidth := m.rightContentWidth() - 1
-	return rightWidth >= tui.MinWidthForDetailPanel
+	// Use the single source of truth for 3-pane layout threshold
+	return m.width >= tui.MinTerminalWidthFor3Pane
 }
 
 // View renders the TUI.

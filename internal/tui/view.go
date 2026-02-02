@@ -20,10 +20,15 @@ var ansiResetPattern = regexp.MustCompile(`\x1b\[(0?m|49m)`)
 var ansiTrailingResetPattern = regexp.MustCompile(`\x1b\[0?m$`)
 
 const (
-	MinWidthForDetailPanel = 120 // Same as workspace minSplitWidth for consistency
-	MinDetailPanelWidth    = 40
-	GutterWidth            = 1
-	appPadding             = 4
+	// MinTerminalWidthFor3Pane is the minimum terminal width for 3-pane view.
+	// This is the single source of truth for the layout threshold.
+	// - Below this: 1-pane view (workspace / tasks / detail switch between full-width)
+	// - At or above: 3-pane view (workspace + tasks + detail shown together)
+	MinTerminalWidthFor3Pane = 120
+
+	MinDetailPanelWidth = 40
+	GutterWidth         = 1
+	appPadding          = 4
 )
 
 // dialogStyles holds common styles for dialog rendering.
@@ -887,20 +892,31 @@ func (m *Model) viewHelp() string {
 }
 
 func (m *Model) showDetailPanel() bool {
-	// Always show detail panel when focused, even on narrow screens
+	// Always show detail panel when focused (full screen in 1-pane mode)
 	if m.detailFocused {
 		return true
 	}
-	return m.width >= MinWidthForDetailPanel
+	// Embedded mode: hideDetailPanel controls visibility (set by workspace)
+	if m.embedded {
+		return !m.hideDetailPanel
+	}
+	// Standalone tui: use terminal width threshold directly
+	// (m.width is content width = terminal width - appPadding, so add it back)
+	return m.width+appPadding >= MinTerminalWidthFor3Pane
 }
 
 // showListPane returns whether the list pane should be shown.
-// On narrow screens with detail focused, hide the list entirely.
+// On narrow screens or 1-pane mode with detail focused, hide the list entirely.
 func (m *Model) showListPane() bool {
-	if m.detailFocused && m.width < MinWidthForDetailPanel {
-		return false
+	if !m.detailFocused {
+		return true
 	}
-	return true
+	// Embedded mode: hideDetailPanel indicates 1-pane mode
+	if m.embedded {
+		return !m.hideDetailPanel
+	}
+	// Standalone tui: check terminal width
+	return m.width+appPadding >= MinTerminalWidthFor3Pane
 }
 
 func (m *Model) viewStatusPicker() string {
@@ -1015,8 +1031,8 @@ func (m *Model) detailPanelWidth() int {
 		return 0
 	}
 
-	// On narrow screen + focused: use full width (list is hidden)
-	if m.detailFocused && m.width < MinWidthForDetailPanel {
+	// On 1-pane mode + focused: use full width (list is hidden)
+	if m.detailFocused && !m.showListPane() {
 		return m.contentWidth()
 	}
 
