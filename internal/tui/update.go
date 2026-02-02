@@ -88,6 +88,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.Err
 		m.mode = ModeNormal
 		m.confirmAction = ConfirmNone
+		m.reviewTaskID = 0
+		m.reviewResult = ""
+		m.reviewActionCursor = 0
+		m.reviewMessageReturnMode = ModeNormal
 		return m, nil
 
 	case MsgClearError:
@@ -275,6 +279,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		newTask := m.SelectedTask()
 		// If task changed and we're showing detail panel, load comments
 		if prevTask != newTask && newTask != nil {
+			m.updateSelectedTaskWorktree()
 			if m.showDetailPanel() {
 				// Update viewport content immediately, comments will update async
 				m.updateDetailPanelViewport()

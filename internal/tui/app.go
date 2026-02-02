@@ -116,6 +116,7 @@ type Model struct {
 	showAll                 bool
 	detailFocused           bool // Right pane is focused for scrolling
 	blockFocusUnblock       bool // True when Unblock button is focused in Block dialog
+	selectedTaskHasWorktree bool
 }
 
 // New creates a new TUI Model with the given container.
@@ -292,6 +293,10 @@ func (m *Model) hasWorktree(task *domain.Task) bool {
 	if task == nil {
 		return false
 	}
+	if m.container == nil || m.container.Worktrees == nil {
+		m.err = fmt.Errorf("worktree manager not initialized")
+		return false
+	}
 	branch := domain.BranchName(task.ID, task.Issue)
 	exists, err := m.container.Worktrees.Exists(branch)
 	if err != nil {
@@ -309,12 +314,24 @@ func (m *Model) hasWorktreeQuiet(task *domain.Task) bool {
 	if task == nil {
 		return false
 	}
+	if m.container == nil || m.container.Worktrees == nil {
+		return false
+	}
 	branch := domain.BranchName(task.ID, task.Issue)
 	exists, err := m.container.Worktrees.Exists(branch)
 	if err != nil {
 		return false
 	}
 	return exists
+}
+
+func (m *Model) updateSelectedTaskWorktree() {
+	task := m.SelectedTask()
+	if task == nil {
+		m.selectedTaskHasWorktree = false
+		return
+	}
+	m.selectedTaskHasWorktree = m.hasWorktreeQuiet(task)
 }
 
 func sessionNameForLog(taskID int, isReview bool) string {
@@ -363,6 +380,7 @@ func (m *Model) setTaskItems(tasks []*domain.Task) {
 		items = append(items, taskItem{task: task, commentCount: count})
 	}
 	m.taskList.SetItems(items)
+	m.updateSelectedTaskWorktree()
 }
 
 // updateDetailPanelViewport updates the viewport size and content for the right pane.

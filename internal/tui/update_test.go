@@ -291,6 +291,25 @@ func TestUpdate_MsgReviewActionCompleted(t *testing.T) {
 	assert.Equal(t, 0, result.reviewActionCursor)
 }
 
+func TestUpdate_MsgError_ClearsReviewState(t *testing.T) {
+	m := &Model{
+		mode:                    ModeReviewMessage,
+		reviewTaskID:            42,
+		reviewResult:            "Some review",
+		reviewActionCursor:      1,
+		reviewMessageReturnMode: ModeReviewAction,
+	}
+
+	updatedModel, _ := m.Update(MsgError{Err: assert.AnError})
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Equal(t, 0, result.reviewTaskID)
+	assert.Equal(t, "", result.reviewResult)
+	assert.Equal(t, 0, result.reviewActionCursor)
+	assert.Equal(t, ModeNormal, result.reviewMessageReturnMode)
+}
+
 func TestUpdate_MsgPrepareEditComment(t *testing.T) {
 	eci := textinput.New()
 
