@@ -43,10 +43,24 @@ func (uc *EditComment) Execute(_ context.Context, in EditCommentInput) error {
 		return err
 	}
 
+	// Load existing comments to preserve metadata
+	comments, err := uc.tasks.GetComments(in.TaskID)
+	if err != nil {
+		return fmt.Errorf("get comments: %w", err)
+	}
+	if in.Index < 0 || in.Index >= len(comments) {
+		return domain.ErrCommentNotFound
+	}
+	original := comments[in.Index]
+
 	// Create updated comment
 	comment := domain.Comment{
-		Text: message,
-		Time: uc.clock.Now(),
+		Text:     message,
+		Time:     uc.clock.Now(),
+		Author:   original.Author,
+		Type:     original.Type,
+		Tags:     original.Tags,
+		Metadata: original.Metadata,
 	}
 
 	// Update comment

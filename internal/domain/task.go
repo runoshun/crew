@@ -4,6 +4,7 @@ package domain
 import (
 	"errors"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -114,6 +115,21 @@ func (t *Task) ToMarkdownWithComments(comments []Comment) string {
 		result += "\n\n---\n"
 		result += "# Comment: " + intToStr(i) + "\n"
 		result += "# Author: " + comment.Author + "\n"
+		if comment.Type != CommentTypeGeneral {
+			result += "# Type: " + string(comment.Type) + "\n"
+		}
+		if len(comment.Tags) > 0 {
+			tags := normalizeCommentTags(comment.Tags)
+			if len(tags) > 0 {
+				result += "# Tags: " + strings.Join(tags, ", ") + "\n"
+			}
+		}
+		if len(comment.Metadata) > 0 {
+			metadata := formatCommentMetadata(comment.Metadata)
+			if metadata != "" {
+				result += "# Metadata: " + metadata + "\n"
+			}
+		}
 		result += "# Time: " + comment.Time.Format(time.RFC3339) + "\n"
 		result += "\n" + comment.Text
 	}
@@ -360,12 +376,94 @@ func trimSpace(s string) string {
 	return s[start:end]
 }
 
+// CommentType represents the type/category of a comment.
+type CommentType string
+
+const (
+	CommentTypeGeneral    CommentType = ""           // Default (legacy) comment
+	CommentTypeReport     CommentType = "report"     // Work report
+	CommentTypeMessage    CommentType = "message"    // Message/notification
+	CommentTypeSuggestion CommentType = "suggestion" // Improvement suggestion
+	CommentTypeFriction   CommentType = "friction"   // Friction/blocker
+)
+
+// IsValid returns true if the CommentType is recognized.
+func (t CommentType) IsValid() bool {
+	switch t {
+	case CommentTypeGeneral, CommentTypeReport, CommentTypeMessage, CommentTypeSuggestion, CommentTypeFriction:
+		return true
+	default:
+		return false
+	}
+}
+
 // Comment represents a note attached to a task.
 // Fields are ordered to minimize memory padding.
 type Comment struct {
-	Time   time.Time `json:"time"`             // Creation time
-	Text   string    `json:"text"`             // Comment text
-	Author string    `json:"author,omitempty"` // "manager", "worker", or empty
+	Text     string            `json:"text"`               // Comment text
+	Author   string            `json:"author,omitempty"`   // "manager", "worker", or empty
+	Type     CommentType       `json:"type,omitempty"`     // Comment type/category
+	Metadata map[string]string `json:"metadata,omitempty"` // Additional metadata
+	Time     time.Time         `json:"time"`               // Creation time
+	Tags     []string          `json:"tags,omitempty"`     // Tags for filtering
+}
+
+func normalizeCommentTags(tags []string) []string {
+	if len(tags) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		trimmed := trimSpace(tag)
+		if trimmed == "" {
+			continue
+		}
+		set[trimmed] = true
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(set))
+	for tag := range set {
+		normalized = append(normalized, tag)
+	}
+	slices.Sort(normalized)
+	return normalized
+}
+
+func formatCommentMetadata(metadata map[string]string) string {
+	normalized := normalizeCommentMetadata(metadata)
+	if len(normalized) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(normalized))
+	for key := range normalized {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, key+"="+normalized[key])
+	}
+	return strings.Join(parts, ", ")
+}
+
+func normalizeCommentMetadata(metadata map[string]string) map[string]string {
+	if len(metadata) == 0 {
+		return nil
+	}
+	normalized := make(map[string]string, len(metadata))
+	for key, value := range metadata {
+		trimmedKey := trimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		normalized[trimmedKey] = trimSpace(value)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
 }
 
 // ParsedComment represents a comment parsed from editor markdown format.
@@ -648,17 +746,44 @@ func parseCommentBlock(block string) (ParsedComment, error) {
 		return ParsedComment{}, ErrInvalidCommentMeta
 	}
 
-	// Parse "# Time: <time>" and validate RFC3339 format
-	if len(lines[3]) < 8 || lines[3][:7] != "# Time:" {
-		return ParsedComment{}, ErrInvalidCommentMeta
+	// Parse optional metadata lines until "# Time:" is found
+	metaStartIdx := 3
+	metaEndIdx := -1
+	for i := metaStartIdx; i < len(lines); i++ {
+		line := lines[i]
+		switch {
+		case strings.HasPrefix(line, "# Time:"):
+			timeStr := trimSpace(line[7:])
+			if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
+				return ParsedComment{}, ErrInvalidCommentMeta
+			}
+			metaEndIdx = i
+		case strings.HasPrefix(line, "# Type:"):
+			if _, err := parseCommentTypeValue(line[7:]); err != nil {
+				return ParsedComment{}, ErrInvalidCommentMeta
+			}
+		case strings.HasPrefix(line, "# Tags:"):
+			_ = parseCommentTagsValue(line[7:])
+		case strings.HasPrefix(line, "# Metadata:"):
+			if _, err := parseCommentMetadataValue(line[11:]); err != nil {
+				return ParsedComment{}, ErrInvalidCommentMeta
+			}
+		case line == "":
+			// Empty line before time is invalid
+			return ParsedComment{}, ErrInvalidCommentMeta
+		default:
+			return ParsedComment{}, ErrInvalidCommentMeta
+		}
+		if metaEndIdx >= 0 {
+			break
+		}
 	}
-	timeStr := trimSpace(lines[3][7:])
-	if _, err := time.Parse(time.RFC3339, timeStr); err != nil {
+	if metaEndIdx < 0 {
 		return ParsedComment{}, ErrInvalidCommentMeta
 	}
 
 	// Find text (after empty line following meta)
-	textStartIdx := 4
+	textStartIdx := metaEndIdx + 1
 	// Skip any empty lines
 	for textStartIdx < len(lines) && lines[textStartIdx] == "" {
 		textStartIdx++
@@ -680,6 +805,55 @@ func parseCommentBlock(block string) (ParsedComment, error) {
 		Index: index,
 		Text:  text,
 	}, nil
+}
+
+func parseCommentTypeValue(value string) (CommentType, error) {
+	trimmed := trimSpace(value)
+	if trimmed == "" {
+		return CommentTypeGeneral, nil
+	}
+	commentType := CommentType(trimmed)
+	if !commentType.IsValid() {
+		return "", ErrInvalidCommentMeta
+	}
+	return commentType, nil
+}
+
+func parseCommentTagsValue(value string) []string {
+	trimmed := trimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	parts := splitByComma(trimmed)
+	return normalizeCommentTags(parts)
+}
+
+func parseCommentMetadataValue(value string) (map[string]string, error) {
+	trimmed := trimSpace(value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parts := splitByComma(trimmed)
+	metadata := make(map[string]string, len(parts))
+	for _, part := range parts {
+		pair := trimSpace(part)
+		if pair == "" {
+			continue
+		}
+		kv := strings.SplitN(pair, "=", 2)
+		if len(kv) != 2 {
+			return nil, ErrInvalidCommentMeta
+		}
+		key := trimSpace(kv[0])
+		if key == "" {
+			return nil, ErrInvalidCommentMeta
+		}
+		metadata[key] = trimSpace(kv[1])
+	}
+	if len(metadata) == 0 {
+		return nil, nil
+	}
+	return metadata, nil
 }
 
 // indexOf returns the index of substr in s, or -1 if not found.

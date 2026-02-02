@@ -416,3 +416,38 @@ func TestAddComment_Execute_WithAuthor(t *testing.T) {
 	require.Len(t, comments, 1)
 	assert.Equal(t, "manager", comments[0].Author)
 }
+
+func TestAddComment_Execute_WithTypeAndTags(t *testing.T) {
+	// Setup
+	repo := testutil.NewMockTaskRepository()
+	repo.Tasks[1] = &domain.Task{
+		ID:     1,
+		Title:  "Test task",
+		Status: domain.StatusTodo,
+	}
+	sessions := testutil.NewMockSessionManager()
+	clock := &testutil.MockClock{NowTime: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}
+	uc := NewAddComment(repo, sessions, clock)
+
+	// Execute
+	out, err := uc.Execute(context.Background(), AddCommentInput{
+		TaskID:   1,
+		Message:  "Tag test",
+		Type:     domain.CommentTypeFriction,
+		Tags:     []string{"docs", " testing ", "docs"},
+		Metadata: map[string]string{"source": "cli", " priority ": " high "},
+	})
+
+	// Assert
+	require.NoError(t, err)
+	assert.Equal(t, domain.CommentTypeFriction, out.Comment.Type)
+	assert.Equal(t, []string{"docs", "testing"}, out.Comment.Tags)
+	assert.Equal(t, map[string]string{"priority": "high", "source": "cli"}, out.Comment.Metadata)
+
+	// Verify saved
+	comments := repo.Comments[1]
+	require.Len(t, comments, 1)
+	assert.Equal(t, domain.CommentTypeFriction, comments[0].Type)
+	assert.Equal(t, []string{"docs", "testing"}, comments[0].Tags)
+	assert.Equal(t, map[string]string{"priority": "high", "source": "cli"}, comments[0].Metadata)
+}

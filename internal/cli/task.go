@@ -559,9 +559,12 @@ Examples:
 
 			// Print output
 			type jsonComment struct {
-				Time   time.Time `json:"time"`
-				Text   string    `json:"text"`
-				Author string    `json:"author,omitempty"`
+				Text     string             `json:"text"`
+				Author   string             `json:"author,omitempty"`
+				Type     domain.CommentType `json:"type,omitempty"`
+				Metadata map[string]string  `json:"metadata,omitempty"`
+				Time     time.Time          `json:"time"`
+				Tags     []string           `json:"tags,omitempty"`
 			}
 			type jsonTask struct {
 				Created           time.Time                `json:"created"`
@@ -611,9 +614,12 @@ Examples:
 			}
 			for i, c := range out.Comments {
 				jt.Comments[i] = jsonComment{
-					Time:   c.Time,
-					Text:   c.Text,
-					Author: c.Author,
+					Time:     c.Time,
+					Text:     c.Text,
+					Author:   c.Author,
+					Type:     c.Type,
+					Tags:     c.Tags,
+					Metadata: c.Metadata,
 				}
 			}
 
@@ -1207,6 +1213,9 @@ Examples:
 func newCommentCommand(c *app.Container) *cobra.Command {
 	var opts struct {
 		Author         string
+		Type           string
+		TagsCSV        string
+		Tags           []string
 		Edit           int
 		RequestChanges bool
 	}
@@ -1223,9 +1232,20 @@ Examples:
   # Add a comment to task #1
   crew comment 1 "Started working on authentication"
 
-  # Request changes (comment + status change + notification)
-  crew comment 1 "修正してください" --request-changes
-  crew comment 1 "修正してください" -R
+	  # Request changes (comment + status change + notification)
+	  crew comment 1 "修正してください" --request-changes
+	  crew comment 1 "修正してください" -R
+
+	  # Add a typed comment
+	  crew comment 1 "認証ロジックを実装しました" --type report
+	  crew comment 1 "テストデータが不足" --type friction
+	  crew comment 1 "エラー処理を共通化すべき" --type suggestion
+
+	  # Add tags (repeatable)
+	  crew comment 1 "メッセージ" --tag testing --tag refactoring
+
+	  # Add tags (comma-separated)
+	  crew comment 1 "メッセージ" --tags testing,refactoring
 
   # Edit an existing comment (index starts from 0)
   crew comment 1 --edit 0 "Updated message"
@@ -1240,7 +1260,12 @@ Examples:
 				return fmt.Errorf("invalid task ID: %w", err)
 			}
 
+			tags := parseCommentTags(opts.Tags, opts.TagsCSV)
+
 			if cmd.Flags().Changed("edit") {
+				if cmd.Flags().Changed("type") || len(tags) > 0 {
+					return fmt.Errorf("--type/--tag/--tags cannot be used with --edit")
+				}
 				// Execute edit comment use case
 				uc := c.EditCommentUseCase()
 				err = uc.Execute(cmd.Context(), usecase.EditCommentInput{
@@ -1255,11 +1280,17 @@ Examples:
 				return nil
 			}
 			// Execute add comment use case
+			commentType := domain.CommentType(strings.TrimSpace(strings.ToLower(opts.Type)))
+			if !commentType.IsValid() {
+				return fmt.Errorf("invalid comment type: %q: %w", opts.Type, domain.ErrInvalidCommentType)
+			}
 			uc := c.AddCommentUseCase()
 			out, err := uc.Execute(cmd.Context(), usecase.AddCommentInput{
 				TaskID:         taskID,
 				Message:        args[1],
 				Author:         opts.Author,
+				Type:           commentType,
+				Tags:           tags,
 				RequestChanges: opts.RequestChanges,
 			})
 			if err != nil {
@@ -1283,8 +1314,21 @@ Examples:
 	cmd.Flags().StringVar(&opts.Author, "author", "", "Author name (manager, worker, etc.)")
 	cmd.Flags().IntVar(&opts.Edit, "edit", -1, "Edit an existing comment by index")
 	cmd.Flags().BoolVarP(&opts.RequestChanges, "request-changes", "R", false, "Request changes and update status to in_progress")
+	cmd.Flags().StringVar(&opts.Type, "type", "", "Comment type (report, message, suggestion, friction)")
+	cmd.Flags().StringArrayVar(&opts.Tags, "tag", nil, "Comment tag (can specify multiple)")
+	cmd.Flags().StringVar(&opts.TagsCSV, "tags", "", "Comment tags (comma-separated)")
 
 	return cmd
+}
+
+func parseCommentTags(tags []string, tagsCSV string) []string {
+	combined := make([]string, 0, len(tags)+1)
+	combined = append(combined, tags...)
+	if tagsCSV == "" {
+		return combined
+	}
+	combined = append(combined, strings.Split(tagsCSV, ",")...)
+	return combined
 }
 
 // newCloseCommand creates the close command for closing tasks.

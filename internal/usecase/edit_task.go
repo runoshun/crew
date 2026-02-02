@@ -232,9 +232,12 @@ func (uc *EditTask) executeEditorMode(in EditTaskInput) (*EditTaskOutput, error)
 			// Apply text update (preserve original author and time)
 			original := originalComments[parsed.Index]
 			updatedComments[parsed.Index] = domain.Comment{
-				Text:   parsed.Text,
-				Time:   original.Time,
-				Author: original.Author,
+				Text:     parsed.Text,
+				Time:     original.Time,
+				Author:   original.Author,
+				Type:     original.Type,
+				Tags:     original.Tags,
+				Metadata: original.Metadata,
 			}
 		}
 
