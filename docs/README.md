@@ -11,3 +11,4 @@ git-crew is a task management CLI for AI coding agents. It combines git worktree
 | [core-concepts.md](./core-concepts.md) | Core principles and design concepts |
 | [architecture.md](./architecture.md) | Technical architecture and code structure |
 | [acp.md](./acp.md) | ACP usage and workflow |
+| [reviewer-template-variables.md](./reviewer-template-variables.md) | Reviewer prompt template variables |

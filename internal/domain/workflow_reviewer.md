@@ -46,23 +46,15 @@ crew comment <id> "<message>"
 
 ---
 
-## Template Variables (Reviewer Prompts)
+## Follow-up Review Mode
 
-Available in reviewer system_prompt/prompt templates:
+When reviewing a follow-up attempt, focus on:
 
-- `{{.TaskID}}` - Task ID
-- `{{.Title}}` - Task title
-- `{{.Description}}` - Task description
-- `{{.Branch}}` - Task branch name
-- `{{.Issue}}` - GitHub issue number (0 if not linked)
-- `{{.GitDir}}` - Path to .git directory
-- `{{.RepoRoot}}` - Repository root path
-- `{{.Worktree}}` - Worktree path
-- `{{.Model}}` - Model name override
-- `{{.ReviewAttempt}}` - Review attempt number (1 = first review)
-- `{{.PreviousReview}}` - Previous review result (empty on first attempt)
-- `{{.IsFollowUp}}` - true if review attempt > 1
-- `{{.Continue}}` - true if `--continue` was specified
+1. Verify previous review issues have been addressed
+2. Check ONLY changes made since last review
+3. Report ONLY blocking issues - skip new minor issues
+
+If all issues are addressed, respond with "✅ LGTM".
 
 ---
 
