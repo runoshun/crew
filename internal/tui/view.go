@@ -225,8 +225,10 @@ func (m *Model) viewMain() string {
 	}
 
 	leftPane.WriteString(m.viewTaskList())
-	leftPane.WriteString("\n")
-	leftPane.WriteString(m.viewFooter())
+	if !m.hideFooter {
+		leftPane.WriteString("\n")
+		leftPane.WriteString(m.viewFooter())
+	}
 
 	if m.showDetailPanel() {
 		rightContent := m.viewDetailPanel()

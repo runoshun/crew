@@ -532,6 +532,7 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 		model := tui.New(container)
 		model.DisableAutoRefresh()
 		model.UseHLPagingKeys()
+		model.SetHideFooter(true)
 		m.models[m.activeRepo] = model
 		initCmd := m.wrapRepoCmd(m.activeRepo, model.Init())
 		sizeCmd := m.updateModelSize(m.activeRepo)
@@ -776,23 +777,29 @@ func (m *Model) View() string {
 	return m.styles.App.Render(base)
 }
 
-// viewMain renders the main view with header, list, and footer.
+// viewMain renders the main view with header, list, and status line.
 func (m *Model) viewMain() string {
 	// Show empty state only if no error and no repos
 	if len(m.repos) == 0 && !m.loading && m.err == nil {
 		return m.viewEmptyState()
 	}
 
+	var panes string
 	leftPane := m.viewLeftPane()
 	if !m.isSplitView() {
 		if m.leftFocused {
-			return leftPane
+			panes = leftPane
+		} else {
+			panes = m.viewRightPane()
 		}
-		return m.viewRightPane()
+	} else {
+		rightPane := m.viewRightPane()
+		panes = lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 	}
 
-	rightPane := m.viewRightPane()
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
+	// Add unified status line at the bottom
+	statusLine := m.viewStatusLine()
+	return lipgloss.JoinVertical(lipgloss.Left, panes, statusLine)
 }
 
 func (m *Model) viewLeftPane() string {
@@ -806,15 +813,14 @@ func (m *Model) viewLeftPane() string {
 	}
 
 	b.WriteString(m.viewRepoList())
-	b.WriteString("\n")
-	b.WriteString(m.viewFooter())
 
-	return lipgloss.NewStyle().Width(m.leftContentWidth()).Render(b.String())
+	height := m.paneContentHeight()
+	return lipgloss.NewStyle().Width(m.leftContentWidth()).Height(height).Render(b.String())
 }
 
 func (m *Model) viewRightPane() string {
 	width := m.rightContentWidth()
-	height := m.contentHeight()
+	height := m.paneContentHeight()
 	content := m.viewRightPaneContent()
 
 	paneStyle := lipgloss.NewStyle().Width(width).Height(height)
@@ -1024,37 +1030,50 @@ func (m *Model) formatSummaryColored(s domain.TaskSummary) string {
 	return strings.Join(parts, " ")
 }
 
-// viewFooter renders the footer with key hints.
-func (m *Model) viewFooter() string {
-	keyStyle := m.styles.FooterKey
-	contentWidth := m.leftContentWidth()
+// viewStatusLine renders the unified status line at the bottom.
+func (m *Model) viewStatusLine() string {
+	tuiStyles := tui.DefaultStyles()
+	statusLine := tui.NewStatusLine(m.contentWidth(), &tuiStyles)
+	info := m.getStatusInfo()
+	return statusLine.Render(info)
+}
 
-	paneHint := ""
+// getStatusInfo returns status line info based on current focus.
+func (m *Model) getStatusInfo() tui.StatusLineInfo {
 	if m.leftFocused {
-		paneHint = keyStyle.Render("tab/right") + " pane"
-	} else {
-		backKey := "left"
-		if m.activeModelUsesCursorKeys() {
-			backKey = "ctrl+left"
+		// Workspace pane focused
+		return tui.StatusLineInfo{
+			FocusPane: tui.FocusPaneWorkspace,
+			KeyHints: []tui.KeyHint{
+				{Key: "j/k", Desc: "nav"},
+				{Key: "enter", Desc: "focus"},
+				{Key: "tab", Desc: "next"},
+				{Key: "a", Desc: "add"},
+				{Key: "d", Desc: "remove"},
+				{Key: "q", Desc: "quit"},
+			},
 		}
-		paneHint = keyStyle.Render(backKey) + " back"
 	}
 
-	content := keyStyle.Render("j/k") + " nav  " +
-		keyStyle.Render("enter") + " focus  " +
-		paneHint + "  " +
-		keyStyle.Render("a") + " add  " +
-		keyStyle.Render("d") + " remove  " +
-		keyStyle.Render("r") + " refresh  " +
-		keyStyle.Render("q") + " quit"
-
-	focusLabel := "tasks"
-	if m.leftFocused {
-		focusLabel = "list"
+	// TUI pane focused - get info from active model
+	model, ok := m.models[m.activeRepo]
+	if !ok || model == nil {
+		return tui.StatusLineInfo{
+			FocusPane: tui.FocusPaneTaskList,
+		}
 	}
-	content = content + "  " + m.styles.Muted.Render("focus:"+focusLabel)
 
-	return m.styles.Footer.Width(contentWidth).Render(content)
+	return model.GetStatusInfo()
+}
+
+// paneContentHeight returns the height available for pane content (excluding status line).
+func (m *Model) paneContentHeight() int {
+	// height - 1 for status line
+	h := m.height - 1
+	if h < 0 {
+		h = 0
+	}
+	return h
 }
 
 // viewEmptyState renders a friendly empty state message.

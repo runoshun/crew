@@ -122,6 +122,7 @@ type Model struct {
 	blockFocusUnblock       bool // True when Unblock button is focused in Block dialog
 	autoRefresh             bool
 	selectedTaskHasWorktree bool
+	hideFooter              bool // Hide footer (used when embedded in workspace)
 }
 
 // New creates a new TUI Model with the given container.
@@ -218,6 +219,11 @@ func (m *Model) Init() tea.Cmd {
 // DisableAutoRefresh disables periodic task refresh ticks.
 func (m *Model) DisableAutoRefresh() {
 	m.autoRefresh = false
+}
+
+// SetHideFooter sets whether to hide the footer (used when embedded in workspace).
+func (m *Model) SetHideFooter(hide bool) {
+	m.hideFooter = hide
 }
 
 // UsesCursorKeys reports whether left/right should be forwarded to inputs.
