@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/testutil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -184,6 +185,58 @@ func TestUpdate_StopKey_InProgress(t *testing.T) {
 	assert.Equal(t, 1, result.confirmTaskID)
 }
 
+func TestUpdate_ReviewKey_OpensRequestChanges(t *testing.T) {
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusDone}
+	items := []list.Item{taskItem{task: task}}
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ExistsVal = true
+
+	m := &Model{
+		container:          &app.Container{Worktrees: worktrees},
+		keys:               DefaultKeyMap(),
+		mode:               ModeNormal,
+		tasks:              []*domain.Task{task},
+		taskList:           list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+		reviewMessageInput: textinput.New(),
+	}
+
+	updatedModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeReviewMessage, result.mode)
+	assert.Equal(t, 1, result.reviewTaskID)
+	assert.Equal(t, ModeNormal, result.reviewMessageReturnMode)
+}
+
+func TestUpdate_ReviewMessage_Escape_ReturnsToNormal(t *testing.T) {
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusDone}
+	items := []list.Item{taskItem{task: task}}
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ExistsVal = true
+
+	m := &Model{
+		container:          &app.Container{Worktrees: worktrees},
+		keys:               DefaultKeyMap(),
+		mode:               ModeNormal,
+		tasks:              []*domain.Task{task},
+		taskList:           list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+		reviewMessageInput: textinput.New(),
+	}
+
+	updatedModel, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+
+	updatedModel, cmd := result.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	assert.Nil(t, cmd)
+	result, ok = updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Equal(t, 0, result.reviewTaskID)
+	assert.Equal(t, ModeNormal, result.reviewMessageReturnMode)
+}
+
 func TestUpdate_MsgCommentsLoaded_EmptyComments(t *testing.T) {
 	m := &Model{
 		comments: []domain.Comment{
@@ -227,7 +280,7 @@ func TestUpdate_MsgReviewActionCompleted(t *testing.T) {
 		reviewActionCursor: 1,
 	}
 
-	msg := MsgReviewActionCompleted{TaskID: 42, Action: ReviewActionNotifyWorker}
+	msg := MsgReviewActionCompleted{TaskID: 42}
 
 	updatedModel, _ := m.Update(msg)
 	result, ok := updatedModel.(*Model)
@@ -236,6 +289,25 @@ func TestUpdate_MsgReviewActionCompleted(t *testing.T) {
 	assert.Equal(t, 0, result.reviewTaskID)
 	assert.Equal(t, "", result.reviewResult)
 	assert.Equal(t, 0, result.reviewActionCursor)
+}
+
+func TestUpdate_MsgError_ClearsReviewState(t *testing.T) {
+	m := &Model{
+		mode:                    ModeReviewMessage,
+		reviewTaskID:            42,
+		reviewResult:            "Some review",
+		reviewActionCursor:      1,
+		reviewMessageReturnMode: ModeReviewAction,
+	}
+
+	updatedModel, _ := m.Update(MsgError{Err: assert.AnError})
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeNormal, result.mode)
+	assert.Equal(t, 0, result.reviewTaskID)
+	assert.Equal(t, "", result.reviewResult)
+	assert.Equal(t, 0, result.reviewActionCursor)
+	assert.Equal(t, ModeNormal, result.reviewMessageReturnMode)
 }
 
 func TestUpdate_MsgPrepareEditComment(t *testing.T) {
@@ -279,6 +351,68 @@ func TestUpdate_MsgReviewResultLoaded(t *testing.T) {
 	assert.Equal(t, ModeReviewResult, result.mode)
 	assert.Equal(t, 42, result.reviewTaskID)
 	assert.Equal(t, "Review content here", result.reviewResult)
+}
+
+func TestHandleReviewActionMode_RequestChanges_KeepsReviewResult(t *testing.T) {
+	m := &Model{
+		keys:               DefaultKeyMap(),
+		mode:               ModeReviewAction,
+		reviewTaskID:       42,
+		reviewResult:       "Review content here",
+		reviewActionCursor: 0,
+		reviewMessageInput: textinput.New(),
+	}
+
+	updatedModel, cmd := m.handleReviewActionMode(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Nil(t, cmd)
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeReviewMessage, result.mode)
+	assert.Equal(t, "Review content here", result.reviewResult)
+}
+
+func TestHandleReviewMessageMode_Escape_ReturnsToActionMenu(t *testing.T) {
+	task := &domain.Task{ID: 1, Title: "Task", Status: domain.StatusDone}
+	items := []list.Item{taskItem{task: task}}
+	worktrees := testutil.NewMockWorktreeManager()
+	worktrees.ExistsVal = true
+
+	m := &Model{
+		container:          &app.Container{Worktrees: worktrees},
+		keys:               DefaultKeyMap(),
+		mode:               ModeNormal,
+		tasks:              []*domain.Task{task},
+		taskList:           list.New(items, newTaskDelegate(DefaultStyles()), 0, 0),
+		reviewMessageInput: textinput.New(),
+	}
+	m.taskList.Select(0)
+
+	updatedModel, _ := m.openActionMenu()
+	result, ok := updatedModel.(*Model)
+	assert.True(t, ok)
+
+	requestIdx := -1
+	for i, item := range result.actionMenuItems {
+		if item.ActionID == "request_changes" {
+			requestIdx = i
+			break
+		}
+	}
+	assert.NotEqual(t, -1, requestIdx)
+	result.actionMenuCursor = requestIdx
+
+	updatedModel, _ = result.handleActionMenuMode(tea.KeyMsg{Type: tea.KeyEnter})
+	result, ok = updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeReviewMessage, result.mode)
+
+	updatedModel, _ = result.handleReviewMessageMode(tea.KeyMsg{Type: tea.KeyEsc})
+	result, ok = updatedModel.(*Model)
+	assert.True(t, ok)
+	assert.Equal(t, ModeActionMenu, result.mode)
+	if assert.NotEmpty(t, result.actionMenuItems) {
+		assert.Equal(t, "request_changes", result.actionMenuItems[result.actionMenuCursor].ActionID)
+	}
 }
 
 func TestUpdate_ActionMenuEnter(t *testing.T) {

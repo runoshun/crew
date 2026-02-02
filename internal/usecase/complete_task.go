@@ -263,14 +263,14 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 	startedAt := uc.clock.Now()
 	logOffset := int64(0)
 	if running {
-		// If the session is already running, try to avoid accidentally parsing an older review
-		// result by only considering log content written after we start waiting.
+		// If the session is already running, avoid accidentally parsing an older review
+		// result by only considering log content written after the last review run start.
 		logPath := domain.SessionLogPath(uc.crewDir, reviewSessionName)
-		if t, ok := readReviewRunStartedAtFromLog(logPath); ok {
-			startedAt = t
-		}
-		if info, statErr := os.Stat(logPath); statErr == nil {
-			logOffset = info.Size()
+		if offset, t, ok := findLastReviewRunStart(logPath, int64(reviewLogReadMaxBytes)); ok {
+			logOffset = offset
+			if !t.IsZero() {
+				startedAt = t
+			}
 		}
 	}
 
@@ -430,23 +430,50 @@ func (uc *CompleteTask) waitForReview(ctx context.Context, sessionName string, v
 	}
 }
 
-func readReviewRunStartedAtFromLog(logPath string) (time.Time, bool) {
+func findLastReviewRunStart(logPath string, maxBytes int64) (int64, time.Time, bool) {
+	if maxBytes <= 0 {
+		return 0, time.Time{}, false
+	}
 	file, err := os.Open(logPath)
 	if err != nil {
-		return time.Time{}, false
+		return 0, time.Time{}, false
 	}
 	defer func() {
 		_ = file.Close()
 	}()
 
-	data, err := io.ReadAll(io.LimitReader(file, 4096))
+	info, err := file.Stat()
 	if err != nil {
-		return time.Time{}, false
+		return 0, time.Time{}, false
+	}
+	if info.Size() == 0 {
+		return 0, time.Time{}, false
+	}
+
+	baseOffset := int64(0)
+	if info.Size() > maxBytes {
+		baseOffset = info.Size() - maxBytes
+	}
+	if baseOffset > 0 {
+		if _, seekErr := file.Seek(baseOffset, io.SeekStart); seekErr != nil {
+			return 0, time.Time{}, false
+		}
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return 0, time.Time{}, false
 	}
 	text := string(data)
-	idx := strings.Index(text, reviewRunStartPrefix)
+	if baseOffset > 0 {
+		var ok bool
+		text, baseOffset, ok = trimLeadingPartialLine(text, baseOffset, file)
+		if !ok {
+			return 0, time.Time{}, false
+		}
+	}
+	idx := lastLinePrefixIndex(text, reviewRunStartPrefix)
 	if idx < 0 {
-		return time.Time{}, false
+		return 0, time.Time{}, false
 	}
 	line := text[idx:]
 	if nl := strings.IndexByte(line, '\n'); nl >= 0 {
@@ -454,13 +481,13 @@ func readReviewRunStartedAtFromLog(logPath string) (time.Time, bool) {
 	}
 	ts := strings.TrimSpace(strings.TrimPrefix(line, reviewRunStartPrefix))
 	if ts == "" {
-		return time.Time{}, false
+		return baseOffset + int64(idx), time.Time{}, true
 	}
 	t, err := time.Parse(time.RFC3339, ts)
 	if err != nil {
-		return time.Time{}, false
+		return baseOffset + int64(idx), time.Time{}, true
 	}
-	return t, true
+	return baseOffset + int64(idx), t, true
 }
 
 func (uc *CompleteTask) streamSessionOutput(sessionName string, lastOutput *string) error {
@@ -575,12 +602,11 @@ func readFileTailBytes(path string, offset int64, maxBytes int64) string {
 	}
 
 	text := string(data)
-	if offset > 0 {
-		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
-			text = text[idx+1:]
-		}
+	trimmed, _, ok := trimLeadingPartialLine(text, offset, file)
+	if !ok {
+		return ""
 	}
-	return text
+	return trimmed
 }
 
 func extractReviewResult(logText string) (string, bool) {
@@ -590,7 +616,8 @@ func extractReviewResult(logText string) (string, bool) {
 
 	// If the log contains multiple review runs (e.g. file was appended), only consider
 	// the latest run to avoid accidentally picking an old marker.
-	if idx := strings.LastIndex(logText, reviewRunStartPrefix); idx >= 0 {
+	idx := lastLinePrefixIndex(logText, reviewRunStartPrefix)
+	if idx >= 0 {
 		logText = logText[idx+len(reviewRunStartPrefix):]
 		if nl := strings.IndexByte(logText, '\n'); nl >= 0 {
 			logText = logText[nl+1:]
@@ -659,11 +686,11 @@ func tailFileLines(path string, maxLines int) string {
 		return ""
 	}
 	text := string(data)
-	if offset > 0 {
-		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
-			text = text[idx+1:]
-		}
+	trimmed, _, ok := trimLeadingPartialLine(text, offset, file)
+	if !ok {
+		return ""
 	}
+	text = trimmed
 	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
 	if len(lines) > maxLines {
 		lines = lines[len(lines)-maxLines:]
@@ -688,4 +715,48 @@ func diffOutput(prev, curr string) string {
 		}
 	}
 	return curr
+}
+
+func lastLinePrefixIndex(text, prefix string) int {
+	if prefix == "" {
+		return -1
+	}
+	for i := len(text) - 1; i >= 0; i-- {
+		if text[i] != '\n' {
+			continue
+		}
+		lineStart := i + 1
+		if len(text)-lineStart < len(prefix) {
+			continue
+		}
+		if strings.HasPrefix(text[lineStart:], prefix) {
+			return lineStart
+		}
+	}
+	if strings.HasPrefix(text, prefix) {
+		return 0
+	}
+	return -1
+}
+
+func isOffsetLineStart(file *os.File, offset int64) bool {
+	if offset <= 0 {
+		return true
+	}
+	buf := []byte{0}
+	if _, err := file.ReadAt(buf, offset-1); err != nil {
+		return true
+	}
+	return buf[0] == '\n'
+}
+
+func trimLeadingPartialLine(text string, offset int64, file *os.File) (string, int64, bool) {
+	if offset <= 0 || isOffsetLineStart(file, offset) {
+		return text, offset, true
+	}
+	idx := strings.IndexByte(text, '\n')
+	if idx < 0 {
+		return "", offset, false
+	}
+	return text[idx+1:], offset + int64(idx+1), true
 }

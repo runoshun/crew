@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	acpsdk "github.com/coder/acp-go-sdk"
 	"github.com/runoshun/git-crew/v2/internal/app"
@@ -30,6 +31,7 @@ func newACPCommand(c *app.Container) *cobra.Command {
 	cmd.AddCommand(newACPAttachCommand(c))
 	cmd.AddCommand(newACPPeekCommand(c))
 	cmd.AddCommand(newACPLogCommand(c))
+	cmd.AddCommand(newACPConsoleCommand(c))
 	return cmd
 }
 
@@ -581,7 +583,41 @@ func printRawEvents(cmd *cobra.Command, events []domain.ACPEvent) error {
 
 func printFormattedEvents(cmd *cobra.Command, events []domain.ACPEvent) error {
 	out := cmd.OutOrStdout()
+
+	var msgBuffer strings.Builder
+	var lastMsgTime time.Time
+
+	flushMessageBuffer := func() {
+		if msgBuffer.Len() == 0 {
+			return
+		}
+		text := msgBuffer.String()
+		// Truncate if too long
+		if len(text) > 200 {
+			text = text[:200] + "..."
+		}
+		// Replace newlines for single-line display
+		text = strings.ReplaceAll(text, "\n", "\\n")
+		_, _ = fmt.Fprintf(out, "[%s] AGENT_MESSAGE: %s\n", lastMsgTime.Format("15:04:05"), text)
+		msgBuffer.Reset()
+	}
+
 	for _, event := range events {
+		// Accumulate agent message chunks
+		if event.Type == domain.ACPEventAgentMessageChunk {
+			text := extractAgentMessageText(event.Payload)
+			if text != "" {
+				if msgBuffer.Len() == 0 {
+					lastMsgTime = event.Timestamp
+				}
+				msgBuffer.WriteString(text)
+			}
+			continue
+		}
+
+		// Flush accumulated messages before printing other events
+		flushMessageBuffer()
+
 		ts := event.Timestamp.Format("15:04:05")
 		eventType := formatEventType(event.Type)
 		detail := extractEventDetail(event)
@@ -591,6 +627,9 @@ func printFormattedEvents(cmd *cobra.Command, events []domain.ACPEvent) error {
 			_, _ = fmt.Fprintf(out, "[%s] %s\n", ts, eventType)
 		}
 	}
+
+	// Flush any remaining messages
+	flushMessageBuffer()
 	return nil
 }
 
@@ -640,11 +679,10 @@ func extractEventDetail(event domain.ACPEvent) string {
 		return extractToolCallDetail(event.Payload)
 	case domain.ACPEventToolCallUpdate:
 		return extractToolCallUpdateDetail(event.Payload)
-	case domain.ACPEventAgentMessageChunk:
-		return extractAgentMessageDetail(event.Payload)
 	case domain.ACPEventSessionUpdate,
 		domain.ACPEventPromptSent,
 		domain.ACPEventSessionEnd,
+		domain.ACPEventAgentMessageChunk,
 		domain.ACPEventAgentThoughtChunk,
 		domain.ACPEventUserMessageChunk,
 		domain.ACPEventPlan,
@@ -716,7 +754,9 @@ func extractToolCallUpdateDetail(payload json.RawMessage) string {
 	return fmt.Sprintf("id=%s status=%s", update.ToolCallId, status)
 }
 
-func extractAgentMessageDetail(payload json.RawMessage) string {
+// extractAgentMessageText extracts only the text from an agent message chunk payload.
+// Unlike extractAgentMessageDetail, it does not truncate or escape the text.
+func extractAgentMessageText(payload json.RawMessage) string {
 	var notification acpsdk.SessionNotification
 	if err := json.Unmarshal(payload, &notification); err != nil {
 		return ""
@@ -726,13 +766,42 @@ func extractAgentMessageDetail(payload json.RawMessage) string {
 	}
 	chunk := notification.Update.AgentMessageChunk
 	if chunk.Content.Text != nil {
-		text := chunk.Content.Text.Text
-		if len(text) > 80 {
-			text = text[:80] + "..."
-		}
-		// Replace newlines for single-line display
-		text = strings.ReplaceAll(text, "\n", "\\n")
-		return text
+		return chunk.Content.Text.Text
 	}
 	return ""
+}
+
+// newACPConsoleCommand creates the ACP console command.
+func newACPConsoleCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "console <task-id>",
+		Short: "Interactive ACP console",
+		Long: `Open an interactive console for an ACP session.
+
+The console provides:
+- Real-time log viewing
+- Prompt input
+- Permission request handling
+
+Keys:
+  Enter    Send prompt
+  1-9      Select permission option
+  Esc      Cancel current operation
+  Ctrl+D   Stop session
+  Ctrl+C   Quit console
+
+Examples:
+  crew acp console 1`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			return c.RunACPConsole(cmd.Context(), taskID)
+		},
+	}
+
+	return cmd
 }

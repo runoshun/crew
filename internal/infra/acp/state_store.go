@@ -26,6 +26,7 @@ func NewFileStateStore(crewDir string) *FileStateStore {
 
 type acpStatePayload struct {
 	ExecutionSubstate string `json:"execution_substate"`
+	SessionID         string `json:"session_id,omitempty"`
 }
 
 // Load reads the current ACP state for a task.
@@ -48,7 +49,10 @@ func (s *FileStateStore) Load(ctx context.Context, namespace string, taskID int)
 	if err := decodeJSONStrict(data, &payload); err != nil {
 		return domain.ACPExecutionState{}, err
 	}
-	state := domain.ACPExecutionState{ExecutionSubstate: domain.ACPExecutionSubstate(payload.ExecutionSubstate)}
+	state := domain.ACPExecutionState{
+		ExecutionSubstate: domain.ACPExecutionSubstate(payload.ExecutionSubstate),
+		SessionID:         payload.SessionID,
+	}
 	if !state.ExecutionSubstate.IsValid() {
 		return domain.ACPExecutionState{}, domain.ErrInvalidACPExecutionSubstate
 	}
@@ -67,7 +71,10 @@ func (s *FileStateStore) Save(ctx context.Context, namespace string, taskID int,
 	if err := os.MkdirAll(base, 0o750); err != nil {
 		return err
 	}
-	payload := acpStatePayload{ExecutionSubstate: string(state.ExecutionSubstate)}
+	payload := acpStatePayload{
+		ExecutionSubstate: string(state.ExecutionSubstate),
+		SessionID:         state.SessionID,
+	}
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return err

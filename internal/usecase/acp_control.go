@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/runoshun/git-crew/v2/internal/domain"
@@ -76,7 +77,13 @@ func (uc *ACPControl) Execute(ctx context.Context, in ACPControlInput) (*ACPCont
 	if uc.acpStates != nil {
 		switch in.CommandType {
 		case domain.ACPCommandPermission, domain.ACPCommandPrompt:
-			if err := uc.acpStates.Save(ctx, namespace, in.TaskID, domain.ACPExecutionState{ExecutionSubstate: domain.ACPExecutionRunning}); err != nil {
+			// Load existing state to preserve session ID
+			state, err := uc.acpStates.Load(ctx, namespace, in.TaskID)
+			if err != nil && !errors.Is(err, domain.ErrACPStateNotFound) {
+				return nil, fmt.Errorf("load acp state: %w", err)
+			}
+			state.ExecutionSubstate = domain.ACPExecutionRunning
+			if err := uc.acpStates.Save(ctx, namespace, in.TaskID, state); err != nil {
 				return nil, fmt.Errorf("save acp state: %w", err)
 			}
 		case domain.ACPCommandCancel, domain.ACPCommandStop:

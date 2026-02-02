@@ -88,6 +88,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.Err
 		m.mode = ModeNormal
 		m.confirmAction = ConfirmNone
+		m.resetReviewState()
 		return m, nil
 
 	case MsgClearError:
@@ -112,6 +113,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgShowDiff:
 		// Trigger diff display for a task
 		return m, m.showDiff(msg.TaskID)
+
+	case execLogMsg:
+		// Execute the log pager command
+		return m, tea.Exec(&domainExecCmd{cmd: msg.cmd}, func(err error) tea.Msg {
+			if err != nil {
+				return MsgError{Err: err}
+			}
+			return MsgReloadTasks{}
+		})
 
 	case execDiffMsg:
 		// Execute the diff command using domainExecCmd wrapper
@@ -159,9 +169,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgReviewActionCompleted:
 		m.mode = ModeNormal
-		m.reviewTaskID = 0
-		m.reviewResult = ""
-		m.reviewActionCursor = 0
+		m.resetReviewState()
 		return m, m.loadTasks()
 
 	case MsgPrepareEditComment:
@@ -245,8 +253,6 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleEditReviewCommentMode(msg)
 	case ModeBlock:
 		return m.handleBlockMode(msg)
-	case ModeSelectReviewer:
-		return m.handleSelectReviewerMode(msg)
 	}
 
 	return m, nil
@@ -270,6 +276,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		newTask := m.SelectedTask()
 		// If task changed and we're showing detail panel, load comments
 		if prevTask != newTask && newTask != nil {
+			m.updateSelectedTaskWorktree()
 			if m.showDetailPanel() {
 				// Update viewport content immediately, comments will update async
 				m.updateDetailPanelViewport()
@@ -280,10 +287,12 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.PrevPage):
 		m.taskList.Paginator.PrevPage()
+		m.updateSelectedTaskWorktree()
 		return m, nil
 
 	case key.Matches(msg, m.keys.NextPage):
 		m.taskList.Paginator.NextPage()
+		m.updateSelectedTaskWorktree()
 		return m, nil
 
 	case key.Matches(msg, m.keys.Enter):
@@ -333,20 +342,13 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.Review):
 		task := m.SelectedTask()
+		if task == nil || task.Status != domain.StatusDone {
+			return m, nil
+		}
 		if !m.hasWorktree(task) {
 			return m, nil
 		}
-		// Start review selection
-		m.mode = ModeSelectReviewer
-		m.reviewerCursor = 0
-		if m.config != nil {
-			for i, r := range m.reviewerAgents {
-				if r == m.config.AgentsConfig.DefaultReviewer {
-					m.reviewerCursor = i
-					break
-				}
-			}
-		}
+		m.enterRequestChanges(task.ID, ModeNormal, true)
 		return m, nil
 
 	case key.Matches(msg, m.keys.New):
@@ -488,7 +490,8 @@ func (m *Model) handleDefaultAction() (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
-	items := m.actionMenuItemsForTask(m.SelectedTask())
+	task := m.SelectedTask()
+	items := m.actionMenuItemsForTask(task)
 	if len(items) == 0 {
 		return m, nil
 	}
@@ -500,6 +503,14 @@ func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
 			break
 		}
 	}
+	if m.actionMenuLastID != "" && task != nil && task.ID == m.actionMenuLastTaskID {
+		for i, item := range items {
+			if item.ActionID == m.actionMenuLastID {
+				m.actionMenuCursor = i
+				break
+			}
+		}
+	}
 	m.mode = ModeActionMenu
 	return m, nil
 }
@@ -507,6 +518,12 @@ func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
 func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Escape):
+		if len(m.actionMenuItems) > 0 && m.actionMenuCursor < len(m.actionMenuItems) {
+			m.actionMenuLastID = m.actionMenuItems[m.actionMenuCursor].ActionID
+			if task := m.SelectedTask(); task != nil {
+				m.actionMenuLastTaskID = task.ID
+			}
+		}
 		m.mode = ModeNormal
 		m.actionMenuItems = nil
 		return m, nil
@@ -529,6 +546,10 @@ func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		selected := m.actionMenuItems[m.actionMenuCursor]
+		m.actionMenuLastID = selected.ActionID
+		if task := m.SelectedTask(); task != nil {
+			m.actionMenuLastTaskID = task.ID
+		}
 		m.mode = ModeNormal
 		m.actionMenuItems = nil
 		if selected.Action == nil {
@@ -543,6 +564,10 @@ func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		runeKey := string(msg.Runes)
 		for _, action := range m.actionMenuItems {
 			if action.Key == runeKey {
+				m.actionMenuLastID = action.ActionID
+				if task := m.SelectedTask(); task != nil {
+					m.actionMenuLastTaskID = task.ID
+				}
 				m.mode = ModeNormal
 				m.actionMenuItems = nil
 				if action.Action == nil {
@@ -1049,8 +1074,7 @@ func (m *Model) handleReviewResultMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Escape):
 		m.mode = ModeNormal
-		m.reviewResult = ""
-		m.reviewTaskID = 0
+		m.resetReviewState()
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
@@ -1074,7 +1098,7 @@ func (m *Model) handleReviewResultMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleReviewActionMode handles keys when selecting a review action.
 func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	const numActions = 5 // NotifyWorker (restart), NotifyWorker (no restart), Merge, Close, EditComment
+	const numActions = 5 // Request Changes, Comment Only, Merge, Close, Edit Comment
 
 	switch {
 	case key.Matches(msg, m.keys.Escape):
@@ -1098,9 +1122,7 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Execute selected action
 		switch m.reviewActionCursor {
 		case 0: // Request Changes - enter message input mode
-			m.mode = ModeReviewMessage
-			m.reviewMessageInput.Reset()
-			m.reviewMessageInput.Focus()
+			m.enterRequestChanges(m.reviewTaskID, ModeReviewAction, false)
 			return m, nil
 		case 1: // NotifyWorker without restart (just send comment)
 			return m, m.notifyWorker(m.reviewTaskID, m.reviewResult, false)
@@ -1122,6 +1144,25 @@ func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) enterRequestChanges(taskID int, returnMode Mode, resetReviewContext bool) {
+	m.reviewTaskID = taskID
+	if resetReviewContext {
+		m.reviewResult = ""
+		m.reviewActionCursor = 0
+	}
+	m.reviewMessageReturnMode = returnMode
+	m.mode = ModeReviewMessage
+	m.reviewMessageInput.Reset()
+	m.reviewMessageInput.Focus()
+}
+
+func (m *Model) resetReviewState() {
+	m.reviewTaskID = 0
+	m.reviewResult = ""
+	m.reviewActionCursor = 0
+	m.reviewMessageReturnMode = ModeNormal
+}
+
 // defaultReviewMessage is the default message when the user leaves the input empty.
 const defaultReviewMessage = "Please address the review comments above."
 
@@ -1129,10 +1170,23 @@ const defaultReviewMessage = "Please address the review comments above."
 func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Escape):
-		// Go back to review action selection
-		m.mode = ModeReviewAction
 		m.reviewMessageInput.Blur()
-		return m, nil
+		returnMode := m.reviewMessageReturnMode
+		m.reviewMessageReturnMode = ModeNormal
+		//nolint:exhaustive
+		switch returnMode {
+		case ModeReviewAction:
+			m.mode = ModeReviewAction
+			return m, nil
+		case ModeActionMenu:
+			m.resetReviewState()
+			m.mode = ModeNormal
+			return m.openActionMenu()
+		default:
+			m.resetReviewState()
+			m.mode = ModeNormal
+			return m, nil
+		}
 
 	case msg.Type == tea.KeyEnter:
 		// Submit the message (or use default if empty)
@@ -1230,44 +1284,6 @@ func (m *Model) handleBlockMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.blockInput, cmd = m.blockInput.Update(msg)
 		return m, cmd
-	}
-
-	return m, nil
-}
-
-// handleSelectReviewerMode handles keys in reviewer selection mode.
-func (m *Model) handleSelectReviewerMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, m.keys.Escape):
-		m.mode = ModeNormal
-		return m, nil
-
-	case key.Matches(msg, m.keys.Up):
-		if m.reviewerCursor > 0 {
-			m.reviewerCursor--
-		}
-		return m, nil
-
-	case key.Matches(msg, m.keys.Down):
-		if m.reviewerCursor < len(m.reviewerAgents)-1 {
-			m.reviewerCursor++
-		}
-		return m, nil
-
-	case msg.Type == tea.KeyEnter:
-		task := m.SelectedTask()
-		if task == nil {
-			m.mode = ModeNormal
-			return m, nil
-		}
-		if len(m.reviewerAgents) == 0 {
-			// No reviewers available, use default
-			m.mode = ModeNormal
-			return m, m.completeTask(task.ID, "")
-		}
-		agent := m.reviewerAgents[m.reviewerCursor]
-		m.mode = ModeNormal
-		return m, m.completeTask(task.ID, agent)
 	}
 
 	return m, nil
