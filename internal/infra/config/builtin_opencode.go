@@ -53,6 +53,15 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 		}
 	};
 
+	const permissionResolvedEvents = new Set([
+		"permission.responded",
+		"permission.response",
+		"permission.resolved",
+		"permission.granted",
+		"permission.denied",
+		"permission.approved",
+	]);
+
   return {
 		event: async ({ event }) => {
 			// Permission asked: auto-approve safe git operations in worktree
@@ -75,13 +84,18 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 				if (isSafeCommand && isSafeDir) {
 					// Allow: git status, diff, log, add, commit
 					if (/^git\s+(status|diff|log|add|commit)(\s+|$)/.test(command)) {
-						await $.client.permission.reply({ requestID: id, reply: "once" });
-						await updateSubstate("running");
-						return;
+						if ($.client && $.client.permission && typeof $.client.permission.reply === "function") {
+							await $.client.permission.reply({ requestID: id, reply: "once" });
+							await updateSubstate("running");
+							return;
+						}
 					}
 				}
 			}
 
+			}
+			if (permissionResolvedEvents.has(event.type)) {
+				await updateSubstate("running");
 			}
 		}
   }

@@ -52,7 +52,7 @@ func (uc *SetSubstate) Execute(ctx context.Context, in SetSubstateInput) (*SetSu
 
 	namespace := task.Namespace
 	if namespace == "" {
-		namespace = "default"
+		namespace = domain.DefaultNamespace
 	}
 
 	state, err := uc.acpStates.Load(ctx, namespace, in.TaskID)
