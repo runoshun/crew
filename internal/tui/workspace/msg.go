@@ -1,6 +1,9 @@
 package workspace
 
-import "github.com/runoshun/git-crew/v2/internal/domain"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/runoshun/git-crew/v2/internal/domain"
+)
 
 // Msg is the interface for all workspace TUI messages.
 // All message types implement this sealed interface.
@@ -24,9 +27,8 @@ func (MsgReposLoaded) sealed() {}
 //
 //nolint:govet // Logical field order preferred
 type MsgSummaryLoaded struct {
-	Info    domain.WorkspaceRepoInfo
-	Path    string
-	Loading bool // true if still loading
+	Info domain.WorkspaceRepoInfo
+	Path string
 }
 
 func (MsgSummaryLoaded) sealed() {}
@@ -54,21 +56,17 @@ type MsgError struct {
 
 func (MsgError) sealed() {}
 
-// MsgOpenRepo is sent when the user wants to open a repo.
-type MsgOpenRepo struct {
-	Path string
-}
-
-func (MsgOpenRepo) sealed() {}
-
-// MsgRepoExited is sent when returning from a repo TUI.
-type MsgRepoExited struct {
-	Err error // Error from crew tui if it failed to start
-}
-
-func (MsgRepoExited) sealed() {}
-
 // MsgTick is sent periodically for auto-refresh.
 type MsgTick struct{}
 
 func (MsgTick) sealed() {}
+
+// RepoMsg wraps a message with a repo path for routing.
+//
+//nolint:govet // Logical field order preferred
+type RepoMsg struct {
+	Path string
+	Msg  tea.Msg
+}
+
+func (RepoMsg) sealed() {}

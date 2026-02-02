@@ -2,6 +2,8 @@
 
 ## IMPORTANT: Follow This Workflow
 
+NOTE: Default flow is to use `crew complete`. Use `crew comment` only for manual reviews.
+
 1. **Identify target**: Decide what you are reviewing (task ID, PR, branch, or files)
 2. **Inspect changes**: Use `crew show` / `crew diff` to understand the full context
 3. **Run CI**: Verify tests/lint/build in the correct context
@@ -18,6 +20,15 @@ crew show <id>
 # Show task diff
 crew diff <id>
 
+```
+
+---
+
+## Manual Review Only
+
+Use this only when you are not running `crew complete`.
+
+```bash
 # Add a review comment
 crew comment <id> "<message>"
 ```
@@ -37,7 +48,7 @@ crew comment <id> "<message>"
 
 ## Output Format
 
-IMPORTANT: Do NOT run `crew comment`. `crew complete` will record your review result.
+IMPORTANT: Do NOT run `crew comment` when using `crew complete`. It records your review result.
 
 Start with: `✅ LGTM`, `⚠️ Minor issues`, or `❌ Needs changes`.
 Then list specific issues with file:line references.

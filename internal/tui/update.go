@@ -149,7 +149,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgTick:
 		// Auto-refresh: reload tasks and schedule next tick
-		return m, tea.Batch(m.loadTasks(), m.tick())
+		if m.autoRefresh {
+			return m, tea.Batch(m.loadTasks(), m.tick())
+		}
+		return m, m.loadTasks()
 
 	case MsgCommentsLoaded:
 		m.comments = msg.Comments

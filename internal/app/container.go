@@ -75,6 +75,12 @@ type Container struct {
 
 // New creates a new Container by detecting the git repository from the given directory.
 func New(dir string) (*Container, error) {
+	return NewWithWarningWriter(dir, os.Stderr)
+}
+
+// NewWithWarningWriter creates a new Container and sends config warnings to the writer.
+// Pass nil to suppress warnings.
+func NewWithWarningWriter(dir string, warningWriter io.Writer) (*Container, error) {
 	// Detect git repository
 	gitClient, err := git.NewClient(dir)
 	if err != nil {
@@ -89,7 +95,9 @@ func New(dir string) (*Container, error) {
 	appConfig, err := configLoader.Load()
 	if err != nil {
 		// Warn about config error and use defaults
-		fmt.Fprintf(os.Stderr, "warning: config error: %v (using defaults)\n", err)
+		if warningWriter != nil {
+			_, _ = fmt.Fprintf(warningWriter, "warning: config error: %v (using defaults)\n", err)
+		}
 		appConfig = domain.NewDefaultConfig()
 	}
 

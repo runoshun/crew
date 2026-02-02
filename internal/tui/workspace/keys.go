@@ -28,7 +28,7 @@ func DefaultKeyMap() KeyMap {
 		),
 		Enter: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("enter", "open repo"),
+			key.WithHelp("enter", "focus tasks"),
 		),
 		Add: key.NewBinding(
 			key.WithKeys("a"),

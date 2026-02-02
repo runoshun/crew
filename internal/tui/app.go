@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -21,7 +22,8 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
 
-const autoRefreshInterval = 5 * time.Second
+// AutoRefreshInterval is the default refresh cadence for the TUI.
+const AutoRefreshInterval = 5 * time.Second
 
 // Model is the main bubbletea model for the TUI.
 //
@@ -118,6 +120,7 @@ type Model struct {
 	showAll                 bool
 	detailFocused           bool // Right pane is focused for scrolling
 	blockFocusUnblock       bool // True when Unblock button is focused in Block dialog
+	autoRefresh             bool
 	selectedTaskHasWorktree bool
 }
 
@@ -199,21 +202,47 @@ func New(c *app.Container) *Model {
 		commentCounts:      make(map[int]int),
 		agentCursor:        0,
 		startFocusCustom:   false,
+		autoRefresh:        true,
 	}
 }
 
 // Init initializes the model and returns the initial command.
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(
-		m.loadTasks(),
-		m.loadConfig(),
-		m.tick(),
+	cmds := []tea.Cmd{m.loadTasks(), m.loadConfig()}
+	if m.autoRefresh {
+		cmds = append(cmds, m.tick())
+	}
+	return tea.Batch(cmds...)
+}
+
+// DisableAutoRefresh disables periodic task refresh ticks.
+func (m *Model) DisableAutoRefresh() {
+	m.autoRefresh = false
+}
+
+// UsesCursorKeys reports whether left/right should be forwarded to inputs.
+func (m *Model) UsesCursorKeys() bool {
+	if m.mode.IsInputMode() {
+		return true
+	}
+	return m.mode == ModeStart && m.startFocusCustom
+}
+
+// UseHLPagingKeys limits page navigation to h/l.
+func (m *Model) UseHLPagingKeys() {
+	m.keys.PrevPage = key.NewBinding(
+		key.WithKeys("h"),
+		key.WithHelp("h", "prev page"),
+	)
+	m.keys.NextPage = key.NewBinding(
+		key.WithKeys("l"),
+		key.WithHelp("l", "next page"),
 	)
 }
 
 // tick returns a command that sends a tick message after the refresh interval.
 func (m *Model) tick() tea.Cmd {
-	return tea.Tick(autoRefreshInterval, func(t time.Time) tea.Msg {
+	return tea.Tick(AutoRefreshInterval, func(t time.Time) tea.Msg {
 		return MsgTick{}
 	})
 }
