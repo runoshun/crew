@@ -776,7 +776,7 @@ func TestNewSubstateCommand_Success(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, store.saveCalled)
-	assert.Equal(t, "default", store.lastNamespace)
+	assert.Equal(t, domain.DefaultNamespace, store.lastNamespace)
 	assert.Equal(t, 1, store.lastTaskID)
 	assert.Equal(t, domain.ACPExecutionAwaitingPermission, store.savedState.ExecutionSubstate)
 }

@@ -492,5 +492,5 @@ func resolveNamespace(cfg *domain.Config, gitClient domain.Git) string {
 			}
 		}
 	}
-	return "default"
+	return domain.DefaultNamespace
 }
