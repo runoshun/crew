@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -148,4 +149,30 @@ func TestWrapRepoCmdWrapsTuiMsg(t *testing.T) {
 	}
 }
 
+func TestWrapRepoCmdPassesThroughExecMsg(t *testing.T) {
+	m := New()
+	cmd := tea.Exec(noopExecCmd{}, func(error) tea.Msg { return nil })
+	wrapped := m.wrapRepoCmd("/repo/a", cmd)
+	if wrapped == nil {
+		t.Fatalf("expected wrapped cmd to be non-nil")
+	}
+	msg := wrapped()
+	if msg == nil {
+		t.Fatalf("expected wrapped cmd to return a message")
+	}
+	if _, ok := msg.(RepoMsg); ok {
+		t.Fatalf("expected exec message to pass through, got %T", msg)
+	}
+}
+
 type otherMsg struct{}
+
+type noopExecCmd struct{}
+
+func (noopExecCmd) Run() error { return nil }
+
+func (noopExecCmd) SetStdin(io.Reader) {}
+
+func (noopExecCmd) SetStdout(io.Writer) {}
+
+func (noopExecCmd) SetStderr(io.Writer) {}

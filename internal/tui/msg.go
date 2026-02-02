@@ -4,6 +4,8 @@ import "github.com/runoshun/git-crew/v2/internal/domain"
 
 // Msg is the sealed interface for all TUI messages.
 // All message types must implement the sealed() method.
+// Messages intended for repo routing must implement Msg; non-Msg tea.Msg
+// are treated as program-level messages by workspace.
 //
 // go-sumtype:decl Msg
 type Msg interface {
