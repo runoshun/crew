@@ -209,7 +209,11 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 
 		reviewSucceeded := false
 		for attempt := 1; attempt <= maxReviews; attempt++ {
-			reviewResult, reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent, cfg)
+			previousReview := ""
+			if attempt > 1 {
+				previousReview = lastReviewResult
+			}
+			reviewResult, reviewErr := uc.runReview(ctx, task, in.Verbose, in.ReviewAgent, cfg, attempt, previousReview)
 			if reviewErr != nil {
 				return nil, reviewErr
 			}
@@ -257,7 +261,7 @@ func (uc *CompleteTask) Execute(ctx context.Context, in CompleteTaskInput) (*Com
 	}, nil
 }
 
-func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbose bool, agent string, cfg *domain.Config) (string, error) {
+func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbose bool, agent string, cfg *domain.Config, attempt int, previousReview string) (string, error) {
 	reviewSessionName := domain.ReviewSessionName(task.ID)
 	running, err := uc.sessions.IsRunning(reviewSessionName)
 	if err != nil {
@@ -291,8 +295,10 @@ func (uc *CompleteTask) runReview(ctx context.Context, task *domain.Task, verbos
 			Worktrees:    uc.worktrees,
 			RepoRoot:     uc.repoRoot,
 		}, shared.ReviewCommandInput{
-			Task:  task,
-			Agent: agent,
+			Task:           task,
+			Agent:          agent,
+			ReviewAttempt:  attempt,
+			PreviousReview: previousReview,
 		})
 		if prepareErr != nil {
 			return "", prepareErr
