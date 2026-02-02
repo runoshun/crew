@@ -280,7 +280,7 @@ func TestUpdate_MsgReviewActionCompleted(t *testing.T) {
 		reviewActionCursor: 1,
 	}
 
-	msg := MsgReviewActionCompleted{TaskID: 42, Action: ReviewActionNotifyWorker}
+	msg := MsgReviewActionCompleted{TaskID: 42}
 
 	updatedModel, _ := m.Update(msg)
 	result, ok := updatedModel.(*Model)

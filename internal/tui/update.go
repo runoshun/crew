@@ -1145,12 +1145,20 @@ func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.reviewMessageInput.Blur()
 		if m.reviewMessageReturnMode == ModeReviewAction {
 			m.mode = ModeReviewAction
-		} else {
-			m.mode = ModeNormal
+			m.reviewMessageReturnMode = ModeNormal
+			return m, nil
+		}
+		if m.reviewMessageReturnMode == ModeActionMenu {
 			m.reviewTaskID = 0
 			m.reviewResult = ""
 			m.reviewActionCursor = 0
+			m.reviewMessageReturnMode = ModeNormal
+			return m.openActionMenu()
 		}
+		m.mode = ModeNormal
+		m.reviewTaskID = 0
+		m.reviewResult = ""
+		m.reviewActionCursor = 0
 		m.reviewMessageReturnMode = ModeNormal
 		return m, nil
 
