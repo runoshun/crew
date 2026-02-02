@@ -446,6 +446,16 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.updateLayoutSizes() // Update both taskList and viewport sizes
 		return m, m.loadComments(task.ID)
 
+	// Tab: focus detail panel (in workspace mode, cycles through panes)
+	case msg.Type == tea.KeyTab:
+		task := m.SelectedTask()
+		if task == nil {
+			return m, nil
+		}
+		m.detailFocused = true
+		m.updateLayoutSizes()
+		return m, m.loadComments(task.ID)
+
 	case key.Matches(msg, m.keys.ToggleShowAll):
 		m.showAll = !m.showAll
 		return m, m.loadTasks()
@@ -950,6 +960,12 @@ func (m *Model) handleDetailPanelFocused(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.detailFocused = false
 		m.updateLayoutSizes() // Restore taskList width
 		return m, nil
+
+	// Tab: return focus to workspace (in workspace mode)
+	case msg.Type == tea.KeyTab:
+		m.detailFocused = false
+		m.updateLayoutSizes()
+		return m, func() tea.Msg { return MsgFocusWorkspace{} }
 
 	// Arrow keys: 1 line scroll
 	case msg.String() == "up":

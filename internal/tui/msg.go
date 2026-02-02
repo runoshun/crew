@@ -186,3 +186,9 @@ func (MsgAttachManagerSession) sealed() {}
 type MsgShowManagerSelect struct{}
 
 func (MsgShowManagerSelect) sealed() {}
+
+// MsgFocusWorkspace is sent when TUI wants to return focus to the workspace pane.
+// This is used in workspace mode when Tab is pressed from the detail panel.
+type MsgFocusWorkspace struct{}
+
+func (MsgFocusWorkspace) sealed() {}

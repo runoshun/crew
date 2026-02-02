@@ -255,6 +255,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.Err
 		return m, nil
 
+	case tui.MsgFocusWorkspace:
+		m.leftFocused = true
+		return m, nil
+
 	case RepoMsg:
 		return m.routeRepoMsg(msg)
 
@@ -640,6 +644,10 @@ func (m *Model) wrapRepoCmd(path string, cmd tea.Cmd) tea.Cmd {
 		default:
 			// Route internal TUI messages through RepoMsg; program-level messages
 			// (exec/alt-screen/etc.) must pass through unwrapped.
+			// MsgFocusWorkspace is handled by workspace model, not wrapped.
+			if _, ok := msg.(tui.MsgFocusWorkspace); ok {
+				return msg
+			}
 			if _, ok := msg.(tui.Msg); ok {
 				return RepoMsg{Path: path, Msg: msg}
 			}
