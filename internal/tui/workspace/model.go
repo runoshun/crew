@@ -119,13 +119,6 @@ func (m *Model) loadRepos() tea.Cmd {
 }
 
 func (m *Model) tick() tea.Cmd {
-	if m.activeRepo == "" {
-		return nil
-	}
-	model, ok := m.models[m.activeRepo]
-	if !ok || model == nil {
-		return nil
-	}
 	return tea.Tick(tui.AutoRefreshInterval, func(t time.Time) tea.Msg {
 		return MsgTick{}
 	})
@@ -538,7 +531,7 @@ func (m *Model) ensureActiveModel() tea.Cmd {
 		m.models[m.activeRepo] = model
 		initCmd := m.wrapRepoCmd(m.activeRepo, model.Init())
 		sizeCmd := m.updateModelSize(m.activeRepo)
-		return tea.Batch(initCmd, sizeCmd, m.tick())
+		return tea.Batch(initCmd, sizeCmd)
 	}
 	return m.updateModelSize(m.activeRepo)
 }
@@ -641,7 +634,7 @@ func (m *Model) wrapRepoCmd(path string, cmd tea.Cmd) tea.Cmd {
 			}
 			return wrapped
 		case tea.QuitMsg:
-			return typed
+			return nil
 		case RepoMsg:
 			return typed
 		default:
