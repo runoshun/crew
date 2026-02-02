@@ -149,10 +149,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgTick:
 		// Auto-refresh: reload tasks and schedule next tick
+		cmds := []tea.Cmd{m.loadTasks()}
 		if m.autoRefresh {
-			return m, tea.Batch(m.loadTasks(), m.tick())
+			cmds = append(cmds, m.tick())
 		}
-		return m, m.loadTasks()
+		// Auto-refresh Diff and Peek content when showing and panel is focused
+		if m.detailFocused {
+			if task := m.SelectedTask(); task != nil {
+				switch m.panelContent {
+				case PanelContentDetail:
+					// Detail content is refreshed with task reload
+				case PanelContentDiff:
+					cmds = append(cmds, m.loadDiffContent(task.ID))
+				case PanelContentPeek:
+					cmds = append(cmds, m.loadPeekContent(task.ID))
+				}
+			}
+		}
+		return m, tea.Batch(cmds...)
 
 	case MsgCommentsLoaded:
 		m.comments = msg.Comments
@@ -197,6 +211,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case MsgShowManagerSelect:
 		// Show manager agent selection UI
 		m.mode = ModeSelectManager
+		return m, nil
+
+	case MsgDiffLoaded:
+		m.panelContentLoading = false
+		task := m.SelectedTask()
+		if task != nil && task.ID == msg.TaskID {
+			m.diffContent = msg.Content
+			m.updateDetailPanelViewport()
+		}
+		return m, nil
+
+	case MsgPeekLoaded:
+		m.panelContentLoading = false
+		task := m.SelectedTask()
+		if task != nil && task.ID == msg.TaskID {
+			m.peekContent = msg.Content
+			m.updateDetailPanelViewport()
+		}
 		return m, nil
 	}
 
@@ -261,6 +293,13 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
 
+	// Esc: return focus to workspace (in embedded mode)
+	case key.Matches(msg, m.keys.Escape):
+		if m.embedded {
+			return m, func() tea.Msg { return MsgFocusWorkspace{} }
+		}
+		return m, nil
+
 	case key.Matches(msg, m.keys.Up), key.Matches(msg, m.keys.Down):
 		prevTask := m.SelectedTask()
 		var cmd tea.Cmd
@@ -269,6 +308,9 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If task changed and we're showing detail panel, load comments
 		if prevTask != newTask && newTask != nil {
 			m.updateSelectedTaskWorktree()
+			// Clear cached content when task changes
+			m.diffContent = ""
+			m.peekContent = ""
 			if m.showDetailPanel() {
 				// Update viewport content immediately, comments will update async
 				m.updateDetailPanelViewport()
@@ -939,22 +981,26 @@ func (m *Model) handleDetailPanelFocused(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
 
-	// Exit focus: v, Esc, h, left arrow
+	// Exit focus: v, Esc - return to task list
 	case key.Matches(msg, m.keys.Detail), key.Matches(msg, m.keys.Escape):
 		m.detailFocused = false
-		m.updateLayoutSizes() // Restore taskList width
+		m.panelContent = PanelContentDetail // Reset to detail when exiting
+		m.updateLayoutSizes()               // Restore taskList width
 		return m, nil
 
-	case msg.String() == "h", msg.String() == "left":
-		m.detailFocused = false
-		m.updateLayoutSizes() // Restore taskList width
-		return m, nil
-
-	// Tab: return focus to workspace (in workspace mode)
+	// Tab: cycle to next content type
 	case msg.Type == tea.KeyTab:
-		m.detailFocused = false
-		m.updateLayoutSizes()
-		return m, func() tea.Msg { return MsgFocusWorkspace{} }
+		return m.switchPanelContent(m.panelContent.Next())
+
+	// 1, 2, 3: switch panel content directly
+	case msg.String() == "1":
+		return m.switchPanelContent(PanelContentDetail)
+
+	case msg.String() == "2":
+		return m.switchPanelContent(PanelContentDiff)
+
+	case msg.String() == "3":
+		return m.switchPanelContent(PanelContentPeek)
 
 	// Arrow keys: 1 line scroll
 	case msg.String() == "up":
@@ -988,6 +1034,35 @@ func (m *Model) handleDetailPanelFocused(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.detailPanelViewport, cmd = m.detailPanelViewport.Update(msg)
 	return m, cmd
+}
+
+// switchPanelContent switches the panel to the specified content type.
+func (m *Model) switchPanelContent(content PanelContent) (tea.Model, tea.Cmd) {
+	task := m.SelectedTask()
+	if task == nil {
+		return m, nil
+	}
+
+	m.panelContent = content
+	m.detailPanelViewport.GotoTop() // Reset scroll position
+
+	switch content {
+	case PanelContentDetail:
+		m.updateDetailPanelViewport()
+		return m, m.loadComments(task.ID)
+	case PanelContentDiff:
+		m.panelContentLoading = true
+		m.diffContent = ""
+		m.updateDetailPanelViewport()
+		return m, m.loadDiffContent(task.ID)
+	case PanelContentPeek:
+		m.panelContentLoading = true
+		m.peekContent = ""
+		m.updateDetailPanelViewport()
+		return m, m.loadPeekContent(task.ID)
+	}
+
+	return m, nil
 }
 
 // handleEditStatusMode handles keys in status change mode.

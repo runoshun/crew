@@ -774,17 +774,20 @@ func (m *Model) viewMain() string {
 		return m.viewEmptyState()
 	}
 
+	paneHeight := m.paneContentHeight()
+
 	var panes string
 	leftPane := m.viewLeftPane()
 	if !m.isSplitView() {
 		if m.leftFocused {
-			panes = leftPane
+			panes = lipgloss.NewStyle().Height(paneHeight).Render(leftPane)
 		} else {
-			panes = m.viewRightPane()
+			panes = lipgloss.NewStyle().Height(paneHeight).Render(m.viewRightPane())
 		}
 	} else {
 		rightPane := m.viewRightPane()
-		panes = lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
+		combined := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
+		panes = lipgloss.NewStyle().Height(paneHeight).Render(combined)
 	}
 
 	// Add unified status line at the bottom
@@ -824,41 +827,29 @@ func (m *Model) viewRightPane() string {
 
 func (m *Model) viewRightPaneContent() string {
 	if m.activeRepo == "" {
-		return m.withRightPaneHint(m.styles.Muted.Render("Select a repository to view tasks."))
+		return m.styles.Muted.Render("Select a repository to view tasks.")
 	}
 	info, ok := m.repoInfos[m.activeRepo]
 	if !ok {
-		return m.withRightPaneHint(m.styles.Loading.Render("Loading repository..."))
+		return m.styles.Loading.Render("Loading repository...")
 	}
 	if info.State != domain.RepoStateOK {
 		message := fmt.Sprintf("Cannot open: %s", info.State.String())
 		if info.ErrorMsg != "" {
 			message = message + "\n" + info.ErrorMsg
 		}
-		return m.withRightPaneHint(m.styles.Error.Render(message))
+		return m.styles.Error.Render(message)
 	}
 	model, ok := m.models[m.activeRepo]
 	if !ok || model == nil {
-		return m.withRightPaneHint(m.styles.Loading.Render("Loading repository tasks..."))
+		return m.styles.Loading.Render("Loading repository tasks...")
 	}
 	// Update focus state before rendering
 	model.SetFocused(!m.leftFocused)
 	content := model.View()
 	if info.WarningMsg != "" {
 		warning := lipgloss.NewStyle().Foreground(tui.Colors.Warning).Render("Warning: " + info.WarningMsg)
-		return m.withRightPaneHint(warning + "\n" + content)
-	}
-	return m.withRightPaneHint(content)
-}
-
-func (m *Model) withRightPaneHint(content string) string {
-	if !m.isSplitView() && !m.leftFocused {
-		backKey := "left"
-		if m.activeModelUsesCursorKeys() {
-			backKey = "ctrl+left"
-		}
-		hint := m.styles.Muted.Render(backKey + ": back to list")
-		return hint + "\n" + content
+		return warning + "\n" + content
 	}
 	return content
 }
@@ -1071,10 +1062,10 @@ func (m *Model) getStatusInfo() tui.StatusLineInfo {
 }
 
 // paneContentHeight returns the height available for pane content.
-// This accounts for App style padding (top: 1, bottom: 1) and status line (1).
+// This accounts for App style padding (top: 1, bottom: 1) and status line (2: border + content).
 func (m *Model) paneContentHeight() int {
-	// height - 2 for App padding (top + bottom) - 1 for status line
-	h := m.height - 3
+	// height - 2 for App padding (top + bottom) - 2 for status line (border line + content line)
+	h := m.height - 4
 	if h < 0 {
 		h = 0
 	}

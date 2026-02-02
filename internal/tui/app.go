@@ -55,6 +55,7 @@ func (m *Model) defaultActionID(task *domain.Task) string {
 	return ""
 }
 
+//nolint:govet // Field alignment optimized for readability over memory layout.
 type Model struct {
 	// Dependencies (pointers first for alignment)
 	container *app.Container
@@ -99,11 +100,16 @@ type Model struct {
 	// Block dialog components
 	blockInput textinput.Model
 
+	// Panel content state (strings before smaller types)
+	diffContent string // Cached diff content
+	peekContent string // Cached peek content
+
 	// Numeric state (smaller types last)
 	mode                    Mode
 	confirmAction           ConfirmAction
 	sortMode                SortMode
 	newTaskField            NewTaskField
+	panelContent            PanelContent // Current content type displayed in right panel
 	width                   int
 	height                  int
 	confirmTaskID           int
@@ -125,6 +131,7 @@ type Model struct {
 	hideFooter              bool // Hide footer (used when embedded in workspace)
 	embedded                bool // Embedded mode (skip App padding, used in workspace)
 	focused                 bool // Whether this TUI has focus (used when embedded in workspace)
+	panelContentLoading     bool // Whether panel content is being loaded
 }
 
 // New creates a new TUI Model with the given container.
@@ -449,7 +456,7 @@ func (m *Model) updateDetailPanelViewport() {
 	}
 	m.detailPanelViewport.Width = panelWidth
 	m.detailPanelViewport.Height = panelHeight
-	m.detailPanelViewport.SetContent(m.detailPanelContent(panelWidth))
+	m.detailPanelViewport.SetContent(m.panelContentString(panelWidth))
 }
 
 // updateLayoutSizes updates all layout-dependent sizes (taskList, viewport).
@@ -1630,5 +1637,60 @@ func (m *Model) checkAndAttachOrSelectManager() tea.Cmd {
 
 		// Session not running, show agent selection UI
 		return MsgShowManagerSelect{}
+	}
+}
+
+// loadDiffContent returns a command that loads diff content for the panel.
+func (m *Model) loadDiffContent(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		uc := m.container.ShowDiffUseCaseForCommand()
+		execCmd, err := uc.GetCommand(context.Background(), usecase.ShowDiffInput{
+			TaskID: taskID,
+		})
+		if err != nil {
+			return MsgDiffLoaded{TaskID: taskID, Content: fmt.Sprintf("Error: %v", err)}
+		}
+
+		// Execute the command and capture output
+		// #nosec G204 - execCmd comes from trusted internal use case
+		cmd := exec.Command(execCmd.Program, execCmd.Args...)
+		cmd.Dir = execCmd.Dir
+
+		output, err := cmd.Output()
+		if err != nil {
+			// diff can return non-zero when there are differences, check if output exists
+			if len(output) > 0 {
+				return MsgDiffLoaded{TaskID: taskID, Content: string(output)}
+			}
+			return MsgDiffLoaded{TaskID: taskID, Content: fmt.Sprintf("Error: %v", err)}
+		}
+
+		content := string(output)
+		if content == "" {
+			content = "No changes"
+		}
+
+		return MsgDiffLoaded{TaskID: taskID, Content: content}
+	}
+}
+
+// loadPeekContent returns a command that loads peek content for the panel.
+func (m *Model) loadPeekContent(taskID int) tea.Cmd {
+	return func() tea.Msg {
+		uc := m.container.PeekSessionUseCase()
+		out, err := uc.Execute(context.Background(), usecase.PeekSessionInput{
+			TaskID: taskID,
+			Escape: true, // Preserve ANSI sequences
+		})
+		if err != nil {
+			return MsgPeekLoaded{TaskID: taskID, Content: fmt.Sprintf("No running session: %v", err)}
+		}
+
+		content := out.Output
+		if content == "" {
+			content = "No output"
+		}
+
+		return MsgPeekLoaded{TaskID: taskID, Content: content}
 	}
 }

@@ -185,3 +185,19 @@ func (MsgShowManagerSelect) sealed() {}
 type MsgFocusWorkspace struct{}
 
 func (MsgFocusWorkspace) sealed() {}
+
+// MsgDiffLoaded is sent when diff content is loaded for the panel.
+type MsgDiffLoaded struct {
+	Content string
+	TaskID  int
+}
+
+func (MsgDiffLoaded) sealed() {}
+
+// MsgPeekLoaded is sent when peek content is loaded for the panel.
+type MsgPeekLoaded struct {
+	Content string
+	TaskID  int
+}
+
+func (MsgPeekLoaded) sealed() {}

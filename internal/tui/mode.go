@@ -149,6 +149,41 @@ const (
 	SortByIDDesc
 )
 
+// PanelContent represents the content type displayed in the right panel.
+type PanelContent int
+
+const (
+	PanelContentDetail PanelContent = iota // Task details and comments
+	PanelContentDiff                       // Git diff output
+	PanelContentPeek                       // Session peek output
+)
+
+func (p PanelContent) String() string {
+	switch p {
+	case PanelContentDetail:
+		return "Detail"
+	case PanelContentDiff:
+		return "Diff"
+	case PanelContentPeek:
+		return "Peek"
+	default:
+		return "unknown"
+	}
+}
+
+func (p PanelContent) Next() PanelContent {
+	switch p {
+	case PanelContentDetail:
+		return PanelContentDiff
+	case PanelContentDiff:
+		return PanelContentPeek
+	case PanelContentPeek:
+		return PanelContentDetail
+	default:
+		return PanelContentDetail
+	}
+}
+
 func (s SortMode) String() string {
 	switch s {
 	case SortByStatusAsc:

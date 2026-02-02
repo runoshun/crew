@@ -151,13 +151,13 @@ func TestDetailPanelWidth(t *testing.T) {
 		},
 		{
 			name:     "Threshold width, minimum width panel",
-			width:    100, // 40% is 40, which is MinDetailPanelWidth
-			expected: 40,
+			width:    120, // 40% is 48
+			expected: 48,
 		},
 		{
 			name:     "Slightly wider screen, 40% panel",
-			width:    110, // 40% is 44
-			expected: 44,
+			width:    130, // 40% is 52
+			expected: 52,
 		},
 		{
 			name:     "Wide screen, 40% panel",

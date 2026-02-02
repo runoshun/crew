@@ -20,7 +20,7 @@ var ansiResetPattern = regexp.MustCompile(`\x1b\[(0?m|49m)`)
 var ansiTrailingResetPattern = regexp.MustCompile(`\x1b\[0?m$`)
 
 const (
-	MinWidthForDetailPanel = 100
+	MinWidthForDetailPanel = 120 // Same as workspace minSplitWidth for consistency
 	MinDetailPanelWidth    = 40
 	GutterWidth            = 1
 	appPadding             = 4
@@ -236,12 +236,21 @@ func (m *Model) viewMain() string {
 		leftPane.WriteString(m.viewFooter())
 	}
 
-	if m.showDetailPanel() {
-		rightContent := m.viewDetailPanel()
-		return lipgloss.JoinHorizontal(lipgloss.Top, leftPane.String(), rightContent)
+	leftContent := leftPane.String()
+
+	// In embedded mode, apply height constraint to prevent overflow
+	if m.embedded && m.height > 0 {
+		leftContent = lipgloss.NewStyle().
+			MaxHeight(m.height).
+			Render(leftContent)
 	}
 
-	return leftPane.String()
+	if m.showDetailPanel() {
+		rightContent := m.viewDetailPanel()
+		return lipgloss.JoinHorizontal(lipgloss.Top, leftContent, rightContent)
+	}
+
+	return leftContent
 }
 
 func (m *Model) headerFooterContentWidth() int {
@@ -998,17 +1007,8 @@ func (m *Model) detailPanelWidth() int {
 		return m.contentWidth()
 	}
 
-	// Determine ratio based on focus state
-	var ratio float64
-	if m.detailFocused {
-		// Wide screen + focused: 70%
-		ratio = 0.7
-	} else {
-		// Not focused (only possible on wide screens): 40%
-		ratio = 0.4
-	}
-
-	w := int(float64(m.width) * ratio)
+	// Fixed 40% width for detail panel (regardless of focus)
+	w := int(float64(m.width) * 0.4)
 	if w < MinDetailPanelWidth {
 		w = MinDetailPanelWidth
 	}
@@ -1127,6 +1127,63 @@ func (m *Model) detailPanelContent(contentWidth int) string {
 	return strings.Join(lines, "\n")
 }
 
+// viewPanelTabs renders the tab indicators for the panel.
+func (m *Model) viewPanelTabs(_ int) string {
+	tabStyle := lipgloss.NewStyle().Foreground(Colors.Muted)
+	activeTabStyle := lipgloss.NewStyle().Foreground(Colors.Primary).Bold(true)
+
+	tabs := []struct {
+		key     string
+		label   string
+		content PanelContent
+	}{
+		{"1", "Detail", PanelContentDetail},
+		{"2", "Diff", PanelContentDiff},
+		{"3", "Peek", PanelContentPeek},
+	}
+
+	var parts []string
+	for i, tab := range tabs {
+		style := tabStyle
+		if m.panelContent == tab.content {
+			style = activeTabStyle
+		}
+		part := style.Render(fmt.Sprintf("[%s] %s", tab.key, tab.label))
+		parts = append(parts, part)
+		if i < len(tabs)-1 {
+			parts = append(parts, tabStyle.Render("  "))
+		}
+	}
+
+	return lipgloss.JoinHorizontal(lipgloss.Left, parts...)
+}
+
+// panelContentString returns the content string for the current panel content type.
+func (m *Model) panelContentString(contentWidth int) string {
+	switch m.panelContent {
+	case PanelContentDetail:
+		return m.detailPanelContent(contentWidth)
+	case PanelContentDiff:
+		if m.panelContentLoading {
+			return "Loading..."
+		}
+		if m.diffContent == "" {
+			return "No diff available"
+		}
+		return m.diffContent
+	case PanelContentPeek:
+		if m.panelContentLoading {
+			return "Loading..."
+		}
+		if m.peekContent == "" {
+			return "No running session"
+		}
+		return m.peekContent
+	default:
+		return m.detailPanelContent(contentWidth)
+	}
+}
+
 func (m *Model) viewDetailPanel() string {
 	panelWidth := m.detailPanelWidth()
 	panelHeight := m.height - 2
@@ -1159,19 +1216,33 @@ func (m *Model) viewDetailPanel() string {
 		return panelStyle.Height(panelHeight).Render(emptyStyle.Render("Select a task\nto view details"))
 	}
 
-	// Header: "Task #N" - rendered outside viewport for dynamic focus styling
 	contentWidth := panelWidth - 4 // account for border and padding
 	borderColor := Colors.GroupLine
 	if m.detailFocused {
 		borderColor = Colors.Primary
 	}
+
+	// Header with tab indicators
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(Colors.Primary).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
 		BorderForeground(borderColor).
 		Width(contentWidth)
-	header := headerStyle.Render(fmt.Sprintf("Task #%d", task.ID))
+
+	taskLabel := fmt.Sprintf("Task #%d", task.ID)
+	tabs := m.viewPanelTabs(contentWidth)
+
+	// Calculate spacing between task label and tabs
+	labelWidth := lipgloss.Width(taskLabel)
+	tabsWidth := lipgloss.Width(tabs)
+	spacing := contentWidth - labelWidth - tabsWidth - 2
+	if spacing < 1 {
+		spacing = 1
+	}
+
+	headerContent := taskLabel + strings.Repeat(" ", spacing) + tabs
+	header := headerStyle.Render(headerContent)
 
 	// Use viewport for scrollable content (without header)
 	viewportContent := m.detailPanelViewport.View()
@@ -1185,7 +1256,14 @@ func (m *Model) viewDetailPanel() string {
 			Foreground(Colors.Muted).
 			Width(panelWidth - 4)
 		scrollInfo := fmt.Sprintf(" %d%%", int(m.detailPanelViewport.ScrollPercent()*100))
-		footer := footerStyle.Render("↑↓ scroll · j/k half · g/G jump · v/esc back" + scrollInfo)
+		var footerText string
+		switch m.panelContent {
+		case PanelContentDetail:
+			footerText = "↑↓ scroll · j/k half · tab next · v/esc back" + scrollInfo
+		case PanelContentDiff, PanelContentPeek:
+			footerText = "↑↓ scroll · j/k half · tab next · v/esc back" + scrollInfo
+		}
+		footer := footerStyle.Render(footerText)
 		content = content + "\n" + footer
 	}
 
