@@ -88,7 +88,7 @@ func TestSetSubstate_TaskNotFound(t *testing.T) {
 
 func TestSetSubstate_LoadError(t *testing.T) {
 	repo := testutil.NewMockTaskRepository()
-	repo.Tasks[1] = &domain.Task{ID: 1, Namespace: "default"}
+	repo.Tasks[1] = &domain.Task{ID: 1, Namespace: domain.DefaultNamespace}
 	store := &usecaseACPStateStore{loadErr: assert.AnError}
 	uc := NewSetSubstate(repo, store)
 

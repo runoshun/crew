@@ -53,6 +53,13 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 		}
 	};
 
+	// Best-effort: permission response event names observed in OpenCode runtime.
+	const permissionResolvedEvents = new Set([
+		"permission.responded",
+		"permission.response",
+		"permission.resolved",
+	]);
+
   return {
 		event: async ({ event }) => {
 			const canReplyPermission = $.client && $.client.permission && typeof $.client.permission.reply === "function";
@@ -91,8 +98,7 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 					return;
 				}
 			}
-			// Best-effort: treat any permission.* event other than "permission.asked" as resolved.
-			if (typeof event.type === "string" && event.type.startsWith("permission.") && event.type !== "permission.asked") {
+			if (permissionResolvedEvents.has(event.type)) {
 				await updateSubstate("running");
 			}
 		}

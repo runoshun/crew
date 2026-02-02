@@ -19,5 +19,5 @@ func ResolveACPNamespace(cfg *domain.Config, git domain.Git) string {
 			}
 		}
 	}
-	return "default"
+	return domain.DefaultNamespace
 }
