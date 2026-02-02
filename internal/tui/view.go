@@ -682,6 +682,9 @@ func (m *Model) viewFooter() string {
 		if m.canStopSelectedTask(m.SelectedTask()) {
 			content = content + "  " + keyStyle.Render("S") + " stop"
 		}
+		if task := m.SelectedTask(); task != nil && task.Status == domain.StatusDone {
+			content = content + "  " + keyStyle.Render("R") + " request changes"
+		}
 	case ModeFilter:
 		content = "enter apply · esc cancel"
 	case ModeChangeStatus:

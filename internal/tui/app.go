@@ -617,8 +617,7 @@ func (m *Model) unblockTask(taskID int) tea.Cmd {
 	}
 }
 
-// updateAgents updates the agent lists from config.
-// Agents with role=worker and hidden=false are shown in the TUI.
+// actionMenuItemsForTask builds menu actions for the selected task.
 func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 	if task == nil {
 		return nil
