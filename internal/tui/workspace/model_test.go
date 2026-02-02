@@ -1,13 +1,12 @@
 package workspace
 
 import (
-	"io"
-	"reflect"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/domain"
+	"github.com/runoshun/git-crew/v2/internal/tui"
 )
 
 func TestModelSetsActiveRepoOnLoad(t *testing.T) {
@@ -113,9 +112,9 @@ func TestViewRightPaneContentShowsError(t *testing.T) {
 	}
 }
 
-func TestWrapRepoCmdPassesThroughExecMsg(t *testing.T) {
+func TestWrapRepoCmdPassesThroughNonTuiMsg(t *testing.T) {
 	m := New()
-	cmd := tea.Exec(noopExecCmd{}, func(error) tea.Msg { return nil })
+	cmd := func() tea.Msg { return otherMsg{} }
 	wrapped := m.wrapRepoCmd("/repo/a", cmd)
 	if wrapped == nil {
 		t.Fatalf("expected wrapped cmd to be non-nil")
@@ -124,28 +123,29 @@ func TestWrapRepoCmdPassesThroughExecMsg(t *testing.T) {
 	if msg == nil {
 		t.Fatalf("expected wrapped cmd to return a message")
 	}
-	typeOf := reflect.TypeOf(msg)
-	if typeOf.Kind() == reflect.Ptr {
-		typeOf = typeOf.Elem()
-	}
-	if typeOf.PkgPath() != "github.com/charmbracelet/bubbletea" {
-		t.Fatalf("expected bubbletea message, got %s.%s", typeOf.PkgPath(), typeOf.Name())
-	}
-	name := typeOf.Name()
-	if name == "" {
-		t.Fatalf("expected named bubbletea message, got empty name")
-	}
-	if name[0] < 'a' || name[0] > 'z' {
-		t.Fatalf("expected unexported bubbletea message, got %s", name)
+	if _, ok := msg.(otherMsg); !ok {
+		t.Fatalf("expected otherMsg to pass through, got %T", msg)
 	}
 }
 
-type noopExecCmd struct{}
+func TestWrapRepoCmdWrapsTuiMsg(t *testing.T) {
+	m := New()
+	cmd := func() tea.Msg { return tui.MsgReloadTasks{} }
+	wrapped := m.wrapRepoCmd("/repo/a", cmd)
+	if wrapped == nil {
+		t.Fatalf("expected wrapped cmd to be non-nil")
+	}
+	msg := wrapped()
+	repoMsg, ok := msg.(RepoMsg)
+	if !ok {
+		t.Fatalf("expected RepoMsg, got %T", msg)
+	}
+	if repoMsg.Path != "/repo/a" {
+		t.Fatalf("expected repo path /repo/a, got %q", repoMsg.Path)
+	}
+	if _, ok := repoMsg.Msg.(tui.MsgReloadTasks); !ok {
+		t.Fatalf("expected MsgReloadTasks, got %T", repoMsg.Msg)
+	}
+}
 
-func (noopExecCmd) Run() error { return nil }
-
-func (noopExecCmd) SetStdin(io.Reader) {}
-
-func (noopExecCmd) SetStdout(io.Writer) {}
-
-func (noopExecCmd) SetStderr(io.Writer) {}
+type otherMsg struct{}

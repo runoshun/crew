@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"time"
 
@@ -639,34 +638,12 @@ func (m *Model) wrapRepoCmd(path string, cmd tea.Cmd) tea.Cmd {
 		case RepoMsg:
 			return typed
 		default:
-			if isBubbleteaInternalMsg(msg) {
-				return msg
+			if _, ok := msg.(tui.Msg); ok {
+				return RepoMsg{Path: path, Msg: msg}
 			}
-			return RepoMsg{Path: path, Msg: msg}
+			return msg
 		}
 	}
-}
-
-func isBubbleteaInternalMsg(msg tea.Msg) bool {
-	if msg == nil {
-		return false
-	}
-	typeOf := reflect.TypeOf(msg)
-	if typeOf == nil {
-		return false
-	}
-	if typeOf.Kind() == reflect.Ptr {
-		typeOf = typeOf.Elem()
-	}
-	if typeOf.PkgPath() != "github.com/charmbracelet/bubbletea" {
-		return false
-	}
-	name := typeOf.Name()
-	if name == "" {
-		return false
-	}
-	first := name[0]
-	return first >= 'a' && first <= 'z'
 }
 
 // addRepo returns a command that adds a repo.
