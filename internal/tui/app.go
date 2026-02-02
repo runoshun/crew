@@ -328,14 +328,9 @@ func (m *Model) sessionLogPath(taskID int, isReview bool) (string, error) {
 func (m *Model) hasSessionLog(taskID int, isReview bool) bool {
 	logPath, err := m.sessionLogPath(taskID, isReview)
 	if err != nil {
-		m.err = err
 		return false
 	}
 	if _, err := os.Stat(logPath); err != nil {
-		if os.IsNotExist(err) {
-			return false
-		}
-		m.err = fmt.Errorf("check log file: %w", err)
 		return false
 	}
 	return true
@@ -1102,6 +1097,32 @@ func (m *Model) showDiff(taskID int) tea.Cmd {
 	}
 }
 
+func resolvePagerCommand() (string, []string, error) {
+	pager := strings.TrimSpace(os.Getenv("PAGER"))
+	if pager != "" {
+		fields := strings.Fields(pager)
+		if len(fields) == 0 {
+			return "", nil, fmt.Errorf("PAGER is set but empty")
+		}
+		return fields[0], fields[1:], nil
+	}
+
+	candidates := []struct {
+		program string
+		args    []string
+	}{
+		{program: "less", args: []string{"-R"}},
+		{program: "more"},
+	}
+	for _, candidate := range candidates {
+		if _, err := exec.LookPath(candidate.program); err == nil {
+			return candidate.program, candidate.args, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("no pager found (set PAGER)")
+}
+
 // showLogInPager returns a tea.Cmd that opens a session log in a pager.
 func (m *Model) showLogInPager(taskID int, isReview bool) tea.Cmd {
 	return func() tea.Msg {
@@ -1109,14 +1130,18 @@ func (m *Model) showLogInPager(taskID int, isReview bool) tea.Cmd {
 		if err != nil {
 			return MsgError{Err: err}
 		}
-		if _, err := os.Stat(logPath); err != nil {
-			if os.IsNotExist(err) {
+		if _, statErr := os.Stat(logPath); statErr != nil {
+			if os.IsNotExist(statErr) {
 				sessionName := sessionNameForLog(taskID, isReview)
 				return MsgError{Err: fmt.Errorf("no log file found for session %s: %w", sessionName, domain.ErrNoSession)}
 			}
-			return MsgError{Err: fmt.Errorf("check log file: %w", err)}
+			return MsgError{Err: fmt.Errorf("check log file: %w", statErr)}
 		}
-		cmd := domain.NewCommand("less", []string{"-R", logPath}, "")
+		program, args, err := resolvePagerCommand()
+		if err != nil {
+			return MsgError{Err: err}
+		}
+		cmd := domain.NewCommand(program, append(args, logPath), "")
 		return execLogMsg{cmd: cmd}
 	}
 }

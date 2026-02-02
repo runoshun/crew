@@ -39,9 +39,22 @@ func TestModel_hasSessionLog(t *testing.T) {
 	assert.True(t, model.hasSessionLog(1, false))
 }
 
+func TestModel_hasSessionLog_Review(t *testing.T) {
+	crewDir := t.TempDir()
+	model := &Model{container: &app.Container{Config: app.Config{CrewDir: crewDir}}}
+
+	logPath, err := model.sessionLogPath(1, true)
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(logPath), 0o755))
+	require.NoError(t, os.WriteFile(logPath, []byte("log"), 0o644))
+
+	assert.True(t, model.hasSessionLog(1, true))
+}
+
 func TestModel_showLogInPager_ReturnsExecLogMsg(t *testing.T) {
 	crewDir := t.TempDir()
 	model := &Model{container: &app.Container{Config: app.Config{CrewDir: crewDir}}}
+	t.Setenv("PAGER", "cat -n")
 
 	logPath, err := model.sessionLogPath(1, false)
 	require.NoError(t, err)
@@ -53,8 +66,8 @@ func TestModel_showLogInPager_ReturnsExecLogMsg(t *testing.T) {
 
 	execMsg, ok := msg.(execLogMsg)
 	require.True(t, ok)
-	assert.Equal(t, "less", execMsg.cmd.Program)
-	assert.Equal(t, []string{"-R", logPath}, execMsg.cmd.Args)
+	assert.Equal(t, "cat", execMsg.cmd.Program)
+	assert.Equal(t, []string{"-n", logPath}, execMsg.cmd.Args)
 }
 
 func TestModel_showLogInPager_MissingLog(t *testing.T) {
