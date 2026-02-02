@@ -61,17 +61,18 @@ type Model struct {
 	err       error
 
 	// State (slices - contain pointers)
-	tasks           []*domain.Task
-	comments        []domain.Comment
-	commentCounts   map[int]int // taskID -> comment count
-	builtinAgents   []string
-	customAgents    []string
-	managerAgents   []string
-	agentCommands   map[string]string
-	customKeybinds  map[string]domain.TUIKeybinding
-	keybindWarnings []string
-	reviewResult    string // Review result text
-	actionMenuItems []actionMenuItem
+	tasks            []*domain.Task
+	comments         []domain.Comment
+	commentCounts    map[int]int // taskID -> comment count
+	builtinAgents    []string
+	customAgents     []string
+	managerAgents    []string
+	agentCommands    map[string]string
+	customKeybinds   map[string]domain.TUIKeybinding
+	keybindWarnings  []string
+	reviewResult     string // Review result text
+	actionMenuLastID string
+	actionMenuItems  []actionMenuItem
 
 	// Components (structs with pointers)
 	keys                KeyMap

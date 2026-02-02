@@ -284,10 +284,12 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case key.Matches(msg, m.keys.PrevPage):
 		m.taskList.Paginator.PrevPage()
+		m.updateSelectedTaskWorktree()
 		return m, nil
 
 	case key.Matches(msg, m.keys.NextPage):
 		m.taskList.Paginator.NextPage()
+		m.updateSelectedTaskWorktree()
 		return m, nil
 
 	case key.Matches(msg, m.keys.Enter):
@@ -490,7 +492,6 @@ func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.actionMenuItems = items
-	previousCursor := m.actionMenuCursor
 	m.actionMenuCursor = 0
 	for i, item := range items {
 		if item.IsDefault {
@@ -498,8 +499,13 @@ func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
 			break
 		}
 	}
-	if previousCursor >= 0 && previousCursor < len(items) {
-		m.actionMenuCursor = previousCursor
+	if m.actionMenuLastID != "" {
+		for i, item := range items {
+			if item.ActionID == m.actionMenuLastID {
+				m.actionMenuCursor = i
+				break
+			}
+		}
 	}
 	m.mode = ModeActionMenu
 	return m, nil
@@ -508,6 +514,9 @@ func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
 func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.Escape):
+		if len(m.actionMenuItems) > 0 && m.actionMenuCursor < len(m.actionMenuItems) {
+			m.actionMenuLastID = m.actionMenuItems[m.actionMenuCursor].ActionID
+		}
 		m.mode = ModeNormal
 		m.actionMenuItems = nil
 		return m, nil
@@ -530,6 +539,7 @@ func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		selected := m.actionMenuItems[m.actionMenuCursor]
+		m.actionMenuLastID = selected.ActionID
 		m.mode = ModeNormal
 		m.actionMenuItems = nil
 		if selected.Action == nil {
@@ -544,6 +554,7 @@ func (m *Model) handleActionMenuMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		runeKey := string(msg.Runes)
 		for _, action := range m.actionMenuItems {
 			if action.Key == runeKey {
+				m.actionMenuLastID = action.ActionID
 				m.mode = ModeNormal
 				m.actionMenuItems = nil
 				if action.Action == nil {
@@ -1075,7 +1086,7 @@ func (m *Model) handleReviewResultMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleReviewActionMode handles keys when selecting a review action.
 func (m *Model) handleReviewActionMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	const numActions = 5 // NotifyWorker (restart), NotifyWorker (no restart), Merge, Close, EditComment
+	const numActions = 5 // Request Changes, Comment Only, Merge, Close, Edit Comment
 
 	switch {
 	case key.Matches(msg, m.keys.Escape):
