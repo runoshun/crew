@@ -472,11 +472,19 @@ func findLastReviewRunStart(logPath string, maxBytes int64) (int64, time.Time, b
 			return 0, time.Time{}, false
 		}
 	}
-	idx := strings.LastIndex(text, reviewRunStartPrefix)
-	if idx < 0 {
-		return 0, time.Time{}, false
+	searchText := text
+	idx := -1
+	for {
+		idx = strings.LastIndex(searchText, reviewRunStartPrefix)
+		if idx < 0 {
+			return 0, time.Time{}, false
+		}
+		if idx == 0 || searchText[idx-1] == '\n' {
+			break
+		}
+		searchText = searchText[:idx]
 	}
-	line := text[idx:]
+	line := searchText[idx:]
 	if nl := strings.IndexByte(line, '\n'); nl >= 0 {
 		line = line[:nl]
 	}
@@ -618,7 +626,19 @@ func extractReviewResult(logText string) (string, bool) {
 
 	// If the log contains multiple review runs (e.g. file was appended), only consider
 	// the latest run to avoid accidentally picking an old marker.
-	if idx := strings.LastIndex(logText, reviewRunStartPrefix); idx >= 0 {
+	searchText := logText
+	idx := -1
+	for {
+		idx = strings.LastIndex(searchText, reviewRunStartPrefix)
+		if idx < 0 {
+			break
+		}
+		if idx == 0 || searchText[idx-1] == '\n' {
+			break
+		}
+		searchText = searchText[:idx]
+	}
+	if idx >= 0 {
 		logText = logText[idx+len(reviewRunStartPrefix):]
 		if nl := strings.IndexByte(logText, '\n'); nl >= 0 {
 			logText = logText[nl+1:]

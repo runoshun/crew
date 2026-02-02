@@ -886,9 +886,7 @@ func TestCompleteTask_Execute_ReviewSessionAlreadyRunning(t *testing.T) {
 
 	uc := newTestCompleteTask(t, repo, sessions, worktrees, git, configLoader, clock, executor)
 	logPath := domain.SessionLogPath(uc.crewDir, domain.ReviewSessionName(1))
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
-		require.NoError(t, err)
-	}
+	require.NoError(t, os.MkdirAll(filepath.Dir(logPath), 0o750))
 	content := strings.Join([]string{
 		"old output",
 		reviewRunStartPrefix + "2026-02-01T00:00:00Z",
@@ -899,6 +897,7 @@ func TestCompleteTask_Execute_ReviewSessionAlreadyRunning(t *testing.T) {
 		"new review output",
 		domain.ReviewResultMarker,
 		domain.ReviewLGTMPrefix + " Looks good",
+		"note: " + reviewRunStartPrefix + "inline mention should be ignored",
 		"",
 	}, "\n")
 	require.NoError(t, os.WriteFile(logPath, []byte(content), 0o644))
