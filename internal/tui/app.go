@@ -677,7 +677,6 @@ func (m *Model) unblockTask(taskID int) tea.Cmd {
 	}
 }
 
-// actionMenuItemsForTask builds menu actions for the selected task.
 func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 	if task == nil {
 		return nil
@@ -1283,11 +1282,7 @@ func (m *Model) notifyWorker(taskID int, message string, requestChanges bool) te
 		if err != nil {
 			return MsgError{Err: err}
 		}
-		action := ReviewActionNotifyWorker
-		if requestChanges {
-			action = ReviewActionRequestChanges
-		}
-		return MsgReviewActionCompleted{TaskID: taskID, Action: action}
+		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionNotifyWorker}
 	}
 }
 
