@@ -170,8 +170,6 @@ func (m *Model) View() string {
 		dialog = m.viewEditReviewCommentDialog()
 	case ModeBlock:
 		dialog = m.viewBlockDialog()
-	case ModeSelectReviewer:
-		dialog = m.viewSelectReviewerDialog()
 	}
 
 	if dialog != "" {
@@ -271,14 +269,14 @@ func (m *Model) viewHeader() string {
 		}
 		switch mode {
 		case domain.ReviewModeAutoFix:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Primary).Render("[R:fix]") + " · "
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Primary).Render("[review:fix]") + " · "
 		case domain.ReviewModeManual:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Warning).Render("[R:man]") + " · "
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Warning).Render("[review:man]") + " · "
 		case domain.ReviewModeAuto:
-			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[R:auto]") + " · "
+			reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[review:auto]") + " · "
 		}
 	} else {
-		reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[R:auto]") + " · "
+		reviewModeLabel = lipgloss.NewStyle().Foreground(Colors.Success).Render("[review:auto]") + " · "
 	}
 
 	// Add filter indicator
@@ -471,56 +469,6 @@ func (m *Model) viewConfirmDialog() string {
 		buttons,
 	)
 
-	return m.dialogStyle().Render(content)
-}
-
-func (m *Model) viewSelectReviewerDialog() string {
-	task := m.SelectedTask()
-	if task == nil {
-		return ""
-	}
-
-	ds := m.newDialogStyles()
-	baseStyle := lipgloss.NewStyle().Background(ds.bg)
-
-	title := ds.renderLine(ds.label.Render("Select Reviewer"))
-	taskLine := ds.renderLine(ds.text.Render(fmt.Sprintf("Task #%d: %s", task.ID, task.Title)))
-	selectLabel := ds.renderLine(ds.label.Render("Reviewer Agent:"))
-
-	var reviewerRows []string
-	if len(m.reviewerAgents) == 0 {
-		reviewerRows = append(reviewerRows, ds.renderLine(ds.muted.Render("  No reviewer agents configured")))
-	} else {
-		for i, agent := range m.reviewerAgents {
-			selected := i == m.reviewerCursor
-			cursor := " "
-			cursorStyle := ds.label.Foreground(Colors.Primary)
-			style := ds.text
-			if selected {
-				cursor = "▸"
-				style = ds.label
-			}
-
-			// Mark default reviewer
-			defaultTag := ""
-			if m.config != nil && agent == m.config.AgentsConfig.DefaultReviewer {
-				defaultTag = ds.muted.Render(" (default)")
-			}
-
-			row := ds.renderLine(baseStyle.Render("  ") + cursorStyle.Render(cursor) + baseStyle.Render(" ") + style.Render(agent) + defaultTag)
-			reviewerRows = append(reviewerRows, row)
-		}
-	}
-
-	hint := ds.renderLine(ds.key.Render("enter") + ds.text.Render(" select · ") +
-		ds.key.Render("esc") + ds.text.Render(" cancel"))
-
-	lines := make([]string, 0, 5+len(reviewerRows)+2)
-	lines = append(lines, title, ds.emptyLine(), taskLine, ds.emptyLine(), selectLabel)
-	lines = append(lines, reviewerRows...)
-	lines = append(lines, ds.emptyLine(), hint)
-
-	content := lipgloss.JoinVertical(lipgloss.Left, lines...)
 	return m.dialogStyle().Render(content)
 }
 
@@ -734,13 +682,16 @@ func (m *Model) viewFooter() string {
 		if m.canStopSelectedTask(m.SelectedTask()) {
 			content = content + "  " + keyStyle.Render("S") + " stop"
 		}
+		if task := m.SelectedTask(); task != nil && task.Status == domain.StatusDone && m.selectedTaskHasWorktree {
+			content = content + "  " + keyStyle.Render("R") + " request changes"
+		}
 	case ModeFilter:
 		content = "enter apply · esc cancel"
 	case ModeChangeStatus:
 		content = "enter select · esc cancel"
 	case ModeExec:
 		content = "enter execute · esc cancel"
-	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeSelectManager, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock, ModeSelectReviewer:
+	case ModeConfirm, ModeInputTitle, ModeInputDesc, ModeNewTask, ModeStart, ModeSelectManager, ModeHelp, ModeActionMenu, ModeReviewResult, ModeReviewAction, ModeReviewMessage, ModeEditReviewComment, ModeBlock:
 		return ""
 	default:
 		return ""
@@ -823,7 +774,7 @@ func (m *Model) viewHelp() string {
 				{"S", "Stop (work/review)"},
 				{"a", "Attach"},
 				{"x", "Execute"},
-				{"R", "Complete"},
+				{"R", "Request Changes"},
 				{"n", "New Task"},
 				{"e", "Change Status"},
 				{"E", "Edit Task"},
@@ -1306,7 +1257,7 @@ func (m *Model) viewActionMenuDialog() string {
 func (m *Model) viewReviewResultDialog() string {
 	ds := m.newDialogStyles()
 
-	title := ds.renderLine(ds.label.Render("Review Complete"))
+	title := ds.renderLine(ds.label.Render("Review Result"))
 
 	// Find task title
 	var taskTitle string
@@ -1375,7 +1326,7 @@ func (m *Model) viewReviewActionDialog() string {
 	}
 
 	options := []actionOption{
-		{"Request Changes", "Send message and restart task (back to in_progress)"},
+		{"Request Changes", "Send message and restart task (back to in_progress, notify if available)"},
 		{"Comment Only", "Send review as comment without restarting"},
 		{"Merge", "Merge the task (requires done)"},
 		{"Close", "Close the task without merging"},
@@ -1441,11 +1392,11 @@ func (m *Model) viewReviewMessageDialog() string {
 
 	inputLine := ds.renderLine(m.reviewMessageInput.View())
 
-	defaultHint := ds.renderLine(ds.muted.Render("Leave empty to use: \"Please address the review comments above.\""))
+	defaultHint := ds.renderLine(ds.muted.Render(fmt.Sprintf("Leave empty to use: \"%s\"", defaultReviewMessage)))
 
 	hint := ds.renderLine(
 		ds.key.Render("enter") + ds.text.Render(" send  ") +
-			ds.key.Render("esc") + ds.text.Render(" back"))
+			ds.key.Render("esc") + ds.text.Render(" cancel"))
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		title, ds.emptyLine(),

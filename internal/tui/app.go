@@ -61,18 +61,18 @@ type Model struct {
 	err       error
 
 	// State (slices - contain pointers)
-	tasks           []*domain.Task
-	comments        []domain.Comment
-	commentCounts   map[int]int // taskID -> comment count
-	builtinAgents   []string
-	customAgents    []string
-	managerAgents   []string
-	reviewerAgents  []string // List of available reviewer agents
-	agentCommands   map[string]string
-	customKeybinds  map[string]domain.TUIKeybinding
-	keybindWarnings []string
-	reviewResult    string // Review result text
-	actionMenuItems []actionMenuItem
+	tasks            []*domain.Task
+	comments         []domain.Comment
+	commentCounts    map[int]int // taskID -> comment count
+	builtinAgents    []string
+	customAgents     []string
+	managerAgents    []string
+	agentCommands    map[string]string
+	customKeybinds   map[string]domain.TUIKeybinding
+	keybindWarnings  []string
+	reviewResult     string // Review result text
+	actionMenuLastID string
+	actionMenuItems  []actionMenuItem
 
 	// Components (structs with pointers)
 	keys                KeyMap
@@ -98,25 +98,27 @@ type Model struct {
 	blockInput textinput.Model
 
 	// Numeric state (smaller types last)
-	mode               Mode
-	confirmAction      ConfirmAction
-	sortMode           SortMode
-	newTaskField       NewTaskField
-	width              int
-	height             int
-	confirmTaskID      int
-	agentCursor        int
-	managerAgentCursor int
-	reviewerCursor     int
-	statusCursor       int
-	actionMenuCursor   int
-	reviewTaskID       int // Task being reviewed
-	reviewActionCursor int // Cursor for action selection
-	editCommentIndex   int // Index of comment being edited
-	startFocusCustom   bool
-	showAll            bool
-	detailFocused      bool // Right pane is focused for scrolling
-	blockFocusUnblock  bool // True when Unblock button is focused in Block dialog
+	mode                    Mode
+	confirmAction           ConfirmAction
+	sortMode                SortMode
+	newTaskField            NewTaskField
+	width                   int
+	height                  int
+	confirmTaskID           int
+	agentCursor             int
+	managerAgentCursor      int
+	statusCursor            int
+	actionMenuCursor        int
+	actionMenuLastTaskID    int
+	reviewTaskID            int // Task being reviewed
+	reviewActionCursor      int // Cursor for action selection
+	reviewMessageReturnMode Mode
+	editCommentIndex        int // Index of comment being edited
+	startFocusCustom        bool
+	showAll                 bool
+	detailFocused           bool // Right pane is focused for scrolling
+	blockFocusUnblock       bool // True when Unblock button is focused in Block dialog
+	selectedTaskHasWorktree bool
 }
 
 // New creates a new TUI Model with the given container.
@@ -146,7 +148,7 @@ func New(c *app.Container) *Model {
 	ei.CharLimit = 500
 
 	ri := textinput.New()
-	ri.Placeholder = "Message to worker (optional, Enter to skip)"
+	ri.Placeholder = "Message to worker (optional, empty uses default)"
 	ri.CharLimit = 500
 
 	eci := textinput.New()
@@ -293,6 +295,10 @@ func (m *Model) hasWorktree(task *domain.Task) bool {
 	if task == nil {
 		return false
 	}
+	if m.container == nil || m.container.Worktrees == nil {
+		m.err = fmt.Errorf("worktree manager not initialized")
+		return false
+	}
 	branch := domain.BranchName(task.ID, task.Issue)
 	exists, err := m.container.Worktrees.Exists(branch)
 	if err != nil {
@@ -304,6 +310,30 @@ func (m *Model) hasWorktree(task *domain.Task) bool {
 		return false
 	}
 	return true
+}
+
+func (m *Model) hasWorktreeQuiet(task *domain.Task) bool {
+	if task == nil {
+		return false
+	}
+	if m.container == nil || m.container.Worktrees == nil {
+		return false
+	}
+	branch := domain.BranchName(task.ID, task.Issue)
+	exists, err := m.container.Worktrees.Exists(branch)
+	if err != nil {
+		return false
+	}
+	return exists
+}
+
+func (m *Model) updateSelectedTaskWorktree() {
+	task := m.SelectedTask()
+	if task == nil {
+		m.selectedTaskHasWorktree = false
+		return
+	}
+	m.selectedTaskHasWorktree = m.hasWorktreeQuiet(task)
 }
 
 func sessionNameForLog(taskID int, isReview bool) string {
@@ -352,6 +382,7 @@ func (m *Model) setTaskItems(tasks []*domain.Task) {
 		items = append(items, taskItem{task: task, commentCount: count})
 	}
 	m.taskList.SetItems(items)
+	m.updateSelectedTaskWorktree()
 }
 
 // updateDetailPanelViewport updates the viewport size and content for the right pane.
@@ -648,12 +679,12 @@ func (m *Model) unblockTask(taskID int) tea.Cmd {
 	}
 }
 
-// updateAgents updates the agent lists from config.
-// Agents with role=worker and hidden=false are shown in the TUI.
 func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 	if task == nil {
 		return nil
 	}
+
+	hasWorktree := m.hasWorktreeQuiet(task)
 
 	actions := []actionMenuItem{
 		{
@@ -771,30 +802,20 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return m.hasWorktree(task)
+				return hasWorktree
 			},
 		},
 		{
-			ActionID: "complete",
-			Label:    "Complete",
-			Desc:     "Run review and complete task",
+			ActionID: "request_changes",
+			Label:    "Request Changes",
+			Desc:     "Send request changes (back to in_progress, notify if available)",
 			Key:      "R",
 			Action: func() (tea.Model, tea.Cmd) {
-				m.mode = ModeSelectReviewer
-				m.reviewerCursor = 0
-				// Set default cursor position if default reviewer is found
-				if m.config != nil {
-					for i, r := range m.reviewerAgents {
-						if r == m.config.AgentsConfig.DefaultReviewer {
-							m.reviewerCursor = i
-							break
-						}
-					}
-				}
+				m.enterRequestChanges(task.ID, ModeActionMenu, true)
 				return m, nil
 			},
 			IsAvailable: func() bool {
-				return m.hasWorktree(task)
+				return task.Status == domain.StatusDone && hasWorktree
 			},
 		},
 		{
@@ -983,9 +1004,6 @@ func (m *Model) updateAgents() {
 	sort.Strings(m.builtinAgents)
 	sort.Strings(m.customAgents)
 	sort.Strings(m.managerAgents)
-
-	// Populate reviewer agents
-	m.reviewerAgents = m.config.GetReviewerAgents()
 
 	// Set cursor to default agent
 	allAgents := m.allAgents()
@@ -1256,21 +1274,6 @@ func renderTemplate(tmpl string, data any) (string, error) {
 	return buf.String(), nil
 }
 
-// completeTask returns a command that completes a task (runs review if needed).
-func (m *Model) completeTask(taskID int, agent string) tea.Cmd {
-	return func() tea.Msg {
-		uc := m.container.CompleteTaskUseCase(io.Discard, io.Discard)
-		_, err := uc.Execute(context.Background(), usecase.CompleteTaskInput{
-			TaskID:      taskID,
-			ReviewAgent: agent,
-		})
-		if err != nil {
-			return MsgError{Err: err}
-		}
-		return MsgReloadTasks{}
-	}
-}
-
 // notifyWorker returns a command that sends a review comment to the worker.
 func (m *Model) notifyWorker(taskID int, message string, requestChanges bool) tea.Cmd {
 	return func() tea.Msg {
@@ -1283,7 +1286,7 @@ func (m *Model) notifyWorker(taskID int, message string, requestChanges bool) te
 		if err != nil {
 			return MsgError{Err: err}
 		}
-		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionNotifyWorker}
+		return MsgReviewActionCompleted{TaskID: taskID}
 	}
 }
 
@@ -1299,7 +1302,7 @@ func (m *Model) editComment(taskID int, index int, message string) tea.Cmd {
 		if err != nil {
 			return MsgError{Err: err}
 		}
-		return MsgReviewActionCompleted{TaskID: taskID, Action: ReviewActionEditComment}
+		return MsgReviewActionCompleted{TaskID: taskID}
 	}
 }
 
