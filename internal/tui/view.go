@@ -1224,8 +1224,12 @@ func (m *Model) panelContentString(contentWidth int) string {
 func (m *Model) viewDetailPanel() string {
 	panelWidth := m.detailPanelWidth()
 	// Height calculation: must match left pane height
-	// Left pane = header (2) + taskList (m.height - 8) + footer (3) = m.height - 3
-	panelHeight := m.height - 3
+	// Embedded mode: height is already pane content height from workspace
+	// Standalone mode: Left pane = header (2) + taskList (m.height - 8) + footer (3) = m.height - 3
+	panelHeight := m.height
+	if !m.embedded {
+		panelHeight = m.height - 3
+	}
 	if panelHeight < 10 {
 		panelHeight = 10
 	}
