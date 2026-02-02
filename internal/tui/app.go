@@ -21,7 +21,7 @@ import (
 	"github.com/runoshun/git-crew/v2/internal/usecase"
 )
 
-const autoRefreshInterval = 5 * time.Second
+const AutoRefreshInterval = 5 * time.Second
 
 // Model is the main bubbletea model for the TUI.
 //
@@ -236,7 +236,7 @@ func (m *Model) UsesCursorKeys() bool {
 
 // tick returns a command that sends a tick message after the refresh interval.
 func (m *Model) tick() tea.Cmd {
-	return tea.Tick(autoRefreshInterval, func(t time.Time) tea.Msg {
+	return tea.Tick(AutoRefreshInterval, func(t time.Time) tea.Msg {
 		return MsgTick{}
 	})
 }

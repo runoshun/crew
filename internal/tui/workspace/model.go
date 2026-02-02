@@ -29,11 +29,10 @@ const (
 )
 
 const (
-	appPadding               = 4
-	minSplitWidth            = 120
-	minPaneWidth             = 24
-	leftPaneRatio            = 0.3
-	workspaceRefreshInterval = 5 * time.Second
+	appPadding    = 4
+	minSplitWidth = 120
+	minPaneWidth  = 24
+	leftPaneRatio = 0.3
 )
 
 // Model is the workspace TUI model.
@@ -119,7 +118,7 @@ func (m *Model) loadRepos() tea.Cmd {
 }
 
 func (m *Model) tick() tea.Cmd {
-	return tea.Tick(workspaceRefreshInterval, func(t time.Time) tea.Msg {
+	return tea.Tick(tui.AutoRefreshInterval, func(t time.Time) tea.Msg {
 		return MsgTick{}
 	})
 }
@@ -397,6 +396,12 @@ func (m *Model) handleDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) handleFocusSwitch(msg tea.KeyMsg) (bool, tea.Cmd) {
 	switch msg.String() {
+	case "ctrl+left":
+		m.leftFocused = true
+		return true, nil
+	case "ctrl+right":
+		m.leftFocused = false
+		return true, m.ensureActiveModelAndSize()
 	case "tab":
 		if !m.leftFocused && m.activeModelUsesTab() {
 			return false, nil
@@ -953,6 +958,7 @@ func (m *Model) viewFooter() string {
 		keyStyle.Render("enter") + " focus  " +
 		keyStyle.Render("tab") + " pane  " +
 		keyStyle.Render("left/right") + " pane  " +
+		keyStyle.Render("ctrl+left/right") + " pane  " +
 		keyStyle.Render("a") + " add  " +
 		keyStyle.Render("d") + " remove  " +
 		keyStyle.Render("r") + " refresh  " +

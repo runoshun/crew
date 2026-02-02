@@ -24,9 +24,8 @@ func (MsgReposLoaded) sealed() {}
 //
 //nolint:govet // Logical field order preferred
 type MsgSummaryLoaded struct {
-	Info    domain.WorkspaceRepoInfo
-	Path    string
-	Loading bool // true if still loading
+	Info domain.WorkspaceRepoInfo
+	Path string
 }
 
 func (MsgSummaryLoaded) sealed() {}
@@ -53,13 +52,6 @@ type MsgError struct {
 }
 
 func (MsgError) sealed() {}
-
-// MsgOpenRepo is sent when the user wants to open a repo.
-type MsgOpenRepo struct {
-	Path string
-}
-
-func (MsgOpenRepo) sealed() {}
 
 // MsgTick is sent periodically for auto-refresh.
 type MsgTick struct{}
