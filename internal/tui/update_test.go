@@ -43,6 +43,10 @@ func (m *mockSessionManager) IsRunning(_ string) (bool, error) {
 	return m.isRunningResult, m.isRunningErr
 }
 
+func (m *mockSessionManager) Wait(_ context.Context, _ string) error {
+	return nil
+}
+
 func (m *mockSessionManager) GetPaneProcesses(_ string) ([]domain.ProcessInfo, error) {
 	return nil, nil
 }

@@ -32,30 +32,36 @@ Add comments in these situations:
 ### Complete Task
 ```bash
 crew complete          # Mark task as complete
+crew complete --force-review  # Run review even if not required
 ```
 
 ---
 
 ## Review Requirements
 
-`[complete].min_reviews` controls how many successful reviews are required before completion.
+`[complete].max_reviews` controls how many review attempts are allowed before completion fails.
+`[complete].review_success_regex` controls which review result is considered successful (matched from the start of the comment).
 
-- Default: 1
+- Default `max_reviews`: 1
+- Default `review_success_regex`: `✅ LGTM`
 - `skip_review = true` bypasses the review requirement
-- Review count increments only when `crew review` exits with code 0
-- `crew review` runs the external tool synchronously and does not change task status
+- `crew complete --force-review` runs review even when not required
+- Review count increments only when the review result is recorded
+- Review runs synchronously inside `crew complete` and does not change task status unless completion succeeds
 
 ### Configuration
 
 ```toml
 [complete]
 command = "mise run ci"
-min_reviews = 1
+max_reviews = 1
+review_success_regex = "✅ LGTM"
 ```
 
 ### Deprecated Settings
 
-`[complete].review_mode` and `auto_fix` are deprecated and ignored.
+- `[complete].min_reviews` is deprecated; use `max_reviews` instead.
+- `[complete].review_mode` and `auto_fix` are deprecated and ignored.
 
 ---
 
@@ -136,24 +142,12 @@ crew complete
 | `crew complete` | Mark task as complete |
 | `crew comment` | Add a comment |
 | `crew diff` | Show diff |
-| `crew review` | Run AI code review |
 
 ---
 
 ## Running Reviews
 
-`crew review` runs synchronously and waits for the AI reviewer to complete. This can take a significant amount of time.
-
-**Important**: Always set a 20-minute timeout when running reviews to avoid hanging indefinitely.
-
-```bash
-# Using shell timeout command
-timeout 1200 crew review <id>
-
-# Or with Bash tool timeout parameter (1200000ms = 20 minutes)
-```
-
----
+Reviews run synchronously inside `crew complete`. Use `--verbose` when you need to stream reviewer output.
 
 ## Agent Configuration Tips
 

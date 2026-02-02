@@ -3,6 +3,8 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
 
 	acpsdk "github.com/coder/acp-go-sdk"
@@ -19,12 +21,60 @@ func newACPCommand(c *app.Container) *cobra.Command {
 		Short: "ACP commands",
 	}
 
+	cmd.AddCommand(newACPStartCommand(c))
 	cmd.AddCommand(newACPRunCommand(c))
 	cmd.AddCommand(newACPSendCommand(c))
 	cmd.AddCommand(newACPPermissionCommand(c))
 	cmd.AddCommand(newACPCancelCommand(c))
 	cmd.AddCommand(newACPStopCommand(c))
+	cmd.AddCommand(newACPAttachCommand(c))
+	cmd.AddCommand(newACPPeekCommand(c))
 	cmd.AddCommand(newACPLogCommand(c))
+	return cmd
+}
+
+// newACPStartCommand creates the ACP start command.
+func newACPStartCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		agent string
+		model string
+	}
+
+	cmd := &cobra.Command{
+		Use:   "start <task-id>",
+		Short: "Start an ACP session in tmux",
+		Long: `Start an ACP session in tmux for a task.
+
+This creates a worktree (if needed) and launches "crew acp run" in a tmux session.
+
+Examples:
+  crew acp start 1 --agent my-acp-agent
+  crew acp start 1 --agent my-acp-agent --model gpt-4o`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			uc := c.ACPStartUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.ACPStartInput{
+				TaskID: taskID,
+				Agent:  opts.agent,
+				Model:  opts.model,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Started ACP task #%d (session: %s, worktree: %s)\n", taskID, out.SessionName, out.WorktreePath)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&opts.agent, "agent", "", "Agent name (default: config agents.default_worker)")
+	cmd.Flags().StringVarP(&opts.model, "model", "m", "", "Model override")
+
 	return cmd
 }
 
@@ -82,9 +132,38 @@ func newACPSendCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "send",
+		Use:   "send [task-id] [text]",
 		Short: "Send a prompt to an ACP session",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Long: `Send a prompt to an ACP session.
+
+You can pass task ID and text as positional arguments or use --task/--text flags (do not mix).
+When using positional arguments, remaining tokens are joined as the text payload.`,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") || cmd.Flags().Changed("text") {
+				return fmt.Errorf("cannot mix positional arguments with --task/--text")
+			}
+			if len(args) < 2 {
+				return fmt.Errorf("text is required")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				var err error
+				opts.taskID, err = parseTaskID(args[0])
+				if err != nil {
+					return fmt.Errorf("invalid task ID: %w", err)
+				}
+			}
+			if len(args) > 1 {
+				opts.text = strings.Join(args[1:], " ")
+			}
 			if opts.taskID <= 0 {
 				return fmt.Errorf("task is required")
 			}
@@ -104,8 +183,6 @@ func newACPSendCommand(c *app.Container) *cobra.Command {
 
 	cmd.Flags().IntVar(&opts.taskID, "task", 0, "Task ID")
 	cmd.Flags().StringVar(&opts.text, "text", "", "Prompt text to send")
-	_ = cmd.MarkFlagRequired("task")
-	_ = cmd.MarkFlagRequired("text")
 
 	return cmd
 }
@@ -118,9 +195,42 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "permission",
+		Use:   "permission [task-id] [option-id|#index]",
 		Short: "Respond to a permission request",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Long: `Respond to a permission request.
+
+You can pass task ID and option as positional arguments or use --task/--option flags (do not mix).
+Positional option values are treated as a single token; use --option to avoid shell splitting.
+Prefix the option with "#" to select by index from the latest permission request.`,
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") || cmd.Flags().Changed("option") {
+				return fmt.Errorf("cannot mix positional arguments with --task/--option")
+			}
+			if len(args) < 2 {
+				return fmt.Errorf("option is required")
+			}
+			if len(args) > 2 {
+				return fmt.Errorf("too many arguments")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				var err error
+				opts.taskID, err = parseTaskID(args[0])
+				if err != nil {
+					return fmt.Errorf("invalid task ID: %w", err)
+				}
+			}
+			if len(args) > 1 {
+				opts.optionID = args[1]
+			}
 			if opts.taskID <= 0 {
 				return fmt.Errorf("task is required")
 			}
@@ -128,20 +238,31 @@ func newACPPermissionCommand(c *app.Container) *cobra.Command {
 				return fmt.Errorf("option is required")
 			}
 
+			optionID := strings.TrimSpace(opts.optionID)
+			if strings.HasPrefix(optionID, "#") {
+				logUC := c.ACPLogUseCase()
+				out, err := logUC.Execute(cmd.Context(), usecase.ACPLogInput{TaskID: opts.taskID})
+				if err != nil {
+					return err
+				}
+				optionID, err = resolvePermissionOptionID(optionID, out.Events, cmd.ErrOrStderr())
+				if err != nil {
+					return err
+				}
+			}
+
 			uc := c.ACPControlUseCase()
 			_, err := uc.Execute(cmd.Context(), usecase.ACPControlInput{
 				TaskID:      opts.taskID,
 				CommandType: domain.ACPCommandPermission,
-				OptionID:    opts.optionID,
+				OptionID:    optionID,
 			})
 			return err
 		},
 	}
 
 	cmd.Flags().IntVar(&opts.taskID, "task", 0, "Task ID")
-	cmd.Flags().StringVar(&opts.optionID, "option", "", "Permission option ID")
-	_ = cmd.MarkFlagRequired("task")
-	_ = cmd.MarkFlagRequired("option")
+	cmd.Flags().StringVar(&opts.optionID, "option", "", "Permission option ID or #index")
 
 	return cmd
 }
@@ -153,9 +274,31 @@ func newACPCancelCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "cancel",
+		Use:   "cancel [task-id]",
 		Short: "Cancel the current ACP session",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") {
+				return fmt.Errorf("cannot mix positional arguments with --task")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("too many arguments")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				var err error
+				opts.taskID, err = parseTaskID(args[0])
+				if err != nil {
+					return fmt.Errorf("invalid task ID: %w", err)
+				}
+			}
 			if opts.taskID <= 0 {
 				return fmt.Errorf("task is required")
 			}
@@ -170,7 +313,6 @@ func newACPCancelCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd.Flags().IntVar(&opts.taskID, "task", 0, "Task ID")
-	_ = cmd.MarkFlagRequired("task")
 
 	return cmd
 }
@@ -182,9 +324,31 @@ func newACPStopCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "stop",
+		Use:   "stop [task-id]",
 		Short: "Stop the ACP session cleanly",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") {
+				return fmt.Errorf("cannot mix positional arguments with --task")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("too many arguments")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				var err error
+				opts.taskID, err = parseTaskID(args[0])
+				if err != nil {
+					return fmt.Errorf("invalid task ID: %w", err)
+				}
+			}
 			if opts.taskID <= 0 {
 				return fmt.Errorf("task is required")
 			}
@@ -199,7 +363,84 @@ func newACPStopCommand(c *app.Container) *cobra.Command {
 	}
 
 	cmd.Flags().IntVar(&opts.taskID, "task", 0, "Task ID")
-	_ = cmd.MarkFlagRequired("task")
+
+	return cmd
+}
+
+// newACPAttachCommand creates the ACP attach command.
+func newACPAttachCommand(c *app.Container) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "attach <task-id>",
+		Short: "Attach to a running ACP session",
+		Long: `Attach to a running tmux session for an ACP task.
+
+This replaces the current process with the tmux session.
+Use your configured tmux detach key to leave the session.
+
+Examples:
+  crew acp attach 1`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			uc := c.ACPAttachUseCase()
+			_, err = uc.Execute(cmd.Context(), usecase.ACPAttachInput{TaskID: taskID})
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+// newACPPeekCommand creates the ACP peek command.
+func newACPPeekCommand(c *app.Container) *cobra.Command {
+	var opts struct {
+		lines  int
+		escape bool
+	}
+
+	cmd := &cobra.Command{
+		Use:   "peek <task-id>",
+		Short: "View ACP session output non-interactively",
+		Long: `View ACP session output non-interactively using tmux capture-pane.
+
+This captures and displays the last N lines from a running ACP session
+without attaching to it.
+
+Examples:
+  crew acp peek 1
+  crew acp peek 1 --lines 50
+  crew acp peek 1 --escape`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			taskID, err := parseTaskID(args[0])
+			if err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+
+			uc := c.ACPPeekUseCase()
+			out, err := uc.Execute(cmd.Context(), usecase.ACPPeekInput{
+				TaskID: taskID,
+				Lines:  opts.lines,
+				Escape: opts.escape,
+			})
+			if err != nil {
+				return err
+			}
+
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), out.Output)
+			return nil
+		},
+	}
+
+	cmd.Flags().IntVarP(&opts.lines, "lines", "n", usecase.DefaultPeekLines, "Number of lines to display")
+	cmd.Flags().BoolVarP(&opts.escape, "escape", "e", false, "Include ANSI escape sequences (colors)")
 
 	return cmd
 }
@@ -223,7 +464,21 @@ Examples:
   crew acp log 1
   crew acp log 1 --raw
   crew acp log --task 1`,
-		Args: cobra.MaximumNArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return nil
+			}
+			if cmd.Flags().Changed("task") {
+				return fmt.Errorf("cannot mix positional arguments with --task")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("too many arguments")
+			}
+			if _, err := parseTaskID(args[0]); err != nil {
+				return fmt.Errorf("invalid task ID: %w", err)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Accept task ID as positional argument or flag
 			if len(args) > 0 {
@@ -259,9 +514,59 @@ Examples:
 
 	cmd.Flags().IntVar(&opts.taskID, "task", 0, "Task ID")
 	cmd.Flags().BoolVar(&opts.raw, "raw", false, "Output raw JSON events")
-	_ = cmd.MarkFlagRequired("task")
 
 	return cmd
+}
+
+func resolvePermissionOptionID(option string, events []domain.ACPEvent, warn io.Writer) (string, error) {
+	option = strings.TrimSpace(option)
+	if !strings.HasPrefix(option, "#") {
+		return option, nil
+	}
+	idxText := strings.TrimPrefix(option, "#")
+	if idxText == "" {
+		return "", fmt.Errorf("option index must be >= 1")
+	}
+	idx, err := strconv.Atoi(idxText)
+	if err != nil {
+		return "", fmt.Errorf("option index must be numeric")
+	}
+	if idx <= 0 {
+		return "", fmt.Errorf("option index must be >= 1")
+	}
+
+	var invalidPayloadErr error
+	for i := len(events) - 1; i >= 0; i-- {
+		event := events[i]
+		if event.Type != domain.ACPEventRequestPermission {
+			continue
+		}
+		if len(event.Payload) == 0 {
+			if invalidPayloadErr == nil {
+				invalidPayloadErr = fmt.Errorf("permission request payload is empty")
+			}
+			continue
+		}
+		var req acpsdk.RequestPermissionRequest
+		if err := json.Unmarshal(event.Payload, &req); err != nil {
+			if invalidPayloadErr == nil {
+				invalidPayloadErr = fmt.Errorf("decode permission request: %w", err)
+			}
+			continue
+		}
+		if invalidPayloadErr != nil && warn != nil {
+			_, _ = fmt.Fprintf(warn, "warning: latest permission request payload is invalid; using previous request: %v\n", invalidPayloadErr)
+		}
+		if idx > len(req.Options) {
+			return "", fmt.Errorf("permission option index out of range: %d", idx)
+		}
+		return string(req.Options[idx-1].OptionId), nil
+	}
+
+	if invalidPayloadErr != nil {
+		return "", invalidPayloadErr
+	}
+	return "", fmt.Errorf("no permission requests found")
 }
 
 func printRawEvents(cmd *cobra.Command, events []domain.ACPEvent) error {

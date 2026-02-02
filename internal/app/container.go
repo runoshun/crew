@@ -321,6 +321,30 @@ func (c *Container) ACPRunUseCase(stdout, stderr io.Writer) *usecase.ACPRun {
 	)
 }
 
+// ACPStartUseCase returns a new ACPStart use case.
+func (c *Container) ACPStartUseCase() *usecase.ACPStart {
+	return usecase.NewACPStart(
+		c.Tasks,
+		c.Sessions,
+		c.Worktrees,
+		c.ConfigLoader,
+		c.Git,
+		c.Runner,
+		c.Config.CrewDir,
+		c.Config.RepoRoot,
+	)
+}
+
+// ACPAttachUseCase returns a new ACPAttach use case.
+func (c *Container) ACPAttachUseCase() *usecase.ACPAttach {
+	return usecase.NewACPAttach(c.Tasks, c.Sessions)
+}
+
+// ACPPeekUseCase returns a new ACPPeek use case.
+func (c *Container) ACPPeekUseCase() *usecase.ACPPeek {
+	return usecase.NewACPPeek(c.Tasks, c.Sessions)
+}
+
 // ACPLogUseCase returns a new ACPLog use case.
 func (c *Container) ACPLogUseCase() *usecase.ACPLog {
 	return usecase.NewACPLog(
@@ -336,12 +360,6 @@ func (c *Container) ACPLogUseCase() *usecase.ACPLog {
 // StartManagerUseCase returns a new StartManager use case.
 func (c *Container) StartManagerUseCase() *usecase.StartManager {
 	return usecase.NewStartManager(c.Sessions, c.ConfigLoader, c.Config.RepoRoot, c.Config.GitDir, c.Config.CrewDir)
-}
-
-// ReviewTaskUseCase returns a new ReviewTask use case.
-// stderr is the writer for warning messages.
-func (c *Container) ReviewTaskUseCase(stderr io.Writer) *usecase.ReviewTask {
-	return usecase.NewReviewTask(c.Tasks, c.Worktrees, c.ConfigLoader, c.Executor, c.Clock, c.Config.RepoRoot, stderr)
 }
 
 // PollTaskUseCase returns a new PollTask use case.

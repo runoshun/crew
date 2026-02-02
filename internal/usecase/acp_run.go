@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	acpsdk "github.com/coder/acp-go-sdk"
@@ -117,7 +116,7 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		model = agent.DefaultModel
 	}
 
-	wtPath, err := uc.ensureWorktree(task, cfg, agent)
+	wtPath, _, err := ensureACPWorktree(task, cfg, agent, uc.worktrees, uc.git, uc.runner, uc.repoRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +224,13 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 		client.eventWriter = eventWriter
 	}
 
+	var endOnce sync.Once
+	emitSessionEnd := func(reason string, err error) {
+		endOnce.Do(func() {
+			client.writeSessionEndEvent(context.Background(), reason, err)
+		})
+	}
+
 	for {
 		select {
 		case cmd := <-promptCh:
@@ -236,6 +242,7 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			_ = conn.Cancel(context.Background(), acpsdk.CancelNotification{SessionId: session.SessionId})
 		case <-stopCh:
 			_ = conn.Cancel(context.Background(), acpsdk.CancelNotification{SessionId: session.SessionId})
+			emitSessionEnd("stop", nil)
 			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
 				cancel()
 				return nil, fmt.Errorf("update state: %w", idleErr)
@@ -248,6 +255,7 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 				continue
 			}
 			if err != nil {
+				emitSessionEnd("router_error", err)
 				if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
 					return nil, fmt.Errorf("acp router error: %w (update state: %v)", err, stateErr)
 				}
@@ -255,11 +263,13 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			}
 		case err := <-procErrCh:
 			if err == nil || errors.Is(cmdCtx.Err(), context.Canceled) {
+				emitSessionEnd("process_exit", nil)
 				if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
 					return nil, fmt.Errorf("update state: %w", idleErr)
 				}
 				return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 			}
+			emitSessionEnd("process_error", err)
 			if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
 				return nil, fmt.Errorf("agent process exited: %w (update state: %v)", err, stateErr)
 			}
@@ -268,94 +278,25 @@ func (uc *ACPRun) Execute(ctx context.Context, in ACPRunInput) (*ACPRunOutput, e
 			wasCanceled := cmdCtx.Err() != nil
 			cancel()
 			if err := <-procErrCh; err != nil && !wasCanceled {
+				emitSessionEnd("process_error", err)
 				if stateErr := uc.markACPError(ctx, task, namespace); stateErr != nil {
 					return nil, fmt.Errorf("agent process exited: %w (update state: %v)", err, stateErr)
 				}
 				return nil, fmt.Errorf("agent process exited: %w", err)
 			}
+			emitSessionEnd("connection_closed", nil)
 			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
 				return nil, fmt.Errorf("update state: %w", idleErr)
 			}
 			return &ACPRunOutput{SessionID: string(session.SessionId)}, nil
 		case <-ctx.Done():
+			emitSessionEnd("context_canceled", ctx.Err())
 			if idleErr := uc.setExecutionSubstate(context.Background(), namespace, task.ID, domain.ACPExecutionIdle); idleErr != nil {
 				return nil, fmt.Errorf("context canceled: %w (update state: %v)", ctx.Err(), idleErr)
 			}
 			return nil, ctx.Err()
 		}
 	}
-}
-
-func (uc *ACPRun) ensureWorktree(task *domain.Task, cfg *domain.Config, agent domain.Agent) (string, error) {
-	branch := domain.BranchName(task.ID, task.Issue)
-	exists, err := uc.worktrees.Exists(branch)
-	if err != nil {
-		return "", fmt.Errorf("check worktree: %w", err)
-	}
-	if exists {
-		wtPath, resolveErr := uc.worktrees.Resolve(branch)
-		if resolveErr != nil {
-			return "", fmt.Errorf("resolve worktree: %w", resolveErr)
-		}
-		return wtPath, nil
-	}
-
-	baseBranch, err := resolveBaseBranch(task, uc.git)
-	if err != nil {
-		return "", err
-	}
-
-	wtPath, err := uc.worktrees.Create(branch, baseBranch)
-	if err != nil {
-		return "", fmt.Errorf("create worktree: %w", err)
-	}
-
-	if setupErr := uc.worktrees.SetupWorktree(wtPath, &cfg.Worktree); setupErr != nil {
-		_ = uc.worktrees.Remove(branch)
-		return "", fmt.Errorf("setup worktree: %w", setupErr)
-	}
-
-	if setupErr := uc.setupAgent(task, wtPath, agent); setupErr != nil {
-		_ = uc.worktrees.Remove(branch)
-		return "", fmt.Errorf("setup agent: %w", setupErr)
-	}
-
-	return wtPath, nil
-}
-
-func (uc *ACPRun) setupAgent(task *domain.Task, wtPath string, agent domain.Agent) error {
-	if agent.SetupScript == "" {
-		return nil
-	}
-
-	gitDir := filepath.Join(uc.repoRoot, ".git")
-	data := struct {
-		GitDir   string
-		RepoRoot string
-		Worktree string
-		TaskID   int
-	}{
-		GitDir:   gitDir,
-		RepoRoot: uc.repoRoot,
-		Worktree: wtPath,
-		TaskID:   task.ID,
-	}
-
-	tmpl, err := template.New("acp-setup").Parse(agent.SetupScript)
-	if err != nil {
-		return fmt.Errorf("parse setup script template: %w", err)
-	}
-
-	var script strings.Builder
-	if err := tmpl.Execute(&script, data); err != nil {
-		return fmt.Errorf("expand setup script template: %w", err)
-	}
-
-	if err := uc.runner.Run(wtPath, script.String()); err != nil {
-		return fmt.Errorf("run setup script: %w", err)
-	}
-
-	return nil
 }
 
 func (uc *ACPRun) buildAgentCommand(task *domain.Task, worktreePath string, agent domain.Agent, model string) (string, error) {
@@ -686,6 +627,19 @@ type promptSentPayload struct {
 
 func (c *acpRunClient) writePromptSentEvent(ctx context.Context, cmd domain.ACPCommand) {
 	c.writeEvent(ctx, domain.ACPEventPromptSent, promptSentPayload{Text: cmd.Text})
+}
+
+type sessionEndPayload struct {
+	Reason string `json:"reason"`
+	Error  string `json:"error,omitempty"`
+}
+
+func (c *acpRunClient) writeSessionEndEvent(ctx context.Context, reason string, err error) {
+	payload := sessionEndPayload{Reason: reason}
+	if err != nil {
+		payload.Error = err.Error()
+	}
+	c.writeEvent(ctx, domain.ACPEventSessionEnd, payload)
 }
 
 func cancelPermissionResponse() acpsdk.RequestPermissionResponse {

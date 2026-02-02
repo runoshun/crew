@@ -1263,11 +1263,11 @@ func (m *Model) handleSelectReviewerMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.reviewerAgents) == 0 {
 			// No reviewers available, use default
 			m.mode = ModeNormal
-			return m, m.reviewTask(task.ID, "")
+			return m, m.completeTask(task.ID, "")
 		}
 		agent := m.reviewerAgents[m.reviewerCursor]
 		m.mode = ModeNormal
-		return m, m.reviewTask(task.ID, agent)
+		return m, m.completeTask(task.ID, agent)
 	}
 
 	return m, nil

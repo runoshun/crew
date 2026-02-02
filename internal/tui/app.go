@@ -730,9 +730,9 @@ func (m *Model) actionMenuItemsForTask(task *domain.Task) []actionMenuItem {
 			},
 		},
 		{
-			ActionID: "review",
-			Label:    "Review",
-			Desc:     "Run reviewer session",
+			ActionID: "complete",
+			Label:    "Complete",
+			Desc:     "Run review and complete task",
 			Key:      "R",
 			Action: func() (tea.Model, tea.Cmd) {
 				m.mode = ModeSelectReviewer
@@ -1157,13 +1157,13 @@ func renderTemplate(tmpl string, data any) (string, error) {
 	return buf.String(), nil
 }
 
-// reviewTask returns a command that reviews a task using the AI reviewer.
-func (m *Model) reviewTask(taskID int, agent string) tea.Cmd {
+// completeTask returns a command that completes a task (runs review if needed).
+func (m *Model) completeTask(taskID int, agent string) tea.Cmd {
 	return func() tea.Msg {
-		uc := m.container.ReviewTaskUseCase(io.Discard)
-		_, err := uc.Execute(context.Background(), usecase.ReviewTaskInput{
-			TaskID: taskID,
-			Agent:  agent,
+		uc := m.container.CompleteTaskUseCase(io.Discard, io.Discard)
+		_, err := uc.Execute(context.Background(), usecase.CompleteTaskInput{
+			TaskID:      taskID,
+			ReviewAgent: agent,
 		})
 		if err != nil {
 			return MsgError{Err: err}

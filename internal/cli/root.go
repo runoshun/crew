@@ -40,7 +40,7 @@ It combines git worktree + tmux to achieve a model where
 1 task = 1 worktree = 1 AI session, enabling fully parallel
 and isolated task execution.
 
-Use --help-worker, --help-reviwer, or --help-manager for role-specific detailed help.
+Use --help-worker, --help-reviewer, or --help-manager for role-specific detailed help.
 Use --help-manager-onboarding to see the onboarding guide for new projects.
 Use --help-manager-auto to see the auto mode guide.`,
 		Version: version,
@@ -119,7 +119,11 @@ Use --help-manager-auto to see the auto mode guide.`,
 
 	// Add role-specific help flags
 	root.Flags().BoolVar(&fullWorker, "help-worker", false, "Show detailed help for worker agents")
-	root.Flags().BoolVar(&fullReviewer, "help-reviwer", false, "Show detailed help for reviewer agents")
+	root.Flags().BoolVar(&fullReviewer, "help-reviewer", false, "Show detailed help for reviewer agents")
+	// Backward-compatible alias (typo kept for compatibility)
+	root.Flags().BoolVar(&fullReviewer, "help-reviwer", false, "DEPRECATED: use --help-reviewer")
+	_ = root.Flags().MarkDeprecated("help-reviwer", "use --help-reviewer")
+	_ = root.Flags().MarkHidden("help-reviwer")
 	root.Flags().BoolVar(&fullManager, "help-manager", false, "Show detailed help for manager agents")
 	root.Flags().BoolVar(&managerOnboarding, "help-manager-onboarding", false, "Show onboarding guide for setting up crew")
 	root.Flags().BoolVar(&managerAuto, "help-manager-auto", false, "Show auto mode guide for manager agents")
@@ -195,9 +199,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 	mergeCmd := newMergeCommand(c)
 	mergeCmd.GroupID = groupSession
 
-	reviewCmd := newReviewCommand(c)
-	reviewCmd.GroupID = groupSession
-
 	pollCmd := newPollCommand(c)
 	pollCmd.GroupID = groupSession
 
@@ -253,7 +254,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 		diffCmd,
 		completeCmd,
 		mergeCmd,
-		reviewCmd,
 		pollCmd,
 		logsCmd,
 		pruneCmd,

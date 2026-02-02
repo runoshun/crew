@@ -17,7 +17,7 @@ type KeyMap struct {
 	Stop    key.Binding // Stop running session
 	Attach  key.Binding // Attach to session
 	Exec    key.Binding // Execute command
-	Review  key.Binding // Run review on task
+	Review  key.Binding // Complete task (runs review if needed)
 
 	// Task management
 	New        key.Binding // Create new task
@@ -94,7 +94,7 @@ func DefaultKeyMap() KeyMap {
 		),
 		Review: key.NewBinding(
 			key.WithKeys("R"),
-			key.WithHelp("R", "review"),
+			key.WithHelp("R", "complete"),
 		),
 		New: key.NewBinding(
 			key.WithKeys("n"),

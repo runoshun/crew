@@ -18,7 +18,7 @@ crew show <id>
 # Show task diff
 crew diff <id>
 
-# Add review comment (optional)
+# Add a review comment
 crew comment <id> "<message>"
 ```
 
@@ -36,6 +36,8 @@ crew comment <id> "<message>"
 ---
 
 ## Output Format
+
+IMPORTANT: Do NOT run `crew comment`. `crew complete` will record your review result.
 
 Start with: `✅ LGTM`, `⚠️ Minor issues`, or `❌ Needs changes`.
 Then list specific issues with file:line references.

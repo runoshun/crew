@@ -283,21 +283,43 @@ func (c *Client) IsRunning(sessionName string) (bool, error) {
 		"-t", sessionName,
 	)
 
-	err := cmd.Run()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// Check if it's an exit error
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			// Exit code 1 means session doesn't exist
 			if exitErr.ExitCode() == 1 {
 				return false, nil
 			}
 		}
-		// Other errors might mean tmux isn't running at all (socket doesn't exist)
-		// which is fine - the session doesn't exist
-		return false, nil
+		trimmed := strings.TrimSpace(string(out))
+		if trimmed == "" {
+			return false, fmt.Errorf("check session: %w", err)
+		}
+		return false, fmt.Errorf("check session: %w: %s", err, trimmed)
 	}
 
 	return true, nil
+}
+
+// Wait waits for a session to stop running.
+// It polls every 3 seconds and can be cancelled via context.
+func (c *Client) Wait(ctx context.Context, sessionName string) error {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			running, err := c.IsRunning(sessionName)
+			if err != nil {
+				return err
+			}
+			if !running {
+				return nil
+			}
+		}
+	}
 }
 
 // configureStatusBar configures the status bar for a tmux session.
