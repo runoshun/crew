@@ -1053,3 +1053,43 @@ func TestCompleteTask_Execute_DeprecatedReviewSettingsWarn(t *testing.T) {
 	assert.True(t, reviewModeWarned)
 	assert.True(t, autoFixWarned)
 }
+
+func TestReadFileTailBytes_LineBoundary(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "log.txt")
+	content := "alpha\nbeta\ngamma\n"
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+
+	offsetAtLineStart := int64(len("alpha\n"))
+	got := readFileTailBytes(path, offsetAtLineStart, 1024)
+	assert.Equal(t, "beta\ngamma\n", got)
+
+	offsetMidLine := int64(len("alpha\nbe"))
+	got = readFileTailBytes(path, offsetMidLine, 1024)
+	assert.Equal(t, "gamma\n", got)
+}
+
+func TestFindLastReviewRunStart_BaseOffsetBoundary(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "review.log")
+	content := strings.Join([]string{
+		"preamble",
+		reviewRunStartPrefix + "2026-02-01T00:00:00Z",
+		"review output",
+		"",
+	}, "\n")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+
+	size := int64(len(content))
+	boundaryOffset := int64(len("preamble\n"))
+	maxBytes := size - boundaryOffset
+	offset, startedAt, ok := findLastReviewRunStart(path, maxBytes)
+	require.True(t, ok)
+	assert.Equal(t, boundaryOffset, offset)
+	assert.Equal(t, time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), startedAt)
+
+	midOffset := int64(len("pre"))
+	maxBytes = size - midOffset
+	offset, startedAt, ok = findLastReviewRunStart(path, maxBytes)
+	require.True(t, ok)
+	assert.Equal(t, boundaryOffset, offset)
+	assert.Equal(t, time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), startedAt)
+}

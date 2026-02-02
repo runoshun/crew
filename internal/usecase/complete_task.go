@@ -454,9 +454,7 @@ func findLastReviewRunStart(logPath string, maxBytes int64) (int64, time.Time, b
 	if info.Size() > maxBytes {
 		baseOffset = info.Size() - maxBytes
 	}
-	isLineStart := true
 	if baseOffset > 0 {
-		isLineStart = isOffsetLineStart(file, baseOffset)
 		if _, seekErr := file.Seek(baseOffset, io.SeekStart); seekErr != nil {
 			return 0, time.Time{}, false
 		}
@@ -466,11 +464,10 @@ func findLastReviewRunStart(logPath string, maxBytes int64) (int64, time.Time, b
 		return 0, time.Time{}, false
 	}
 	text := string(data)
-	if baseOffset > 0 && !isLineStart {
-		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
-			baseOffset += int64(idx + 1)
-			text = text[idx+1:]
-		} else {
+	if baseOffset > 0 {
+		var ok bool
+		text, baseOffset, ok = trimLeadingPartialLine(text, baseOffset, file)
+		if !ok {
 			return 0, time.Time{}, false
 		}
 	}
@@ -605,12 +602,11 @@ func readFileTailBytes(path string, offset int64, maxBytes int64) string {
 	}
 
 	text := string(data)
-	if offset > 0 && !isOffsetLineStart(file, offset) {
-		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
-			text = text[idx+1:]
-		}
+	trimmed, _, ok := trimLeadingPartialLine(text, offset, file)
+	if !ok {
+		return ""
 	}
-	return text
+	return trimmed
 }
 
 func extractReviewResult(logText string) (string, bool) {
@@ -690,11 +686,11 @@ func tailFileLines(path string, maxLines int) string {
 		return ""
 	}
 	text := string(data)
-	if offset > 0 {
-		if idx := strings.IndexByte(text, '\n'); idx >= 0 {
-			text = text[idx+1:]
-		}
+	trimmed, _, ok := trimLeadingPartialLine(text, offset, file)
+	if !ok {
+		return ""
 	}
+	text = trimmed
 	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
 	if len(lines) > maxLines {
 		lines = lines[len(lines)-maxLines:]
@@ -722,17 +718,25 @@ func diffOutput(prev, curr string) string {
 }
 
 func lastLinePrefixIndex(text, prefix string) int {
-	searchText := text
-	for {
-		idx := strings.LastIndex(searchText, prefix)
-		if idx < 0 {
-			return -1
-		}
-		if idx == 0 || searchText[idx-1] == '\n' {
-			return idx
-		}
-		searchText = searchText[:idx]
+	if prefix == "" {
+		return -1
 	}
+	for i := len(text) - 1; i >= 0; i-- {
+		if text[i] != '\n' {
+			continue
+		}
+		lineStart := i + 1
+		if len(text)-lineStart < len(prefix) {
+			continue
+		}
+		if strings.HasPrefix(text[lineStart:], prefix) {
+			return lineStart
+		}
+	}
+	if strings.HasPrefix(text, prefix) {
+		return 0
+	}
+	return -1
 }
 
 func isOffsetLineStart(file *os.File, offset int64) bool {
@@ -741,7 +745,18 @@ func isOffsetLineStart(file *os.File, offset int64) bool {
 	}
 	buf := []byte{0}
 	if _, err := file.ReadAt(buf, offset-1); err != nil {
-		return false
+		return true
 	}
 	return buf[0] == '\n'
+}
+
+func trimLeadingPartialLine(text string, offset int64, file *os.File) (string, int64, bool) {
+	if offset <= 0 || isOffsetLineStart(file, offset) {
+		return text, offset, true
+	}
+	idx := strings.IndexByte(text, '\n')
+	if idx < 0 {
+		return "", offset, false
+	}
+	return text[idx+1:], offset + int64(idx+1), true
 }
