@@ -65,7 +65,36 @@ cat > ${PLUGIN_DIR}/hooks/hooks.json << 'EOF'
     ],
     "Notification": [
       {
-        "matcher": ".*",
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew substate {{.TaskID}} awaiting_permission"
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew substate {{.TaskID}} awaiting_user"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "crew substate {{.TaskID}} running"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
         "hooks": [
           {
             "type": "command",
