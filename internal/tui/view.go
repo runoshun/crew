@@ -247,7 +247,15 @@ func (m *Model) viewMain() string {
 
 	if m.showDetailPanel() {
 		rightContent := m.viewDetailPanel()
-		return lipgloss.JoinHorizontal(lipgloss.Top, leftContent, rightContent)
+		// Ensure right panel matches left pane height exactly
+		leftHeight := lipgloss.Height(leftContent)
+		rightContent = lipgloss.NewStyle().Height(leftHeight).MaxHeight(leftHeight).Render(rightContent)
+		result := lipgloss.JoinHorizontal(lipgloss.Top, leftContent, rightContent)
+		// In embedded mode, ensure total height doesn't exceed allocated space
+		if m.embedded && m.height > 0 {
+			result = lipgloss.NewStyle().MaxHeight(m.height).Render(result)
+		}
+		return result
 	}
 
 	return leftContent
@@ -1191,11 +1199,9 @@ func (m *Model) panelContentString(contentWidth int) string {
 
 func (m *Model) viewDetailPanel() string {
 	panelWidth := m.detailPanelWidth()
-	// Height calculation: m.height minus header (2) and footer (3 when visible)
-	panelHeight := m.height - 2
-	if !m.hideFooter {
-		panelHeight -= 3 // footer border + content + margin
-	}
+	// Height calculation: must match left pane height
+	// Left pane = header (2) + taskList (m.height - 8) + footer (3) = m.height - 3
+	panelHeight := m.height - 3
 	if panelHeight < 10 {
 		panelHeight = 10
 	}

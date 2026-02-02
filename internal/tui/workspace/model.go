@@ -751,7 +751,14 @@ func (m *Model) rightModelWidth() int {
 }
 
 func (m *Model) isSplitView() bool {
-	return m.width >= minSplitWidth
+	if m.width < minSplitWidth {
+		return false
+	}
+	// Also check if right pane can show detail panel (3-pane view)
+	// If not, use single pane view instead of 2-pane intermediate state
+	// Use rightContentWidth() - 1 to account for border (same as rightModelWidth logic)
+	rightWidth := m.rightContentWidth() - 1
+	return rightWidth >= tui.MinWidthForDetailPanel
 }
 
 // View renders the TUI.

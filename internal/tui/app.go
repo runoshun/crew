@@ -446,12 +446,9 @@ func (m *Model) updateDetailPanelViewport() {
 	}
 	panelWidth := m.detailPanelWidth() - 4 // account for border and padding
 	// Height calculation:
-	// - m.height minus header (2) and footer (3 when visible)
-	// - minus 2 for panel header (Task #N + border line, rendered outside viewport)
-	panelHeight := m.height - 4
-	if !m.hideFooter {
-		panelHeight -= 3 // footer border + content + margin
-	}
+	// - panel height = m.height - 3 (see viewDetailPanel)
+	// - minus 2 for panel header (Task #N + border line)
+	panelHeight := m.height - 5
 	if panelHeight < 5 {
 		panelHeight = 5
 	}
@@ -467,7 +464,16 @@ func (m *Model) updateLayoutSizes() {
 	// Header/Footer use this same width with Padding(0, 1) which adds 2 to total width
 	// but lipgloss Width() includes padding, so the content area matches
 	listW := m.headerFooterContentWidth()
-	m.taskList.SetSize(listW, m.height-8)
+	// Height calculation: subtract header (2) and footer (3 if visible)
+	// In embedded mode, footer is hidden so only subtract header
+	listH := m.height - 2 // header
+	if !m.hideFooter {
+		listH -= 3 // footer (border + content + margin)
+	}
+	if listH < 5 {
+		listH = 5
+	}
+	m.taskList.SetSize(listW, listH)
 	m.updateDetailPanelViewport()
 	m.updateReviewViewport()
 }
