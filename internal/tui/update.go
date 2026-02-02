@@ -88,10 +88,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.Err
 		m.mode = ModeNormal
 		m.confirmAction = ConfirmNone
-		m.reviewTaskID = 0
-		m.reviewResult = ""
-		m.reviewActionCursor = 0
-		m.reviewMessageReturnMode = ModeNormal
+		m.resetReviewState()
 		return m, nil
 
 	case MsgClearError:
@@ -169,10 +166,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case MsgReviewActionCompleted:
 		m.mode = ModeNormal
-		m.reviewTaskID = 0
-		m.reviewResult = ""
-		m.reviewActionCursor = 0
-		m.reviewMessageReturnMode = ModeNormal
+		m.resetReviewState()
 		return m, m.loadTasks()
 
 	case MsgPrepareEditComment:
@@ -496,12 +490,16 @@ func (m *Model) openActionMenu() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.actionMenuItems = items
+	previousCursor := m.actionMenuCursor
 	m.actionMenuCursor = 0
 	for i, item := range items {
 		if item.IsDefault {
 			m.actionMenuCursor = i
 			break
 		}
+	}
+	if previousCursor >= 0 && previousCursor < len(items) {
+		m.actionMenuCursor = previousCursor
 	}
 	m.mode = ModeActionMenu
 	return m, nil
@@ -1135,6 +1133,13 @@ func (m *Model) enterRequestChanges(taskID int, returnMode Mode, resetReviewCont
 	m.reviewMessageInput.Focus()
 }
 
+func (m *Model) resetReviewState() {
+	m.reviewTaskID = 0
+	m.reviewResult = ""
+	m.reviewActionCursor = 0
+	m.reviewMessageReturnMode = ModeNormal
+}
+
 // defaultReviewMessage is the default message when the user leaves the input empty.
 const defaultReviewMessage = "Please address the review comments above."
 
@@ -1149,18 +1154,12 @@ func (m *Model) handleReviewMessageMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.reviewMessageReturnMode == ModeActionMenu {
-			m.reviewTaskID = 0
-			m.reviewResult = ""
-			m.reviewActionCursor = 0
-			m.reviewMessageReturnMode = ModeNormal
+			m.resetReviewState()
 			m.mode = ModeNormal
 			return m.openActionMenu()
 		}
 		m.mode = ModeNormal
-		m.reviewTaskID = 0
-		m.reviewResult = ""
-		m.reviewActionCursor = 0
-		m.reviewMessageReturnMode = ModeNormal
+		m.resetReviewState()
 		return m, nil
 
 	case msg.Type == tea.KeyEnter:
