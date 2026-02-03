@@ -546,6 +546,34 @@ func TestIntegration_NotGitRepo(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestIntegration_Help_NotGitRepo(t *testing.T) {
+	dir := t.TempDir() // Not a git repo
+
+	out := crewMust(t, dir, "--help")
+	assert.Contains(t, out, "--help-worker")
+
+	out = crewMust(t, dir, "help")
+	assert.Contains(t, out, "--help-worker")
+
+	out = crewMust(t, dir, "--help-worker")
+	assert.Contains(t, out, "## IMPORTANT: Follow This Workflow")
+}
+
+func TestIntegration_WorkspaceList_NotGitRepo(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	dir := t.TempDir() // Not a git repo
+
+	out := crewMust(t, dir, "workspace", "list")
+	assert.Empty(t, strings.TrimSpace(out))
+}
+
+func TestIntegration_Version_NotGitRepo(t *testing.T) {
+	dir := t.TempDir() // Not a git repo
+
+	out := crewMust(t, dir, "--version")
+	assert.True(t, len(strings.TrimSpace(out)) > 0)
+}
+
 func TestIntegration_InvalidTaskID(t *testing.T) {
 	dir := testRepo(t)
 	crewMust(t, dir, "init")

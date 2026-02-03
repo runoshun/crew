@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/cli"
@@ -13,6 +14,8 @@ import (
 
 // version is set at build time using -ldflags.
 var version = "dev"
+
+var newRootCommand = cli.NewRootCommand
 
 func main() {
 	if err := run(); err != nil {
@@ -31,7 +34,7 @@ func run() error {
 	// Create dependency injection container
 	container, err := app.New(cwd)
 	if err != nil {
-		// Allow running without git repo for --version and --help
+		// Allow running without git repo for no-args/help/version/workspace
 		if errors.Is(err, domain.ErrNotGitRepository) {
 			return runWithoutContainer(err)
 		}
@@ -44,20 +47,31 @@ func run() error {
 }
 
 // runWithoutContainer handles cases where git repo is not found.
-// This allows --version, --help, and workspace commands to work without a git repository.
+// This allows no-args, help, version, and workspace commands to work without a git repository.
 func runWithoutContainer(gitErr error) error {
-	rootCmd := cli.NewRootCommand(nil, version)
+	rootCmd := newRootCommand(nil, version)
 
 	// Commands that can run without a git repository
-	if len(os.Args) > 1 {
-		arg := os.Args[1]
-		if arg == "--version" || arg == "-v" || arg == "version" ||
-			arg == "--help" || arg == "-h" || arg == "help" ||
-			arg == "workspace" || arg == "ws" {
-			return rootCmd.Execute()
-		}
+	if canRunWithoutGit(os.Args[1:]) {
+		return rootCmd.Execute()
 	}
-
 	// For other commands, return the git error
 	return gitErr
+}
+
+func canRunWithoutGit(args []string) bool {
+	if len(args) == 0 {
+		return true
+	}
+	if cli.IsNoRepoAllowedCommand(args[0]) {
+		return true
+	}
+	// Allow known help/version/follow-up flags so Cobra can validate usage.
+	for _, arg := range args {
+		normalized, _, _ := strings.Cut(arg, "=")
+		if cli.IsNoRepoAllowedFlag(normalized) {
+			return true
+		}
+	}
+	return false
 }

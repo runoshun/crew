@@ -21,8 +21,49 @@ const (
 	groupSession = "session"
 )
 
+const (
+	cmdHelp           = "help"
+	cmdWorkspace      = "workspace"
+	cmdWorkspaceShort = "ws"
+
+	flagHelp      = "--help"
+	flagHelpShort = "-h"
+	flagVersion   = "--version"
+
+	flagHelpWorker            = "help-worker"
+	flagHelpReviewer          = "help-reviewer"
+	flagHelpReviewerTypo      = "help-reviwer"
+	flagHelpManager           = "help-manager"
+	flagHelpManagerOnboarding = "help-manager-onboarding"
+	flagHelpManagerAuto       = "help-manager-auto"
+	flagReviewerFollowUp      = "follow-up"
+)
+
 // launchUnifiedTUIFunc is a function variable for launching unified TUI, allowing it to be mocked in tests.
 var launchUnifiedTUIFunc = launchUnifiedTUI
+
+func flagArg(name string) string {
+	return "--" + name
+}
+
+var noRepoAllowedCommands = map[string]struct{}{
+	cmdHelp:           {},
+	cmdWorkspace:      {},
+	cmdWorkspaceShort: {},
+}
+
+var noRepoAllowedFlags = map[string]struct{}{
+	flagVersion:                        {},
+	flagHelp:                           {},
+	flagHelpShort:                      {},
+	flagArg(flagHelpWorker):            {},
+	flagArg(flagHelpReviewer):          {},
+	flagArg(flagHelpReviewerTypo):      {},
+	flagArg(flagHelpManager):           {},
+	flagArg(flagHelpManagerOnboarding): {},
+	flagArg(flagHelpManagerAuto):       {},
+	flagArg(flagReviewerFollowUp):      {},
+}
 
 // NewRootCommand creates the root command for git-crew.
 // It receives the container for dependency injection and version for display.
@@ -127,16 +168,16 @@ Use --help-manager-auto to see the auto mode guide.`,
 	}
 
 	// Add role-specific help flags
-	root.Flags().BoolVar(&fullWorker, "help-worker", false, "Show detailed help for worker agents")
-	root.Flags().BoolVar(&fullReviewer, "help-reviewer", false, "Show detailed help for reviewer agents")
-	root.Flags().BoolVar(&reviewerFollowUp, "follow-up", false, "Show follow-up guidance in reviewer help")
+	root.Flags().BoolVar(&fullWorker, flagHelpWorker, false, "Show detailed help for worker agents")
+	root.Flags().BoolVar(&fullReviewer, flagHelpReviewer, false, "Show detailed help for reviewer agents")
+	root.Flags().BoolVar(&reviewerFollowUp, flagReviewerFollowUp, false, "Show follow-up guidance in reviewer help")
 	// Backward-compatible alias (typo kept for compatibility)
-	root.Flags().BoolVar(&fullReviewer, "help-reviwer", false, "DEPRECATED: use --help-reviewer")
-	_ = root.Flags().MarkDeprecated("help-reviwer", "use --help-reviewer")
-	_ = root.Flags().MarkHidden("help-reviwer")
-	root.Flags().BoolVar(&fullManager, "help-manager", false, "Show detailed help for manager agents")
-	root.Flags().BoolVar(&managerOnboarding, "help-manager-onboarding", false, "Show onboarding guide for setting up crew")
-	root.Flags().BoolVar(&managerAuto, "help-manager-auto", false, "Show auto mode guide for manager agents")
+	root.Flags().BoolVar(&fullReviewer, flagHelpReviewerTypo, false, "DEPRECATED: use --help-reviewer")
+	_ = root.Flags().MarkDeprecated(flagHelpReviewerTypo, "use --help-reviewer")
+	_ = root.Flags().MarkHidden(flagHelpReviewerTypo)
+	root.Flags().BoolVar(&fullManager, flagHelpManager, false, "Show detailed help for manager agents")
+	root.Flags().BoolVar(&managerOnboarding, flagHelpManagerOnboarding, false, "Show onboarding guide for setting up crew")
+	root.Flags().BoolVar(&managerAuto, flagHelpManagerAuto, false, "Show auto mode guide for manager agents")
 
 	// Define command groups
 	root.AddGroup(
@@ -282,4 +323,25 @@ func launchUnifiedTUI(cwd string) error {
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	_, err := p.Run()
 	return err
+}
+
+// SetLaunchUnifiedTUIFunc replaces the launcher for tests and returns a restore function.
+func SetLaunchUnifiedTUIFunc(fn func(string) error) func() {
+	original := launchUnifiedTUIFunc
+	launchUnifiedTUIFunc = fn
+	return func() {
+		launchUnifiedTUIFunc = original
+	}
+}
+
+// IsNoRepoAllowedCommand reports whether a command can run outside a git repo.
+func IsNoRepoAllowedCommand(arg string) bool {
+	_, ok := noRepoAllowedCommands[arg]
+	return ok
+}
+
+// IsNoRepoAllowedFlag reports whether a flag can run outside a git repo.
+func IsNoRepoAllowedFlag(arg string) bool {
+	_, ok := noRepoAllowedFlags[arg]
+	return ok
 }
