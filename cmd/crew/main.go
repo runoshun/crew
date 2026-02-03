@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/cli"
@@ -65,11 +66,12 @@ func canRunWithoutGit(args []string) bool {
 	if cli.IsNoRepoAllowedCommand(args[0]) {
 		return true
 	}
-	hasAllowedFlag := false
+	// Allow known help/version/follow-up flags so Cobra can validate usage.
 	for _, arg := range args {
-		if cli.IsNoRepoAllowedFlag(arg) {
-			hasAllowedFlag = true
+		normalized, _, _ := strings.Cut(arg, "=")
+		if cli.IsNoRepoAllowedFlag(normalized) {
+			return true
 		}
 	}
-	return hasAllowedFlag
+	return false
 }

@@ -348,8 +348,3 @@ func IsNoRepoAllowedFlag(arg string) bool {
 	_, ok := noRepoAllowedFlags[arg]
 	return ok
 }
-
-// IsReviewerHelpFlag reports whether a flag enables reviewer help output.
-func IsReviewerHelpFlag(arg string) bool {
-	return arg == flagArg(flagHelpReviewer) || arg == flagArg(flagHelpReviewerTypo)
-}
