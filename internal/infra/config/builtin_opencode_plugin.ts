@@ -1,13 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { appendFile } from "node:fs/promises"
 
-const LOG_FILE = "/tmp/crew-opencode-plugin.log"
-
-const log = async (message: string) => {
-  const timestamp = new Date().toISOString()
-  await appendFile(LOG_FILE, `[${timestamp}] ${message}\n`).catch(() => { })
-}
-
 export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 
   const updateSubstate = async (substate: string) => {
@@ -20,12 +13,10 @@ export const CrewHooksPlugin: Plugin = async ({ $ }) => {
 
   return {
     event: async ({ event }) => {
-      await log(`event: ${JSON.stringify(event)}`)
-
       // Check if current status is in_review (if so, skip auto-switching)
       const isInReview = async () => {
         try {
-          const { json } = await $`crew show {{.TaskID }} --json`;
+          const { json } = await $`crew show {{.TaskID }} --json`.quiet();
           return json().status === "done";
         } catch {
           return false;
