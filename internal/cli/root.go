@@ -23,6 +23,24 @@ const (
 // launchUnifiedTUIFunc is a function variable for launching unified TUI, allowing it to be mocked in tests.
 var launchUnifiedTUIFunc = launchUnifiedTUI
 
+var noRepoAllowedCommands = map[string]struct{}{
+	"help":      {},
+	"workspace": {},
+	"ws":        {},
+}
+
+var noRepoAllowedFlags = map[string]struct{}{
+	"--version":                 {},
+	"--help":                    {},
+	"-h":                        {},
+	"--help-worker":             {},
+	"--help-reviewer":           {},
+	"--help-reviwer":            {},
+	"--help-manager":            {},
+	"--help-manager-onboarding": {},
+	"--help-manager-auto":       {},
+}
+
 // NewRootCommand creates the root command for git-crew.
 // It receives the container for dependency injection and version for display.
 func NewRootCommand(c *app.Container, version string) *cobra.Command {
@@ -287,11 +305,28 @@ func launchUnifiedTUI(cwd string) error {
 	return err
 }
 
-// SetLaunchUnifiedTUIFunc replaces the launcher and returns a restore function.
+// SetLaunchUnifiedTUIFunc replaces the launcher for tests and returns a restore function.
 func SetLaunchUnifiedTUIFunc(fn func(string) error) func() {
 	original := launchUnifiedTUIFunc
 	launchUnifiedTUIFunc = fn
 	return func() {
 		launchUnifiedTUIFunc = original
 	}
+}
+
+// IsNoRepoAllowedCommand reports whether a command can run outside a git repo.
+func IsNoRepoAllowedCommand(arg string) bool {
+	_, ok := noRepoAllowedCommands[arg]
+	return ok
+}
+
+// IsNoRepoAllowedFlag reports whether a flag can run outside a git repo.
+func IsNoRepoAllowedFlag(arg string) bool {
+	_, ok := noRepoAllowedFlags[arg]
+	return ok
+}
+
+// IsReviewerHelpFlag reports whether a flag enables reviewer help output.
+func IsReviewerHelpFlag(arg string) bool {
+	return arg == "--help-reviewer" || arg == "--help-reviwer"
 }

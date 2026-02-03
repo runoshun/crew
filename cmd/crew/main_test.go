@@ -30,6 +30,11 @@ func TestCanRunWithoutGit(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "follow-up only",
+			args: []string{"--follow-up"},
+			want: false,
+		},
+		{
 			name: "version flag",
 			args: []string{"--version"},
 			want: true,

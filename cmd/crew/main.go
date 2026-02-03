@@ -62,25 +62,26 @@ func canRunWithoutGit(args []string) bool {
 	if len(args) == 0 {
 		return true
 	}
-	switch args[0] {
-	case "help", "workspace", "ws":
+	if cli.IsNoRepoAllowedCommand(args[0]) {
 		return true
 	}
+	hasFollowUp := false
+	hasReviewerHelp := false
+	hasAllowedFlag := false
 	for _, arg := range args {
-		if isAllowedWithoutGitFlag(arg) {
-			return true
+		if arg == "--follow-up" {
+			hasFollowUp = true
+			continue
+		}
+		if cli.IsReviewerHelpFlag(arg) {
+			hasReviewerHelp = true
+		}
+		if cli.IsNoRepoAllowedFlag(arg) {
+			hasAllowedFlag = true
 		}
 	}
-	return false
-}
-
-func isAllowedWithoutGitFlag(arg string) bool {
-	switch arg {
-	case "--version", "--help", "-h", "--follow-up",
-		"--help-worker", "--help-reviewer", "--help-reviwer",
-		"--help-manager", "--help-manager-onboarding", "--help-manager-auto":
-		return true
-	default:
+	if hasFollowUp && !hasReviewerHelp {
 		return false
 	}
+	return hasAllowedFlag || hasReviewerHelp
 }
