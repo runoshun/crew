@@ -17,6 +17,7 @@ import (
 const (
 	groupSetup   = "setup"
 	groupTask    = "task"
+	groupUI      = "ui"
 	groupSession = "session"
 )
 
@@ -141,6 +142,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 	root.AddGroup(
 		&cobra.Group{ID: groupSetup, Title: "Setup Commands:"},
 		&cobra.Group{ID: groupTask, Title: "Task Management:"},
+		&cobra.Group{ID: groupUI, Title: "UI Commands:"},
 		&cobra.Group{ID: groupSession, Title: "Session Management:"},
 	)
 
@@ -222,10 +224,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 	pruneCmd := newPruneCommand(c)
 	pruneCmd.GroupID = groupTask
 
-	// TUI command
-	tuiCmd := newTUICommand(c)
-	tuiCmd.GroupID = groupTask
-
 	// Manager command
 	managerCmd := newManagerCommand(c)
 	managerCmd.GroupID = groupSession
@@ -236,7 +234,7 @@ Use --help-manager-auto to see the auto mode guide.`,
 
 	// Workspace command (can run without git repo)
 	workspaceCmd := newWorkspaceCommand(c)
-	workspaceCmd.GroupID = groupSession
+	workspaceCmd.GroupID = groupUI
 
 	// Internal commands (hidden)
 	sessionEndedCmd := newSessionEndedCommand(c)
@@ -269,7 +267,6 @@ Use --help-manager-auto to see the auto mode guide.`,
 		pollCmd,
 		logsCmd,
 		pruneCmd,
-		tuiCmd,
 		managerCmd,
 		workspaceCmd,
 		sessionEndedCmd,

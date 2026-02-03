@@ -581,6 +581,8 @@ func TestIntegration_Help(t *testing.T) {
 	assert.Contains(t, out, "git-crew")
 	assert.Contains(t, out, "Setup Commands:")
 	assert.Contains(t, out, "Task Management:")
+	assert.Contains(t, out, "UI Commands:")
+	assert.NotContains(t, out, "\ntui")
 
 	// Subcommand help
 	out = crewMust(t, dir, "new", "--help")
