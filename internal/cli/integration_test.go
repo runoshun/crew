@@ -550,10 +550,10 @@ func TestIntegration_Help_NotGitRepo(t *testing.T) {
 	dir := t.TempDir() // Not a git repo
 
 	out := crewMust(t, dir, "--help")
-	assert.Contains(t, out, "git-crew")
+	assert.Contains(t, out, "--help-worker")
 
 	out = crewMust(t, dir, "--help-worker")
-	assert.Contains(t, out, "--help-worker")
+	assert.Contains(t, out, "Follow This Workflow")
 }
 
 func TestIntegration_WorkspaceList_NotGitRepo(t *testing.T) {

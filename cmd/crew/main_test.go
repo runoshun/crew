@@ -1,6 +1,13 @@
 package main
 
-import "testing"
+import (
+	"errors"
+	"os"
+	"testing"
+
+	"github.com/runoshun/git-crew/v2/internal/app"
+	"github.com/spf13/cobra"
+)
 
 func TestCanRunWithoutGit(t *testing.T) {
 	tests := []struct {
@@ -48,6 +55,16 @@ func TestCanRunWithoutGit(t *testing.T) {
 			args: []string{"new", "--title", "test"},
 			want: false,
 		},
+		{
+			name: "unknown help flag",
+			args: []string{"--help-foo"},
+			want: false,
+		},
+		{
+			name: "version shorthand",
+			args: []string{"-v"},
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -56,5 +73,32 @@ func TestCanRunWithoutGit(t *testing.T) {
 				t.Fatalf("canRunWithoutGit(%v) = %v, want %v", tt.args, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRunWithoutContainer_NoArgsExecutes(t *testing.T) {
+	originalArgs := os.Args
+	originalRoot := newRootCommand
+	t.Cleanup(func() {
+		os.Args = originalArgs
+		newRootCommand = originalRoot
+	})
+
+	os.Args = []string{"crew"}
+	called := false
+	newRootCommand = func(_ *app.Container, _ string) *cobra.Command {
+		return &cobra.Command{
+			RunE: func(_ *cobra.Command, _ []string) error {
+				called = true
+				return nil
+			},
+		}
+	}
+
+	if err := runWithoutContainer(errors.New("git")); err != nil {
+		t.Fatalf("runWithoutContainer returned error: %v", err)
+	}
+	if !called {
+		t.Fatalf("expected root command to execute")
 	}
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/cli"
@@ -14,6 +13,8 @@ import (
 
 // version is set at build time using -ldflags.
 var version = "dev"
+
+var newRootCommand = cli.NewRootCommand
 
 func main() {
 	if err := run(); err != nil {
@@ -47,7 +48,7 @@ func run() error {
 // runWithoutContainer handles cases where git repo is not found.
 // This allows no-args, help, version, and workspace commands to work without a git repository.
 func runWithoutContainer(gitErr error) error {
-	rootCmd := cli.NewRootCommand(nil, version)
+	rootCmd := newRootCommand(nil, version)
 
 	// Commands that can run without a git repository
 	if canRunWithoutGit(os.Args[1:]) {
@@ -66,10 +67,20 @@ func canRunWithoutGit(args []string) bool {
 		return true
 	}
 	for _, arg := range args {
-		if arg == "--version" || arg == "-v" || arg == "--help" || arg == "-h" ||
-			arg == "--follow-up" || strings.HasPrefix(arg, "--help-") {
+		if isAllowedWithoutGitFlag(arg) {
 			return true
 		}
 	}
 	return false
+}
+
+func isAllowedWithoutGitFlag(arg string) bool {
+	switch arg {
+	case "--version", "--help", "-h", "--follow-up",
+		"--help-worker", "--help-reviewer", "--help-reviwer",
+		"--help-manager", "--help-manager-onboarding", "--help-manager-auto":
+		return true
+	default:
+		return false
+	}
 }
