@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/cli"
@@ -44,7 +45,7 @@ func run() error {
 }
 
 // runWithoutContainer handles cases where git repo is not found.
-// This allows --version, --help, and workspace commands to work without a git repository.
+// This allows no-args, help, version, and workspace commands to work without a git repository.
 func runWithoutContainer(gitErr error) error {
 	rootCmd := cli.NewRootCommand(nil, version)
 
@@ -55,6 +56,7 @@ func runWithoutContainer(gitErr error) error {
 	arg := os.Args[1]
 	if arg == "--version" || arg == "-v" || arg == "version" ||
 		arg == "--help" || arg == "-h" || arg == "help" ||
+		strings.HasPrefix(arg, "--help-") ||
 		arg == "workspace" || arg == "ws" {
 		return rootCmd.Execute()
 	}
