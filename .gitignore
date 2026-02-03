@@ -1,6 +1,9 @@
 # Binary
 /crew
 
+# GoReleaser
+/dist/
+
 # Test coverage
 coverage.out
 coverage*.out
