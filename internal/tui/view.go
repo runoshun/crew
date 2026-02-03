@@ -1178,7 +1178,7 @@ func (m *Model) viewPanelTabs(_ int) string {
 		{"Peek", PanelContentPeek},
 	}
 
-	var parts []string
+	parts := make([]string, 0, len(tabs)*2-1) // tabs + separators
 	for i, tab := range tabs {
 		style := tabStyle
 		if m.panelContent == tab.content {
