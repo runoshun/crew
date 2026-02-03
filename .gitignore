@@ -9,6 +9,9 @@ coverage.out
 coverage*.out
 coverage.html
 
+# node
+node_modules/
+
 # IDE
 .idea/
 .vscode/
