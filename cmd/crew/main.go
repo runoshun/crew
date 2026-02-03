@@ -49,13 +49,14 @@ func runWithoutContainer(gitErr error) error {
 	rootCmd := cli.NewRootCommand(nil, version)
 
 	// Commands that can run without a git repository
-	if len(os.Args) > 1 {
-		arg := os.Args[1]
-		if arg == "--version" || arg == "-v" || arg == "version" ||
-			arg == "--help" || arg == "-h" || arg == "help" ||
-			arg == "workspace" || arg == "ws" {
-			return rootCmd.Execute()
-		}
+	if len(os.Args) == 1 {
+		return rootCmd.Execute()
+	}
+	arg := os.Args[1]
+	if arg == "--version" || arg == "-v" || arg == "version" ||
+		arg == "--help" || arg == "-h" || arg == "help" ||
+		arg == "workspace" || arg == "ws" {
+		return rootCmd.Execute()
 	}
 
 	// For other commands, return the git error

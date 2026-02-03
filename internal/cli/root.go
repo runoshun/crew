@@ -281,6 +281,9 @@ Use --help-manager-auto to see the auto mode guide.`,
 // launchUnifiedTUI launches the unified TUI that works from any directory.
 // It detects if cwd is in a git repository and adjusts the view accordingly.
 func launchUnifiedTUI(cwd string) error {
+	if os.Getenv("CREW_TUI_TEST") == "1" {
+		return nil
+	}
 	model := workspace.NewUnified(cwd)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	_, err := p.Run()

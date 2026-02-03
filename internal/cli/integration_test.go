@@ -546,6 +546,14 @@ func TestIntegration_NotGitRepo(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestIntegration_NoArgs_NotGitRepo_LaunchesTUI(t *testing.T) {
+	t.Setenv("CREW_TUI_TEST", "1")
+	dir := t.TempDir() // Not a git repo
+
+	_, err := crew(t, dir)
+	assert.NoError(t, err)
+}
+
 func TestIntegration_InvalidTaskID(t *testing.T) {
 	dir := testRepo(t)
 	crewMust(t, dir, "init")
