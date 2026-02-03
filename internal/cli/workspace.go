@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -35,11 +36,14 @@ This command can be run from outside a git repository.`,
 // launchWorkspaceTUI launches the workspace TUI (with workspace panel visible).
 // This uses NewUnified but always shows the workspace panel.
 func launchWorkspaceTUI() error {
-	cwd, _ := os.Getwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get current directory: %w", err)
+	}
 	model := workspace.NewUnified(cwd)
 	model.SetShowWorkspace(true) // Force workspace panel visible
 	p := tea.NewProgram(model, tea.WithAltScreen())
-	_, err := p.Run()
+	_, err = p.Run()
 	return err
 }
 

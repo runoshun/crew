@@ -582,12 +582,17 @@ func TestIntegration_Help(t *testing.T) {
 	assert.Contains(t, out, "Setup Commands:")
 	assert.Contains(t, out, "Task Management:")
 	assert.Contains(t, out, "UI Commands:")
-	assert.NotContains(t, out, "\ntui")
+	assert.Contains(t, out, "\n  workspace")
+	assert.NotContains(t, out, "\n  tui")
 
 	// Subcommand help
 	out = crewMust(t, dir, "new", "--help")
 	assert.Contains(t, out, "Create a new task")
 	assert.Contains(t, out, "--title")
+
+	// Workspace alias help
+	out = crewMust(t, dir, "ws", "--help")
+	assert.Contains(t, out, "Launch workspace TUI")
 }
 
 func TestIntegration_Version(t *testing.T) {
