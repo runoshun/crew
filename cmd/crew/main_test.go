@@ -5,8 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/runoshun/git-crew/v2/internal/app"
-	"github.com/spf13/cobra"
+	"github.com/runoshun/git-crew/v2/internal/cli"
 )
 
 func TestCanRunWithoutGit(t *testing.T) {
@@ -79,21 +78,19 @@ func TestCanRunWithoutGit(t *testing.T) {
 func TestRunWithoutContainer_NoArgsExecutes(t *testing.T) {
 	originalArgs := os.Args
 	originalRoot := newRootCommand
+	called := false
+	restore := cli.SetLaunchUnifiedTUIFunc(func(string) error {
+		called = true
+		return nil
+	})
 	t.Cleanup(func() {
 		os.Args = originalArgs
 		newRootCommand = originalRoot
+		restore()
 	})
 
 	os.Args = []string{"crew"}
-	called := false
-	newRootCommand = func(_ *app.Container, _ string) *cobra.Command {
-		return &cobra.Command{
-			RunE: func(_ *cobra.Command, _ []string) error {
-				called = true
-				return nil
-			},
-		}
-	}
+	newRootCommand = cli.NewRootCommand
 
 	if err := runWithoutContainer(errors.New("git")); err != nil {
 		t.Fatalf("runWithoutContainer returned error: %v", err)

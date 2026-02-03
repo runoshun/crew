@@ -286,3 +286,12 @@ func launchUnifiedTUI(cwd string) error {
 	_, err := p.Run()
 	return err
 }
+
+// SetLaunchUnifiedTUIFunc replaces the launcher and returns a restore function.
+func SetLaunchUnifiedTUIFunc(fn func(string) error) func() {
+	original := launchUnifiedTUIFunc
+	launchUnifiedTUIFunc = fn
+	return func() {
+		launchUnifiedTUIFunc = original
+	}
+}
