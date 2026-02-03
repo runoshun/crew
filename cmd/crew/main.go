@@ -50,20 +50,26 @@ func runWithoutContainer(gitErr error) error {
 	rootCmd := cli.NewRootCommand(nil, version)
 
 	// Commands that can run without a git repository
-	if len(os.Args) == 1 {
+	if canRunWithoutGit(os.Args[1:]) {
 		return rootCmd.Execute()
-	}
-	args := os.Args[1:]
-	firstArg := args[0]
-	if firstArg == "version" || firstArg == "help" || firstArg == "workspace" || firstArg == "ws" {
-		return rootCmd.Execute()
-	}
-	for _, arg := range args {
-		if arg == "--version" || arg == "-v" || arg == "--help" || arg == "-h" ||
-			strings.HasPrefix(arg, "--help-") {
-			return rootCmd.Execute()
-		}
 	}
 	// For other commands, return the git error
 	return gitErr
+}
+
+func canRunWithoutGit(args []string) bool {
+	if len(args) == 0 {
+		return true
+	}
+	switch args[0] {
+	case "help", "workspace", "ws":
+		return true
+	}
+	for _, arg := range args {
+		if arg == "--version" || arg == "-v" || arg == "--help" || arg == "-h" ||
+			arg == "--follow-up" || strings.HasPrefix(arg, "--help-") {
+			return true
+		}
+	}
+	return false
 }

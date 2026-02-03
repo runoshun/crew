@@ -553,7 +553,7 @@ func TestIntegration_Help_NotGitRepo(t *testing.T) {
 	assert.Contains(t, out, "git-crew")
 
 	out = crewMust(t, dir, "--help-worker")
-	assert.Contains(t, out, "worker")
+	assert.Contains(t, out, "--help-worker")
 }
 
 func TestIntegration_WorkspaceList_NotGitRepo(t *testing.T) {
