@@ -11,6 +11,7 @@ type WorkspaceRepo struct {
 	Name       string    `toml:"name,omitempty"`       // Display name (defaults to directory basename)
 	Pinned     bool      `toml:"pinned,omitempty"`     // Whether the repo is pinned to top
 	LastOpened time.Time `toml:"last_opened,omitzero"` // Last time the repo was opened (omitzero for time.Time)
+	Temporary  bool      `toml:"-"`                    // True for current directory repo (not persisted)
 }
 
 // WorkspaceFile represents the workspaces.toml file structure.

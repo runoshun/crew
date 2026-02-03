@@ -3,20 +3,19 @@ package cli
 import (
 	"testing"
 
-	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewRootCommand_NoArgs_LaunchesTUI(t *testing.T) {
 	// Save original function and restore after test
-	originalFunc := launchTUIFunc
+	originalFunc := launchUnifiedTUIFunc
 	defer func() {
-		launchTUIFunc = originalFunc
+		launchUnifiedTUIFunc = originalFunc
 	}()
 
-	// Mock launchTUIFunc to track if it was called
+	// Mock launchUnifiedTUIFunc to track if it was called
 	called := false
-	launchTUIFunc = func(c *app.Container) error {
+	launchUnifiedTUIFunc = func(cwd string) error {
 		called = true
 		return nil
 	}
@@ -28,21 +27,21 @@ func TestNewRootCommand_NoArgs_LaunchesTUI(t *testing.T) {
 	root.SetArgs([]string{})
 	err := root.Execute()
 
-	// Verify launchTUIFunc was called
+	// Verify launchUnifiedTUIFunc was called
 	assert.NoError(t, err)
-	assert.True(t, called, "launchTUIFunc should be called when no arguments are provided")
+	assert.True(t, called, "launchUnifiedTUIFunc should be called when no arguments are provided")
 }
 
 func TestNewRootCommand_WithHelp_ShowsHelp(t *testing.T) {
 	// Save original function and restore after test
-	originalFunc := launchTUIFunc
+	originalFunc := launchUnifiedTUIFunc
 	defer func() {
-		launchTUIFunc = originalFunc
+		launchUnifiedTUIFunc = originalFunc
 	}()
 
-	// Mock launchTUIFunc to ensure it's NOT called
+	// Mock launchUnifiedTUIFunc to ensure it's NOT called
 	called := false
-	launchTUIFunc = func(c *app.Container) error {
+	launchUnifiedTUIFunc = func(cwd string) error {
 		called = true
 		return nil
 	}
@@ -54,9 +53,9 @@ func TestNewRootCommand_WithHelp_ShowsHelp(t *testing.T) {
 	root.SetArgs([]string{"--help"})
 	err := root.Execute()
 
-	// Verify launchTUIFunc was NOT called (help is handled by cobra)
+	// Verify launchUnifiedTUIFunc was NOT called (help is handled by cobra)
 	// Note: --help causes cobra to exit early, so we expect an error or successful help display
 	// In practice, cobra's --help doesn't return an error, it just displays help and returns nil
 	assert.NoError(t, err)
-	assert.False(t, called, "launchTUIFunc should NOT be called when --help is provided")
+	assert.False(t, called, "launchUnifiedTUIFunc should NOT be called when --help is provided")
 }

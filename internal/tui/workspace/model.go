@@ -45,9 +45,11 @@ type Model struct {
 	activeRepo string
 
 	// State
-	repos     []domain.WorkspaceRepo
-	repoInfos map[string]domain.WorkspaceRepoInfo
-	err       error
+	repos        []domain.WorkspaceRepo
+	displayRepos []domain.WorkspaceRepo // Repos to display (includes currentRepo, deduped)
+	repoInfos    map[string]domain.WorkspaceRepoInfo
+	err          error
+	currentRepo  *domain.WorkspaceRepo // Current directory repo (nil if not in git repo)
 
 	// Components
 	keys     KeyMap
@@ -64,11 +66,13 @@ type Model struct {
 	rightWidth  int
 
 	// Boolean state
-	leftFocused bool
-	loading     bool
+	leftFocused   bool
+	loading       bool
+	showWorkspace bool // Whether to show workspace panel (toggled with 'w')
 }
 
 // New creates a new workspace TUI model.
+// This is used when explicitly launching workspace view (workspace panel always shown).
 func New() *Model {
 	ai := textinput.New()
 	ai.Placeholder = "Enter repository path..."
@@ -77,32 +81,101 @@ func New() *Model {
 	store, storeErr := NewStoreFromDefault()
 
 	return &Model{
-		store:       store,
-		models:      make(map[string]*tui.Model),
-		activeRepo:  "",
-		repos:       nil,
-		repoInfos:   make(map[string]domain.WorkspaceRepoInfo),
-		err:         storeErr, // Will be displayed on first render if store creation failed
-		cursor:      0,
-		mode:        ModeNormal,
-		keys:        DefaultKeyMap(),
-		styles:      DefaultStyles(),
-		addInput:    ai,
-		leftFocused: true,
-		loading:     storeErr == nil, // Don't show loading if we already have an error
+		store:         store,
+		models:        make(map[string]*tui.Model),
+		activeRepo:    "",
+		repos:         nil,
+		displayRepos:  nil,
+		repoInfos:     make(map[string]domain.WorkspaceRepoInfo),
+		err:           storeErr, // Will be displayed on first render if store creation failed
+		currentRepo:   nil,
+		cursor:        0,
+		mode:          ModeNormal,
+		keys:          DefaultKeyMap(),
+		styles:        DefaultStyles(),
+		addInput:      ai,
+		leftFocused:   true,
+		loading:       storeErr == nil, // Don't show loading if we already have an error
+		showWorkspace: true,            // Always show workspace panel in explicit workspace mode
+	}
+}
+
+// NewUnified creates a unified TUI model that detects the current directory.
+// If cwd is inside a git repository, the workspace panel is hidden initially.
+// If cwd is not a git repository, the workspace panel is shown.
+func NewUnified(cwd string) *Model {
+	m := New()
+
+	// Detect if cwd is inside a git repository
+	currentRepo := detectGitRepo(cwd)
+	if currentRepo != nil {
+		m.currentRepo = currentRepo
+		m.activeRepo = currentRepo.Path
+		m.showWorkspace = false // Hide workspace panel when in a git repo
+		m.leftFocused = false   // Start with task list focused
+	}
+
+	return m
+}
+
+// detectGitRepo checks if the given path is inside a git repository.
+// Returns a WorkspaceRepo with Temporary=true if found, nil otherwise.
+func detectGitRepo(path string) *domain.WorkspaceRepo {
+	// Walk up the directory tree to find .git
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil
+	}
+
+	current := absPath
+	for {
+		gitPath := filepath.Join(current, ".git")
+		if info, err := os.Stat(gitPath); err == nil && (info.IsDir() || info.Mode().IsRegular()) {
+			// Found .git (could be a directory or a file for worktrees)
+			return &domain.WorkspaceRepo{
+				Path:      current,
+				Temporary: true,
+			}
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			// Reached root
+			break
+		}
+		current = parent
+	}
+
+	return nil
+}
+
+// SetShowWorkspace sets whether to show the workspace panel.
+// This should be called before Init() to take effect.
+func (m *Model) SetShowWorkspace(show bool) {
+	m.showWorkspace = show
+	if show {
+		m.leftFocused = true
+	} else {
+		m.leftFocused = false
 	}
 }
 
 // Init initializes the model.
 func (m *Model) Init() tea.Cmd {
-	// Don't try to load if store creation failed
-	if m.store == nil {
-		return nil
+	cmds := []tea.Cmd{m.tick()}
+
+	// Load repos from workspace file if store is available
+	if m.store != nil {
+		cmds = append(cmds, m.loadRepos())
 	}
-	return tea.Batch(
-		m.loadRepos(),
-		m.tick(),
-	)
+
+	// If we have a currentRepo, load its summary immediately
+	if m.currentRepo != nil {
+		m.syncDisplayRepos()
+		cmds = append(cmds, loadSummary(*m.currentRepo))
+	}
+
+	return tea.Batch(cmds...)
 }
 
 // loadRepos loads repos from the workspace file.
@@ -189,6 +262,53 @@ func loadRepoInfo(repo domain.WorkspaceRepo) domain.WorkspaceRepoInfo {
 	return info
 }
 
+// syncDisplayRepos builds the display list by combining currentRepo and registered repos.
+// Deduplication: if currentRepo matches a registered repo, mark it as non-temporary.
+func (m *Model) syncDisplayRepos() {
+	displayRepos := make([]domain.WorkspaceRepo, 0, len(m.repos)+1)
+
+	// Add currentRepo first if present
+	if m.currentRepo != nil {
+		// Check if currentRepo is already registered
+		currentPath := normalizePath(m.currentRepo.Path)
+		isRegistered := false
+		for _, repo := range m.repos {
+			if normalizePath(repo.Path) == currentPath {
+				isRegistered = true
+				break
+			}
+		}
+
+		if isRegistered {
+			// Mark currentRepo as non-temporary (it's registered)
+			m.currentRepo.Temporary = false
+		}
+
+		displayRepos = append(displayRepos, *m.currentRepo)
+	}
+
+	// Add registered repos (skip duplicates with currentRepo)
+	for _, repo := range m.repos {
+		if m.currentRepo != nil && normalizePath(repo.Path) == normalizePath(m.currentRepo.Path) {
+			continue // Skip duplicate
+		}
+		displayRepos = append(displayRepos, repo)
+	}
+
+	m.displayRepos = displayRepos
+}
+
+// normalizePath normalizes a path for comparison.
+func normalizePath(path string) string {
+	// Resolve symlinks and clean the path
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		// If symlink resolution fails, just clean the path
+		resolved = filepath.Clean(path)
+	}
+	return resolved
+}
+
 // Update handles messages.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -208,6 +328,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.repos = msg.Repos
+		m.syncDisplayRepos()
 		m.pruneRepoState()
 		m.clampCursor()
 		m.syncActiveRepo()
@@ -244,7 +365,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.mode = ModeNormal
-		if m.cursor >= len(m.repos)-1 && m.cursor > 0 {
+		if m.cursor >= len(m.displayRepos)-1 && m.cursor > 0 {
 			m.cursor--
 		}
 		return m, m.loadRepos()
@@ -293,6 +414,21 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.String() == "q" || msg.String() == "ctrl+c" {
 		return m, tea.Quit
 	}
+
+	// Handle 'w' key to toggle workspace panel (works regardless of focus)
+	if msg.String() == "w" {
+		m.showWorkspace = !m.showWorkspace
+		if m.showWorkspace {
+			// When showing workspace panel, focus left pane
+			m.leftFocused = true
+		} else {
+			// When hiding workspace panel, focus task list
+			m.leftFocused = false
+		}
+		m.updateLayout()
+		return m, m.propagateWindowSize()
+	}
+
 	if !m.leftFocused {
 		return m.forwardToActiveModel(msg)
 	}
@@ -304,7 +440,7 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.setActiveRepoByCursor()
 
 	case msg.String() == "down" || msg.String() == "j":
-		if m.cursor < len(m.repos)-1 {
+		if m.cursor < len(m.displayRepos)-1 {
 			m.cursor++
 		}
 		return m, m.setActiveRepoByCursor()
@@ -318,8 +454,8 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case msg.String() == "pgdown" || msg.String() == "ctrl+f":
 		m.cursor += 5
-		if m.cursor >= len(m.repos) {
-			m.cursor = len(m.repos) - 1
+		if m.cursor >= len(m.displayRepos) {
+			m.cursor = len(m.displayRepos) - 1
 		}
 		if m.cursor < 0 {
 			m.cursor = 0
@@ -327,15 +463,17 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.setActiveRepoByCursor()
 
 	case msg.String() == "enter":
-		if len(m.repos) > 0 && m.cursor < len(m.repos) {
-			repo := m.repos[m.cursor]
+		if len(m.displayRepos) > 0 && m.cursor < len(m.displayRepos) {
+			repo := m.displayRepos[m.cursor]
 			// Check if repo is in a valid state
 			if info, ok := m.repoInfos[repo.Path]; ok && info.State != domain.RepoStateOK {
 				m.err = fmt.Errorf("cannot open: %s", info.State.String())
 				return m, nil
 			}
-			// Update last opened and focus right pane
-			_ = m.store.UpdateLastOpened(repo.Path)
+			// Update last opened (only for non-temporary repos) and focus right pane
+			if m.store != nil && !repo.Temporary {
+				_ = m.store.UpdateLastOpened(repo.Path)
+			}
 			m.activeRepo = repo.Path
 			m.leftFocused = false
 			return m, m.ensureActiveModelAndSize()
@@ -348,7 +486,13 @@ func (m *Model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, textinput.Blink
 
 	case msg.String() == "d":
-		if len(m.repos) > 0 && m.cursor < len(m.repos) {
+		if len(m.displayRepos) > 0 && m.cursor < len(m.displayRepos) {
+			repo := m.displayRepos[m.cursor]
+			// Cannot delete temporary repos
+			if repo.Temporary {
+				m.err = fmt.Errorf("cannot remove: this is the current directory (not registered)")
+				return m, nil
+			}
 			m.mode = ModeConfirmDelete
 			m.deleteIndex = m.cursor
 		}
@@ -395,9 +539,14 @@ func (m *Model) handleAddMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) handleDeleteMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y", "enter":
-		if m.deleteIndex < len(m.repos) {
-			path := m.repos[m.deleteIndex].Path
-			return m, m.removeRepo(path)
+		if m.deleteIndex < len(m.displayRepos) {
+			repo := m.displayRepos[m.deleteIndex]
+			// Cannot delete temporary repos
+			if repo.Temporary {
+				m.mode = ModeNormal
+				return m, nil
+			}
+			return m, m.removeRepo(repo.Path)
 		}
 		m.mode = ModeNormal
 		return m, nil
@@ -452,11 +601,11 @@ func (m *Model) ensureActiveModelAndSize() tea.Cmd {
 }
 
 func (m *Model) setActiveRepoByCursor() tea.Cmd {
-	if len(m.repos) == 0 || m.cursor < 0 || m.cursor >= len(m.repos) {
+	if len(m.displayRepos) == 0 || m.cursor < 0 || m.cursor >= len(m.displayRepos) {
 		m.activeRepo = ""
 		return nil
 	}
-	path := m.repos[m.cursor].Path
+	path := m.displayRepos[m.cursor].Path
 	if m.activeRepo == path {
 		return nil
 	}
@@ -465,25 +614,30 @@ func (m *Model) setActiveRepoByCursor() tea.Cmd {
 }
 
 func (m *Model) clampCursor() {
-	if len(m.repos) == 0 {
+	if len(m.displayRepos) == 0 {
 		m.cursor = 0
 		return
 	}
 	if m.cursor < 0 {
 		m.cursor = 0
 	}
-	if m.cursor >= len(m.repos) {
-		m.cursor = len(m.repos) - 1
+	if m.cursor >= len(m.displayRepos) {
+		m.cursor = len(m.displayRepos) - 1
 	}
 }
 
 func (m *Model) syncActiveRepo() {
-	if len(m.repos) == 0 {
-		m.activeRepo = ""
+	if len(m.displayRepos) == 0 {
+		// If no display repos but we have a currentRepo, keep it as activeRepo
+		if m.currentRepo != nil {
+			m.activeRepo = m.currentRepo.Path
+		} else {
+			m.activeRepo = ""
+		}
 		return
 	}
 	if m.activeRepo != "" {
-		for i, repo := range m.repos {
+		for i, repo := range m.displayRepos {
 			if repo.Path == m.activeRepo {
 				m.cursor = i
 				return
@@ -491,7 +645,7 @@ func (m *Model) syncActiveRepo() {
 		}
 	}
 	m.clampCursor()
-	m.activeRepo = m.repos[m.cursor].Path
+	m.activeRepo = m.displayRepos[m.cursor].Path
 }
 
 func (m *Model) pruneRepoState() {
@@ -744,6 +898,10 @@ func (m *Model) rightContentWidth() int {
 }
 
 func (m *Model) rightModelWidth() int {
+	// When workspace panel is hidden, use full content width
+	if !m.showWorkspace {
+		return m.contentWidth()
+	}
 	width := m.rightContentWidth()
 	if m.isSplitView() && width > 0 {
 		width--
@@ -755,6 +913,10 @@ func (m *Model) rightModelWidth() int {
 }
 
 func (m *Model) isSplitView() bool {
+	// If workspace panel is hidden, never show split view (with workspace pane)
+	if !m.showWorkspace {
+		return false
+	}
 	// Use the single source of truth for 3-pane layout threshold
 	return m.width >= tui.MinTerminalWidthFor3Pane
 }
@@ -780,8 +942,13 @@ func (m *Model) View() string {
 
 // viewMain renders the main view with header, list, and status line.
 func (m *Model) viewMain() string {
-	// Show empty state only if no error and no repos
-	if len(m.repos) == 0 && !m.loading && m.err == nil {
+	// When workspace panel is hidden, show only the right pane (task list + detail)
+	if !m.showWorkspace {
+		return m.viewUnifiedTUI()
+	}
+
+	// Show empty state only if no error, no repos, and no currentRepo
+	if len(m.displayRepos) == 0 && !m.loading && m.err == nil {
 		return m.viewEmptyState()
 	}
 
@@ -800,6 +967,24 @@ func (m *Model) viewMain() string {
 		combined := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 		panes = lipgloss.NewStyle().Height(paneHeight).Render(combined)
 	}
+
+	// Add unified status line at the bottom
+	statusLine := m.viewStatusLine()
+	return lipgloss.JoinVertical(lipgloss.Left, panes, statusLine)
+}
+
+// viewUnifiedTUI renders the unified TUI view when workspace panel is hidden.
+// Shows only the right pane (task list + detail panel) using full width.
+func (m *Model) viewUnifiedTUI() string {
+	paneHeight := m.paneContentHeight()
+	content := m.viewRightPaneContent()
+
+	// Use full content width (no left pane)
+	paneStyle := lipgloss.NewStyle().
+		Width(m.contentWidth()).
+		Height(paneHeight)
+
+	panes := paneStyle.Render(content)
 
 	// Add unified status line at the bottom
 	statusLine := m.viewStatusLine()
@@ -881,7 +1066,7 @@ func (m *Model) viewHeader() string {
 	title := textStyle.Render(titleText)
 
 	contentWidth := m.leftContentWidth()
-	countText := fmt.Sprintf("%d repos", len(m.repos))
+	countText := fmt.Sprintf("%d repos", len(m.displayRepos))
 
 	leftLen := lipgloss.Width(title)
 	rightLen := len(countText) // Plain text length before rendering
@@ -917,7 +1102,7 @@ func (m *Model) viewRepoList() string {
 
 	// Don't show "No repositories" message if there's an error
 	// (error is already displayed above)
-	if len(m.repos) == 0 {
+	if len(m.displayRepos) == 0 {
 		if m.err != nil {
 			return ""
 		}
@@ -925,11 +1110,11 @@ func (m *Model) viewRepoList() string {
 	}
 
 	var b strings.Builder
-	for i, repo := range m.repos {
+	for i, repo := range m.displayRepos {
 		lines := m.renderRepoItem(repo, i == m.cursor)
 		b.WriteString(lines)
 		b.WriteString("\n") // end of line 2
-		if i < len(m.repos)-1 {
+		if i < len(m.displayRepos)-1 {
 			b.WriteString("\n") // empty line 3 (spacing between items)
 		}
 	}
@@ -1046,7 +1231,8 @@ func (m *Model) viewStatusLine() string {
 
 // getStatusInfo returns status line info based on current focus.
 func (m *Model) getStatusInfo() tui.StatusLineInfo {
-	if m.leftFocused {
+	// When workspace panel is shown and left pane is focused
+	if m.showWorkspace && m.leftFocused {
 		// Workspace pane focused
 		return tui.StatusLineInfo{
 			FocusPane: tui.FocusPaneWorkspace,
@@ -1056,6 +1242,7 @@ func (m *Model) getStatusInfo() tui.StatusLineInfo {
 				{Key: "tab", Desc: "next"},
 				{Key: "a", Desc: "add"},
 				{Key: "d", Desc: "remove"},
+				{Key: "w", Desc: "hide ws"},
 				{Key: "q", Desc: "quit"},
 			},
 		}
@@ -1064,12 +1251,27 @@ func (m *Model) getStatusInfo() tui.StatusLineInfo {
 	// TUI pane focused - get info from active model
 	model, ok := m.models[m.activeRepo]
 	if !ok || model == nil {
-		return tui.StatusLineInfo{
+		info := tui.StatusLineInfo{
 			FocusPane: tui.FocusPaneTaskList,
 		}
+		// Add w key hint for showing workspace panel
+		if !m.showWorkspace {
+			info.KeyHints = []tui.KeyHint{
+				{Key: "w", Desc: "show ws"},
+				{Key: "q", Desc: "quit"},
+			}
+		}
+		return info
 	}
 
-	return model.GetStatusInfo()
+	// Get info from active model and add w key hint
+	info := model.GetStatusInfo()
+	// Prepend w key hint to show workspace panel
+	if !m.showWorkspace {
+		wHint := tui.KeyHint{Key: "w", Desc: "show ws"}
+		info.KeyHints = append([]tui.KeyHint{wHint}, info.KeyHints...)
+	}
+	return info
 }
 
 // paneContentHeight returns the height available for pane content.
@@ -1177,10 +1379,10 @@ func (m *Model) dialogWidth() int {
 
 // viewDeleteDialog renders the delete confirmation dialog.
 func (m *Model) viewDeleteDialog() string {
-	if m.deleteIndex >= len(m.repos) {
+	if m.deleteIndex >= len(m.displayRepos) {
 		return ""
 	}
-	repo := m.repos[m.deleteIndex]
+	repo := m.displayRepos[m.deleteIndex]
 
 	dialogWidth := m.dialogWidth()
 	bg := tui.Colors.Background

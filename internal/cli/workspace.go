@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/tui/workspace"
@@ -30,9 +32,12 @@ This command can be run from outside a git repository.`,
 	return cmd
 }
 
-// launchWorkspaceTUI launches the workspace TUI.
+// launchWorkspaceTUI launches the workspace TUI (with workspace panel visible).
+// This uses NewUnified but always shows the workspace panel.
 func launchWorkspaceTUI() error {
-	model := workspace.New()
+	cwd, _ := os.Getwd()
+	model := workspace.NewUnified(cwd)
+	model.SetShowWorkspace(true) // Force workspace panel visible
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	_, err := p.Run()
 	return err

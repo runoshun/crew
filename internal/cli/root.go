@@ -4,11 +4,12 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/runoshun/git-crew/v2/internal/app"
 	"github.com/runoshun/git-crew/v2/internal/domain"
-	"github.com/runoshun/git-crew/v2/internal/tui"
+	"github.com/runoshun/git-crew/v2/internal/tui/workspace"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +20,8 @@ const (
 	groupSession = "session"
 )
 
-// launchTUIFunc is a function variable for launching TUI, allowing it to be mocked in tests.
-var launchTUIFunc = launchTUI
+// launchUnifiedTUIFunc is a function variable for launching unified TUI, allowing it to be mocked in tests.
+var launchUnifiedTUIFunc = launchUnifiedTUI
 
 // NewRootCommand creates the root command for git-crew.
 // It receives the container for dependency injection and version for display.
@@ -115,8 +116,12 @@ Use --help-manager-auto to see the auto mode guide.`,
 			if managerAuto {
 				return showManagerAutoHelp(cmd.OutOrStdout(), cmd.ErrOrStderr(), cfg)
 			}
-			// Default: launch TUI
-			return launchTUIFunc(c)
+			// Default: launch unified TUI
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get current directory: %w", err)
+			}
+			return launchUnifiedTUIFunc(cwd)
 		},
 	}
 
@@ -273,9 +278,10 @@ Use --help-manager-auto to see the auto mode guide.`,
 	return root
 }
 
-// launchTUI launches the interactive TUI.
-func launchTUI(c *app.Container) error {
-	model := tui.New(c)
+// launchUnifiedTUI launches the unified TUI that works from any directory.
+// It detects if cwd is in a git repository and adjusts the view accordingly.
+func launchUnifiedTUI(cwd string) error {
+	model := workspace.NewUnified(cwd)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	_, err := p.Run()
 	return err
