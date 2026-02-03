@@ -564,6 +564,13 @@ func TestIntegration_WorkspaceList_NotGitRepo(t *testing.T) {
 	assert.Empty(t, strings.TrimSpace(out))
 }
 
+func TestIntegration_Version_NotGitRepo(t *testing.T) {
+	dir := t.TempDir() // Not a git repo
+
+	out := crewMust(t, dir, "--version")
+	assert.True(t, len(strings.TrimSpace(out)) > 0)
+}
+
 func TestIntegration_InvalidTaskID(t *testing.T) {
 	dir := testRepo(t)
 	crewMust(t, dir, "init")

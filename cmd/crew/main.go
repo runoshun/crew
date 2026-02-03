@@ -32,7 +32,7 @@ func run() error {
 	// Create dependency injection container
 	container, err := app.New(cwd)
 	if err != nil {
-		// Allow running without git repo for --version and --help
+		// Allow running without git repo for no-args/help/version/workspace
 		if errors.Is(err, domain.ErrNotGitRepository) {
 			return runWithoutContainer(err)
 		}
@@ -53,14 +53,17 @@ func runWithoutContainer(gitErr error) error {
 	if len(os.Args) == 1 {
 		return rootCmd.Execute()
 	}
-	arg := os.Args[1]
-	if arg == "--version" || arg == "-v" || arg == "version" ||
-		arg == "--help" || arg == "-h" || arg == "help" ||
-		strings.HasPrefix(arg, "--help-") ||
-		arg == "workspace" || arg == "ws" {
+	args := os.Args[1:]
+	firstArg := args[0]
+	if firstArg == "version" || firstArg == "help" || firstArg == "workspace" || firstArg == "ws" {
 		return rootCmd.Execute()
 	}
-
+	for _, arg := range args {
+		if arg == "--version" || arg == "-v" || arg == "--help" || arg == "-h" ||
+			strings.HasPrefix(arg, "--help-") {
+			return rootCmd.Execute()
+		}
+	}
 	// For other commands, return the git error
 	return gitErr
 }
