@@ -30,9 +30,14 @@ func TestCanRunWithoutGit(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "follow-up only",
+			name: "follow-up only allowed",
 			args: []string{"--follow-up"},
-			want: false,
+			want: true,
+		},
+		{
+			name: "follow-up with worker help",
+			args: []string{"--follow-up", "--help-worker"},
+			want: true,
 		},
 		{
 			name: "version flag",
@@ -80,7 +85,7 @@ func TestCanRunWithoutGit(t *testing.T) {
 	}
 }
 
-func TestRunWithoutContainer_NoArgsExecutes(t *testing.T) {
+func TestRunWithoutContainer_NoArgsLaunchesUnifiedTUI(t *testing.T) {
 	originalArgs := os.Args
 	originalRoot := newRootCommand
 	called := false
@@ -101,6 +106,6 @@ func TestRunWithoutContainer_NoArgsExecutes(t *testing.T) {
 		t.Fatalf("runWithoutContainer returned error: %v", err)
 	}
 	if !called {
-		t.Fatalf("expected root command to execute")
+		t.Fatalf("expected unified TUI launcher to be called")
 	}
 }

@@ -65,23 +65,11 @@ func canRunWithoutGit(args []string) bool {
 	if cli.IsNoRepoAllowedCommand(args[0]) {
 		return true
 	}
-	hasFollowUp := false
-	hasReviewerHelp := false
 	hasAllowedFlag := false
 	for _, arg := range args {
-		if arg == "--follow-up" {
-			hasFollowUp = true
-			continue
-		}
-		if cli.IsReviewerHelpFlag(arg) {
-			hasReviewerHelp = true
-		}
 		if cli.IsNoRepoAllowedFlag(arg) {
 			hasAllowedFlag = true
 		}
 	}
-	if hasFollowUp && !hasReviewerHelp {
-		return false
-	}
-	return hasAllowedFlag || hasReviewerHelp
+	return hasAllowedFlag
 }
